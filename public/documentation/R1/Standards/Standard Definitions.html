@@ -1,0 +1,54 @@
+<h1>Standard Definitions</h1>
+<p>
+    Standard definitions are Standards that serve as enumerations. You can define a Standard definition for an object or variable where it may be represented as a single value.
+</p>
+<pre>
+    <code>
+    color: CLR {
+        def red "RED"
+        def orange "ORANGE"
+        def yellow "YELLOW"
+        def green "GREEN"
+        def blue "BLUE"
+        def indigo "INDIGO"
+        def violet "VIOLET"
+    }
+    </code>
+</pre>
+<p>
+    Standard definitions are used by referencing them as a constraint in another Standard. A Standard representing a vehicle may have the color Standard definition to define the vehicle color like so.
+</p>
+<pre>
+    <code>
+    vehicle: VHL {
+        private vin string VN *
+        protected make string MK *
+        protected model string MDL *
+        protected type standard @CLR clr
+    }
+    </code>
+</pre>
+<p>
+    Now when a value is passed to the vehicle Standard for the color constraint, it must match one of the values defined in the color Standard definition.
+</p>
+
+<h2>Creating with Definitions</h2>
+<p>
+    When using a creation query and Standard definitions, you can use the values verbatim or reference the Standard. You reference Standard definitions in any type of query like this:
+</p>
+<pre>
+    <code>
+    #Create red vehicles
+    [vehicle] + ("VIN173", "Dodge", "Durango", red)
+    [vehicle] + ("VIN453", "Dodge", "Durango", "RED")
+    [vehicle] + ("VIN189", "Dodge", "Durango", @CLR.red)
+
+    #Delete red vehicles
+    [vehicle] - &lt;color CLR.red&gt;
+    [vehicle] - &lt;color "RED"&gt;
+    [vehicle] - &lt;color red&gt;
+
+    #Find 5 red vehicles
+    [vehicle] &lt;color @CLR.red, LIMIT 5&gt;
+    </code>
+</pre>

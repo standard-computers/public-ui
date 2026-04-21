@@ -1,0 +1,28 @@
+<h2>Extending Standards</h2>
+<p>
+    Like other coding languages for objects, you can extend a Standard to duplicate a table for separate use. You can extend a Standard by creating a new Standard with the Standard name and reference, followed by the Standard reference of the existing Standard prepended by an <code>@</code>.
+</p>
+<pre>
+    <code>
+    new_std: NSTD: @STDREF
+    </code>
+</pre>
+<p>
+    A classic example is vehicle applications and types.
+</p>
+<pre>
+    <code>
+    truck: TRCK: @VHL
+    </code>
+</pre>
+<p>
+    You can give your extended Standard additional properties by adding constraints. In the example below, <code>TRCK</code> will have the same constraints as <code>VHL</code> in addition to the  <code>owner</code> and <code>max_weight</code> constraint.
+</p>
+<pre>
+    <code>
+    truck: TRCK: @VHL {
+        protected owner standard @PER OWNR *
+        protected max_weight double MXWGHT
+    }
+    </code>
+</pre>

@@ -1,0 +1,17 @@
+<h1>Updating Records</h1>
+<p>
+    Update records in Standard by appending the constraint name and value to be updated to the table declaration. If you do not follow the constraint name/value with a query, all constraints will be updated to the given value.
+</p>
+
+<h2>Format</h2>
+<pre>
+    <code>
+    [std_name] CONST_NAME NEW_CONST_VAL ?&lt;FILTER_PARAMS...&gt;
+    </code>
+</pre>
+<p></p>
+<pre>
+    <code>
+    [vehicles] year 1984 &lt;color "Green", LIMIT 4&gt;
+    </code>
+</pre>

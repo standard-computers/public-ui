@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Setup Public UI</title>
+        <meta name="HandheldFriendly" content="True">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="robots" content="index, follow">
+        <link href="/style.css" rel="stylesheet"/>
+        <link href="/root.css" rel="stylesheet"/>
+        <link href="/services.css" rel="stylesheet"/>
+    </head>
+    <body>
+        <main>
+            <div class="padded center guttered">
+                <form id="login-input" method="POST" action="/setup">
+                    <h1 class="padded large-margin-top large-margin-bottom">Welcome!</h1>
+                    {{#if error}}
+                    <div class="error padded">{{error}}</div>
+                    {{/if}}
+                    <div class="padded align-left">
+                        <label for="endpoint" class="margin-bottom">Device Endpoint</label>
+                        <p>
+                            <em>Only change if custom setup</em>
+                        </p>
+                        <input type="text" name="endpoint" id="endpoint" value="{{endpoint}}"/>
+                    </div>
+                    <div class="padded align-left">
+                        <label for="device-key" class="margin-bottom">Device Key</label>
+                        <p>
+                            <em>Device Chit Token from Setup</em>
+                        </p>
+                        <input type="text" name="device-key" id="device-key" value="{{deviceKey}}"/>
+                    </div>
+                    <div class="padded align-left">
+                        <label for="mapbox-key" class="margin-bottom">Mapbox Key</label>
+                        <p>
+                            <em>Mapbox public access token for Maps</em>
+                        </p>
+                        <input type="text" name="mapbox-key" id="mapbox-key" value="{{mapboxKey}}"/>
+                    </div>
+                    <div class="padded">
+                        <button type="submit" class="fat primary fill hover-zoom hover-shadowed">Connect</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </body>
+</html>

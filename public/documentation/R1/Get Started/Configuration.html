@@ -1,0 +1,107 @@
+<h1>Configuration</h1>
+
+<h4>Default Config</h4>
+<pre>
+    <code>
+    name: standard-c1
+    version: 1.0
+    master: true
+    server_port: 9002
+    server_bind_address: 0.0.0.0
+    mode: client
+    relay: relay.standardcomputers.net
+    gui_host: standard.local
+    nodes: []
+    conversational: true
+    voice: en_GB-northern_english_male-medium
+    model: standard
+    sms: true
+    email: true
+    spoken: true
+    remote_changes: true
+    release_cadence: 86400
+    indexing_cadence: 21600
+    relay_response_timeout: 30
+    </code>
+</pre>
+
+<h3>Properties</h3>
+<ul>
+    <li>
+        <code>name</code> — Device hostname. Hostname naming conventions.
+    </li>
+    <li>
+        <code>version</code> — Don't change; Standard Parser and Compiler version.
+    </li>
+    <li>
+        <code>server_port</code> — Web socket port clients connect to. Default <code>9002</code>
+    </li>
+    <li>
+        <code>server_bind_address</code> — Default <code>0.0.0.0</code>
+    </li>
+    <li>
+        <code>mode</code> — Options are <code>relay</code>, <code>server</code>, or <code>client</code>.
+    </li>
+    <li>
+        <code>relay</code> — URL of a Standard System in relay mode. Default is <code>relay.standardcomputers.net</code>. Do not include http(s)/www.
+    </li>
+    <li>
+        <code>gui_host</code> — GUI or Public UI address. Default is <code>standard.local</code>
+    </li>
+    <li>
+        <code>nodes</code> — List of child nodes as IP addresses
+    </li>
+    <li>
+        <code>conversational</code> — If true, enable conversational AI
+    </li>
+    <li>
+        <code>voice</code> — Voice file for text-to-speech
+    </li>
+    <li>
+        <code>model</code> — AI Large Language Model. Default is <code>standard</code> or ollama model
+    </li>
+    <li>
+        <code>sms</code> — If true, enables SMS notifications
+    </li>
+    <li>
+        <code>email</code> — If true, enables email notifications
+    </li>
+    <li>
+        <code>spoken</code> — If true, enables spoken notifications via TTS
+    </li>
+    <li>
+        <code>remote_changes</code> — True or false; allow changes via relay. Default <code>true</code>
+    </li>
+    <li>
+        <code>release_cadence</code> — Time in seconds for bulletin updates. Default <code>86400</code> for 24 hours
+    </li>
+    <li>
+        <code>indexing_cadence</code> — Time in seconds for file indexing. Default <code>21600</code> for 6 hours
+    </li>
+    <li>
+        <code>relay_response_timeout</code> — Time in seconds for response timeout. Default <code>30</code>
+    </li>
+</ul>
+
+<h3>Relay Example</h3>
+<pre>
+    <code>
+    name: standard-relay-sv1
+    version: 1.0
+    master: true
+    port: 42069
+    mode: server
+    relay: relay.standardcomputers.net
+    nodes: []
+    conversational: true
+    voice: en_GB-northern_english_male-medium
+    model: standard
+    sms: false
+    email: false
+    spoken: false
+    remote_changes: false
+    release_cadence: 86400
+    indexing_cadence: 21600
+    relay_response_timeout: 30
+    </code>
+</pre>

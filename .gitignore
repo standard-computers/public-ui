@@ -1,0 +1,9 @@
+node_modules/
+npm-debug.log
+.DS_Store
+.env
+.idea/
+dist/
+private/
+user_data/
+*.log

@@ -1,0 +1,47 @@
+<h1>Standards as Constraints</h1>
+<p>
+    In other databases or languages, you are able to join properties or perform aggregations. We can do this in Standard by creating a constraint of type <code>standard</code>.
+</p>
+<pre>
+    <code>
+    truck: TRCK: @VHL {
+        protected owner standard @PER OWNR *
+        protected max_weight double MXWGHT
+    }
+    </code>
+</pre>
+<p>
+    Now when accessing the <code>owner</code> constraint, you can access it like <code>@USR</code> or <code>OWNR</code>. When this record is saved, the constraint value is the record id of the parent Standard record.
+</p>
+<pre>
+    <code>
+    #Get Trucks where vehicle model is 'Tesla', limit 1
+    foundTruck [TRCK] &lt;VHL.MK "Tesla" LIMIT 1&gt;
+
+    #Prints truck owner's first name
+    print foundTruck.OWNR.FNAME
+
+    #Also prints truck owner's first name
+    print foundTruck.owner.firstname
+
+    #again
+    print foundTruck.USR.firstname
+    </code>
+</pre>
+<p>
+    If your Standard references the same Standard in more than one constraint, Standard will select the first constraint that uses that Standard if accessed that way.
+</p>
+<pre>
+    <code>
+    truck: TRCK: @VHL {
+        protected owner standard @PER OWNR *
+        protected driver standard @PER DRVR *
+    }
+
+    #Ini empty object
+    truck @TRCK
+
+    print truck PER firstname #Will only ever print the owner's firstname
+    print truck driver firstname #Now we print driver's firstname
+    </code>
+</pre>

@@ -1,0 +1,112 @@
+<h1>Conditions</h1>
+<p>
+    Standard uses boolean logic to evaluate conditions. This means triggering of logic is predicated on a <code>true</code> or <code>false</code> return.
+</p>
+<pre>
+    <code>
+    price 5
+    print (price == 5) #Prints true
+    print (price = 5) #Prints true
+    print (price &lt; 5) #Prints false
+    print (price &gt; 5) #Prints false
+    print (price &gt;= 5) #Prints true
+    </code>
+</pre>
+<p>
+    <strong>If-equals short-hand</strong>
+</p>
+<p>
+    Since Standard does not use <code>=</code> to set variables to value, you can also exclude it when checking value equality.
+</p>
+<p>
+    <strong>Note</strong>: This is for checking equality of values. When comparing two variables using <code>==</code>, the memory addresses are compared.
+</p>
+<pre>
+    <code>
+    print (p 5) #Prints true
+    print (p 7) #Prints false
+
+    f1 7
+    f2 7
+
+    print (f1 f2) #Prints true, uses euqlas-short-hand
+    print (f1 == f2) #Prints false, values at different addresses
+    </code>
+</pre>
+
+<h2>If Conditions</h2>
+<p>
+    If, if-else, and else-if conditions will be the core of the logic your programs will perform.
+</p>
+<h3>If</h3>
+<p>
+    A simple if condition follows <code>if: ARGS {...}</code> where <code>...</code> is the suceeding arguments to be processed if the condition is met.
+</p>
+<pre>
+    <code>
+    if: 7 &gt; 5 {
+        print "Duh!"
+    }
+    </code>
+</pre>
+
+<h3>If-else</h3>
+<p>
+    If the first condition is not met and another condition should be checked, then use if-else to start a condition tree. If-else will follow the <em>if</em> struture but will be suceeded by <code>...else: ARGS {...}</code>.
+</p>
+<pre>
+    <code>
+    in number
+
+    if: number &gt; 5 {
+
+        print "Nice, more than 5 is great!"
+    } else: number &lt; 0 {
+
+        print "Number should be more than 0!"
+    }
+    </code>
+</pre>
+<p>
+    <strong>Short Hand</strong>
+</p>
+<p>
+    When using if-else conditions and the else will have no arguments, simply exclude <code>else</code>.
+</p>
+<pre>
+    <code>
+    if: 5 &lt; 7 {
+        print "5 is less than 7! YAY!"
+    }:{
+        print "Your computer can't do math!"
+    }
+    </code>
+</pre>
+
+<h2>Boolean Operators</h2>
+<p>
+    To build more complex conditions, you can use <code>and</code>, <code>or</code>, <code>&amp;</code>, <code>&amp;&amp;</code>, <code>|</code>, <code>||</code>.
+</p>
+<pre>
+    <code>
+    in username "Username: "
+    in psswd "Password: "
+
+    if: username "" and psswd "" {
+        print "Welcome in!"
+    }:{
+        print "Denied"
+    }
+    </code>
+</pre>
+
+<h2>Negation</h2>
+<p>
+    If you have a boolean value, prepend the value or variable with <code>!</code> to negate.
+</p>
+<pre>
+    <code>
+    bool true
+    print !bool #Prints false
+    </code>
+</pre>

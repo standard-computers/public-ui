@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Login</title>
+        <link href="/root.css" rel="stylesheet"/>
+        <link href="/style.css" rel="stylesheet"/>
+    </head>
+    <body>
+        <div class="padded guttered">
+            <h1>Login</h1>
+            <form method="POST" action="/login" id="login-form">
+                <label for="username">Username</label>
+                <input id="username" name="username" type="text" autocomplete="username" placeholder="Username" autofocus required/>
+                <button type="submit" id="click-me">Continue</button>
+                {{#if error}}
+                <div class="error" id="login-error">{{error}}</div>
+                {{/if}}
+                <div id="retry-status" class="error" style="display:none"></div>
+            </form>
+        </div>
+        <script>
+        !function(){
+            let e=document.cookie.match(/(?:^|;\s*)loginUsername=([^;]+)/);
+            if(!e)return;
+            try{
+                let t=decodeURIComponent(e[1]),
+                    n=document.getElementById("username"),
+                    o=document.getElementById("login-form"),
+                    r=document.getElementById("click-me"),
+                    i=document.getElementById("login-error"),
+                    a=document.getElementById("retry-status");
+                if(!t||!n||!o||!r)return;
+                n.value=t;
+                if(!i){
+                    r.click();
+                    return;
+                }
+                let d=30;
+                if(a){
+                    a.style.display="block";
+                    a.textContent=`${i.textContent} Retrying in ${d} seconds...`;
+                }
+                let s=setInterval(function(){
+                    d-=1;
+                    if(!a)return;
+                    if(d>0){
+                        a.textContent=`${i.textContent} Retrying in ${d} seconds...`;
+                        return;
+                    }
+                    clearInterval(s);
+                },1e3);
+                setTimeout(function(){
+                    if(o.requestSubmit){
+                        o.requestSubmit();
+                        return;
+                    }
+                    r.click();
+                },3e4);
+            }catch(l){}
+        }();
+        </script>
+    </body>
+</html>

@@ -1,0 +1,192 @@
+{
+    "version": "1",
+    "modified": "April 2026",
+    "1": {
+        "name": "Get Started",
+        "icon": "get-started.svg",
+        "files": [
+            {
+                "name": "Get Started",
+                "login": false
+            },
+            {
+                "name": "Install on Linux",
+                "login": true
+            },
+            {
+                "name": "Install on Windows",
+                "login": true
+            },
+            {
+                "name": "Configuration",
+                "login": true
+            },
+            {
+                "name": "Commands",
+                "login": false
+            }
+        ]
+    },
+    "2": {
+        "name": "Infrastructure",
+        "icon": "infrastructure.svg",
+        "files": [
+            {
+                "name": "Relay",
+                "login": false
+            },
+            {
+                "name": "Bulletin",
+                "login": false
+            },
+            {
+                "name": "Bulletin Specs",
+                "login": false
+            }
+        ]
+    },
+    "3": {
+        "name": "Authentication",
+        "icon": "authentication.svg",
+        "files": [
+            {
+                "name": "Chits",
+                "login": false
+            },
+            {
+                "name": "License Plate Nonce",
+                "login": false
+            }
+        ]
+    },
+    "4": {
+        "name": "Standards",
+        "icon": "standards.svg",
+        "files": [
+            {
+                "name": "Standards",
+                "login": false
+            },
+            {
+                "name": "Constraints",
+                "login": false
+            },
+            {
+                "name": "Extending Standards",
+                "login": false
+            },
+            {
+                "name": "Standards as Constraints",
+                "login": false
+            },
+            {
+                "name": "Standard Definitions",
+                "login": false
+            }
+        ]
+    },
+    "5": {
+        "name": "Records",
+        "icon": "records.svg",
+        "files": [
+            {
+                "name": "Records",
+                "login": false
+            },
+            {
+                "name": "In-Memory",
+                "login": false
+            },
+            {
+                "name": "Finding",
+                "login": false
+            },
+            {
+                "name": "Sorting",
+                "login": false
+            },
+            {
+                "name": "Updating",
+                "login": false
+            },
+            {
+                "name": "Deleting",
+                "login": false
+            },
+            {
+                "name": "Importing and Exporting",
+                "login": false
+            }
+        ]
+    },
+    "6": {
+        "name": "Code",
+        "icon": "code.svg",
+        "files": [
+            {
+                "name": "Variables & Types",
+                "login": false
+            },
+            {
+                "name": "Operators",
+                "login": false
+            },
+            {
+                "name": "Conditions",
+                "login": false
+            },
+            {
+                "name": "Loops",
+                "login": false
+            },
+            {
+                "name": "Functions",
+                "login": false
+            },
+            {
+                "name": "First Run",
+                "login": false
+            }
+        ]
+    },
+    "7": {
+        "name": "Functionality",
+        "icon": "functionality.svg",
+        "files": [
+            {
+                "name": "Functionality",
+                "login": false
+            },
+            {
+                "name": "Search",
+                "login": false
+            },
+            {
+                "name": "Files",
+                "login": false
+            },
+            {
+                "name": "Intelligence",
+                "login": false
+            },
+            {
+                "name": "Database",
+                "login": false
+            }
+        ]
+    },
+    "8": {
+        "name": "Interfaces",
+        "icon": "interfaces.svg",
+        "files": [
+            {
+                "name": "Secured Websocket",
+                "login": false
+            },
+            {
+                "name": "Node GUI",
+                "login": false
+            }
+        ]
+    }
+}

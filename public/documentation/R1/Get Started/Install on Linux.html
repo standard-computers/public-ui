@@ -1,0 +1,30 @@
+<h1>Installing the Standard System</h1>
+
+<h2>Linux</h2>
+<p>
+    If you're running a relay or running the Standard System on or as a server, Linux is the best choice. Download the Linux installer <a href="https://standardcomputers.net/downloads/linux">here</a> or continue with the CLI installation below.
+</p>
+
+<strong>Install Key</strong>
+<pre>
+    <code>
+    curl -fsSL https://standardcomputers.net/downloads/standardcomputers.gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/standardcomputers.gpg
+    </code>
+</pre>
+
+<strong>Add Repo</strong>
+<pre>
+    <code>
+    echo "deb [signed-by=/usr/share/keyrings/standardcomputers.gpg] https://standardcomputers.net/repo stable main" \
+  | sudo tee /etc/apt/sources.list.d/standardcomputers.list
+    </code>
+</pre>
+
+<strong>Install</strong>
+<pre>
+    <code>
+    sudo apt update
+    sudo apt install standard
+    </code>
+</pre>

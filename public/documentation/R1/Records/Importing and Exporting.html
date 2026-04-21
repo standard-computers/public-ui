@@ -1,0 +1,31 @@
+<h1>Importing and Exporting Records</h1>
+<p>
+    Importing, exporting, and converting data has always been a necessary function of client applications. Standard moves this to the backend as it has direct access to the data.
+</p>
+<p>
+    In other words, these same simple queries can run as the API for your app or Standard code by returning results as JSON, XML, and CSV.
+</p>
+
+<h2>Importing from Disk</h2>
+<p>
+    The import query can import records to a Standard provided the file
+    location. This query can auto-upload JSON, XML, and CSV.
+</p>
+<pre>
+    <code>
+    [std_name or STD_REF] &lt;&lt; "[PATH_TO_DIR]"
+    </code>
+</pre>
+
+<h2>Exporting to Disk</h2>
+<pre>
+    <code>
+    [std_name or STD_REF] &gt;&gt; "[PATH_TO_DIR]"
+    </code>
+</pre>
+<p>Export all vehicles like so :)</p>
+<pre>
+    <code>
+    [vehicle] &gt;&gt; "/home/JohnDoe/Downloads/vehicles.csv"
+    </code>
+</pre>

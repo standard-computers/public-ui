@@ -1,0 +1,59 @@
+<h1>Bulletin Packaging Specifications</h1>
+<p>
+    Bulletin files have the extension <em>STLX</em> that is downloaded by connected Standard Systems as update instructions. The file should begin with parent object <code>package {…}</code>. At the beginning of this object we specify metadata about this bulletin that serves to verify its authenticity.
+</p>
+<p>
+    <code>version</code> — Bulletin format version. Currently, <code>1</code>
+</p>
+<p>
+    <code>date</code> — As eight digits <code>MMDDYYY</code>
+</p>
+<p>
+    <code>match</code> — JWT.
+</p>
+
+<pre>
+    <code>
+    package {
+
+        version 1
+        date 10022025
+        match w9hqewpf7hqoerf7hoe8r7hfq8oeh7froqe
+
+        bulletin {
+
+            articles {
+                record_id_1 update
+                record_id_2 delete
+                record_id_3 move locations
+            }
+
+            locations {
+                record_id_99 update
+                record_id_98 update
+            }
+        }
+    }
+    </code>
+</pre>
+
+<p>
+    The metadata properties are followed by two blocks:
+    <code>bulletin {…}</code> and <code>software {…}</code>.
+</p>
+
+<h2>Bulletin Block</h2>
+<p>
+    The bulletin block defines the information to be updated. This includes Standard records like articles, locations, or images in the information database for search. The bulletin block may have later predefined blocks.
+</p>
+<p>
+    The succeeding bulletin blocks contain a list of Record IDs separated by new line characters. You may specify an action to take for the record by following the Record ID with one of three actions: <code>update</code>, <code>move</code>, or <code>delete</code>.
+</p>
+<p>
+    If no action is specified, <code>update</code> is used as the default action. This is used for new records. If <code>move</code> is specified, follow the action with the name of the Standard table the record should be moved to.
+</p>
+<p>
+    <em>
+        You can maintain a block for each Standard table if you are using a custom relay. The block name will be the name of the Standard.
+    </em>
+</p>

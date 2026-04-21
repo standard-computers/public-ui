@@ -1,0 +1,25 @@
+<h1>Standards</h1>
+<p>
+    Standards are the core of the Standard System. All data is saved, recorded, or logged using a Standard. If you save a file on your Standard System, there is a <em>file</em> Standard where all files are logged for faster search.
+</p>
+<p>
+    A Standard is a database table construct that sets the Standard for how data should represent an object. When creating a Standard, save the content with the file extension <code>.stds</code>. Each Standard requires its own file. The Standard's name and file name must match.
+</p>
+<p><em>Starter Example</em></p>
+<pre>
+    <code>
+    vehicle: VHL {
+        private vin string:36! VN *
+        protected make string MK *
+        protected model string MDL *
+    }
+    </code>
+</pre>
+<p>
+    A Standard should always start with the <code>standard_name: STDREF { ... }</code>. Standards will typically be referenced by the standard reference. Standard’s columns, variables, or properties are called constraints and go inside the brackets. Prepend a Standard's name with <code>!</code> to enable change history.
+</p>
+
+<h2>Listing Standards</h2>
+<p>
+    To list Standards, run <code>stds</code> or <code>standards</code>. To view a specific Standard, use <code>stds</code> or <code>standards</code> followed by the Standard name (not the Standard reference). Many web apps and client applications communicate with JSON. Append the standards command with <code>json</code> to view a Standard as JSON.
+</p>

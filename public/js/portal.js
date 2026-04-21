@@ -1,0 +1,834 @@
+function showInterfaces() {
+    if (document.getElementById("interface-shortcuts")) {
+        const container = document.getElementById("interface-shortcuts");
+        if (!container) {
+            console.warn(`[animateInterfacesIn] container #${containerId} not found`);
+            return;
+        }
+        const icons = Array.from(container.querySelectorAll(".interface-icon"));
+        container.classList.remove("none");
+        container.style.setProperty("display", "block", "important");
+        requestAnimationFrame(() => {
+            for (const el of icons) {
+                el.style.setProperty("opacity", "0", "important");
+                el.style.setProperty("transform", "translateY(16px) scale(0.95)", "important");
+                el.style.setProperty("filter", "blur(2px)", "important");
+                el.style.setProperty("transition", "opacity 260ms ease, transform 260ms cubic-bezier(.2,.8,.2,1), filter 260ms ease", "important");
+                el.style.setProperty("display", "inline-block", "important");
+                el.style.setProperty("will-change", "opacity, transform, filter", "important");
+            }
+            requestAnimationFrame(() => {
+                icons.forEach((el, i) => {
+                    setTimeout(() => {
+                        el.style.setProperty("opacity", "1", "important");
+                        el.style.setProperty("transform", "translateY(0) scale(1)", "important");
+                        el.style.setProperty("filter", "blur(0)", "important");
+                    }, i * 70);
+                });
+            });
+        });
+    }
+}
+
+function prefersSvgSearchIcons() {
+    return window.StandardUI?.prefersSvgIcons?.() !== false;
+}
+
+function getSearchResultIconMarkup(portal = {}) {
+    const primaryRecordMatch = Array.isArray(portal?.recordMatches) ? portal.recordMatches[0] : null;
+    if (primaryRecordMatch?.command === "files") {
+        const fileIconPath = window.StandardFiles?.getFileTypeIconPath?.(primaryRecordMatch.record);
+        if (fileIconPath) return fileIconPath;
+    }
+    if (prefersSvgSearchIcons()) {
+        return portal.svg_icon || portal.icon || "";
+    }
+    return portal.icon || portal.svg_icon || "";
+}
+
+function buildSearchResultIcon(portal = {}) {
+    const iconMarkup = `${getSearchResultIconMarkup(portal) || ""}`.trim();
+    if (!iconMarkup) return null;
+    if (iconMarkup.startsWith("/") || iconMarkup.startsWith("https")) {
+        const image = document.createElement("img");
+        image.src = iconMarkup;
+        image.alt = portal?.title || "Portal";
+        image.className = "search-result-icon-image";
+        return image;
+    }
+    const wrapper = document.createElement("div");
+    wrapper.className = "search-result-icon-svg";
+    wrapper.innerHTML = iconMarkup;
+    const svg = wrapper.querySelector("svg");
+    if (svg) {
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("focusable", "false");
+    }
+    return wrapper;
+}
+
+window.StandardRecordSearch = window.StandardRecordSearch || (() => {
+    const NOTE_CONTENT_PREFIX = "__STD_NOTE_B64__:";
+    const CACHE_INTERFACE = "com.standard.settings";
+    const CACHE_KEY = "search-records";
+    const COMMAND_CONFIGS = [
+        {command: "[alarms]", key: "alarms", label: "alarms", serviceId: "com.standard.alarms", portalIndex: 0},
+        {command: "[categories]", key: "categories", label: "categories", serviceId: "com.standard.calendar", portalIndex: 1},
+        {command: "[contacts]", key: "contacts", label: "contacts", serviceId: "com.standard.contacts", portalIndex: 0},
+        {command: "[events]", key: "events", label: "events", serviceId: "com.standard.calendar", portalIndex: 0},
+        {command: "[files]", key: "files", label: "files", serviceId: "com.standard.files", portalIndex: 0},
+        {command: "[notes]", key: "notes", label: "notes", serviceId: "com.standard.notes", portalIndex: 0},
+        {command: "[user]", key: "user", label: "user", serviceId: "com.standard.settings", portalIndex: 0}
+    ];
+    let cacheState = {updatedAt: "", records: {}};
+    let cacheLoaded = false;
+
+    const createCacheEndpoint = ({serviceId = CACHE_INTERFACE, key = CACHE_KEY, format = "json"} = {}) => {
+        const params = new URLSearchParams();
+        if (format) params.set("format", format);
+        return `/api/cache/${encodeURIComponent(serviceId)}/${encodeURIComponent(key)}${params.toString() ? `?${params.toString()}` : ""}`;
+    };
+    const readCache = async () => {
+        const response = await fetch(createCacheEndpoint(), {cache: "no-store"});
+        if (response.status === 404) return null;
+        if (!response.ok) throw new Error(`Failed to read record cache (${response.status})`);
+        return response.json();
+    };
+    const writeCache = async (payload) => {
+        const response = await fetch(createCacheEndpoint(), {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(payload ?? {}, null, 2)
+        });
+        if (!response.ok) throw new Error(`Failed to write record cache (${response.status})`);
+        return response.json();
+    };
+    const setCacheState = (nextState = {}) => {
+        cacheState = {
+            updatedAt: nextState?.updatedAt || "",
+            records: nextState?.records && typeof nextState.records === "object" ? nextState.records : {}
+        };
+        cacheLoaded = true;
+        document.dispatchEvent(new CustomEvent("standard-record-cache-updated", {detail: cacheState}));
+        return cacheState;
+    };
+    const normalizeRecord = (record = {}) => {
+        if (!record || typeof record !== "object" || Array.isArray(record)) return null;
+        if (record.id === undefined || record.id === null || `${record.id}`.trim() === "") return null;
+        return {...record};
+    };
+    const decodeNoteContent = (value = "") => {
+        const raw = String(value || "");
+        if (!raw.startsWith(NOTE_CONTENT_PREFIX)) return raw;
+        try {
+            const binary = atob(raw.slice(NOTE_CONTENT_PREFIX.length));
+            const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+            return new TextDecoder().decode(bytes);
+        } catch (_) {
+            return "";
+        }
+    };
+    const stripMarkupToPreview = (value = "") => {
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = String(value || "");
+        return (wrapper.textContent || wrapper.innerText || "").replace(/\s+/g, " ").trim();
+    };
+    const truncatePreview = (value = "", maxLength = 120) => {
+        const normalized = `${value || ""}`.trim();
+        if (normalized.length <= maxLength) return normalized;
+        return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
+    };
+    const mergeRecordsById = (existingRecords = [], nextRecords = []) => {
+        const existingById = new Map(
+            (Array.isArray(existingRecords) ? existingRecords : [])
+                .map(normalizeRecord)
+                .filter(Boolean)
+                .map(record => [`${record.id}`, record])
+        );
+        const merged = [];
+        (Array.isArray(nextRecords) ? nextRecords : []).forEach((rawRecord) => {
+            const normalizedRecord = normalizeRecord(rawRecord);
+            if (!normalizedRecord) return;
+            const recordId = `${normalizedRecord.id}`;
+            merged.push({...existingById.get(recordId), ...normalizedRecord});
+            existingById.delete(recordId);
+        });
+        return merged;
+    };
+    const getCommandRecords = (key = "") => {
+        const records = cacheState?.records?.[key];
+        return Array.isArray(records) ? records : [];
+    };
+    const resolveResponseRecords = (config, response) => {
+        if (Array.isArray(response)) return response;
+        if (!response || typeof response !== "object") return null;
+        if (Array.isArray(response?.[config.key])) return response[config.key];
+        const firstArrayEntry = Object.values(response).find(Array.isArray);
+        return Array.isArray(firstArrayEntry) ? firstArrayEntry : null;
+    };
+    const collectSearchableValues = (value, collector = [], seen = new WeakSet()) => {
+        if (value === null || value === undefined) return collector;
+        if (typeof value === "string") {
+            const normalized = value.replace(/\s+/g, " ").trim();
+            if (normalized) collector.push(normalized);
+            return collector;
+        }
+        if (typeof value === "number" || typeof value === "boolean") {
+            collector.push(`${value}`);
+            return collector;
+        }
+        if (Array.isArray(value)) {
+            value.forEach(entry => collectSearchableValues(entry, collector, seen));
+            return collector;
+        }
+        if (typeof value === "object") {
+            if (seen.has(value)) return collector;
+            seen.add(value);
+            Object.values(value).forEach(entry => collectSearchableValues(entry, collector, seen));
+        }
+        return collector;
+    };
+    const buildRecordLabel = (record = {}) => {
+        const preferredKeys = ["name", "title", "firstname", "lastname", "displayName", "username", "timestamp", "created", "path", "email", "phone"];
+        const parts = preferredKeys
+            .map(key => record?.[key])
+            .filter(value => value !== undefined && value !== null && `${value}`.trim() !== "")
+            .slice(0, 3)
+            .map(value => `${value}`.trim());
+        if (parts.length) return parts.join(" ");
+        const firstValue = collectSearchableValues(record).find(Boolean);
+        return firstValue || `Record ${record?.id ?? ""}`.trim();
+    };
+    const buildRecordPrimaryLabel = (record = {}) => {
+        const firstName = `${record?.firstname || ""}`.trim();
+        const lastName = `${record?.lastname || ""}`.trim();
+        const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+        if (fullName) return fullName;
+        const preferredKeys = ["name", "title", "filename", "displayName", "username"];
+        for (const key of preferredKeys) {
+            const value = `${record?.[key] || ""}`.trim();
+            if (value) return value;
+        }
+        const pathValue = `${record?.path || record?.file || ""}`.trim();
+        if (pathValue) {
+            const pathSegments = pathValue.split("/").filter(Boolean);
+            return pathSegments[pathSegments.length - 1] || pathValue;
+        }
+        return buildRecordLabel(record);
+    };
+    const buildRecordSecondaryLabel = (record = {}, primaryLabel = "") => {
+        if (`${record?.content || ""}`.trim()) {
+            const decodedContent = truncatePreview(stripMarkupToPreview(decodeNoteContent(record.content)));
+            if (decodedContent && decodedContent !== primaryLabel) return decodedContent;
+        }
+        const candidates = [
+            record?.path,
+            record?.email,
+            record?.phone,
+            record?.timestamp,
+            record?.created,
+            record?.username,
+            record?.content,
+            record?.description
+        ];
+        for (const candidate of candidates) {
+            const value = `${candidate || ""}`.replace(/\s+/g, " ").trim();
+            if (value && value !== primaryLabel) return value;
+        }
+        const otherValues = collectSearchableValues(record).filter(value => value !== primaryLabel);
+        return otherValues.find(Boolean) || "";
+    };
+    const getPortalConfigs = (portal = {}) => COMMAND_CONFIGS.filter(config => {
+        return config.serviceId === portal?.serviceId && (config.portalIndex ?? 0) === (portal?.portalIndex ?? 0);
+    });
+
+    return {
+        configs: COMMAND_CONFIGS,
+        async loadCache({force = false} = {}) {
+            if (cacheLoaded && !force) return cacheState;
+            try {
+                const cachedPayload = await readCache();
+                return setCacheState(cachedPayload || {updatedAt: "", records: {}});
+            } catch (error) {
+                console.error("Failed to load search records cache:", error);
+                return setCacheState(cacheState);
+            }
+        },
+        async refresh({onProgress} = {}) {
+            await this.loadCache();
+            const nextCacheRecords = {...(cacheState?.records || {})};
+            for (let index = 0; index < COMMAND_CONFIGS.length; index += 1) {
+                const config = COMMAND_CONFIGS[index];
+                if (typeof onProgress === "function") {
+                    try {
+                        onProgress(index + 1, COMMAND_CONFIGS.length, config);
+                    } catch (_) {
+                    }
+                }
+                try {
+                    const response = await CLI.send(config.command);
+                    const resolvedRecords = resolveResponseRecords(config, response);
+                    if (Array.isArray(resolvedRecords)) {
+                        nextCacheRecords[config.key] = mergeRecordsById(nextCacheRecords[config.key], resolvedRecords);
+                    }
+                } catch (error) {
+                    console.error(`Failed to refresh ${config.command}:`, error);
+                }
+            }
+            const nextState = setCacheState({
+                updatedAt: new Date().toISOString(),
+                records: nextCacheRecords
+            });
+            try {
+                await writeCache(nextState);
+            } catch (error) {
+                console.error("Failed to persist search records cache:", error);
+            }
+            return nextState;
+        },
+        getCache() {
+            return cacheState;
+        },
+        hasPortalConfig(portal = {}) {
+            return getPortalConfigs(portal).length > 0;
+        },
+        getPortalMatches(portal = {}, query = "") {
+            const normalizedQuery = `${query || ""}`.trim().toLowerCase();
+            if (!normalizedQuery) return [];
+            const matches = [];
+            getPortalConfigs(portal).forEach((config) => {
+                getCommandRecords(config.key).forEach((record) => {
+                    const matchingValues = [...new Set(
+                        collectSearchableValues(record)
+                            .filter(value => value.toLowerCase().includes(normalizedQuery))
+                    )];
+                    if (!matchingValues.length) return;
+                    matches.push({
+                        command: config.key,
+                        id: record?.id,
+                        label: buildRecordLabel(record),
+                        primaryLabel: buildRecordPrimaryLabel(record),
+                        secondaryLabel: buildRecordSecondaryLabel(record, buildRecordPrimaryLabel(record)),
+                        values: matchingValues.slice(0, 3),
+                        record
+                    });
+                });
+            });
+            return matches.slice(0, 3);
+        }
+    };
+})();
+window.StandardRecordSearch.loadCache();
+
+function searchablePortals() {
+    const servicePortals = (modular.running || []).flatMap((service) => {
+        if (typeof service?.searchablePortals !== "function") {
+            return [];
+        }
+        return service.searchablePortals().map((portal) => ({
+            ...portal,
+            hints: Array.isArray(portal?.hints) ? portal.hints : []
+        }));
+    }).filter((portal) => {
+        return portal.hints.length > 0 || window.StandardRecordSearch?.hasPortalConfig?.(portal);
+    });
+
+    return [...servicePortals, {
+        serviceId: "interfaces",
+        portalIndex: 0,
+        title: "Interfaces",
+        hints: ["interfaces", "interface"],
+        icon: "/icons/interfaces/settings.png",
+        svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>`,
+        action: showInterfaces
+    }];
+}
+
+let activeSearchResultIndex = -1;
+
+function getSearchResultElements() {
+    return Array.from(document.querySelectorAll("#search-results .search-result"));
+}
+
+function syncActiveSearchResult({scrollIntoView = false} = {}) {
+    const results = getSearchResultElements();
+    results.forEach((element, index) => {
+        const isActive = index === activeSearchResultIndex;
+        element.dataset.active = isActive ? "true" : "false";
+        element.setAttribute("aria-selected", isActive ? "true" : "false");
+        element.style.backgroundColor = isActive ? "var(--secondary-bg)" : "";
+        element.style.boxShadow = isActive ? "var(--shadow)" : "";
+        element.style.transform = isActive ? "scale(1.02)" : "";
+        if (isActive && scrollIntoView) {
+            element.scrollIntoView({block: "nearest"});
+        }
+    });
+}
+
+function resetActiveSearchResult() {
+    activeSearchResultIndex = -1;
+    syncActiveSearchResult();
+}
+
+function setActiveSearchResult(index, options = {}) {
+    const results = getSearchResultElements();
+    if (!results.length) {
+        resetActiveSearchResult();
+        return;
+    }
+    const maxIndex = results.length - 1;
+    activeSearchResultIndex = Math.max(0, Math.min(index, maxIndex));
+    syncActiveSearchResult(options);
+}
+
+function moveActiveSearchResult(delta = 1) {
+    const results = getSearchResultElements();
+    if (!results.length) return;
+    if (activeSearchResultIndex < 0) {
+        setActiveSearchResult(delta > 0 ? 0 : results.length - 1, {scrollIntoView: true});
+        return;
+    }
+    const nextIndex = (activeSearchResultIndex + delta + results.length) % results.length;
+    setActiveSearchResult(nextIndex, {scrollIntoView: true});
+}
+
+function activateActiveSearchResult() {
+    const results = getSearchResultElements();
+    const activeElement = results[activeSearchResultIndex];
+    if (activeElement) {
+        activeElement.click();
+        return true;
+    }
+    return false;
+}
+
+function openPortal(portal) {
+    const primaryRecordMatch = Array.isArray(portal?.recordMatches) ? portal.recordMatches[0] : null;
+    if (primaryRecordMatch?.command === "notes") {
+        if (primaryRecordMatch?.record && typeof window.StandardNotes?.openNote === "function") {
+            window.StandardNotes.openNote(primaryRecordMatch.record);
+            return;
+        }
+    }
+    if (primaryRecordMatch?.command === "events") {
+        if (primaryRecordMatch?.record && typeof window.StandardCalendar?.openEvent === "function") {
+            window.StandardCalendar.openEvent(primaryRecordMatch.record);
+            return;
+        }
+    }
+    if (primaryRecordMatch?.command === "categories") {
+        if (typeof window.StandardCalendar?.openCategories === "function") {
+            window.StandardCalendar.openCategories();
+            return;
+        }
+    }
+    if (primaryRecordMatch?.command === "contacts") {
+        if (primaryRecordMatch?.record && typeof window.StandardContacts?.openContact === "function") {
+            window.StandardContacts.openContact(primaryRecordMatch.record);
+            return;
+        }
+    }
+    if (primaryRecordMatch?.command === "alarms") {
+        if (primaryRecordMatch?.record && typeof window.StandardAlarms?.openAlarm === "function") {
+            window.StandardAlarms.openAlarm(primaryRecordMatch.record);
+            return;
+        }
+    }
+    if (primaryRecordMatch?.command === "files") {
+        const filePath = `${primaryRecordMatch?.record?.path || ""}`.trim();
+        if (filePath && typeof window.StandardFiles?.openFilePath === "function") {
+            window.StandardFiles.openFilePath(filePath);
+            return;
+        }
+    }
+    if (typeof portal?.action === "function") {
+        portal.action();
+        return;
+    }
+    if (!portal?.serviceId) {
+        return;
+    }
+    if ((portal.portalIndex || 0) === 0) {
+        modular.start(portal.serviceId);
+    } else {
+        modular.show(portal.serviceId, portal.portalIndex);
+    }
+}
+
+function renderSearchResult(portal, matchingHint) {
+    const result = document.createElement("div");
+    result.className = "search-result pointer medium-margin-bottom block bordered radius small-shadowed hover-zoom hover-shadowed background-background padded";
+    result.setAttribute("role", "option");
+    result.setAttribute("aria-selected", "false");
+    const recordMatches = Array.isArray(portal?.recordMatches) ? portal.recordMatches : [];
+    const primaryRecordMatch = recordMatches[0] || null;
+
+    const icon = buildSearchResultIcon(portal);
+    if (icon) {
+        const iconContainer = document.createElement("div");
+        iconContainer.className = "search-result-icon";
+        iconContainer.append(icon);
+        result.append(iconContainer);
+    }
+
+    const body = document.createElement("div");
+    body.className = "search-result-body";
+
+    const title = document.createElement("div");
+    title.textContent = primaryRecordMatch?.primaryLabel || portal.title || "";
+    body.append(title);
+
+    if (recordMatches.length) {
+        const records = document.createElement("div");
+        records.className = "search-result-records faded";
+        const primaryLine = document.createElement("div");
+        primaryLine.textContent = primaryRecordMatch?.secondaryLabel || "";
+        if (primaryLine.textContent) records.append(primaryLine);
+        body.append(records);
+    }
+
+    if (matchingHint && !recordMatches.length) {
+        const hint = document.createElement("div");
+        hint.className = "faded no-events";
+        hint.textContent = `${matchingHint}`;
+        body.append(hint);
+    }
+
+    result.append(body);
+    result.onclick = () => {
+        openPortal(portal);
+        document.getElementById("search-box").value = "";
+        document.getElementById("search-results").empty();
+        resetActiveSearchResult();
+        document.getElementById("search-box").blur();
+    };
+    document.getElementById("search-results").append(result);
+}
+
+document.getElementById("search-box").addEventListener("keydown", event => {
+    if (event.key === "ArrowDown") {
+        event.preventDefault();
+        moveActiveSearchResult(1);
+        return;
+    }
+    if (event.key === "ArrowUp") {
+        event.preventDefault();
+        moveActiveSearchResult(-1);
+        return;
+    }
+    if (event.key === "Enter") {
+        if (activateActiveSearchResult()) {
+            event.preventDefault();
+        }
+        return;
+    }
+    if (event.key === "Escape") {
+        event.preventDefault();
+        event.target.blur();
+    }
+});
+
+function updateSearchResults() {
+    const searchStatus = document.getElementById("search-status");
+    const searchBox = document.getElementById("search-box");
+    const searchResults = document.getElementById("search-results");
+    searchStatus.isLoading();
+    const query = searchBox.value.trim().toLowerCase();
+    searchResults.empty();
+    if (!query) {
+        resetActiveSearchResult();
+        searchStatus.isLoading(false);
+        return;
+    }
+    const matchingPortals = searchablePortals().map((portal) => {
+        const recordMatches = window.StandardRecordSearch?.getPortalMatches?.(portal, query) || [];
+        const matchingHint = (portal.hints || []).find((hint) => hint.toLowerCase().includes(query));
+        const exactHint = (portal.hints || []).find((hint) => hint.toLowerCase() === query);
+        return {
+            portal: {...portal, recordMatches},
+            matchingHint,
+            exactHint,
+            hasMatch: Boolean(matchingHint) || recordMatches.length > 0
+        };
+    }).filter(({hasMatch}) => Boolean(hasMatch));
+
+    const exactMatch = matchingPortals.find(({exactHint}) => Boolean(exactHint));
+    if (exactMatch) {
+        openPortal(exactMatch.portal);
+        searchBox.value = "";
+        resetActiveSearchResult();
+        searchBox.blur();
+        searchStatus.isLoading(false);
+        return;
+    }
+    matchingPortals.forEach(({portal, matchingHint}) => {
+        renderSearchResult(portal, matchingHint);
+    });
+    if (matchingPortals.length) {
+        setActiveSearchResult(0);
+    } else {
+        resetActiveSearchResult();
+    }
+    searchStatus.isLoading(false);
+}
+
+document.getElementById("search-box").addEventListener("input", () => {
+    updateSearchResults();
+});
+function updateTime() {
+    const now = new Date();
+    let hours = now.getHours();
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const timeString = `${hours.toString()}:${minutes} ${ampm}`;
+    document.getElementById('live-time').innerText = timeString;
+}
+updateTime();
+setInterval(updateTime, 1000);
+function initGlobalFileDrop(onFiles) {
+    if (window.__stdGlobalFileDropInitialized) return;
+    window.__stdGlobalFileDropInitialized = true;
+    let dragDepth = 0;
+    function activate(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+        document.body.classList.add("drag-active");
+    }
+    function deactivate(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.body.classList.remove("drag-active");
+        dragDepth = 0;
+    }
+    document.addEventListener("dragenter", (e) => {
+        dragDepth++;
+        activate(e);
+    });
+    document.addEventListener("dragover", activate);
+    document.addEventListener("dragleave", (e) => {
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) deactivate(e);
+    });
+    document.addEventListener("drop", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length) {
+            onFiles(Array.from(dt.files));
+        }
+        deactivate(e);
+    });
+    window.addEventListener("dragover", (e) => e.preventDefault());
+    window.addEventListener("drop", (e) => e.preventDefault());
+}
+let globalDropUploadInFlight = false;
+initGlobalFileDrop(async (files) => {
+    if (globalDropUploadInFlight) {
+        modular.error("Another file upload is already in progress");
+        return;
+    }
+    const droppedFiles = Array.from(files || []);
+    if (!droppedFiles.length) return;
+    globalDropUploadInFlight = true;
+    try {
+        if (typeof window.StandardFilesUploadSelectedFiles === "function") {
+            await window.StandardFilesUploadSelectedFiles(droppedFiles);
+            return;
+        }
+        const defaultDirectory = String(modular?.working_directory || "Documents").trim().replace(/\\/g, "/").replace(/\/+$/, "").replace(/^\/+/, "") || "Documents";
+        for (const file of droppedFiles) {
+            const uploadUrl = `/api/upload?directory=${encodeURIComponent(defaultDirectory)}`;
+            if (typeof window.StandardUploads?.uploadFile === "function") {
+                const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
+                    label: `Uploading ${file.name || "file"}`
+                });
+                if (!response?.ok) {
+                    modular.error(`Upload failed (${response?.status || 0})`);
+                    return;
+                }
+            } else {
+                const formData = new FormData();
+                formData.append("file", file);
+                const res = await fetch(uploadUrl, {
+                    method: "POST",
+                    body: formData
+                });
+                if (!res.ok) {
+                    modular.error(`Upload failed (${res.status})`);
+                    return;
+                }
+            }
+        }
+        modular.refresh("com.standard.files");
+    } finally {
+        globalDropUploadInFlight = false;
+    }
+});
+let serviceWindowCache = [];
+function parkServiceWindows() {
+    const windows = Array.from(document.querySelectorAll('.draggable-window:not(.minimized)'));
+    if (!windows.length) return;
+    if (!serviceWindowCache.length) {
+        serviceWindowCache = windows.map(win => {
+            const rect = win.getBoundingClientRect();
+            return {
+                element: win, left: win.style.left || `${rect.left}px`, top: win.style.top || `${rect.top}px`
+            };
+        });
+    }
+    const margin = 16;
+    let leftTop = margin;
+    let rightTop = margin;
+    windows.forEach((win, index) => {
+        win.classList.add('service-window-parked');
+        const targetTop = index % 2 === 0 ? leftTop : rightTop;
+        const targetLeft = index % 2 === 0 ? margin : Math.max(margin, window.innerWidth - win.offsetWidth - margin);
+        win.style.top = `${targetTop}px`;
+        win.style.left = `${targetLeft}px`;
+        if (win.portal && typeof win.portal.minimize === "function") {
+            win.portal.minimize({left: win.style.left, top: win.style.top});
+        }
+        if (index % 2 === 0) {
+            leftTop += win.offsetHeight + margin;
+        } else {
+            rightTop += win.offsetHeight + margin;
+        }
+    });
+}
+function restoreServiceWindows() {
+    if (!serviceWindowCache.length) return;
+    serviceWindowCache.forEach(({element, left, top}) => {
+        if (!document.body.contains(element)) return;
+        if (element.portal && typeof element.portal.restoreFromMinimize === "function") {
+            element.portal.restoreFromMinimize();
+        } else {
+            element.classList.remove('minimized');
+            element.style.transform = 'scale(1)';
+            element.style.overflow = 'visible';
+        }
+        element.style.left = left;
+        element.style.top = top;
+        element.classList.remove('service-window-parked');
+    });
+    serviceWindowCache = [];
+}
+function getOpenPortalWindows() {
+    return Array.from(document.querySelectorAll(".draggable-window:not(.widget-window)"))
+        .filter(element => document.body.contains(element) && !element.classList.contains("minimized"))
+        .sort((a, b) => {
+            const aZ = Number.parseInt(window.getComputedStyle(a).zIndex, 10) || 0;
+            const bZ = Number.parseInt(window.getComputedStyle(b).zIndex, 10) || 0;
+            return aZ - bZ;
+        });
+}
+function focusSearchBoxForTyping() {
+    const searchBox = document.getElementById("search-box");
+    if (!searchBox) return null;
+    parkServiceWindows();
+    searchBox.focus();
+    return searchBox;
+}
+function getFocusedPortalSaveTool() {
+    const focusedWindow = document.querySelector(".draggable-window.window-focused:not(.widget-window)");
+    if (!focusedWindow) return null;
+    return focusedWindow.querySelector("[data-portal-tool-title='save'], [aria-label='Save'], [title='Save']");
+}
+document.addEventListener("keydown", function (e) {
+    const activeElement = document.activeElement;
+    const interactiveSelector = "input, textarea, button, select, [contenteditable='true'], [role='textbox']";
+    const interactiveFocused = activeElement?.matches?.(interactiveSelector);
+
+    if (e.ctrlKey && !e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "s") {
+        const saveTool = getFocusedPortalSaveTool();
+        e.preventDefault();
+        if (saveTool) {
+            saveTool.click();
+        } else {
+            modular.error("No save in this app");
+        }
+        return;
+    }
+
+    if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tileDirectionByKey = {
+            ArrowLeft: "left",
+            ArrowRight: "right",
+            ArrowUp: "top",
+            ArrowDown: "bottom"
+        };
+        const tileDirection = tileDirectionByKey[e.key];
+        if (tileDirection && !interactiveFocused) {
+            const focusedWindow = document.querySelector(".draggable-window.window-focused:not(.widget-window)");
+            if (focusedWindow?.portal && typeof focusedWindow.portal.tile === "function") {
+                e.preventDefault();
+                focusedWindow.portal.tile(tileDirection);
+                return;
+            }
+        }
+    }
+
+    if (e.shiftKey && e.key.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey && !e.altKey && !interactiveFocused) {
+        const focusedWindow = document.querySelector(".draggable-window.window-focused:not(.widget-window)");
+        if (focusedWindow?.portal && typeof focusedWindow.portal.hide === "function") {
+            e.preventDefault();
+            focusedWindow.portal.hide();
+            return;
+        }
+    }
+
+    if (e.shiftKey && e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.altKey && !interactiveFocused) {
+        const openPortalWindows = getOpenPortalWindows();
+        if (openPortalWindows.length) {
+            const focusedWindow = document.querySelector(".draggable-window.window-focused:not(.widget-window)");
+            const focusedIndex = openPortalWindows.indexOf(focusedWindow);
+            const nextWindow = openPortalWindows[(focusedIndex + 1 + openPortalWindows.length) % openPortalWindows.length];
+            if (nextWindow && typeof modular?.bringToFront === "function") {
+                e.preventDefault();
+                modular.bringToFront(nextWindow);
+                return;
+            }
+        }
+    }
+
+    if (e.ctrlKey && !e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "f") {
+        const searchBox = focusSearchBoxForTyping();
+        if (searchBox) {
+            e.preventDefault();
+        }
+        return;
+    }
+
+    if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || e.key === " ") {
+        return;
+    }
+    const actionable = activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA" || activeElement.tagName === "SELECT" || activeElement.isContentEditable);
+    if (!actionable) {
+        e.preventDefault();
+        const searchBox = focusSearchBoxForTyping();
+        if (!searchBox) return;
+        searchBox.value += e.key;
+        searchBox.dispatchEvent(new Event("input"));
+    }
+});
+document.getElementById("search-box")?.addEventListener("blur", restoreServiceWindows);
+document.querySelector(".status-indicator").popoutmenu([{
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>`,
+    label: "Refresh",
+    action: () => location.reload()
+}, {
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>`,
+    label: "Disconnect",
+    destructive: true,
+    action: () => {
+        confirmationDialogue({
+            title: "Disconnect",
+            content: "This will log you out of the standard user interface. Are you sure you want to disconnect?",
+            confirmation: () => {
+                window.location = "/logout";
+            }
+        });
+    }
+}]);

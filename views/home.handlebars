@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Standard Computer</title>
+        <meta name="HandheldFriendly" content="True">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="robots" content="index, follow">
+        <meta name="robots" content="index, follow">
+        <link href="/root.css" rel="stylesheet"/>
+        <link href="/style.css" rel="stylesheet"/>
+        <link href="/services.css" rel="stylesheet"/>
+        <link href="https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.css" rel="stylesheet">
+        <script src="https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.js"></script>
+        <script>
+            window.StandardRuntimeConfig = {
+                mapboxAccessToken: {{{mapboxAccessTokenJson}}}
+            };
+        </script>
+        <script src="/js/plastic.js" async></script>
+        <script src="/js/arc-001.js" async></script>
+        <script src="/js/modular.js" async></script>
+        <script src="/js/ui.js" async></script>
+        <script src="/js/services.js" async></script>
+        <script src="/js/widgets.js" async></script>
+        <script src="/js/portal.js" async></script>
+        <script src="/js/service-loader.js" defer></script>
+        <script src="/js/device-status.js" defer></script>
+    </head>
+    <body menu="master">
+        <div id="service-loader" class="service-loader hidden" aria-live="polite">
+            <div class="service-loader-card bordered radius shadowed">
+                <p id="service-loader-text" class="service-loader-text">Preparing services…</p>
+                <div class="service-loader-bar" aria-hidden="true">
+                    <div id="service-loader-bar" class="service-loader-bar-progress" style="width:0"></div>
+                </div>
+                <p id="service-loader-status" class="service-loader-status">0% complete</p>
+            </div>
+        </div>
+        <div id="cover"></div>
+        <header>
+            <button class="plain float-right" id="launch-interfaces" alt-sync="I" title="Interfaces">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>
+            </button>
+            <div class="bordered radius padded inline shadowed pointer blurred" id="live-time">3:00 AM</div>
+            <div id="dynamic-options"></div>
+        </header>
+        <div class="bordered radius status-indicator status-connected" data-status="connected">
+            <div class="status-dot" id="device-status-dot"></div>
+            <span id="device-status">Connected</span>
+        </div>
+        <main>
+            <div class="center-center float" id="search-box-container">
+                <div class="float-left block-loader" id="search-status"></div>
+                <input class="undecorated center large" type="text" placeholder="Start Typing" id="search-box" autofocus/>
+                <div id="interface-shortcuts" class="center">
+                    <div class="interface-icon inline segue" title="Alarms" service="com.standard.alarms">
+                        <img src="/icons/interfaces/alarms.png" alt="Alarms"/>
+                    </div>
+                </div>
+                <div id="search-results" class="small-margin-top large-padding padding-top"></div>
+            </div>
+        </main>
+    </body>
+</html>
