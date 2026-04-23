@@ -26,6 +26,9 @@
     if(user_theme != null){
         ui_settings_options = {...default_settings_options, ...user_theme};
     }
+    const BACKGROUND_IMAGE_CACHE_KEY = "ui-background";
+    const BACKGROUND_IMAGE_CACHE_INTERFACE = "com.standard.settings";
+    const BACKGROUND_IMAGE_META_KEY = "ui-background-meta";
     let latestDeviceInfo = null;
     const defaultDeviceInfo = {
         serial: "Unknown",
@@ -383,9 +386,18 @@
         }
     };
     const applyBackgroundImage = (backgroundImageFileName) => {
+        const rawValue = backgroundImageFileName === true
+            ? (window.StandardUI?.currentBackgroundImageSource || window.StandardUI?.getAppliedBackgroundImageUrl?.() || "")
+            : `${backgroundImageFileName || ""}`.trim();
+        const imageUrl = rawValue && !rawValue.startsWith("data:") && !rawValue.startsWith("blob:") && !rawValue.startsWith("http://") && !rawValue.startsWith("https://") && !rawValue.startsWith("/")
+            ? `/api/user-data/${encodeURIComponent(rawValue)}?t=${Date.now()}`
+            : rawValue;
+        if (typeof window.StandardUI?.applyResolvedBackgroundImage === "function") {
+            window.StandardUI.applyResolvedBackgroundImage(imageUrl);
+            return;
+        }
         const targets = [document.documentElement, document.body];
-        if (backgroundImageFileName) {
-            const imageUrl = `/api/user-data/${encodeURIComponent(backgroundImageFileName)}?t=${Date.now()}`;
+        if (imageUrl) {
             targets.forEach(target => {
                 target.style.backgroundImage = `url("${imageUrl}")`;
                 target.style.backgroundSize = "cover";
@@ -427,6 +439,14 @@
             }
             const payload = JSON.stringify(JSON.stringify(ui_settings_options));
             await CLI.send(`[user] settings ${payload} <userid "${safeUserId}">`, false);
+            if (typeof modular?.user?.cacheUserRecord === "function") {
+                modular.user.cacheUserRecord({
+                    ...((currentUserRecord && typeof currentUserRecord === "object") ? currentUserRecord : {}),
+                    userid: safeUserId,
+                    settings: payload,
+                    theme: payload
+                });
+            }
             if (typeof modular?.user?.writeUserCookie === "function") {
                 modular.user.writeUserCookie({...((currentUserRecord && typeof currentUserRecord === "object") ? currentUserRecord : {}), userid: safeUserId, settings: payload});
             }
@@ -461,9 +481,16 @@
         }
         return true;
     };
-    const peopleProfileFileCandidates = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg"];
-    let currentPeopleProfileFileName = null;
     let peopleProfileFileInput = null;
+    const peopleProfileImageCacheKeys = {};
+    const getPeopleProfileImageCacheKey = (recordId) => {
+        const cacheKey = peopleProfileImageCacheKeys[String(recordId)];
+        return cacheKey ?? "cached";
+    };
+    const bumpPeopleProfileImageCacheKey = (recordId) => {
+        if (!recordId) return;
+        peopleProfileImageCacheKeys[String(recordId)] = Date.now();
+    };
     const normalizeCurrentUserRecord = (payload) => {
         if (!payload) return null;
         if (Array.isArray(payload)) return payload[0] || null;
@@ -472,6 +499,7 @@
         if (typeof payload === "object") return payload;
         return null;
     };
+    const sanitizeUserRecordId = (value = "") => `${value || ""}`.trim().replace(/[^a-zA-Z0-9_-]/g, "");
     const getCurrentUserRecord = async () => {
         try {
             const selectedUserRecord = normalizeCurrentUserRecord(await modular.user.data());
@@ -492,6 +520,180 @@
             return null;
         }
     };
+    const getCurrentUserRecordId = async (userRecord = null) => {
+        const candidateRecord = normalizeCurrentUserRecord(userRecord) || normalizeCurrentUserRecord(typeof modular?.user?.readCachedUserRecord === "function" ? modular.user.readCachedUserRecord() : null);
+        const candidateRecordId = sanitizeUserRecordId(candidateRecord?.id);
+        if (candidateRecordId) return candidateRecordId;
+        const selectedUserRecord = normalizeCurrentUserRecord(await getCurrentUserRecord());
+        return sanitizeUserRecordId(selectedUserRecord?.id);
+    };
+    const sanitizeBackgroundImageFormat = (value = "") => `${value || ""}`.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    const inferBackgroundImageFormat = (file = {}) => {
+        const extensionMatch = `${file?.name || ""}`.match(/\.([a-zA-Z0-9]+)$/);
+        const extension = sanitizeBackgroundImageFormat(extensionMatch ? extensionMatch[1] : "");
+        if (extension) return extension === "jpg" ? "jpeg" : extension;
+        const typeSuffix = sanitizeBackgroundImageFormat(`${file?.type || ""}`.split("/")[1] || "");
+        return typeSuffix || "png";
+    };
+    const createBackgroundImageObjectUrl = (file) => {
+        try {
+            return URL.createObjectURL(file);
+        } catch (_) {
+            return "";
+        }
+    };
+    const buildBackgroundCacheEndpoint = (key, {format = ""} = {}) => {
+        const params = new URLSearchParams();
+        if (format) params.set("format", format);
+        params.set("_", `${Date.now()}`);
+        return `/api/cache/${encodeURIComponent(BACKGROUND_IMAGE_CACHE_INTERFACE)}/${encodeURIComponent(key)}?${params.toString()}`;
+    };
+    const saveBackgroundImageCache = async (file) => {
+        const previousMetadata = await loadBackgroundImageMetadata();
+        const previousFormat = sanitizeBackgroundImageFormat(previousMetadata?.format || "");
+        const format = inferBackgroundImageFormat(file);
+        const metadata = {
+            format,
+            mimeType: `${file?.type || ""}`.trim() || `image/${format}`,
+            updatedAt: new Date().toISOString()
+        };
+        const imageResponse = await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_CACHE_KEY, {format}), {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: {
+                "Content-Type": metadata.mimeType
+            },
+            body: file
+        });
+        if (!imageResponse.ok) {
+            throw new Error(`Image upload failed (${imageResponse.status})`);
+        }
+        const metadataResponse = await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_META_KEY, {format: "json"}), {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(metadata, null, 2)
+        });
+        if (!metadataResponse.ok) {
+            throw new Error(`Metadata upload failed (${metadataResponse.status})`);
+        }
+        if (previousFormat && previousFormat !== format) {
+            try {
+                await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_CACHE_KEY, {format: previousFormat}), {
+                    method: "DELETE",
+                    credentials: "same-origin",
+                    cache: "no-store"
+                });
+            } catch (_) {
+            }
+        }
+        return metadata;
+    };
+    const loadBackgroundImageMetadata = async () => {
+        try {
+            const response = await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_META_KEY, {format: "json"}), {
+                credentials: "same-origin",
+                cache: "no-store"
+            });
+            if (response.status === 404) return null;
+            if (!response.ok) throw new Error(`Metadata fetch failed (${response.status})`);
+            return await response.json();
+        } catch (error) {
+            console.error("Failed to load background image metadata:", error);
+            return null;
+        }
+    };
+    const deleteBackgroundImageCache = async () => {
+        const metadata = await loadBackgroundImageMetadata();
+        const format = sanitizeBackgroundImageFormat(metadata?.format || "");
+        if (format) {
+            const imageResponse = await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_CACHE_KEY, {format}), {
+                method: "DELETE",
+                credentials: "same-origin",
+                cache: "no-store"
+            });
+            if (!(imageResponse.ok || imageResponse.status === 404)) {
+                throw new Error(`Image delete failed (${imageResponse.status})`);
+            }
+        }
+        const metadataResponse = await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_META_KEY, {format: "json"}), {
+            method: "DELETE",
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+        if (!(metadataResponse.ok || metadataResponse.status === 404)) {
+            throw new Error(`Metadata delete failed (${metadataResponse.status})`);
+        }
+    };
+    const getAppliedBackgroundImageUrl = () => {
+        if (typeof window.StandardUI?.getAppliedBackgroundImageUrl === "function") {
+            return window.StandardUI.getAppliedBackgroundImageUrl() || "";
+        }
+        const targets = [document.body, document.documentElement];
+        for (const target of targets) {
+            if (!target) continue;
+            const value = window.getComputedStyle(target).backgroundImage || target.style.backgroundImage || "";
+            const match = value.match(/^url\((.*)\)$/i);
+            if (!match) continue;
+            return match[1].trim().replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1");
+        }
+        return "";
+    };
+    const renderBackgroundImageThumbnail = () => {
+        const previewRoot = document.getElementById("settings-background-image-preview");
+        if (!previewRoot) return;
+        previewRoot.replaceChildren();
+        if (ui_settings_options.background_image !== true) return;
+        const appliedBackgroundImageUrl = getAppliedBackgroundImageUrl();
+        if (!appliedBackgroundImageUrl) return;
+        const label = document.createElement("div");
+        label.className = "faded small-padding";
+        label.textContent = "Selected background image";
+        const thumbnailButton = document.createElement("button");
+        thumbnailButton.type = "button";
+        thumbnailButton.className = "naked bordered radius padded hover-shadowed hover-zoom";
+        thumbnailButton.style.display = "inline-block";
+        const image = document.createElement("img");
+        image.src = appliedBackgroundImageUrl;
+        image.alt = "Selected background image";
+        image.className = "radius";
+        image.style.display = "block";
+        image.style.width = "180px";
+        image.style.height = "110px";
+        image.style.objectFit = "cover";
+        thumbnailButton.appendChild(image);
+        thumbnailButton.onclick = () => {
+            confirmationDialogue({
+                title: "Remove Background Image",
+                content: "You're sure you want to remove the current background image?",
+                confirmation: async () => {
+                    modular.message("Removing background image...");
+                    try {
+                        await deleteBackgroundImageCache();
+                        ui_settings_options.background_image = false;
+                        if (window.StandardUI?.currentBackgroundImageSource?.startsWith?.("blob:")) {
+                            URL.revokeObjectURL(window.StandardUI.currentBackgroundImageSource);
+                        }
+                        if (window.StandardUI) window.StandardUI.currentBackgroundImageSource = "";
+                        refreshUITheme();
+                        renderBackgroundImageThumbnail();
+                        await saveSettings({
+                            successMessage: "Background image removed",
+                            errorMessage: "Unable to save background image removal"
+                        });
+                    } catch (error) {
+                        console.error("Failed to remove background image:", error);
+                        modular.error("Unable to remove background image");
+                    }
+                }
+            });
+        };
+        previewRoot.append(label, thumbnailButton);
+    };
     const buildPeopleDisplayName = (userRecord = {}) => {
         const firstName = `${userRecord.firstname || ""}`.trim();
         const middleName = `${userRecord.middlename || ""}`.trim();
@@ -509,62 +711,44 @@
         const rawUsername = `${userRecord.username || userRecord.userid || userRecord.userId || userRecord.id || userRecord.email || modular.user.id() || ""}`.trim();
         return rawUsername || "Unavailable";
     };
-    const buildProfileImageUrl = (fileName = "") => {
-        const safeFileName = `${fileName || ""}`.trim();
-        return safeFileName ? `/api/user-data/${encodeURIComponent(safeFileName)}?t=${Date.now()}` : "";
+    const buildProfileImageUrl = (recordId = "") => {
+        const safeRecordId = sanitizeUserRecordId(recordId);
+        return safeRecordId ? `/api/records/images/${encodeURIComponent(safeRecordId)}?cb=${safeRecordId}-${getPeopleProfileImageCacheKey(safeRecordId)}` : "";
     };
-    const loadPeopleProfileFileName = async () => {
-        if (currentPeopleProfileFileName) return currentPeopleProfileFileName;
+    const checkPeopleProfileImageExists = async (recordId = "") => {
+        const profileImageUrl = buildProfileImageUrl(recordId);
+        if (!profileImageUrl) return false;
         try {
-            const metadataResponse = await fetch(`/api/user-data/profile.json?t=${Date.now()}`, {
+            const response = await fetch(profileImageUrl, {
                 credentials: "same-origin",
                 cache: "no-store"
             });
-            if (metadataResponse.ok) {
-                const metadata = await metadataResponse.json();
-                const configuredFileName = `${metadata?.fileName || ""}`.trim();
-                if (configuredFileName) {
-                    currentPeopleProfileFileName = configuredFileName;
-                    return currentPeopleProfileFileName;
-                }
-            }
+            return response.ok;
         } catch (_) {
+            return false;
         }
-        for (const extension of peopleProfileFileCandidates) {
-            const candidate = `profile.${extension}`;
-            try {
-                const response = await fetch(buildProfileImageUrl(candidate), {
-                    credentials: "same-origin",
-                    cache: "no-store"
-                });
-                if (response.ok) {
-                    currentPeopleProfileFileName = candidate;
-                    return currentPeopleProfileFileName;
-                }
-            } catch (_) {
-            }
-        }
-        return null;
     };
-    const uploadPeopleProfilePhoto = async (file) => {
+    const uploadPeopleProfilePhoto = async (file, userRecord = null) => {
         if (!(file instanceof File)) return false;
         if (!file.type || !file.type.startsWith("image/")) {
             modular.error("Please choose an image file");
             return false;
         }
-        const extensionMatch = `${file.name || ""}`.match(/\.([a-zA-Z0-9]+)$/);
-        const extension = extensionMatch ? extensionMatch[1].toLowerCase() : "png";
-        const profileFileName = `profile.${extension}`;
+        const userRecordId = await getCurrentUserRecordId(userRecord);
+        if (!userRecordId) {
+            modular.error("Unable to find the current user record");
+            return false;
+        }
         try {
             const uploadResponse = typeof window.StandardUploads?.uploadFile === "function"
-                ? await window.StandardUploads.uploadFile(file, `/api/user-data/${encodeURIComponent(profileFileName)}`, {
+                ? await window.StandardUploads.uploadFile(file, `/api/upload/temp/${encodeURIComponent(userRecordId)}`, {
                     label: `Uploading ${file.name || "profile photo"}`
                 })
-                : await fetch(`/api/user-data/${encodeURIComponent(profileFileName)}`, {
+                : await fetch(`/api/upload/temp/${encodeURIComponent(userRecordId)}`, {
                     method: "POST",
                     body: (() => {
                         const formData = new FormData();
-                        formData.append("file", file, profileFileName);
+                        formData.append("file", file, file.name || "profile-photo");
                         return formData;
                     })()
                 }).then(async response => ({
@@ -576,18 +760,7 @@
                 modular.error(`Profile image upload failed (${uploadResponse.status})`);
                 return false;
             }
-            const metadataResponse = await fetch("/api/user-data/profile.json", {
-                method: "POST",
-                credentials: "same-origin",
-                cache: "no-store",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({fileName: profileFileName}, null, 2)
-            });
-            if (!metadataResponse.ok) {
-                modular.error("Profile image was uploaded but could not be linked");
-                return false;
-            }
-            currentPeopleProfileFileName = profileFileName;
+            bumpPeopleProfileImageCacheKey(userRecordId);
             modular.success("Profile image updated");
             return true;
         } catch (err) {
@@ -600,22 +773,20 @@
         const routeRoot = document.getElementById("settings-people-route");
         if (!routeRoot) return;
         routeRoot.innerHTML = div({style: "faded padded", content: "Loading user..."});
-        const [userRecord, profileFileName] = await Promise.all([
-            getCurrentUserRecord(),
-            loadPeopleProfileFileName()
-        ]);
+        const userRecord = await getCurrentUserRecord();
+        const userRecordId = await getCurrentUserRecordId(userRecord);
+        const hasProfileImage = userRecordId ? await checkPeopleProfileImageExists(userRecordId) : false;
         const displayName = buildPeopleDisplayName(userRecord || {});
         const username = buildPeopleUsername(userRecord || {});
         const email = `${userRecord?.email || ""}`.trim();
-        const hasProfileImage = !!profileFileName;
-        const profileImageUrl = hasProfileImage ? buildProfileImageUrl(profileFileName) : "";
+        const profileImageUrl = hasProfileImage ? buildProfileImageUrl(userRecordId) : "";
         routeRoot.innerHTML = div({style: "padded", content: children([
             div({style: "secondary-bordered radius padded shadowed", content: children([
                 button({
                     id: "people-profile-photo-button",
                     style: `naked no-margin ${hasProfileImage ? "" : "background-secondary"} round float-left space-right`,
                     content: hasProfileImage
-                        ? img({src: profileImageUrl, style: "round cover medium-icon margin-right", alt: displayName, width: 56, height: 56})
+                        ? img({src: profileImageUrl, style: "round cover medium-icon", alt: displayName, width: 56, height: 56})
                         : `<svg class="text-foreground" xmlns="http://www.w3.org/2000/svg" width="56" height="56" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75a17.933 17.933 0 0 1-7.499-1.632Z" /></svg>`,
                     width: 56,
                     height: 56
@@ -645,7 +816,7 @@
         fileInput.onchange = async () => {
             const file = fileInput.files && fileInput.files[0];
             if (!file) return;
-            const didUpload = await uploadPeopleProfilePhoto(file);
+            const didUpload = await uploadPeopleProfilePhoto(file, userRecord);
             fileInput.value = "";
             fileInput.remove();
             if (peopleProfileFileInput === fileInput) peopleProfileFileInput = null;
@@ -665,22 +836,18 @@
                 modular.error("Please choose an image file");
                 return;
             }
-            const extensionMatch = file.name.match(/\.[a-zA-Z0-9]+$/);
-            const extension = extensionMatch ? extensionMatch[0].toLowerCase() : ".png";
-            const backgroundFileName = `background${extension}`;
-            const formData = new FormData();
-            formData.append("file", file, backgroundFileName);
             try {
-                const uploadResponse = await fetch(`/api/user-data/${encodeURIComponent(backgroundFileName)}`, {
-                    method: "POST",
-                    body: formData
-                });
-                if (!uploadResponse.ok) {
-                    throw new Error(`Upload failed (${uploadResponse.status})`);
+                modular.message("Saving background image...");
+                await saveBackgroundImageCache(file);
+                const previewUrl = createBackgroundImageObjectUrl(file);
+                if (window.StandardUI?.currentBackgroundImageSource?.startsWith?.("blob:")) {
+                    URL.revokeObjectURL(window.StandardUI.currentBackgroundImageSource);
                 }
-                ui_settings_options.background_image = backgroundFileName;
+                if (window.StandardUI) window.StandardUI.currentBackgroundImageSource = previewUrl;
+                ui_settings_options.background_image = true;
                 refreshUITheme();
-                saveSettings({successMessage: "Background image updated"});
+                renderBackgroundImageThumbnail();
+                await saveSettings({successMessage: "Background image updated"});
             } catch (err) {
                 console.error("Failed to upload background image:", err);
                 modular.error("Unable to upload background image");
@@ -731,6 +898,7 @@
                                         onclick: () => {
                                             ui_settings_options = {...default_settings_options};
                                             refreshUITheme();
+                                            renderBackgroundImageThumbnail();
                                             saveSettings();
                                         }
                                     }),
@@ -762,6 +930,7 @@
                             colorPicker({id: "background", colors: modular.colors}),
                             div({style: "spacer"}),
                             button({content: "Pick Background Image", onclick: () => pickBackgroundImage()}),
+                            div({id: "settings-background-image-preview"}),
                             div({style: "big-spacer"}),
                             label({style: "faded", content: "Border Color"}),
                             colorPicker({id: "border_color", colors: modular.colors}),
@@ -816,6 +985,7 @@
                             refreshUITheme();
                             saveSettings();
                         });
+                        renderBackgroundImageThumbnail();
                     }
                 }, {
                     text: "Behavior",

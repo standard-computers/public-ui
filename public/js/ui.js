@@ -574,7 +574,82 @@ window.StandardUploads.uploadFile = (file, url, options = {}) => new Promise((re
     };
     xhr.send(formData);
 });
-function applyThemeData(d) {
+const THEME_BACKGROUND_CACHE_KEY = "ui-background";
+const THEME_BACKGROUND_CACHE_INTERFACE = "com.standard.settings";
+const THEME_BACKGROUND_META_KEY = "ui-background-meta";
+let currentThemeBackgroundObjectUrl = "";
+async function resolveThemeBackgroundSource(backgroundSetting) {
+    if (!backgroundSetting) return "";
+    if (typeof backgroundSetting === "string") {
+        const trimmed = backgroundSetting.trim();
+        if (!trimmed) return "";
+        if (trimmed.startsWith("data:") || trimmed.startsWith("blob:") || trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("/")) {
+            return trimmed;
+        }
+        return `/api/user-data/${encodeURIComponent(trimmed)}`;
+    }
+    if (backgroundSetting !== true) return "";
+    const metaEndpoint = `/api/cache/${encodeURIComponent(THEME_BACKGROUND_CACHE_INTERFACE)}/${encodeURIComponent(THEME_BACKGROUND_META_KEY)}?format=json&_=${Date.now()}`;
+    try {
+        const metaResponse = await fetch(metaEndpoint, {cache: "no-store", credentials: "same-origin"});
+        if (!metaResponse.ok) return "";
+        const metadata = await metaResponse.json().catch(() => null);
+        const format = `${metadata?.format || ""}`.trim().replace(/[^a-z0-9]/gi, "").toLowerCase();
+        if (!format) return "";
+        const imageEndpoint = `/api/cache/${encodeURIComponent(THEME_BACKGROUND_CACHE_INTERFACE)}/${encodeURIComponent(THEME_BACKGROUND_CACHE_KEY)}?format=${encodeURIComponent(format)}&_=${Date.now()}`;
+        const imageResponse = await fetch(imageEndpoint, {cache: "no-store", credentials: "same-origin"});
+        if (!imageResponse.ok) return "";
+        const imageBlob = await imageResponse.blob();
+        if (!imageBlob || !imageBlob.size) return "";
+        if (currentThemeBackgroundObjectUrl) {
+            URL.revokeObjectURL(currentThemeBackgroundObjectUrl);
+            currentThemeBackgroundObjectUrl = "";
+        }
+        currentThemeBackgroundObjectUrl = URL.createObjectURL(imageBlob);
+        return currentThemeBackgroundObjectUrl;
+    } catch (error) {
+        console.error("Failed to resolve theme background image", error);
+        return "";
+    }
+}
+function applyResolvedThemeBackground(source = "") {
+    const targets = [document.documentElement, document.body];
+    const resolvedSource = `${source || ""}`.trim();
+    if (currentThemeBackgroundObjectUrl && resolvedSource !== currentThemeBackgroundObjectUrl) {
+        URL.revokeObjectURL(currentThemeBackgroundObjectUrl);
+        currentThemeBackgroundObjectUrl = "";
+    }
+    if (resolvedSource) {
+        targets.forEach(target => {
+            target.style.backgroundImage = `url("${resolvedSource}")`;
+            target.style.backgroundSize = "cover";
+            target.style.backgroundPosition = "center center";
+            target.style.backgroundRepeat = "no-repeat";
+            target.style.backgroundAttachment = "fixed";
+        });
+        document.body.style.minHeight = "100vh";
+    } else {
+        targets.forEach(target => {
+            target.style.backgroundImage = "none";
+            target.style.backgroundAttachment = "scroll";
+        });
+    }
+    window.StandardUI = window.StandardUI || {};
+    window.StandardUI.currentBackgroundImageSource = resolvedSource;
+    return resolvedSource;
+}
+function getAppliedThemeBackgroundImageUrl() {
+    const targets = [document.body, document.documentElement];
+    for (const target of targets) {
+        if (!target) continue;
+        const value = window.getComputedStyle(target).backgroundImage || target.style.backgroundImage || "";
+        const match = value.match(/^url\((.*)\)$/i);
+        if (!match) continue;
+        return match[1].trim().replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1");
+    }
+    return "";
+}
+async function applyThemeData(d) {
     if (!d) return false;
     window.StandardUI = window.StandardUI || {};
     window.StandardUI.currentTheme = d;
@@ -589,23 +664,8 @@ function applyThemeData(d) {
     document.documentElement.style.setProperty("--small-shadow", shadowsEnabled ? "0 4px 12px rgba(5, 5, 5, 0.08)" : "none");
     document.documentElement.style.setProperty("--shadow", shadowsEnabled ? "0 8px 32px rgba(0, 0, 0, 0.1)" : "none");
     document.documentElement.style.setProperty("--darker-shadow", shadowsEnabled ? "4px 4px 10px rgba(0, 0, 0, 0.3)" : "none");
-    const targets = [document.documentElement, document.body];
-    if (d.background_image) {
-        const imageUrl = `/api/user-data/${encodeURIComponent(d.background_image)}`;
-        targets.forEach(target => {
-            target.style.backgroundImage = `url("${imageUrl}")`;
-            target.style.backgroundSize = "cover";
-            target.style.backgroundPosition = "center center";
-            target.style.backgroundRepeat = "no-repeat";
-            target.style.backgroundAttachment = "fixed";
-        });
-        document.body.style.minHeight = "100vh";
-    } else {
-        targets.forEach(target => {
-            target.style.backgroundImage = "none";
-            target.style.backgroundAttachment = "scroll";
-        });
-    }
+    const backgroundSource = await resolveThemeBackgroundSource(d.background_image);
+    applyResolvedThemeBackground(backgroundSource);
     document.body.dataset.useSvgIcons = d.use_svg_icons === false ? "false" : "true";
     if (d.hide_shortcuts) {
         document.getElementById("interface-shortcuts")?.classList.add("none");
@@ -763,11 +823,11 @@ async function loadAndApplyTheme({attempt = 0, maxAttempts = 2, retryDelayMs = 2
             ? cookieTheme
             : (typeof modular?.user?.theme === "function" ? await modular.user.theme() : null);
         if (data && typeof data === "object") {
-            if (applyThemeData(data)) return true;
+            if (await applyThemeData(data)) return true;
         }
     } catch (_) {
     }
-    if (applyThemeData(defaultThemeData)) return true;
+    if (await applyThemeData(defaultThemeData)) return true;
     if (attempt >= maxAttempts) return false;
     const delay = Math.min(retryDelayMs * Math.max(1, attempt + 1), 1000);
     await new Promise(resolve => setTimeout(resolve, delay));
@@ -775,6 +835,8 @@ async function loadAndApplyTheme({attempt = 0, maxAttempts = 2, retryDelayMs = 2
 }
 
 window.StandardUI.prefersSvgIcons = () => window.StandardUI?.currentTheme?.use_svg_icons !== false;
+window.StandardUI.applyResolvedBackgroundImage = applyResolvedThemeBackground;
+window.StandardUI.getAppliedBackgroundImageUrl = getAppliedThemeBackgroundImageUrl;
 window.StandardUI.refreshTheme = ({maxAttempts = 2, retryDelayMs = 250, force = false} = {}) => {
     if (themeRefreshInFlight && !force) return themeRefreshInFlight;
     themeRefreshInFlight = loadAndApplyTheme({attempt: 0, maxAttempts, retryDelayMs})

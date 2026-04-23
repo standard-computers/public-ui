@@ -198,7 +198,7 @@
             const cookieTheme = startupTheme || getThemeFromUserCookie();
             if (cookieTheme && typeof applyThemeData === "function") {
                 try {
-                    applyThemeData(cookieTheme);
+                    await applyThemeData(cookieTheme);
                 } catch (err) {
                     console.error("Failed to apply cookie theme during startup", err);
                 }

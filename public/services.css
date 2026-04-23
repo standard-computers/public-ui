@@ -42,8 +42,8 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .faded {opacity:0.75}
 .faded:hover {opacity:1.0}
 #live-time {font-weight:bold;padding:8px 10px 8px 10px}
-.interface-icon {width:28px;height:28px;border-radius:var(--radius);padding:2px;cursor:pointer;border:1px solid var(--bg)}
-.interface-icon:hover {box-shadow:var(--shadow);border:1px solid var(--border)}
+.interface-icon {width:28px;height:28px;border-radius:var(--radius);padding:2px;cursor:pointer;border:none}
+.interface-icon:hover {box-shadow:var(--shadow);border:none}
 .interface-icon img {width:28px;height:28px;object-fit:contain}
 .guttered {margin-right:calc(var(--gutter) * 2.5);margin-left:calc(var(--gutter) * 2.5)}
 .flex {display:flex;flex-direction:column}

@@ -51,6 +51,7 @@ const WS_BINARY_SETTLE_MS = Math.max(120, Number(process.env.WS_BINARY_SETTLE_MS
 const SESSION_TTL_MS = Math.max(60 * 1000, Number(process.env.SESSION_TTL_MS || 1000 * 60 * 60 * 12) || 1000 * 60 * 60 * 12);
 const SESSION_PRUNE_INTERVAL_MS = Math.max(60 * 1000, Number(process.env.SESSION_PRUNE_INTERVAL_MS || 1000 * 60 * 10) || 1000 * 60 * 10);
 const USER_RECORD_CACHE_TTL_MS = Math.max(5 * 1000, Number(process.env.USER_RECORD_CACHE_TTL_MS || 1000 * 60 * 5) || 1000 * 60 * 5);
+const REQUEST_BODY_LIMIT = (process.env.REQUEST_BODY_LIMIT || "25mb").trim() || "25mb";
 const USER_DATA_ROOT = path.join(__dirname, "user_data");
 const SETTINGS_ARCHIVE_ROOT = USER_DATA_ROOT;
 const ELECTRON_SETUP_CONFIG_PATH = path.join(USER_DATA_ROOT, "desktop-setup.json");
@@ -1300,8 +1301,8 @@ app.set("views", path.join(__dirname, "views"));
 app.set("trust proxy", 1);
 app.use(cors(corsOptions));
 app.use(express.static(path.join(__dirname, "public")));
-app.use(express.urlencoded({extended: true}));
-app.use(express.json());
+app.use(express.urlencoded({extended: true, limit: REQUEST_BODY_LIMIT}));
+app.use(express.json({limit: REQUEST_BODY_LIMIT}));
 app.use(sessionMiddleware);
 app.use((err, req, res, next) => {
     if (err?.message === "Not allowed by CORS") {
@@ -2650,7 +2651,7 @@ app.get("/api/cache/:interface/:key", async (req, res) => {
     }
 });
 
-app.post("/api/cache/:interface/:key", async (req, res) => {
+app.post("/api/cache/:interface/:key", express.raw({type: ["application/octet-stream", "image/*"], limit: REQUEST_BODY_LIMIT}), async (req, res) => {
     try {
         const {interfaceDir, fullPath} = resolveCachePath(req.params.interface, req.params.key, req.query.format);
         await fs.mkdir(interfaceDir, {recursive: true});
@@ -2668,6 +2669,19 @@ app.post("/api/cache/:interface/:key", async (req, res) => {
         const status = err.message.startsWith("Invalid") ? 400 : 500;
         console.error("Failed to save cache file:", err);
         return res.status(status).json({error: "Failed to save cache file"});
+    }
+});
+
+app.delete("/api/cache/:interface/:key", async (req, res) => {
+    try {
+        const {fullPath} = resolveCachePath(req.params.interface, req.params.key, req.query.format);
+        await fs.unlink(fullPath);
+        return res.json({message: "Cache file deleted"});
+    } catch (err) {
+        if (err.code === "ENOENT") return res.status(404).json({error: "Cache file not found"});
+        const status = err.message.startsWith("Invalid") ? 400 : 500;
+        console.error("Failed to delete cache file:", err);
+        return res.status(status).json({error: "Failed to delete cache file"});
     }
 });
 
