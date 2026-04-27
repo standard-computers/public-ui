@@ -395,7 +395,7 @@ function inputDialogue(n) {
         style: "dialogue padded",
         content: children([
             label({content: n.title}),
-            (n.title_entry ? input({style: "undecorated", placeholder: n.titleholder, autofocus: true}) : ""),
+            (n.title_entry ? input({style: "undecorated", placeholder: n.titleholder, value: n.title_value, autofocus: true}) : ""),
             input({style: "undecorated", placeholder: n.placeholder, value: n.value, autofocus: true}),
             div({style: "float-right", content: children([
                 button({style: "undecorated space-right", content: "Cancel"}),
@@ -407,18 +407,34 @@ function inputDialogue(n) {
     const buttons = dialogue.querySelectorAll("button");
     const cancelButton = buttons[0] || null;
     const confirmButton = buttons[1] || null;
-    cancelButton?.addEventListener("click", () => {
+    const closeDialogue = () => {
+        document.removeEventListener("keydown", dialogueKeydownHandler, true);
         document.getElementById("cover").out();
         dialogue.remove();
+    };
+    const dialogueKeydownHandler = (event) => {
+        if (!dialogue.isConnected) return;
+        if (event.key === "Escape") {
+            event.preventDefault();
+            cancelButton?.click();
+            return;
+        }
+        if (event.key === "Enter" && dialogue.contains(document.activeElement) && document.activeElement?.matches("input")) {
+            event.preventDefault();
+            confirmButton?.click();
+        }
+    };
+    cancelButton?.addEventListener("click", () => {
+        closeDialogue();
     });
     confirmButton?.addEventListener("click", () => {
         const inputs = dialogue.querySelectorAll("input");
         const input_title = n.title_entry ? (inputs[0]?.value || "") : "";
         const input_content = n.title_entry ? (inputs[1]?.value || "") : (inputs[0]?.value || "");
-        document.getElementById("cover").out();
-        dialogue.remove();
+        closeDialogue();
         n.confirmation(input_title, input_content);
     });
+    document.addEventListener("keydown", dialogueKeydownHandler, true);
     dialogue.querySelector("input")?.focus();
 }
 function confirmationDialogue(n) {

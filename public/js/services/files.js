@@ -119,6 +119,59 @@
         syncUploadDirectory();
     };
     const isDirectory = (file = {}) => Array.isArray(file.children);
+    let fileSortMode = "name-asc";
+    const FILE_SORT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" /></svg>`;
+    const getFileName = (file = {}) => String(file.name || file.path?.split?.("/")?.pop?.() || "").toLowerCase();
+    const getFileType = (file = {}) => {
+        if (isDirectory(file)) return "folder";
+        const name = getFileName(file);
+        return name.includes(".") ? name.split(".").pop() : "";
+    };
+    const compareFileNames = (left, right, direction = "asc") => {
+        const comparison = getFileName(left).localeCompare(getFileName(right), undefined, {numeric: true, sensitivity: "base"});
+        return direction === "desc" ? -comparison : comparison;
+    };
+    const compareFiles = (left, right) => {
+        const leftDirectory = isDirectory(left);
+        const rightDirectory = isDirectory(right);
+        if (leftDirectory !== rightDirectory) return leftDirectory ? -1 : 1;
+        if (fileSortMode === "type") {
+            const typeComparison = getFileType(left).localeCompare(getFileType(right), undefined, {numeric: true, sensitivity: "base"});
+            if (typeComparison !== 0) return typeComparison;
+            return compareFileNames(left, right, "asc");
+        }
+        return compareFileNames(left, right, fileSortMode === "name-asc" ? "asc" : "desc");
+    };
+    const getSortedWorkingFiles = () => [...working_files].sort(compareFiles);
+    const refreshFileListRoot = (rootId, options = {}) => {
+        const root = document.getElementById(rootId);
+        if (root) root.innerHTML = renderFiles(options);
+    };
+    const createFileSortMenuItems = (rootId, options = {}) => [
+        {mode: "name-asc", label: "Name A-Z"},
+        {mode: "name-desc", label: "Name Z-A"},
+        {mode: "type", label: "Type"}
+    ].map(sortOption => ({
+        label: sortOption.label,
+        action: () => {
+            fileSortMode = sortOption.mode;
+            refreshFileListRoot(rootId, options);
+        }
+    }));
+    const fileSortButton = id => button({
+        id,
+        style: "small naked float-right hover-zoom",
+        icon: FILE_SORT_ICON,
+        title: "Sort"
+    });
+    const bindFileSortButton = (id, rootId, options = {}) => {
+        const sortButton = document.getElementById(id);
+        if (sortButton?.dataset.sortMenuBound === "1") return;
+        if (sortButton) {
+            sortButton.dataset.sortMenuBound = "1";
+            sortButton.popoutmenu(createFileSortMenuItems(rootId, options));
+        }
+    };
     const getFileTypeIconPath = (fileLike = {}) => {
         const rawPath = typeof fileLike === "string" ? fileLike : (fileLike?.path || fileLike?.name || "");
         let icon = "folder";
@@ -400,13 +453,25 @@
     const getFilePathForRemoveCommand = (rawPath = "") => {
         return String(rawPath || "").replace(/^\/home\/standard-system\//, "");
     };
-    const deleteFile = rawPath => {
+    const removeDeletedFileTile = (rawPath = "", tile = null) => {
+        const normalizedPath = getFilePathForRemoveCommand(rawPath);
+        working_files = working_files.filter(file => getFilePathForRemoveCommand(file?.path) !== normalizedPath);
+        const deletedTile = tile?.closest?.(".file-folder");
+        if (deletedTile) {
+            deletedTile.remove();
+            return;
+        }
+        document.querySelectorAll(".file-folder").forEach(fileTile => {
+            if (getFilePathForRemoveCommand(fileTile.getAttribute("directive")) === normalizedPath) fileTile.remove();
+        });
+    };
+    const deleteFile = (rawPath, tile = null) => {
         const filePath = getFilePathForRemoveCommand(rawPath);
         if (!filePath) return;
         const fileName = filePath.split("/").pop() || "file";
         CLI.send(CLI.buildFilesCommand("remove", filePath)).then(response => {
             if (response !== 0 && response !== "false" && response !== false) {
-                modular.refresh("com.standard.files");
+                removeDeletedFileTile(rawPath, tile);
                 modular.success(`Deleted ${fileName}`);
             } else {
                 modular.error(`Failed to delete ${fileName}`);
@@ -693,8 +758,9 @@
         label: "Delete",
         destructive: true,
         action: (b, e, el) => {
-            const path = el.closest(".file-folder")?.getAttribute("directive");
-            deleteFile(path);
+            const tile = el.closest(".file-folder");
+            const path = tile?.getAttribute("directive");
+            deleteFile(path, tile);
         }
     }];
     const openPhotoInImageViewer = async (rawPath = "", sourceNode = null) => {
@@ -941,24 +1007,26 @@
         return loadDocumentsDirectory(directoryPath);
     };
     syncUploadDirectory();
-    function renderFiles() {
+    function renderFiles({openDirectories = true} = {}) {
         let as = []
-        for (let i = 0; i < working_files.length; i++) {
+        const files = getSortedWorkingFiles();
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
             as.push(div({
                 style: "padded secondary-tile brick list-item hidden file-folder",
-                directive: working_files[i].path,
-                content: children([img({style: "margined-icon float-left no-events", src: getFileTypeIconPath(working_files[i])}), div({
+                directive: file.path,
+                content: children([img({style: "margined-icon float-left no-events", src: getFileTypeIconPath(file)}), div({
                     content: children([div({
                         style: "no-events",
-                        content: working_files[i].name
-                    }), em({style: "faded no-wrap hidden", content: working_files[i].path.replace("/home/standard-system/", "")})])
+                        content: file.name
+                    }), em({style: "faded no-wrap hidden", content: file.path.replace("/home/standard-system/", "")})])
                 })]),
                 onclick: () => {
-                    if (!isDirectory(working_files[i])) {
-                        openFilePath(working_files[i].path);
+                    if (!isDirectory(file) || !openDirectories) {
+                        openFilePath(file.path);
                         return;
                     }
-                    navigateDocumentsDirectory(working_files[i].path);
+                    navigateDocumentsDirectory(file.path);
                 }
             }));
         }
@@ -975,34 +1043,17 @@
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" /></svg>`,
             route: () => div({
                 style: "small-padding",
-                content: children([h({level: 3, content: "Everything"}), div({style: "spacer"}), div({
+                content: children([fileSortButton("everything-sort", "all-files", {openDirectories: false}), h({level: 3, content: "Everything"}), div({style: "spacer"}), div({
                     id: "all-files", menu: "file", content: () => {
                         return CLI.send("[files]").then(everything => {
                             working_files = everything.files;
-                            let as = []
-                            for (let i = 0; i < working_files.length; i++) {
-                                as.push(div({
-                                    style: "padded secondary-tile brick list-item hidden file-folder",
-                                    directive: working_files[i].path,
-                                    content: children([img({
-                                        style: "margined-icon float-left no-events", src: getFileTypeIconPath(working_files[i])
-                                    }), div({
-                                        content: children([div({
-                                            style: "no-events",
-                                            content: working_files[i].name
-                                        }), em({
-                                            style: "faded no-wrap hidden", content: working_files[i].path.replace("/home/standard-system/", "")
-                                        })])
-                                    })]),
-                                    onclick: () => openFilePath(working_files[i].path)
-                                }));
-                            }
-                            return children(as);
+                            return renderFiles({openDirectories: false});
                         })
                     }
                 })])
             }),
             afterRender: () => {
+                bindFileSortButton("everything-sort", "all-files", {openDirectories: false});
                 document.querySelectorAll("#all-files").forEach((el) => el.contextmenu(createFileMenuItems()));
             }
         }, {
@@ -1023,10 +1074,10 @@
                                         icon: `<svg class="smaller-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>`
                                     })
                                 ])
-                            }), button({
+                            }), fileSortButton("documents-sort", "documents"), button({
                                 id: "documents-create-folder",
                                 style: "small naked float-right hover-zoom",
-                                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
+                                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
                                 title: "New folder"
                             }),
                             h({level: 3, id: "documents-title", style: "very-small-padding-top padding-left", content: "Documents"})
@@ -1063,6 +1114,7 @@
                         createFolderInCurrentDocumentsDirectory();
                     };
                 }
+                bindFileSortButton("documents-sort", "documents");
                 updateDocumentsHeader();
                 document.querySelectorAll("#documents").forEach((el) => el.contextmenu(createFileMenuItems()));
             }
@@ -1217,8 +1269,9 @@
                     label: "Delete",
                     destructive: true,
                     action: (b, e, target) => {
-                        const path = target.closest(".file-folder")?.getAttribute("directive");
-                        deleteFile(path);
+                        const tile = target.closest(".file-folder");
+                        const path = tile?.getAttribute("directive");
+                        deleteFile(path, tile);
                     }
                 }]));
             }
@@ -1296,8 +1349,9 @@
                     label: "Delete",
                     destructive: true,
                     action: (b, e, target) => {
-                        const path = target.closest(".file-folder")?.getAttribute("directive");
-                        deleteFile(path);
+                        const tile = target.closest(".file-folder");
+                        const path = tile?.getAttribute("directive");
+                        deleteFile(path, tile);
                     }
                 }]));
             }

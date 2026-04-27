@@ -82,8 +82,12 @@ Element.prototype.contextmenu = function (items, selector = null) {
     menu.className = "custom-context-menu hidden";
     function buildMenu() {
         menu.innerHTML = "";
+        let itemCount = 0;
         items.forEach(item => {
+            if (typeof item?.visible === "function" && !item.visible(ele, lastClickedTarget)) return;
+            if (item?.visible === false) return;
             if (item === "separator") {
+                if (!itemCount) return;
                 const hr = document.createElement("div");
                 hr.style.height = "1px";
                 hr.style.margin = "5px 0";
@@ -91,6 +95,7 @@ Element.prototype.contextmenu = function (items, selector = null) {
                 menu.appendChild(hr);
                 return;
             }
+            itemCount += 1;
             const option = document.createElement("div");
             option.className = "context-menu-item";
             if (item.className) option.classList.add(...String(item.className).split(/\s+/).filter(Boolean));
@@ -103,6 +108,7 @@ Element.prototype.contextmenu = function (items, selector = null) {
                 option.textContent = item.label;
             }
             option.onclick = (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 hideMenu();
                 if (typeof item.action === "function") {
@@ -115,9 +121,13 @@ Element.prototype.contextmenu = function (items, selector = null) {
             };
             menu.appendChild(option);
         });
+        return itemCount;
     }
     function showMenu(x, y) {
-        buildMenu();
+        if (!buildMenu()) {
+            hideMenu();
+            return;
+        }
         menu.style.left = x + "px";
         menu.style.top = y + "px";
         menu.classList.remove("hidden");
@@ -136,11 +146,13 @@ Element.prototype.contextmenu = function (items, selector = null) {
     function hideMenu() {
         menu.classList.add("hidden");
         menu.style.display = "none";
+        menu.style.opacity = 0;
     }
     document.body.appendChild(menu);
     ele.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
         lastClickedTarget = e.target;
+        if (!buildMenu()) return;
+        e.preventDefault();
         showMenu(e.clientX, e.clientY);
     });
     document.addEventListener("click", hideMenu);
@@ -173,6 +185,7 @@ Element.prototype.popoutmenu = function (items, selector = null) {
                 option.textContent = item.label;
             }
             option.onclick = (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 hideMenu();
                 if (typeof item.action === "function") {
@@ -202,6 +215,7 @@ Element.prototype.popoutmenu = function (items, selector = null) {
     function hideMenu() {
         menu.classList.add("hidden");
         menu.style.display = "none";
+        menu.style.opacity = 0;
     }
     document.body.appendChild(menu);
     ele.addEventListener("click", (e) => {

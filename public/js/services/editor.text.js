@@ -366,6 +366,7 @@
         if (isRichTextDocument()) {
             if (textArea.innerHTML !== nextContent) textArea.innerHTML = nextContent;
             ensureTextEditorImageFrames(textArea);
+            prepareEditorLinks(textArea);
             return;
         }
         if (textArea.textContent !== nextContent) textArea.textContent = nextContent;
@@ -415,6 +416,219 @@
         selection.removeAllRanges();
         selection.addRange(range);
         savedTextSelectionRange = range.cloneRange();
+        return true;
+    };
+    const getActiveTextSelectionRange = () => {
+        const editorNode = findTextEditorNode();
+        const selection = window.getSelection();
+        if (!editorNode || !selection?.rangeCount || !isSelectionInsideTextEditor(selection)) return null;
+        const range = selection.getRangeAt(0);
+        if (range.collapsed) return null;
+        return range;
+    };
+    const hasHighlightedTextSelection = () => !!getActiveTextSelectionRange()?.toString?.().trim();
+    const getTextSelectionPlainText = () => String(getActiveTextSelectionRange()?.toString?.() || "");
+    const normalizeHyperlinkUrl = (rawUrl = "") => {
+        const trimmedUrl = String(rawUrl || "").trim();
+        if (!trimmedUrl) return "";
+        if (/^(https?:|mailto:|tel:)/i.test(trimmedUrl)) return trimmedUrl;
+        if (/^[#/]/.test(trimmedUrl)) return trimmedUrl;
+        return `https://${trimmedUrl}`;
+    };
+    const prepareEditorLinkNode = (linkNode) => {
+        if (!linkNode) return;
+        linkNode.target = "_blank";
+        linkNode.rel = "noopener noreferrer";
+    };
+    const prepareEditorLinks = (rootNode = findTextEditorNode()) => {
+        if (!rootNode?.querySelectorAll) return;
+        rootNode.querySelectorAll("a[href]").forEach(prepareEditorLinkNode);
+    };
+    const applyTextEditorHyperlink = (labelText = "", rawUrl = "") => {
+        const textArea = findTextEditorNode();
+        const url = normalizeHyperlinkUrl(rawUrl);
+        const text = String(labelText || "").trim();
+        if (!textArea || !isRichTextDocument() || !url || !text) return false;
+        restoreTextSelection();
+        const range = getActiveTextSelectionRange();
+        if (!range) return false;
+        const linkNode = document.createElement("a");
+        linkNode.href = url;
+        linkNode.textContent = text;
+        prepareEditorLinkNode(linkNode);
+        range.deleteContents();
+        range.insertNode(linkNode);
+        const selection = window.getSelection();
+        range.setStartAfter(linkNode);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        savedTextSelectionRange = range.cloneRange();
+        syncTextEditorStateFromDom();
+        return true;
+    };
+    const showTextEditorHyperlinkDialogue = () => {
+        if (!isRichTextDocument()) return false;
+        restoreTextSelection();
+        const selectedText = getTextSelectionPlainText().trim();
+        if (!selectedText) return false;
+        rememberTextSelection();
+        inputDialogue({
+            title: "Hyperlink",
+            titleholder: "Text",
+            title_entry: true,
+            title_value: selectedText,
+            placeholder: "Link",
+            confirmation: (textValue, linkValue) => {
+                if (!applyTextEditorHyperlink(textValue, linkValue)) modular.error("Select text and enter a link");
+            }
+        });
+        return true;
+    };
+    const getTextSelectionOffsets = (rootNode = findTextEditorNode()) => {
+        if (!(rootNode instanceof HTMLElement)) return null;
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) return null;
+        const range = selection.getRangeAt(0);
+        if (!rootNode.contains(range.startContainer) || !rootNode.contains(range.endContainer)) return null;
+        const startRange = range.cloneRange();
+        startRange.selectNodeContents(rootNode);
+        startRange.setEnd(range.startContainer, range.startOffset);
+        const endRange = range.cloneRange();
+        endRange.selectNodeContents(rootNode);
+        endRange.setEnd(range.endContainer, range.endOffset);
+        return {start: startRange.toString().length, end: endRange.toString().length};
+    };
+    const getDuplicateTextLineDownEdit = (value = "", selectionStart = 0, selectionEnd = selectionStart) => {
+        const content = String(value ?? "");
+        const start = Math.max(0, Math.min(Number(selectionStart) || 0, content.length));
+        const end = Math.max(start, Math.min(Number(selectionEnd) || start, content.length));
+        const effectiveEnd = end > start && content[end - 1] === "\n" ? end - 1 : end;
+        const lineStart = content.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+        const lineEndIndex = content.indexOf("\n", effectiveEnd);
+        const lineEnd = lineEndIndex >= 0 ? lineEndIndex : content.length;
+        const duplicatedText = content.slice(lineStart, lineEnd);
+        const insertion = `\n${duplicatedText}`;
+        const duplicateStart = lineEnd + 1;
+        const duplicateEnd = duplicateStart + duplicatedText.length;
+        const nextValue = `${content.slice(0, lineEnd)}${insertion}${content.slice(lineEnd)}`;
+        if (start !== end) return {value: nextValue, selectionStart: duplicateStart, selectionEnd: duplicateEnd};
+        const caretColumn = start - lineStart;
+        const caretOffset = duplicateStart + Math.min(caretColumn, duplicatedText.length);
+        return {value: nextValue, selectionStart: caretOffset, selectionEnd: caretOffset};
+    };
+    const resolveTextSelectionPoint = (rootNode, targetOffset = 0) => {
+        const safeOffset = Math.max(0, Number(targetOffset) || 0);
+        const walker = document.createTreeWalker(rootNode, NodeFilter.SHOW_ALL, {
+            acceptNode: (node) => {
+                if (node.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
+                if (node.nodeType === Node.ELEMENT_NODE && String(node.tagName || "").toUpperCase() === "BR") return NodeFilter.FILTER_ACCEPT;
+                return NodeFilter.FILTER_SKIP;
+            }
+        });
+        let traversed = 0;
+        let currentNode = walker.nextNode();
+        while (currentNode) {
+            if (currentNode.nodeType === Node.TEXT_NODE) {
+                const length = currentNode.textContent?.length || 0;
+                if (safeOffset <= traversed + length) return {node: currentNode, offset: safeOffset - traversed};
+                traversed += length;
+            } else {
+                if (safeOffset <= traversed + 1) {
+                    const parentNode = currentNode.parentNode || rootNode;
+                    const childIndex = Array.from(parentNode.childNodes).indexOf(currentNode);
+                    return {node: parentNode, offset: childIndex + (safeOffset > traversed ? 1 : 0)};
+                }
+                traversed += 1;
+            }
+            currentNode = walker.nextNode();
+        }
+        return {node: rootNode, offset: rootNode.childNodes.length};
+    };
+    const restoreTextEditorSelectionOffsets = (rootNode, start = 0, end = start) => {
+        const selection = window.getSelection();
+        if (!selection || !(rootNode instanceof HTMLElement)) return false;
+        const startPoint = resolveTextSelectionPoint(rootNode, start);
+        const endPoint = resolveTextSelectionPoint(rootNode, end);
+        const range = document.createRange();
+        range.setStart(startPoint.node, startPoint.offset);
+        range.setEnd(endPoint.node, endPoint.offset);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        savedTextSelectionRange = range.cloneRange();
+        return true;
+    };
+    const findTextLineNode = (node, rootNode = findTextEditorNode()) => {
+        if (!node || !rootNode) return null;
+        let current = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
+        while (current && current !== rootNode) {
+            if (current.nodeType === Node.ELEMENT_NODE && current.tagName === "LI") return current;
+            if (current.parentNode === rootNode) return current;
+            current = current.parentNode;
+        }
+        return rootNode.firstChild || null;
+    };
+    const placeCaretInTextNode = (targetNode, atEnd = false) => {
+        if (!targetNode) return false;
+        const selection = window.getSelection();
+        const range = document.createRange();
+        if (targetNode.nodeType === Node.TEXT_NODE) {
+            range.setStart(targetNode, atEnd ? targetNode.textContent.length : 0);
+        } else {
+            range.selectNodeContents(targetNode);
+            range.collapse(!atEnd);
+        }
+        range.collapse(!atEnd);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        savedTextSelectionRange = range.cloneRange();
+        return true;
+    };
+    const duplicateRichTextLineDown = (textArea = findTextEditorNode()) => {
+        const selection = window.getSelection();
+        if (!textArea || !selection?.rangeCount || !isSelectionInsideTextEditor(selection)) return false;
+        const range = selection.getRangeAt(0);
+        let nodesToDuplicate = [];
+        if (range.collapsed) {
+            nodesToDuplicate = [findTextLineNode(range.startContainer, textArea)].filter(Boolean);
+        } else {
+            nodesToDuplicate = Array.from(textArea.childNodes || [])
+                .filter((node) => !isTextPageBreakSpacer(node) && range.intersectsNode(node));
+            if (!nodesToDuplicate.length) nodesToDuplicate = [findTextLineNode(range.startContainer, textArea)].filter(Boolean);
+        }
+        if (!nodesToDuplicate.length) {
+            const paragraphNode = createTextEditorParagraphBreak();
+            textArea.appendChild(paragraphNode);
+            placeCaretInTextNode(paragraphNode);
+            return true;
+        }
+        const duplicates = nodesToDuplicate.map((node) => node.cloneNode(true));
+        const needsLeadingBreak = nodesToDuplicate.some((node) => {
+            if (node.nodeType === Node.TEXT_NODE) return true;
+            return node.nodeType === Node.ELEMENT_NODE && !["DIV", "P", "LI", "UL", "OL", "TABLE", "BLOCKQUOTE"].includes(node.tagName);
+        });
+        const insertedNodes = needsLeadingBreak ? [document.createElement("br"), ...duplicates] : duplicates;
+        nodesToDuplicate[nodesToDuplicate.length - 1].after(...insertedNodes);
+        if (range.collapsed) placeCaretInTextNode(duplicates[0]);
+        else {
+            const duplicateRange = document.createRange();
+            duplicateRange.setStartBefore(duplicates[0]);
+            duplicateRange.setEndAfter(duplicates[duplicates.length - 1]);
+            selection.removeAllRanges();
+            selection.addRange(duplicateRange);
+            savedTextSelectionRange = duplicateRange.cloneRange();
+        }
+        return true;
+    };
+    const duplicateTextEditorLineDown = (textArea = findTextEditorNode()) => {
+        if (!textArea) return false;
+        textArea.focus();
+        restoreTextSelection();
+        if (isRichTextDocument()) return duplicateRichTextLineDown(textArea);
+        const selectionOffsets = getTextSelectionOffsets(textArea) || {start: 0, end: 0};
+        const edit = getDuplicateTextLineDownEdit(textArea.innerText || textArea.textContent || "", selectionOffsets.start, selectionOffsets.end);
+        textArea.textContent = edit.value;
+        restoreTextEditorSelectionOffsets(textArea, edit.selectionStart, edit.selectionEnd);
         return true;
     };
     const resolveTextColor = (rawColor = "") => {
@@ -814,12 +1028,32 @@
         if (!textArea || textArea.dataset.bound === "1") return;
         textArea.dataset.bound = "1";
         textArea.addEventListener("keydown", (event) => {
+            if (event.ctrlKey && !event.altKey && !event.shiftKey && event.key?.toLowerCase?.() === "k") {
+                if (hasHighlightedTextSelection()) {
+                    event.preventDefault();
+                    showTextEditorHyperlinkDialogue();
+                }
+                return;
+            }
+            if (event.ctrlKey && !event.altKey && !event.shiftKey && event.key?.toLowerCase?.() === "d") {
+                event.preventDefault();
+                duplicateTextEditorLineDown(textArea);
+                rememberTextSelection();
+                syncTextEditorStateFromDom();
+                return;
+            }
             if (event.key === "Escape") {
                 clearActiveTextImageSelection();
                 return;
             }
             handleTextEditorEnterKey(event);
         });
+        textArea.contextmenu([{
+            label: "Hyperlink",
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 6.364 6.364l-1.77 1.768a4.5 4.5 0 0 1-6.364 0M10.81 15.312a4.5 4.5 0 0 1-6.364-6.364l1.77-1.768a4.5 4.5 0 0 1 6.364 0M8.25 12h7.5" /></svg>`,
+            visible: () => hasHighlightedTextSelection() && isRichTextDocument(),
+            action: () => showTextEditorHyperlinkDialogue()
+        }]);
         textArea.addEventListener("paste", async (event) => {
             const clipboard = event.clipboardData;
             const imageItems = Array.from(clipboard?.items || []).filter((item) => item.type?.startsWith("image/"));
@@ -849,6 +1083,13 @@
             updateTextToolbarState();
         });
         textArea.addEventListener("click", (event) => {
+            const linkNode = event.target?.closest?.("a[href]");
+            if (linkNode && textArea.contains(linkNode)) {
+                event.preventDefault();
+                event.stopPropagation();
+                window.open(linkNode.href, "_blank", "noopener,noreferrer");
+                return;
+            }
             const frameNode = event.target?.closest?.(".editor-text-image-frame");
             if (!frameNode) {
                 clearActiveTextImageSelection();

@@ -336,6 +336,35 @@
         textArea.selectionStart = cursorPosition;
         textArea.selectionEnd = cursorPosition;
     };
+    const getDuplicateLineDownEdit = (value = "", selectionStart = 0, selectionEnd = selectionStart) => {
+        const content = String(value ?? "");
+        const start = Math.max(0, Math.min(Number(selectionStart) || 0, content.length));
+        const end = Math.max(start, Math.min(Number(selectionEnd) || start, content.length));
+        const effectiveEnd = end > start && content[end - 1] === "\n" ? end - 1 : end;
+        const lineStart = content.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+        const lineEndIndex = content.indexOf("\n", effectiveEnd);
+        const lineEnd = lineEndIndex >= 0 ? lineEndIndex : content.length;
+        const duplicatedText = content.slice(lineStart, lineEnd);
+        const insertion = `\n${duplicatedText}`;
+        const duplicateStart = lineEnd + 1;
+        const duplicateEnd = duplicateStart + duplicatedText.length;
+        const nextValue = `${content.slice(0, lineEnd)}${insertion}${content.slice(lineEnd)}`;
+        if (start !== end) return {value: nextValue, selectionStart: duplicateStart, selectionEnd: duplicateEnd};
+        const caretColumn = start - lineStart;
+        return {
+            value: nextValue,
+            selectionStart: duplicateStart + Math.min(caretColumn, duplicatedText.length),
+            selectionEnd: duplicateStart + Math.min(caretColumn, duplicatedText.length)
+        };
+    };
+    const duplicateCodeEditorLineDown = (textArea = null) => {
+        if (!textArea) return false;
+        const edit = getDuplicateLineDownEdit(textArea.value, textArea.selectionStart, textArea.selectionEnd);
+        textArea.value = edit.value;
+        textArea.selectionStart = edit.selectionStart;
+        textArea.selectionEnd = edit.selectionEnd;
+        return true;
+    };
     const bindCodeEditorInteractions = (portal) => {
         const codeEditorInput = getPortalCodeEditorInput(portal);
         if (!codeEditorInput || codeEditorInput.dataset.bound === "1") {
@@ -359,6 +388,12 @@
             syncCodeEditorPresentation(portal);
         });
         codeEditorInput.addEventListener("keydown", (event) => {
+            if (event.ctrlKey && !event.altKey && !event.shiftKey && event.key?.toLowerCase?.() === "d") {
+                event.preventDefault();
+                duplicateCodeEditorLineDown(codeEditorInput);
+                codeEditorInput.dispatchEvent(new Event("input", {bubbles: true}));
+                return;
+            }
             if (event.key === "Tab") {
                 event.preventDefault();
                 insertCodeEditorText(codeEditorInput, "    ", 4);

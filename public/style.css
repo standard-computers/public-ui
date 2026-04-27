@@ -39,8 +39,8 @@ button.secondary svg {color:var(--fg);width:25px;height:25px;display:block}
 button.plain {border:1px solid rgba(0,0,0,0);padding:5px;background-color:rgba(0,0,0,0)}
 button.plain:hover {background-color:var(--secondary-bg);border:1px solid var(--border);box-shadow:var(--shadow)}
 button.plain svg {color:var(--fg);width:25px;height:25px;display:block}
-button.naked {border:none;padding:5px;background-color:rgba(0,0,0,0)}
-button.naked:hover {background:none;backdrop-filter:blur(var(--blur));border:none;box-shadow:var(--shadow)}
+button.naked {border:none !important;padding:5px;background-color:rgba(0,0,0,0)}
+button.naked:hover {background:none !important;backdrop-filter:blur(var(--blur));border:none;box-shadow:var(--shadow)}
 button.naked svg {color:var(--fg);width:25px;height:25px;display:block}
 button.undecorated {border:1px solid rgba(0,0,0,0);padding:5px;background-color:rgba(0,0,0,0);color:var(--fg)}
 button.undecorated:hover {text-decoration:underline;background-color:rgba(0,0,0,0)}
