@@ -14,6 +14,38 @@
         contactImageCacheKeys[String(contactId)] = Date.now();
     };
     const contactImageUrl = (contactId) => contactId ? `/api/records/images/${contactId}?cb=${contactId}-${getContactImageCacheKey(contactId)}` : defaultContactImage;
+    const renderNoContactsState = () => div({style: "contacts-empty-state", content: children([
+        img({src: defaultContactImage, style: "contacts-empty-icon"}),
+        div({style: "contacts-empty-label", content: "No contacts"})
+    ])});
+    const renderNoContactsStateInto = (container) => {
+        if (!container) return;
+        const emptyStateMarkup = renderNoContactsState();
+        if (typeof createMarkupNode === "function") {
+            const emptyState = createMarkupNode(emptyStateMarkup);
+            if (emptyState) {
+                container.replaceChildren(emptyState);
+                return;
+            }
+        }
+        container.innerHTML = emptyStateMarkup;
+    };
+    const removeContactTile = (contactTile) => {
+        if (!contactTile) return;
+        const listContainer = contactTile.parentElement;
+        contactTile.remove();
+        if (listContainer && !listContainer.querySelector(".contact.tile")) {
+            renderNoContactsStateInto(listContainer);
+        }
+    };
+    const removeContactFromVisibleLists = (contactId) => {
+        const contactIdText = String(contactId || "");
+        document.querySelectorAll(".contact.tile").forEach((contactTile) => {
+            if (contactTile.getAttribute("data") === contactIdText) {
+                removeContactTile(contactTile);
+            }
+        });
+    };
     const applyContactImageBackground = (element, imageUrl = defaultContactImage) => {
         if (!element) return;
         element.style.backgroundImage = `url("${imageUrl}")`;
@@ -21,7 +53,7 @@
         element.style.backgroundPosition = "center";
         element.style.backgroundRepeat = "no-repeat";
     };
-    const deleteContact = (contact = {}) => {
+    const deleteContact = (contact = {}, onSuccess = () => {}) => {
         if (!contact.id) {
             modular.error("Missing contact ID");
             return;
@@ -32,8 +64,11 @@
                     const response = await CLI.send(`[contacts] - <id ${contact.id}>`);
                     if (response !== 0) {
                         if (selected_contact.id === contact.id) selected_contact = {firstname: ""};
-                        modular.refresh("com.standard.contacts");
-                        modular.show("com.standard.contacts", 0);
+                        try {
+                            onSuccess();
+                        } catch (error) {
+                            console.error("[contacts:delete] Contact deleted but list cleanup failed", error);
+                        }
                         modular.success("Deleted contact");
                     } else {
                         modular.error("Failed to delete contact");
@@ -46,6 +81,18 @@
     };
     const closeCreateContactPortal = () => {
         const openPortalWindow = typeof modular?.findPortalWindow === "function" ? modular.findPortalWindow("com.standard.contacts", 1) : null;
+        if (typeof openPortalWindow?.portal?.close === "function") {
+            openPortalWindow.portal.close();
+            return true;
+        }
+        if (typeof openPortalWindow?.portal?.hide === "function") {
+            openPortalWindow.portal.hide();
+            return true;
+        }
+        return false;
+    };
+    const closeEditContactPortal = () => {
+        const openPortalWindow = typeof modular?.findPortalWindow === "function" ? modular.findPortalWindow("com.standard.contacts", 2) : null;
         if (typeof openPortalWindow?.portal?.close === "function") {
             openPortalWindow.portal.close();
             return true;
@@ -86,8 +133,10 @@
                 title: "Delete",
                 icon: modular.icons.delete,
                 onclick: () => {
-                    deleteContact(contact);
-                    detailsPortal.close();
+                    deleteContact(contact, () => {
+                        removeContactFromVisibleLists(contact.id);
+                        detailsPortal.close();
+                    });
                 }
             }],
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25" /></svg>`,
@@ -117,7 +166,10 @@
                     div({ style : "notes-list", content: div({
                             style: "padded", content: () => {
                                 return CLI.send("[contacts]").then(d => {
-                                    const sortedContacts = [...(d.contacts || [])].sort((left, right) => {
+                                    const contacts = d === 0 ? [] : d.contacts;
+                                    if (!Array.isArray(contacts)) throw new Error("Invalid contacts response");
+                                    if (contacts.length === 0) return renderNoContactsState();
+                                    const sortedContacts = [...contacts].sort((left, right) => {
                                         const leftName = String(left?.firstname || "").trim();
                                         const rightName = String(right?.firstname || "").trim();
                                         return leftName.localeCompare(rightName, undefined, {sensitivity: "base"});
@@ -125,7 +177,7 @@
                                     let as = []
                                     for (let i = 0; i < sortedContacts.length; i++) {
                                         const contact = sortedContacts[i];
-                                        as.push(div({style: "padded secondary-tile brick line small-spaced hover-shadowed contact tile", onclick: (e) => {
+                                        as.push(div({style: "padded secondary-tile brick line small-spaced hover-shadowed contact tile", data: contact.id, onclick: (e) => {
                                                 if (e.target.closest("button")) return;
                                                 openContact(contact);
                                             }, content: children([
@@ -133,7 +185,7 @@
                                                     icon: `<svg class="small-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`,
                                                     onclick: (e) => {
                                                         e.stopPropagation();
-                                                        deleteContact(contact);
+                                                        deleteContact(contact, () => removeContactTile(e.target.closest(".contact.tile")));
                                                     }
                                                 }),
                                                 img({style: "icon float-left round space-right cover", src: contactImageUrl(contact.id)}),
@@ -285,7 +337,11 @@
                 title: "Delete",
                 icon: modular.icons.delete,
                 onclick: () => {
-                    deleteContact(selected_contact);
+                    const contactId = selected_contact?.id;
+                    deleteContact(selected_contact, () => {
+                        removeContactFromVisibleLists(contactId);
+                        closeEditContactPortal();
+                    });
                 }
             }],
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25" /></svg>`,
@@ -378,7 +434,7 @@
                             try {
                                 editContactImageFile = null;
                                 editContactImageChanged = false;
-                                editContactPortal.hide();
+                                closeEditContactPortal();
                                 modular.refresh("com.standard.contacts");
                                 openContact(selected_contact);
                                 modular.success("Saved contact");

@@ -168,6 +168,10 @@
             color: noteTile.style.background || window.getComputedStyle(noteTile).getPropertyValue("background-color")
         };
     };
+    const renderNoNotesState = () => div({style: "notes-empty-state", content: children([
+        img({src: "/icons/interfaces/notes.png", style: "notes-empty-icon"}),
+        div({style: "notes-empty-label", content: "No notes"})
+    ])});
     const noteColors = [
         {name: "Red", color: "rgba(240, 173, 176, 0.5)", secondary: "rgba(240, 173, 176, 0.5)"},
         {name: "Orange", color: "rgba(245, 194, 171, 0.5)", secondary: "rgba(245, 194, 171, 0.5)"},
@@ -186,9 +190,12 @@
                     if (response !== 0) {
                         onSuccess();
                         refreshNotes();
+                        modular.success("Deleted note");
                     } else {
                         modular.error("Unable to delete note");
                     }
+                }).catch(() => {
+                    modular.error("Unable to delete note");
                 });
             }
         });
@@ -333,9 +340,12 @@
             route: () => div({style: "large-padding-top padding-right", content: children([
                     div({style : "notes-list", content: div({style: "padded", content: () => {
                             return CLI.send("[notes]").then(d => {
+                                const notes = d === 0 ? [] : d.notes;
+                                if (!Array.isArray(notes)) throw new Error("Invalid notes response");
+                                if (notes.length === 0) return renderNoNotesState();
                                 let as = [];
-                                for (let i = 0; i < d.notes.length; i++) {
-                                        const note = d.notes[i];
+                                for (let i = 0; i < notes.length; i++) {
+                                        const note = notes[i];
                                         as.push(div({style: "note-tile padded secondary-tile brick line small-spaced hover-shadowed",
                                             data: note.id,
                                             background: note.color,

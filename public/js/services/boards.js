@@ -345,11 +345,16 @@
         }
         doSave(activeBoardName);
     };
+    const renderNoBoardsState = () => div({style: "boards-empty-state", content: children([
+        img({src: "/icons/interfaces/whiteboard.png", style: "boards-empty-icon"}),
+        div({style: "boards-empty-label", content: "No boards"})
+    ])});
     const renderBoards = async () => {
         try {
             const tree = await CLI.send("tree Boards");
+            if (tree === 0) return renderNoBoardsState();
             const boards = Array.isArray(tree?.children) ? tree.children.filter(file => !file?.children && /\.wtb$/i.test(file?.name || "")) : [];
-            if (!boards.length) return div({style: "small-padding faded", content: "No saved boards yet."});
+            if (!boards.length) return renderNoBoardsState();
             return children(boards.map(board => div({
                 style: "padded radius pointer hidden board-file hover-background hover-shadowed center",
                 directive: board.path,
