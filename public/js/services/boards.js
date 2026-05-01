@@ -294,6 +294,28 @@
         viewport: boardViewport,
         operations: boardOperations
     });
+    const shapeIcon = `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3.75" y="4.5" width="7.5" height="7.5" rx="1.25" /><circle cx="16.75" cy="8.25" r="3.75" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 19.5h12l-6-6-6 6Z" /></svg>`;
+    const boardShapeOptions = [{
+        type: "rectangle",
+        label: "Rectangle",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="1.5" /></svg>`
+    }, {
+        type: "rounded-rectangle",
+        label: "Rounded Rectangle",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="4" /></svg>`
+    }, {
+        type: "ellipse",
+        label: "Ellipse",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><ellipse cx="12" cy="12" rx="8" ry="5.5" /></svg>`
+    }, {
+        type: "triangle",
+        label: "Triangle",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 4 21 20H3L12 4Z" /></svg>`
+    }, {
+        type: "diamond",
+        label: "Diamond",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 3 21 12 12 21 3 12 12 3Z" /></svg>`
+    }];
     const saveBoardToBoardsFolder = async (boardName, canvas = null) => {
         const fileName = `${boardName}.wtb`;
         const payload = buildBoardPayload(canvas);
@@ -425,9 +447,10 @@
                                     div({style: "color-block pointer hover-zoom cube inline background-violet radius", content: div({style: ""})}),
                                     div({style: "color-block pointer hover-zoom cube inline background-pink radius", content: div({style: ""})}),
                                     button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top", data: "action-clear", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`}),
+                                    button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top", data: "action-shapes", icon: shapeIcon}),
                                     button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top", data: "action-attach", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>`}),
                                     button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", data: "tool-select", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg"  viewBox="0 0 50 50"><path d="M 14.78125 5 C 14.75 5.007813 14.71875 5.019531 14.6875 5.03125 C 14.644531 5.050781 14.601563 5.070313 14.5625 5.09375 C 14.550781 5.09375 14.542969 5.09375 14.53125 5.09375 C 14.511719 5.101563 14.488281 5.113281 14.46875 5.125 C 14.457031 5.136719 14.449219 5.144531 14.4375 5.15625 C 14.425781 5.167969 14.417969 5.175781 14.40625 5.1875 C 14.375 5.207031 14.34375 5.226563 14.3125 5.25 C 14.289063 5.269531 14.269531 5.289063 14.25 5.3125 C 14.238281 5.332031 14.226563 5.355469 14.21875 5.375 C 14.183594 5.414063 14.152344 5.457031 14.125 5.5 C 14.113281 5.511719 14.105469 5.519531 14.09375 5.53125 C 14.09375 5.542969 14.09375 5.550781 14.09375 5.5625 C 14.082031 5.582031 14.070313 5.605469 14.0625 5.625 C 14.050781 5.636719 14.042969 5.644531 14.03125 5.65625 C 14.03125 5.675781 14.03125 5.699219 14.03125 5.71875 C 14.019531 5.757813 14.007813 5.800781 14 5.84375 C 14 5.875 14 5.90625 14 5.9375 C 14 5.949219 14 5.957031 14 5.96875 C 14 5.980469 14 5.988281 14 6 C 13.996094 6.050781 13.996094 6.105469 14 6.15625 L 14 39 C 14.003906 39.398438 14.242188 39.757813 14.609375 39.914063 C 14.972656 40.070313 15.398438 39.992188 15.6875 39.71875 L 22.9375 32.90625 L 28.78125 46.40625 C 28.890625 46.652344 29.09375 46.847656 29.347656 46.941406 C 29.601563 47.035156 29.882813 47.023438 30.125 46.90625 L 34.5 44.90625 C 34.996094 44.679688 35.21875 44.09375 35 43.59375 L 28.90625 30.28125 L 39.09375 29.40625 C 39.496094 29.378906 39.84375 29.113281 39.976563 28.730469 C 40.105469 28.347656 39.992188 27.921875 39.6875 27.65625 L 15.84375 5.4375 C 15.796875 5.378906 15.746094 5.328125 15.6875 5.28125 C 15.648438 5.234375 15.609375 5.195313 15.5625 5.15625 C 15.550781 5.15625 15.542969 5.15625 15.53125 5.15625 C 15.511719 5.132813 15.492188 5.113281 15.46875 5.09375 C 15.457031 5.09375 15.449219 5.09375 15.4375 5.09375 C 15.386719 5.070313 15.335938 5.046875 15.28125 5.03125 C 15.269531 5.03125 15.261719 5.03125 15.25 5.03125 C 15.230469 5.019531 15.207031 5.007813 15.1875 5 C 15.175781 5 15.167969 5 15.15625 5 C 15.136719 5 15.113281 5 15.09375 5 C 15.082031 5 15.074219 5 15.0625 5 C 15.042969 5 15.019531 5 15 5 C 14.988281 5 14.980469 5 14.96875 5 C 14.9375 5 14.90625 5 14.875 5 C 14.84375 5 14.8125 5 14.78125 5 Z M 16 8.28125 L 36.6875 27.59375 L 27.3125 28.40625 C 26.992188 28.4375 26.707031 28.621094 26.546875 28.902344 C 26.382813 29.179688 26.367188 29.519531 26.5 29.8125 L 32.78125 43.5 L 30.21875 44.65625 L 24.21875 30.8125 C 24.089844 30.515625 23.828125 30.296875 23.511719 30.230469 C 23.195313 30.160156 22.863281 30.25 22.625 30.46875 L 16 36.6875 Z"/></svg>`}),
-                                    button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", data: "tool-erase", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21h8.25" /></svg>`}),
+                                    button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", data: "tool-erase", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.72-7.72a2.25 2.25 0 0 1 3.18 0l2.57 2.57a2.25 2.25 0 0 1 0 3.18l-5.47 5.47H7.5l-3-3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="m9 11.25 5.25 5.25M12.5 19.25H20" /></svg>`}),
                                     button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", data: "tool-draw", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" /></svg>`}),
                                     button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", data: "tool-drag", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.05 4.575a1.575 1.575 0 1 0-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 0 1 3.15 0v1.5m-3.15 0 .075 5.925m3.075.75V4.575m0 0a1.575 1.575 0 0 1 3.15 0V15M6.9 7.575a1.575 1.575 0 1 0-3.15 0v8.175a6.75 6.75 0 0 0 6.75 6.75h2.018a5.25 5.25 0 0 0 3.712-1.538l1.732-1.732a5.25 5.25 0 0 0 1.538-3.712l.003-2.024a.668.668 0 0 1 .198-.471 1.575 1.575 0 1 0-2.228-2.228 3.818 3.818 0 0 0-1.12 2.687M6.9 7.575V12m6.27 4.318A4.49 4.49 0 0 1 16.35 15m.002 0h-.002" /></svg>`})
                                 ])})
@@ -463,7 +486,8 @@
                         let canvasOrigin = {x: 0, y: 0};
                         let isDragging = false;
                         let dragStart = {x: 0, y: 0};
-                        let selectedImageIndex = -1;
+                        let selectedOperationIndex = -1;
+                        let contextShapeIndex = -1;
                         let selectionAction = null;
                         const resizeHandleSize = 12;
                         const canvasGrowthPadding = 512;
@@ -581,20 +605,24 @@
                                     };
                                     img.src = operation.dataUrl;
                                 }
+                                if (operation?.type === "shape") {
+                                    renderShapeOperation(operation);
+                                }
                             });
-                            const selectedOperation = boardOperations[selectedImageIndex];
-                            if (selectedOperation?.type === "image") {
+                            const selectedOperation = boardOperations[selectedOperationIndex];
+                            if (isSelectableOperation(selectedOperation)) {
                                 ctx.save();
                                 ctx.setLineDash([6, 4]);
                                 ctx.strokeStyle = "#4c8bf5";
                                 ctx.lineWidth = 1.5;
-                                ctx.strokeRect(selectedOperation.x - canvasOrigin.x, selectedOperation.y - canvasOrigin.y, selectedOperation.width, selectedOperation.height);
+                                const bounds = getOperationBounds(selectedOperation);
+                                ctx.strokeRect(bounds.x - canvasOrigin.x, bounds.y - canvasOrigin.y, bounds.width, bounds.height);
                                 ctx.setLineDash([]);
                                 const handles = [
-                                    {x: selectedOperation.x - canvasOrigin.x, y: selectedOperation.y - canvasOrigin.y},
-                                    {x: selectedOperation.x + selectedOperation.width - canvasOrigin.x, y: selectedOperation.y - canvasOrigin.y},
-                                    {x: selectedOperation.x - canvasOrigin.x, y: selectedOperation.y + selectedOperation.height - canvasOrigin.y},
-                                    {x: selectedOperation.x + selectedOperation.width - canvasOrigin.x, y: selectedOperation.y + selectedOperation.height - canvasOrigin.y}
+                                    {x: bounds.x - canvasOrigin.x, y: bounds.y - canvasOrigin.y},
+                                    {x: bounds.x + bounds.width - canvasOrigin.x, y: bounds.y - canvasOrigin.y},
+                                    {x: bounds.x - canvasOrigin.x, y: bounds.y + bounds.height - canvasOrigin.y},
+                                    {x: bounds.x + bounds.width - canvasOrigin.x, y: bounds.y + bounds.height - canvasOrigin.y}
                                 ];
                                 handles.forEach(handle => {
                                     ctx.fillStyle = "#ffffff";
@@ -620,33 +648,100 @@
                         };
                         const clearCanvas = () => {
                             boardOperations = [];
+                            selectedOperationIndex = -1;
+                            contextShapeIndex = -1;
                             renderOperations();
                         };
                         const getPos = e => {
                             const rect = canvas.getBoundingClientRect();
                             return {x: ((e.clientX - rect.left) / scale) + canvasOrigin.x, y: ((e.clientY - rect.top) / scale) + canvasOrigin.y};
                         };
-                        const getImageOperationIndexAtPos = pos => {
+                        const isSelectableOperation = operation => operation?.type === "image" || operation?.type === "shape";
+                        const getOperationBounds = operation => ({
+                            x: Number(operation?.x) || 0,
+                            y: Number(operation?.y) || 0,
+                            width: Math.max(1, Number(operation?.width) || 1),
+                            height: Math.max(1, Number(operation?.height) || 1)
+                        });
+                        const getSelectableOperationIndexAtPos = pos => {
                             for (let i = boardOperations.length - 1; i >= 0; i--) {
                                 const operation = boardOperations[i];
-                                if (operation?.type !== "image") continue;
-                                if (pos.x >= operation.x && pos.x <= operation.x + operation.width && pos.y >= operation.y && pos.y <= operation.y + operation.height) return i;
+                                if (!isSelectableOperation(operation)) continue;
+                                const bounds = getOperationBounds(operation);
+                                if (pos.x >= bounds.x && pos.x <= bounds.x + bounds.width && pos.y >= bounds.y && pos.y <= bounds.y + bounds.height) return i;
                             }
                             return -1;
                         };
                         const getResizeHandleType = (operation, pos) => {
-                            if (!operation || operation.type !== "image") return null;
+                            if (!isSelectableOperation(operation)) return null;
+                            const bounds = getOperationBounds(operation);
                             const halfHandle = resizeHandleSize / 2;
                             const handles = [
-                                {name: "top-left", x: operation.x, y: operation.y},
-                                {name: "top-right", x: operation.x + operation.width, y: operation.y},
-                                {name: "bottom-left", x: operation.x, y: operation.y + operation.height},
-                                {name: "bottom-right", x: operation.x + operation.width, y: operation.y + operation.height}
+                                {name: "top-left", x: bounds.x, y: bounds.y},
+                                {name: "top-right", x: bounds.x + bounds.width, y: bounds.y},
+                                {name: "bottom-left", x: bounds.x, y: bounds.y + bounds.height},
+                                {name: "bottom-right", x: bounds.x + bounds.width, y: bounds.y + bounds.height}
                             ];
                             const handle = handles.find(candidate => {
                                 return pos.x >= candidate.x - halfHandle && pos.x <= candidate.x + halfHandle && pos.y >= candidate.y - halfHandle && pos.y <= candidate.y + halfHandle;
                             });
                             return handle?.name || null;
+                        };
+                        const withShapePath = operation => {
+                            const bounds = getOperationBounds(operation);
+                            const x = bounds.x - canvasOrigin.x;
+                            const y = bounds.y - canvasOrigin.y;
+                            const w = bounds.width;
+                            const h = bounds.height;
+                            ctx.beginPath();
+                            if (operation.shape === "ellipse") {
+                                ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+                                return;
+                            }
+                            if (operation.shape === "triangle") {
+                                ctx.moveTo(x + w / 2, y);
+                                ctx.lineTo(x + w, y + h);
+                                ctx.lineTo(x, y + h);
+                                ctx.closePath();
+                                return;
+                            }
+                            if (operation.shape === "diamond") {
+                                ctx.moveTo(x + w / 2, y);
+                                ctx.lineTo(x + w, y + h / 2);
+                                ctx.lineTo(x + w / 2, y + h);
+                                ctx.lineTo(x, y + h / 2);
+                                ctx.closePath();
+                                return;
+                            }
+                            const radius = operation.shape === "rounded-rectangle" ? Math.min(w, h, 28) / 4 : 0;
+                            if (radius && typeof ctx.roundRect === "function") {
+                                ctx.roundRect(x, y, w, h, radius);
+                                return;
+                            }
+                            if (radius) {
+                                ctx.moveTo(x + radius, y);
+                                ctx.lineTo(x + w - radius, y);
+                                ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+                                ctx.lineTo(x + w, y + h - radius);
+                                ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+                                ctx.lineTo(x + radius, y + h);
+                                ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+                                ctx.lineTo(x, y + radius);
+                                ctx.quadraticCurveTo(x, y, x + radius, y);
+                                ctx.closePath();
+                                return;
+                            }
+                            ctx.rect(x, y, w, h);
+                        };
+                        const renderShapeOperation = operation => {
+                            ctx.save();
+                            withShapePath(operation);
+                            ctx.fillStyle = operation.fillColor || "rgba(76, 139, 245, 0.18)";
+                            ctx.strokeStyle = operation.borderColor || "#1f2937";
+                            ctx.lineWidth = Math.max(0, Number(operation.borderWidth) || 0);
+                            ctx.fill();
+                            if (ctx.lineWidth > 0) ctx.stroke();
+                            ctx.restore();
                         };
                         const setTool = t => {
                             tool = t;
@@ -684,12 +779,56 @@
                                     const x = visibleLeft + ((viewportSize.width / scale) - drawWidth) / 2;
                                     const y = visibleTop + ((viewportSize.height / scale) - drawHeight) / 2;
                                     boardOperations.push({type: "image", dataUrl: reader.result, x, y, width: drawWidth, height: drawHeight});
-                                    selectedImageIndex = boardOperations.length - 1;
+                                    selectedOperationIndex = boardOperations.length - 1;
                                     renderOperations();
                                 };
                                 img.src = reader.result;
                             };
                             reader.readAsDataURL(file);
+                        };
+                        const getCenteredInsertionRect = (width = 160, height = 110) => {
+                            const viewportSize = getViewportSize();
+                            const visibleLeft = (-translate.x) / scale;
+                            const visibleTop = (-translate.y) / scale;
+                            return {
+                                x: visibleLeft + ((viewportSize.width / scale) - width) / 2,
+                                y: visibleTop + ((viewportSize.height / scale) - height) / 2,
+                                width,
+                                height
+                            };
+                        };
+                        const insertShape = shapeType => {
+                            const dimensions = shapeType === "triangle" || shapeType === "diamond" ? getCenteredInsertionRect(140, 140) : getCenteredInsertionRect(170, 110);
+                            boardOperations.push({
+                                type: "shape",
+                                shape: shapeType,
+                                ...dimensions,
+                                borderColor: "#1f2937",
+                                borderWidth: 2,
+                                fillColor: "rgba(76, 139, 245, 0.18)"
+                            });
+                            selectedOperationIndex = boardOperations.length - 1;
+                            setTool("select");
+                            renderOperations();
+                        };
+                        const changeShapeProperty = (property, title, placeholder, parser = value => value) => {
+                            const shape = boardOperations[contextShapeIndex];
+                            if (shape?.type !== "shape") return;
+                            inputDialogue({
+                                title,
+                                placeholder,
+                                value: shape[property],
+                                confirmation: (_, rawValue) => {
+                                    const nextValue = parser(rawValue);
+                                    if (nextValue === null || nextValue === undefined || nextValue === "") return;
+                                    shape[property] = nextValue;
+                                    renderOperations();
+                                }
+                            });
+                        };
+                        const parsePositivePixel = value => {
+                            const number = Math.round(Number.parseFloat(String(value || "")));
+                            return Number.isFinite(number) && number > 0 ? number : null;
                         };
                         const startDrawing = e => {
                             if (tool === "drag") {
@@ -699,20 +838,20 @@
                             }
                             if (tool === "select") {
                                 const pos = getPos(e);
-                                const selectedOperation = boardOperations[selectedImageIndex];
+                                const selectedOperation = boardOperations[selectedOperationIndex];
                                 const handleType = getResizeHandleType(selectedOperation, pos);
                                 if (handleType) {
                                     selectionAction = {type: "resize", handle: handleType, start: pos};
                                     return;
                                 }
-                                const imageIndex = getImageOperationIndexAtPos(pos);
-                                selectedImageIndex = imageIndex;
-                                if (imageIndex >= 0) {
-                                    const selectedImage = boardOperations[imageIndex];
+                                const operationIndex = getSelectableOperationIndexAtPos(pos);
+                                selectedOperationIndex = operationIndex;
+                                if (operationIndex >= 0) {
+                                    const selectedOperation = boardOperations[operationIndex];
                                     selectionAction = {
                                         type: "move",
-                                        offsetX: pos.x - selectedImage.x,
-                                        offsetY: pos.y - selectedImage.y
+                                        offsetX: pos.x - selectedOperation.x,
+                                        offsetY: pos.y - selectedOperation.y
                                     };
                                 } else {
                                     selectionAction = null;
@@ -744,45 +883,45 @@
                                 return;
                             }
                             if (tool === "select") {
-                                if (!selectionAction || selectedImageIndex < 0) return;
-                                const selectedImage = boardOperations[selectedImageIndex];
-                                if (!selectedImage || selectedImage.type !== "image") return;
+                                if (!selectionAction || selectedOperationIndex < 0) return;
+                                const selectedOperation = boardOperations[selectedOperationIndex];
+                                if (!isSelectableOperation(selectedOperation)) return;
                                 const pos = getPos(e);
                                 if (selectionAction.type === "move") {
-                                    selectedImage.x = pos.x - selectionAction.offsetX;
-                                    selectedImage.y = pos.y - selectionAction.offsetY;
+                                    selectedOperation.x = pos.x - selectionAction.offsetX;
+                                    selectedOperation.y = pos.y - selectionAction.offsetY;
                                 }
                                 if (selectionAction.type === "resize") {
                                     const minSize = 24;
-                                    const endX = selectedImage.x + selectedImage.width;
-                                    const endY = selectedImage.y + selectedImage.height;
+                                    const endX = selectedOperation.x + selectedOperation.width;
+                                    const endY = selectedOperation.y + selectedOperation.height;
                                     if (selectionAction.handle === "top-left") {
                                         const nextX = Math.min(pos.x, endX - minSize);
                                         const nextY = Math.min(pos.y, endY - minSize);
-                                        selectedImage.width = endX - nextX;
-                                        selectedImage.height = endY - nextY;
-                                        selectedImage.x = nextX;
-                                        selectedImage.y = nextY;
+                                        selectedOperation.width = endX - nextX;
+                                        selectedOperation.height = endY - nextY;
+                                        selectedOperation.x = nextX;
+                                        selectedOperation.y = nextY;
                                     }
                                     if (selectionAction.handle === "top-right") {
-                                        const nextX = Math.max(pos.x, selectedImage.x + minSize);
+                                        const nextX = Math.max(pos.x, selectedOperation.x + minSize);
                                         const nextY = Math.min(pos.y, endY - minSize);
-                                        selectedImage.width = nextX - selectedImage.x;
-                                        selectedImage.height = endY - nextY;
-                                        selectedImage.y = nextY;
+                                        selectedOperation.width = nextX - selectedOperation.x;
+                                        selectedOperation.height = endY - nextY;
+                                        selectedOperation.y = nextY;
                                     }
                                     if (selectionAction.handle === "bottom-left") {
                                         const nextX = Math.min(pos.x, endX - minSize);
-                                        const nextY = Math.max(pos.y, selectedImage.y + minSize);
-                                        selectedImage.width = endX - nextX;
-                                        selectedImage.height = nextY - selectedImage.y;
-                                        selectedImage.x = nextX;
+                                        const nextY = Math.max(pos.y, selectedOperation.y + minSize);
+                                        selectedOperation.width = endX - nextX;
+                                        selectedOperation.height = nextY - selectedOperation.y;
+                                        selectedOperation.x = nextX;
                                     }
                                     if (selectionAction.handle === "bottom-right") {
-                                        const nextX = Math.max(pos.x, selectedImage.x + minSize);
-                                        const nextY = Math.max(pos.y, selectedImage.y + minSize);
-                                        selectedImage.width = nextX - selectedImage.x;
-                                        selectedImage.height = nextY - selectedImage.y;
+                                        const nextX = Math.max(pos.x, selectedOperation.x + minSize);
+                                        const nextY = Math.max(pos.y, selectedOperation.y + minSize);
+                                        selectedOperation.width = nextX - selectedOperation.x;
+                                        selectedOperation.height = nextY - selectedOperation.y;
                                     }
                                 }
                                 renderOperations();
@@ -824,6 +963,51 @@
                             insertImage(file);
                             attachInput.value = "";
                         });
+                        const shapeButton = windowBody.querySelector('button[data="action-shapes"]');
+                        if (shapeButton && !shapeButton.__boardsShapesMenuAttached) {
+                            shapeButton.__boardsShapesMenuAttached = true;
+                            shapeButton.popoutmenu(boardShapeOptions.map(shape => ({
+                                icon: shape.icon,
+                                label: shape.label,
+                                action: () => insertShape(shape.type)
+                            })));
+                        }
+                        canvas.addEventListener("contextmenu", event => {
+                            const operationIndex = getSelectableOperationIndexAtPos(getPos(event));
+                            const operation = boardOperations[operationIndex];
+                            contextShapeIndex = operation?.type === "shape" ? operationIndex : -1;
+                            if (contextShapeIndex >= 0) selectedOperationIndex = contextShapeIndex;
+                            renderOperations();
+                        }, true);
+                        canvas.contextmenu([{
+                            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m9-9H3" /></svg>`,
+                            label: "Border Color",
+                            visible: () => contextShapeIndex >= 0,
+                            action: () => changeShapeProperty("borderColor", "Border color", "#1f2937")
+                        }, {
+                            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5h15M7 16 17 6" /></svg>`,
+                            label: "Border Width",
+                            visible: () => contextShapeIndex >= 0,
+                            action: () => changeShapeProperty("borderWidth", "Border width", "2", value => {
+                                const number = Math.round(Number.parseFloat(String(value || "")));
+                                return Number.isFinite(number) && number >= 0 ? number : null;
+                            })
+                        }, {
+                            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m15 11.25-3-3m0 0-3 3m3-3v11.25M4.5 19.5h15" /></svg>`,
+                            label: "Fill",
+                            visible: () => contextShapeIndex >= 0,
+                            action: () => changeShapeProperty("fillColor", "Fill", "rgba(76, 139, 245, 0.18)")
+                        }, {
+                            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5M3.75 15h16.5" /></svg>`,
+                            label: "Width",
+                            visible: () => contextShapeIndex >= 0,
+                            action: () => changeShapeProperty("width", "Width", "170", parsePositivePixel)
+                        }, {
+                            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75v16.5M15 3.75v16.5" /></svg>`,
+                            label: "Height",
+                            visible: () => contextShapeIndex >= 0,
+                            action: () => changeShapeProperty("height", "Height", "110", parsePositivePixel)
+                        }]);
                         windowBody.querySelector('button[data="tool-draw"]')?.addEventListener("click", () => setTool("draw"));
                         windowBody.querySelector('button[data="tool-erase"]')?.addEventListener("click", () => setTool("erase"));
                         windowBody.querySelector('button[data="tool-select"]')?.addEventListener("click", () => setTool("select"));

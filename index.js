@@ -1294,6 +1294,57 @@ function withWsResponse(res, sendFn, onMessage, {timeoutMessage = "Timeout waiti
     }).catch(() => null);
 }
 
+function withRelayBinaryUploadResponse(res, payload, {onSettled = null, requestName = "relay-binary-upload"} = {}) {
+    if (!ensureWsOpen(res)) return;
+    let fallbackHandle = null;
+    const clearFallback = () => {
+        if (!fallbackHandle) return;
+        clearTimeout(fallbackHandle);
+        fallbackHandle = null;
+    };
+    enqueueWsRequest({
+        name: requestName,
+        response: res,
+        timeoutMessage: "Timeout waiting for upload confirmation",
+        start: entry => {
+            wsClient.send(payload, err => {
+                if (err) {
+                    clearFallback();
+                    failWsRequest(entry, err);
+                    return;
+                }
+                fallbackHandle = setTimeout(() => {
+                    fallbackHandle = null;
+                    if (!res.headersSent) {
+                        res.send("Upload sent");
+                    }
+                    completeWsRequest(entry);
+                }, WS_BINARY_SETTLE_MS);
+            });
+        },
+        onMessage: (data, _isBinary, entry) => {
+            clearFallback();
+            if (!res.headersSent) {
+                res.send(data.toString());
+            }
+            completeWsRequest(entry);
+        },
+        onError: err => {
+            clearFallback();
+            if (res.headersSent || err.code === "WS_REQUEST_CANCELED") return;
+            if (err.code === "WS_NOT_CONNECTED") {
+                res.status(503).send("WebSocket not connected");
+                return;
+            }
+            res.status(500).send(err.message || "Upload failed");
+        },
+        onSettled: () => {
+            clearFallback();
+            if (typeof onSettled === "function") onSettled();
+        }
+    }).catch(() => null);
+}
+
 app.use(cookieParser());
 app.engine("handlebars", exphbs.engine({defaultLayout: "index"}));
 app.set("view engine", "handlebars");
@@ -1854,6 +1905,13 @@ app.post("/api/upload", uploadSingleFile, async (req, res) => {
                 const uploadDirectory = rawUploadDirectory.replace(/\\/g, "/").replace(/\/+$/, "").replace(/^\/home\/standard-system\//, "").replace(/^home\/standard-system\//, "").replace(/^\/+/, "");
                 const importPath = uploadDirectory ? `${uploadDirectory}/${fileName}` : fileName;
                 const importPayload = buildBinaryCommandPayload("import", importPath, req.file.buffer, resolveRelayContext(req));
+                if (isRelayMode) {
+                    withRelayBinaryUploadResponse(res, importPayload, {
+                        requestName: "relay-file-upload",
+                        onSettled: resolve
+                    });
+                    return;
+                }
                 withWsResponse(res, () => {
                     wsClient.send(importPayload);
                 }, data => {

@@ -275,7 +275,8 @@ body.drag-active::before {content:"";position:fixed;inset:0;pointer-events:none;
 .maps-autocomplete-option:last-child {border-bottom:0}
 .maps-autocomplete-option:hover {background:var(--secondary-bg)}
 .maps-search-button {background:var(--transparent-bg);backdrop-filter:blur(var(--blur));border:1px solid var(--border)}
-.maps-controls-overlay {position:absolute;right:12px;bottom:12px;z-index:4;display:flex;flex-direction:column;gap:4px}
+.maps-controls-overlay {position:absolute;right:12px;bottom:12px;z-index:4;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.maps-control-row {display:flex;gap:4px}
 .maps-control-button {margin:0 !important}
 .maps-control-button svg {margin:0 !important;display:block}
 
@@ -295,12 +296,16 @@ body.drag-active::before {content:"";position:fixed;inset:0;pointer-events:none;
 .editor-sheet-row-header {position:sticky;left:0;z-index:3}
 .editor-sheet-row:first-child .editor-sheet-cell-header {position:sticky;top:0;z-index:4}
 .editor-sheet-row:first-child .editor-sheet-row-header {z-index:5}
-.editor-sheet-cell {border-right:1px solid var(--border);border-bottom:1px solid var(--border);box-shadow:inset 0 -1px 0 var(--border);background:var(--bg);box-sizing:border-box}
+.editor-sheet-cell {position:relative;border-right:1px solid var(--border);border-bottom:1px solid var(--border);box-shadow:inset 0 -1px 0 var(--border);background:var(--bg);box-sizing:border-box}
 .editor-sheet-cell-input {display:block;width:100%;height:100%;border:0;background:transparent;padding:8px 6px;outline:none;box-sizing:border-box}
+.editor-sheet-cell-input[readonly] {cursor:default}
 .editor-sheet-cell-input:focus,
 .editor-sheet-cell-input.active,
 .editor-sheet-cell-header.active {box-shadow:inset 0 0 0 2px #20c05c}
 .editor-sheet-cell[data-styled="1"] {background-image:linear-gradient(135deg, rgba(32, 192, 92, 0.08), rgba(32, 192, 92, 0));}
+.editor-sheet-cell-lock-indicator {position:absolute;top:3px;right:3px;width:11px;height:11px;display:none;align-items:center;justify-content:center;color:var(--fg);opacity:.32;pointer-events:none}
+.editor-sheet-cell-lock-indicator .small-icon {width:11px;height:11px}
+.editor-sheet-cell-locked .editor-sheet-cell-lock-indicator {display:flex}
 .editor-sheet-header-label {display:flex;align-items:center;justify-content:center;width:100%;height:100%;pointer-events:none}
 .editor-sheet-corner-cell .editor-sheet-header-label {display:none}
 .editor-sheet-resize-handle {position:absolute;opacity:0;transition:opacity 120ms ease;background:rgba(32, 192, 92, 0.22);z-index:6}

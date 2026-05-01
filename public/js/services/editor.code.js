@@ -461,6 +461,7 @@
             placeholder: "code.js",
             value: "code.js",
             confirmation: async (_, inputFileName) => {
+                if (!modular.validateFileName(inputFileName)) return;
                 const safeFileName = sanitizeNewCodeFileName(inputFileName) || "code.js";
                 await saveCodeEditorContentToPath(portal, `Documents/${safeFileName}`);
             }

@@ -31,6 +31,7 @@
     const TEXT_PAGE_VIEW_CONTENT_HEIGHT_PX = TEXT_PAGE_VIEW_HEIGHT_PX - (TEXT_PAGE_VIEW_PADDING_PX * 2);
     const TEXT_PAGE_VIEW_BREAK_SPACER_PX = (TEXT_PAGE_VIEW_PADDING_PX * 2) + TEXT_PAGE_VIEW_GAP_PX;
     const TEXT_INPUT_SYNC_DEBOUNCE_MS = 120;
+    const TEXT_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" style="fill:none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path fill="none" style="fill:none" stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>`;
     const TEXT_ALIGN_ICONS = {
         left: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M4 10.5h10M4 14.5h16M4 18.5h10" /></svg>`,
         center: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M7 10.5h10M4 14.5h16M7 18.5h10" /></svg>`,
@@ -450,15 +451,16 @@
         const text = String(labelText || "").trim();
         if (!textArea || !isRichTextDocument() || !url || !text) return false;
         restoreTextSelection();
-        const range = getActiveTextSelectionRange();
-        if (!range) return false;
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return false;
+        const range = selection.getRangeAt(0);
+        if (!textArea.contains(range.commonAncestorContainer)) return false;
         const linkNode = document.createElement("a");
         linkNode.href = url;
         linkNode.textContent = text;
         prepareEditorLinkNode(linkNode);
         range.deleteContents();
         range.insertNode(linkNode);
-        const selection = window.getSelection();
         range.setStartAfter(linkNode);
         range.collapse(true);
         selection.removeAllRanges();
@@ -467,11 +469,11 @@
         syncTextEditorStateFromDom();
         return true;
     };
-    const showTextEditorHyperlinkDialogue = () => {
+    const showTextEditorHyperlinkDialogue = ({allowEmptyText = false} = {}) => {
         if (!isRichTextDocument()) return false;
         restoreTextSelection();
         const selectedText = getTextSelectionPlainText().trim();
-        if (!selectedText) return false;
+        if (!selectedText && !allowEmptyText) return false;
         rememberTextSelection();
         inputDialogue({
             title: "Hyperlink",
@@ -480,7 +482,7 @@
             title_value: selectedText,
             placeholder: "Link",
             confirmation: (textValue, linkValue) => {
-                if (!applyTextEditorHyperlink(textValue, linkValue)) modular.error("Select text and enter a link");
+                if (!applyTextEditorHyperlink(textValue, linkValue)) modular.error("Enter text and a link");
             }
         });
         return true;
@@ -629,6 +631,24 @@
         const edit = getDuplicateTextLineDownEdit(textArea.innerText || textArea.textContent || "", selectionOffsets.start, selectionOffsets.end);
         textArea.textContent = edit.value;
         restoreTextEditorSelectionOffsets(textArea, edit.selectionStart, edit.selectionEnd);
+        return true;
+    };
+    const insertTextEditorTab = (textArea = findTextEditorNode()) => {
+        if (!textArea) return false;
+        textArea.focus();
+        restoreTextSelection();
+        if (document.execCommand("insertText", false, "\t")) return true;
+        const selection = window.getSelection();
+        if (!selection?.rangeCount || !isSelectionInsideTextEditor(selection)) return false;
+        const range = selection.getRangeAt(0);
+        const tabNode = document.createTextNode("\t");
+        range.deleteContents();
+        range.insertNode(tabNode);
+        range.setStartAfter(tabNode);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        savedTextSelectionRange = range.cloneRange();
         return true;
     };
     const resolveTextColor = (rawColor = "") => {
@@ -806,6 +826,7 @@
         const boldButton = document.getElementById("editor-sheet-style-bold");
         const italicButton = document.getElementById("editor-sheet-style-italic");
         const underlineButton = document.getElementById("editor-sheet-style-underline");
+        const linkButton = document.getElementById("editor-sheet-style-link");
         const textColorButton = document.getElementById("editor-sheet-style-color");
         const backgroundColorButton = document.getElementById("editor-sheet-style-background");
         const alignmentButton = document.getElementById("editor-sheet-style-align");
@@ -816,6 +837,7 @@
         const style = getComputedStyle(styleTarget || editorNode);
         const blockStyle = getComputedStyle(getTextSelectionBlockTarget(styleTarget));
         const activeList = getTextSelectionListTarget(styleTarget);
+        const activeLink = styleTarget?.closest?.("a[href]");
         const fontWeightValue = Number(style.fontWeight);
         const isBold = style.fontWeight === "bold" || Number.isFinite(fontWeightValue) && fontWeightValue >= 600;
         const textDecorationLine = String(style.textDecorationLine || style.textDecoration || "");
@@ -827,9 +849,11 @@
         setTextToolbarButtonState(boldButton, isBold);
         setTextToolbarButtonState(italicButton, style.fontStyle === "italic" || style.fontStyle === "oblique");
         setTextToolbarButtonState(underlineButton, textDecorationLine.includes("underline"));
+        setTextToolbarButtonState(linkButton, !!activeLink);
         syncTextToolbarIconColor(boldButton);
         syncTextToolbarIconColor(italicButton);
         syncTextToolbarIconColor(underlineButton);
+        syncTextToolbarIconColor(linkButton);
         if (textColorButton) {
             textColorButton.className = `${textColor ? "tiny primary" : ""} naked align-bottom small-margin-right inner-radius`.trim();
             textColorButton.style.color = textColor || "";
@@ -1018,6 +1042,7 @@
         const boldButton = document.getElementById("editor-sheet-style-bold");
         const italicButton = document.getElementById("editor-sheet-style-italic");
         const underlineButton = document.getElementById("editor-sheet-style-underline");
+        const linkButton = document.getElementById("editor-sheet-style-link");
         const textColorButton = document.getElementById("editor-sheet-style-color");
         const backgroundColorButton = document.getElementById("editor-sheet-style-background");
         const alignmentButton = document.getElementById("editor-sheet-style-align");
@@ -1046,11 +1071,18 @@
                 clearActiveTextImageSelection();
                 return;
             }
+            if (event.key === "Tab" && !event.altKey && !event.ctrlKey && !event.metaKey) {
+                event.preventDefault();
+                insertTextEditorTab(textArea);
+                rememberTextSelection();
+                syncTextEditorStateFromDom();
+                return;
+            }
             handleTextEditorEnterKey(event);
         });
         textArea.contextmenu([{
             label: "Hyperlink",
-            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>`,
+            icon: TEXT_LINK_ICON,
             visible: () => hasHighlightedTextSelection() && isRichTextDocument(),
             action: () => showTextEditorHyperlinkDialogue()
         }]);
@@ -1160,7 +1192,7 @@
                 clearActiveTextImageSelection();
             });
         }
-        [boldButton, italicButton, underlineButton, textColorButton, backgroundColorButton, alignmentButton, highlightButton, listButton, imageButton, otherButton].forEach(bindTextToolbarButtonFocus);
+        [boldButton, italicButton, underlineButton, linkButton, textColorButton, backgroundColorButton, alignmentButton, highlightButton, listButton, imageButton, otherButton].forEach(bindTextToolbarButtonFocus);
         if (fontFamilySelect && fontFamilySelect.dataset.bound !== "1") {
             fontFamilySelect.dataset.bound = "1";
             fontFamilySelect.addEventListener("change", () => execTextEditorCommand("fontName", fontFamilySelect.value || "Inter"));
@@ -1188,6 +1220,14 @@
             underlineButton.addEventListener("click", (event) => {
                 event.preventDefault();
                 execTextEditorCommand("underline");
+            });
+        }
+        if (linkButton && linkButton.dataset.bound !== "1") {
+            linkButton.dataset.bound = "1";
+            linkButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                rememberTextSelection();
+                showTextEditorHyperlinkDialogue({allowEmptyText: true});
             });
         }
         if (textColorButton && textColorButton.dataset.bound !== "1") {
@@ -1377,6 +1417,7 @@
             placeholder: "standard.wrds",
             value: "standard.wrds",
             confirmation: async (_, inputFileName) => {
+                if (!modular.validateFileName(inputFileName)) return;
                 const safeFileName = sanitizeNewTextFileName(inputFileName) || "standard.wrds";
                 await saveTextEditorContentToPath(`Documents/${safeFileName}`, portal);
             }
@@ -1418,7 +1459,7 @@
             title: "Text",
             hints: ["text editor", "create text file", "new text file"],
             action: openFreshTextEditor,
-            dimensions: [700, 500],
+            dimensions: [800, 600],
             horizontal_nav: true,
             centered_nav: true,
             tools: [{
@@ -1435,6 +1476,7 @@
                                 button({id: "editor-sheet-style-bold", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`}),
                                 button({id: "editor-sheet-style-italic", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.2558594 22.003906 L 14.0058594 22.003906 L 14.0058594 20.503906 L 13.2558594 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`}),
                                 button({id: "editor-sheet-style-underline", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 6.0058594 2 L 6.0058594 2.75 L 6.0058594 12.585938 C 6.0058594 15.618894 8.7446099 18.001953 12.003906 18.001953 C 15.263203 18.001953 18.003906 15.618893 18.003906 12.585938 L 18.003906 2.75 L 18.003906 2 L 16.503906 2 L 16.503906 2.75 L 16.503906 12.585938 C 16.503906 14.706981 14.54261 16.501953 12.003906 16.501953 C 9.4652032 16.501953 7.5058594 14.70698 7.5058594 12.585938 L 7.5058594 2.75 L 7.5058594 2 L 6.0058594 2 z M 4.9980469 20.003906 L 4.9980469 21.503906 L 5.7480469 21.503906 L 18.251953 21.503906 L 19.001953 21.503906 L 19.001953 20.003906 L 18.251953 20.003906 L 5.7480469 20.003906 L 4.9980469 20.003906 z"/></svg>`}),
+                                button({id: "editor-sheet-style-link", style: "naked align-bottom small-margin-right inner-radius", title: "Hyperlink", icon: TEXT_LINK_ICON}),
                                 button({id: "editor-sheet-style-color", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
                                 button({id: "editor-sheet-style-background", style: "naked align-bottom small-margin-right inner-radius", title: "Background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
                                 button({id: "editor-sheet-style-align", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: TEXT_ALIGN_ICONS.left}),

@@ -402,6 +402,133 @@ function activateActiveSearchResult() {
     return false;
 }
 
+function formatCalculatorResult(value) {
+    if (!Number.isFinite(value)) return "";
+    const normalized = Object.is(value, -0) ? 0 : value;
+    if (Number.isInteger(normalized)) return `${normalized}`;
+    return `${Number.parseFloat(normalized.toFixed(12))}`;
+}
+
+function evaluateCalculatorExpression(rawQuery = "") {
+    const expression = `${rawQuery || ""}`.trim();
+    if (expression.length < 3 || expression.length > 120) return null;
+    if (!/[0-9]/.test(expression) || !/[+\-*/%^()]/.test(expression)) return null;
+    if (!/^[0-9+\-*/%^().\s]+$/.test(expression)) return null;
+
+    const tokens = [];
+    let index = 0;
+    while (index < expression.length) {
+        const char = expression[index];
+        if (/\s/.test(char)) {
+            index += 1;
+            continue;
+        }
+        if (/[+\-*/%^()]/.test(char)) {
+            tokens.push({type: "operator", value: char});
+            index += 1;
+            continue;
+        }
+        if (/[0-9.]/.test(char)) {
+            let value = "";
+            let dotCount = 0;
+            while (index < expression.length && /[0-9.]/.test(expression[index])) {
+                if (expression[index] === ".") dotCount += 1;
+                value += expression[index];
+                index += 1;
+            }
+            if (dotCount > 1 || value === ".") return null;
+            tokens.push({type: "number", value: Number.parseFloat(value)});
+            continue;
+        }
+        return null;
+    }
+    if (!tokens.length) return null;
+
+    let cursor = 0;
+    const peek = () => tokens[cursor] || null;
+    const take = (value) => {
+        if (peek()?.value !== value) return false;
+        cursor += 1;
+        return true;
+    };
+    const parseExpression = () => parseAddSubtract();
+    const parsePrimary = () => {
+        const token = peek();
+        if (!token) return null;
+        if (take("+")) return parsePrimary();
+        if (take("-")) {
+            const value = parsePrimary();
+            return value === null ? null : -value;
+        }
+        if (take("(")) {
+            const value = parseExpression();
+            if (value === null || !take(")")) return null;
+            return value;
+        }
+        if (token.type === "number") {
+            cursor += 1;
+            return token.value;
+        }
+        return null;
+    };
+    const parsePower = () => {
+        const left = parsePrimary();
+        if (left === null) return null;
+        if (take("^")) {
+            const right = parsePower();
+            return right === null ? null : left ** right;
+        }
+        return left;
+    };
+    const parseMultiplyDivide = () => {
+        let value = parsePower();
+        if (value === null) return null;
+        while (peek() && ["*", "/", "%"].includes(peek().value)) {
+            const operator = peek().value;
+            cursor += 1;
+            const right = parsePower();
+            if (right === null) return null;
+            if (operator === "*") value *= right;
+            if (operator === "/") value /= right;
+            if (operator === "%") value %= right;
+        }
+        return value;
+    };
+    function parseAddSubtract() {
+        let value = parseMultiplyDivide();
+        if (value === null) return null;
+        while (peek() && ["+", "-"].includes(peek().value)) {
+            const operator = peek().value;
+            cursor += 1;
+            const right = parseMultiplyDivide();
+            if (right === null) return null;
+            if (operator === "+") value += right;
+            if (operator === "-") value -= right;
+        }
+        return value;
+    }
+
+    const result = parseExpression();
+    if (result === null || cursor !== tokens.length) return null;
+    const formattedResult = formatCalculatorResult(result);
+    if (!formattedResult) return null;
+    return {
+        expression,
+        result: formattedResult
+    };
+}
+
+function renderCalculatorSearchResult(calculation) {
+    if (!calculation) return;
+    renderSearchResult({
+        title: calculation.result,
+        svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008Zm0 2.25h.008v.008H8.25V13.5Zm0 2.25h.008v.008H8.25v-.008Zm0 2.25h.008v.008H8.25V18Zm2.498-6.75h.007v.008h-.007v-.008Zm0 2.25h.007v.008h-.007V13.5Zm0 2.25h.007v.008h-.007v-.008Zm0 2.25h.007v.008h-.007V18Zm2.504-6.75h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V13.5Zm0 2.25h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V18Zm2.498-6.75h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V13.5ZM8.25 6h7.5v2.25h-7.5V6ZM12 2.25c-1.892 0-3.758.11-5.593.322C5.307 2.7 4.5 3.65 4.5 4.757V19.5a2.25 2.25 0 0 0 2.25 2.25h10.5a2.25 2.25 0 0 0 2.25-2.25V4.757c0-1.108-.806-2.057-1.907-2.185A48.507 48.507 0 0 0 12 2.25Z" /></svg>`,
+        action: () => {
+            navigator.clipboard?.writeText?.(calculation.result);
+        }
+    }, `${calculation.expression} = ${calculation.result}`);
+}
+
 function openPortal(portal) {
     const primaryRecordMatch = Array.isArray(portal?.recordMatches) ? portal.recordMatches[0] : null;
     if (primaryRecordMatch?.command === "notes") {
@@ -533,7 +660,8 @@ function updateSearchResults() {
     const searchBox = document.getElementById("search-box");
     const searchResults = document.getElementById("search-results");
     searchStatus.isLoading();
-    const query = searchBox.value.trim().toLowerCase();
+    const rawQuery = searchBox.value.trim();
+    const query = rawQuery.toLowerCase();
     searchResults.empty();
     if (!query) {
         resetActiveSearchResult();
@@ -561,10 +689,12 @@ function updateSearchResults() {
         searchStatus.isLoading(false);
         return;
     }
+    const calculation = evaluateCalculatorExpression(rawQuery);
+    renderCalculatorSearchResult(calculation);
     matchingPortals.forEach(({portal, matchingHint}) => {
         renderSearchResult(portal, matchingHint);
     });
-    if (matchingPortals.length) {
+    if (calculation || matchingPortals.length) {
         setActiveSearchResult(0);
     } else {
         resetActiveSearchResult();
@@ -736,6 +866,39 @@ function getFocusedPortalSaveTool() {
     if (!focusedWindow) return null;
     return focusedWindow.querySelector("[data-portal-tool-title='save'], [aria-label='Save'], [title='Save']");
 }
+function getFocusedPortalWindow() {
+    return document.querySelector(".draggable-window.window-focused:not(.widget-window)");
+}
+let lastHandledTileShortcutDirection = "";
+function tileFocusedPortalFromShortcut(e) {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return false;
+    const tileDirectionByKey = {
+        ArrowLeft: "left",
+        Left: "left",
+        ArrowRight: "right",
+        Right: "right",
+        ArrowUp: "top",
+        Up: "top",
+        ArrowDown: "bottom",
+        Down: "bottom"
+    };
+    const tileDirection = tileDirectionByKey[e.key];
+    if (!tileDirection) return false;
+    if (e.type === "keyup" && lastHandledTileShortcutDirection === tileDirection) {
+        lastHandledTileShortcutDirection = "";
+        e.preventDefault();
+        return true;
+    }
+    const activeElement = document.activeElement;
+    const interactiveSelector = "input, textarea, button, select, [contenteditable='true'], [role='textbox']";
+    if (activeElement?.matches?.(interactiveSelector)) return false;
+    const focusedWindow = getFocusedPortalWindow();
+    if (!focusedWindow?.portal || typeof focusedWindow.portal.tile !== "function") return false;
+    e.preventDefault();
+    focusedWindow.portal.tile(tileDirection);
+    lastHandledTileShortcutDirection = e.type === "keydown" ? tileDirection : "";
+    return true;
+}
 document.addEventListener("keydown", function (e) {
     const activeElement = document.activeElement;
     const interactiveSelector = "input, textarea, button, select, [contenteditable='true'], [role='textbox']";
@@ -752,26 +915,12 @@ document.addEventListener("keydown", function (e) {
         return;
     }
 
-    if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const tileDirectionByKey = {
-            ArrowLeft: "left",
-            ArrowRight: "right",
-            ArrowUp: "top",
-            ArrowDown: "bottom"
-        };
-        const tileDirection = tileDirectionByKey[e.key];
-        if (tileDirection && !interactiveFocused) {
-            const focusedWindow = document.querySelector(".draggable-window.window-focused:not(.widget-window)");
-            if (focusedWindow?.portal && typeof focusedWindow.portal.tile === "function") {
-                e.preventDefault();
-                focusedWindow.portal.tile(tileDirection);
-                return;
-            }
-        }
+    if (tileFocusedPortalFromShortcut(e)) {
+        return;
     }
 
-    if (e.shiftKey && e.key.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey && !e.altKey && !interactiveFocused) {
-        const focusedWindow = document.querySelector(".draggable-window.window-focused:not(.widget-window)");
+    if (e.altKey && e.key.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey && !e.shiftKey && !interactiveFocused) {
+        const focusedWindow = getFocusedPortalWindow();
         if (focusedWindow?.portal && typeof focusedWindow.portal.hide === "function") {
             e.preventDefault();
             focusedWindow.portal.hide();
@@ -779,10 +928,10 @@ document.addEventListener("keydown", function (e) {
         }
     }
 
-    if (e.shiftKey && e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.altKey && !interactiveFocused) {
+    if (e.altKey && e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.shiftKey && !interactiveFocused) {
         const openPortalWindows = getOpenPortalWindows();
         if (openPortalWindows.length) {
-            const focusedWindow = document.querySelector(".draggable-window.window-focused:not(.widget-window)");
+            const focusedWindow = getFocusedPortalWindow();
             const focusedIndex = openPortalWindows.indexOf(focusedWindow);
             const nextWindow = openPortalWindows[(focusedIndex + 1 + openPortalWindows.length) % openPortalWindows.length];
             if (nextWindow && typeof modular?.bringToFront === "function") {
@@ -812,7 +961,11 @@ document.addEventListener("keydown", function (e) {
         searchBox.value += e.key;
         searchBox.dispatchEvent(new Event("input"));
     }
-});
+}, true);
+document.addEventListener("keyup", function (e) {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown" && e.key !== "Up" && e.key !== "Down") return;
+    tileFocusedPortalFromShortcut(e);
+}, true);
 document.getElementById("search-box")?.addEventListener("blur", restoreServiceWindows);
 document.querySelector(".status-indicator").popoutmenu([{
     icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>`,

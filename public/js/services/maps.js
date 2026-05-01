@@ -4,6 +4,42 @@
     let detachMapsSearchHandlers = null;
     const MAPS_CACHE_KEY = "recent-searches";
     const MAPS_CACHE_LIMIT = 10;
+    const MAP_STYLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3" /></svg>`;
+    const MAP_STYLE_OPTIONS = [{
+        id: "default",
+        label: "Default",
+        style: "mapbox://styles/mapbox/streets-v12"
+    }, {
+        id: "monochrome",
+        label: "Monochrome",
+        style: "mapbox://styles/mapbox/standard",
+        config: {basemap: {theme: "monochrome"}}
+    }, {
+        id: "outdoors",
+        label: "Outdoors",
+        style: "mapbox://styles/mapbox/outdoors-v12"
+    }, {
+        id: "satellite",
+        label: "Satellite",
+        style: "mapbox://styles/mapbox/satellite-streets-v12"
+    }, {
+        id: "warm",
+        label: "Warm",
+        style: "mapbox://styles/mapbox/standard",
+        config: {basemap: {lightPreset: "dusk"}}
+    }, {
+        id: "dark",
+        label: "Dark",
+        style: "mapbox://styles/mapbox/dark-v11"
+    }, {
+        id: "light",
+        label: "Light",
+        style: "mapbox://styles/mapbox/light-v11"
+    }, {
+        id: "navigation",
+        label: "Navigation",
+        style: "mapbox://styles/mapbox/navigation-day-v1"
+    }];
     modular.register(new Service("com.standard.maps", [
         new Portal({
             title: "Maps",
@@ -23,7 +59,10 @@
                     div({style: "maps-controls-overlay no-background", content: [
                             button({id: "maps-zoom-in", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`}),
                             button({id: "maps-zoom-out", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" /></svg>`}),
-                            button({id: "maps-home", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>`})
+                            div({style: "maps-control-row no-background", content: [
+                                    button({id: "maps-style", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: MAP_STYLE_ICON}),
+                                    button({id: "maps-home", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>`})
+                                ].join("")})
                         ].join("")
                     }) +
                     div({style: "brick radius bordered maps-canvas", id: "map"})
@@ -92,6 +131,7 @@
                 const ACTIVE_LOCATION_SOURCE_ID = "active-location-source";
                 const ACTIVE_LOCATION_LAYER_ID = "active-location-layer";
                 const ACTIVE_LOCATION_IMAGE_ID = "active-location-dot";
+                let activeLocationLayerHandlersAttached = false;
                 const formatCoordinate = (value) => Number(value).toFixed(6);
                 const buildActiveLocationFeature = (lng, lat, label = "Selected Location") => ({
                     type: "Feature",
@@ -146,6 +186,29 @@
                         return true;
                     }
                 });
+                const handleActiveLocationMouseenter = (event) => {
+                    const feature = event.features?.[0];
+                    if (!feature || feature.geometry?.type !== "Point") return;
+                    map.getCanvas().style.cursor = "pointer";
+                    const [lng, lat] = feature.geometry.coordinates;
+                    const popupContent = document.createElement("div");
+                    const title = document.createElement("strong");
+                    title.textContent = feature.properties?.label || "Selected Location";
+                    const coordinates = document.createElement("div");
+                    coordinates.textContent = `${formatCoordinate(lat)}, ${formatCoordinate(lng)}`;
+                    popupContent.appendChild(title);
+                    popupContent.appendChild(coordinates);
+                    clearActiveLocationPopup();
+                    activeLocationPopup = new mapboxgl.Popup({
+                        closeButton: false,
+                        closeOnClick: false,
+                        offset: 18
+                    }).setLngLat([lng, lat]).setDOMContent(popupContent).addTo(map);
+                };
+                const handleActiveLocationMouseleave = () => {
+                    map.getCanvas().style.cursor = "";
+                    clearActiveLocationPopup();
+                };
                 const ensureActiveLocationLayer = () => {
                     if (!map.isStyleLoaded()) return;
                     if (!map.hasImage(ACTIVE_LOCATION_IMAGE_ID)) {
@@ -168,29 +231,11 @@
                                 "icon-allow-overlap": true
                             }
                         });
-                        map.on("mouseenter", ACTIVE_LOCATION_LAYER_ID, (event) => {
-                            const feature = event.features?.[0];
-                            if (!feature || feature.geometry?.type !== "Point") return;
-                            map.getCanvas().style.cursor = "pointer";
-                            const [lng, lat] = feature.geometry.coordinates;
-                            const popupContent = document.createElement("div");
-                            const title = document.createElement("strong");
-                            title.textContent = feature.properties?.label || "Selected Location";
-                            const coordinates = document.createElement("div");
-                            coordinates.textContent = `${formatCoordinate(lat)}, ${formatCoordinate(lng)}`;
-                            popupContent.appendChild(title);
-                            popupContent.appendChild(coordinates);
-                            clearActiveLocationPopup();
-                            activeLocationPopup = new mapboxgl.Popup({
-                                closeButton: false,
-                                closeOnClick: false,
-                                offset: 18
-                            }).setLngLat([lng, lat]).setDOMContent(popupContent).addTo(map);
-                        });
-                        map.on("mouseleave", ACTIVE_LOCATION_LAYER_ID, () => {
-                            map.getCanvas().style.cursor = "";
-                            clearActiveLocationPopup();
-                        });
+                        if (!activeLocationLayerHandlersAttached) {
+                            activeLocationLayerHandlersAttached = true;
+                            map.on("mouseenter", ACTIVE_LOCATION_LAYER_ID, handleActiveLocationMouseenter);
+                            map.on("mouseleave", ACTIVE_LOCATION_LAYER_ID, handleActiveLocationMouseleave);
+                        }
                     }
                 };
                 const setActiveLocation = (lng, lat, label = "Selected Location") => {
@@ -212,9 +257,11 @@
                 const searchButton = document.getElementById("maps-search-button");
                 const zoomInButton = document.getElementById("maps-zoom-in");
                 const zoomOutButton = document.getElementById("maps-zoom-out");
+                const styleButton = document.getElementById("maps-style");
                 const homeButton = document.getElementById("maps-home");
                 let cachedSearches = [];
                 let cacheWriteInFlight = Promise.resolve();
+                let activeStyleId = MAP_STYLE_OPTIONS[0].id;
                 const normalizeSearchValue = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
                 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[character] || character));
                 const getSearchCachePayload = () => ({searches: cachedSearches});
@@ -331,6 +378,43 @@
                 };
                 document.addEventListener("click", handleDocumentClick);
                 detachMapsSearchHandlers = () => document.removeEventListener("click", handleDocumentClick);
+                const applyMapStyle = (styleOption) => {
+                    if (!styleOption || activeStyleId === styleOption.id) return;
+                    const previousStyleId = activeStyleId;
+                    activeStyleId = styleOption.id;
+                    const center = map.getCenter();
+                    const zoom = map.getZoom();
+                    const bearing = map.getBearing();
+                    const pitch = map.getPitch();
+                    clearActiveLocationPopup();
+                    const applyStyleConfig = () => {
+                        if (!styleOption.config?.basemap || typeof map.setConfigProperty !== "function") return;
+                        Object.entries(styleOption.config.basemap).forEach(([key, value]) => {
+                            map.setConfigProperty("basemap", key, value);
+                        });
+                    };
+                    const handleStyleLoad = () => {
+                        applyStyleConfig();
+                        map.jumpTo({center, zoom, bearing, pitch});
+                        syncMapViewport();
+                        map.resize();
+                        ensureActiveLocationLayer();
+                        setActiveLocation(pendingActiveLocationFeature.lng, pendingActiveLocationFeature.lat, pendingActiveLocationFeature.label);
+                    };
+                    map.once("style.load", handleStyleLoad);
+                    try {
+                        map.setStyle(styleOption.style);
+                    } catch (error) {
+                        map.off("style.load", handleStyleLoad);
+                        activeStyleId = previousStyleId;
+                        console.error("Failed to apply map style:", error);
+                    }
+                };
+                styleButton?.popoutmenu(MAP_STYLE_OPTIONS.map((styleOption) => ({
+                    icon: MAP_STYLE_ICON,
+                    label: styleOption.label,
+                    action: () => applyMapStyle(styleOption)
+                })));
                 zoomInButton.addEventListener("click", () => map.zoomIn());
                 zoomOutButton.addEventListener("click", () => map.zoomOut());
                 homeButton.addEventListener("click", () => flyToCoordinates(homeCoordinates[0], homeCoordinates[1], 13, homeLocationLabel));

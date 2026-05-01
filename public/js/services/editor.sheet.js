@@ -17,6 +17,8 @@
     const sheetCellValues = {};
     const sheetCellStyles = {};
     const sheetCellTypes = {};
+    const sheetCellLinks = {};
+    const sheetCellLocks = {};
     const sheetColumnWidths = {};
     const sheetRowHeights = {};
     let sheetRows = DEFAULT_SHEET_ROWS;
@@ -55,6 +57,9 @@
         center: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M7 10.5h10M4 14.5h16M7 18.5h10" /></svg>`,
         right: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M10 10.5h10M4 14.5h16M10 18.5h10" /></svg>`
     };
+    const SHEET_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" style="fill:none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path fill="none" style="fill:none" stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>`;
+    const SHEET_LOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`;
+    const SHEET_UNLOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`;
     const SHEET_CELL_TYPES = [
         {label: "Auto", value: ""},
         {label: "Text", value: "text"},
@@ -95,6 +100,12 @@
     };
     const clearSheetCellTypes = () => {
         Object.keys(sheetCellTypes).forEach((key) => delete sheetCellTypes[key]);
+    };
+    const clearSheetCellLinks = () => {
+        Object.keys(sheetCellLinks).forEach((key) => delete sheetCellLinks[key]);
+    };
+    const clearSheetCellLocks = () => {
+        Object.keys(sheetCellLocks).forEach((key) => delete sheetCellLocks[key]);
     };
     const clearSheetColumnWidths = () => {
         Object.keys(sheetColumnWidths).forEach((key) => delete sheetColumnWidths[key]);
@@ -159,6 +170,13 @@
         const normalizedType = String(rawType?.type || rawType || "").trim().toLowerCase();
         return ["text", "number", "date"].includes(normalizedType) ? normalizedType : "";
     };
+    const normalizeSheetHyperlinkUrl = (rawUrl = "") => {
+        const trimmedUrl = String(rawUrl || "").trim();
+        if (!trimmedUrl) return "";
+        if (/^(https?:|mailto:|tel:)/i.test(trimmedUrl)) return trimmedUrl;
+        if (/^[#/]/.test(trimmedUrl)) return trimmedUrl;
+        return `https://${trimmedUrl}`;
+    };
     const getSheetCellStyle = (cellReference = "") => normalizeSheetCellStyle(sheetCellStyles[cellReference]);
     const setSheetCellStyle = (cellReference = "", nextStyle = {}) => {
         const encodedStyle = encodeSheetCellStyle(nextStyle);
@@ -177,8 +195,27 @@
             delete sheetCellTypes[cellReference];
         }
     };
+    const getSheetCellLink = (cellReference = "") => normalizeSheetHyperlinkUrl(sheetCellLinks[cellReference]);
+    const setSheetCellLink = (cellReference = "", rawUrl = "") => {
+        const normalizedUrl = normalizeSheetHyperlinkUrl(rawUrl);
+        if (normalizedUrl) {
+            sheetCellLinks[cellReference] = normalizedUrl;
+        } else {
+            delete sheetCellLinks[cellReference];
+        }
+    };
+    const isSheetCellLocked = (cellReference = "") => sheetCellLocks[cellReference] === true || sheetCellLocks[cellReference] === 1;
+    const setSheetCellLocked = (cellReference = "", isLocked = false) => {
+        if (isLocked) {
+            sheetCellLocks[cellReference] = 1;
+        } else {
+            delete sheetCellLocks[cellReference];
+        }
+    };
     const buildSheetStylesPayload = () => Object.fromEntries(Object.entries(sheetCellStyles).map(([cell, style]) => [cell, encodeSheetCellStyle(style)]).filter(([, style]) => Object.keys(style).length));
     const buildSheetTypesPayload = () => Object.fromEntries(Object.entries(sheetCellTypes).map(([cell, type]) => [cell, normalizeSheetCellType(type)]).filter(([, type]) => type));
+    const buildSheetLinksPayload = () => Object.fromEntries(Object.entries(sheetCellLinks).map(([cell, link]) => [cell, normalizeSheetHyperlinkUrl(link)]).filter(([, link]) => link));
+    const buildSheetLocksPayload = () => Object.fromEntries(Object.keys(sheetCellLocks).filter((cell) => isSheetCellLocked(cell)).map((cell) => [cell, 1]));
     const captureActiveSheetInput = () => {
         const activeElement = document.activeElement;
         const id = String(activeElement?.id || "");
@@ -211,6 +248,8 @@
         cells: {...sheetCellValues},
         styles: buildSheetStylesPayload(),
         types: buildSheetTypesPayload(),
+        links: buildSheetLinksPayload(),
+        locked: buildSheetLocksPayload(),
         columnWidths: buildSheetDimensionPayload(sheetColumnWidths, sheetColumns, getDefaultSheetColumnWidth()),
         rowHeights: buildSheetDimensionPayload(sheetRowHeights, sheetRows, SHEET_DEFAULT_ROW_HEIGHT),
         activeSheetCell,
@@ -221,6 +260,8 @@
         clearSheetCellValues();
         clearSheetCellStyles();
         clearSheetCellTypes();
+        clearSheetCellLinks();
+        clearSheetCellLocks();
         clearSheetColumnWidths();
         clearSheetRowHeights();
         const payloadCells = rawPayload?.cells;
@@ -245,6 +286,18 @@
                 setSheetCellType(cell, type);
             });
         }
+        const payloadLinks = rawPayload?.links;
+        if (payloadLinks && typeof payloadLinks === "object" && !Array.isArray(payloadLinks)) {
+            Object.entries(payloadLinks).forEach(([cell, link]) => {
+                setSheetCellLink(cell, link);
+            });
+        }
+        const payloadLocks = rawPayload?.locked || rawPayload?.locks;
+        if (payloadLocks && typeof payloadLocks === "object" && !Array.isArray(payloadLocks)) {
+            Object.entries(payloadLocks).forEach(([cell, locked]) => {
+                setSheetCellLocked(cell, locked === true || locked === 1);
+            });
+        }
         activeSheetCell = String(rawPayload?.activeSheetCell || "A1");
         activeSheetRow = Number.isInteger(rawPayload?.activeSheetRow) ? rawPayload.activeSheetRow : null;
         activeSheetColumn = Number.isInteger(rawPayload?.activeSheetColumn) ? rawPayload.activeSheetColumn : null;
@@ -267,6 +320,8 @@
             cells: {...sheetCellValues},
             styles: buildSheetStylesPayload(),
             types: buildSheetTypesPayload(),
+            links: buildSheetLinksPayload(),
+            locked: buildSheetLocksPayload(),
             columnWidths: buildSheetDimensionPayload(sheetColumnWidths, sheetColumns, getDefaultSheetColumnWidth()),
             rowHeights: buildSheetDimensionPayload(sheetRowHeights, sheetRows, SHEET_DEFAULT_ROW_HEIGHT),
             activeSheetCell,
@@ -287,6 +342,8 @@
             cells: state?.cells || {},
             styles: state?.styles || {},
             types: state?.types || {},
+            links: state?.links || {},
+            locked: state?.locked || {},
             columnWidths: state?.columnWidths || {},
             rowHeights: state?.rowHeights || {},
             activeSheetCell: state?.activeSheetCell,
@@ -340,6 +397,7 @@
             placeholder: "spreadsheet.sprdshts",
             value: "spreadsheet.sprdshts",
             confirmation: async (_, inputFileName) => {
+                if (!modular.validateFileName(inputFileName)) return;
                 const safeFileName = sanitizeSheetFileName(inputFileName) || "spreadsheet.sprdshts";
                 await saveSheetToPath(`Documents/${safeFileName}`);
             }
@@ -385,6 +443,8 @@
         clearSheetCellValues();
         clearSheetCellStyles();
         clearSheetCellTypes();
+        clearSheetCellLinks();
+        clearSheetCellLocks();
         clearSheetColumnWidths();
         clearSheetRowHeights();
         window.StandardPlastic?.removeInlineStyleEditor?.(false);
@@ -442,20 +502,32 @@
         activeSheetRangeStart = String(startReference || "").toUpperCase() || null;
         activeSheetRangeEnd = String(endReference || "").toUpperCase() || null;
     };
-    const collectSheetCells = () => Object.entries(sheetCellValues).map(([cellReference, value]) => ({
+    const collectSheetCells = () => [...new Set([
+        ...Object.keys(sheetCellValues),
+        ...Object.keys(sheetCellStyles),
+        ...Object.keys(sheetCellTypes),
+        ...Object.keys(sheetCellLinks),
+        ...Object.keys(sheetCellLocks)
+    ])].map((cellReference) => ({
         cellReference,
-        value,
+        value: sheetCellValues[cellReference] ?? "",
         style: sheetCellStyles[cellReference],
-        type: sheetCellTypes[cellReference]
+        type: sheetCellTypes[cellReference],
+        link: sheetCellLinks[cellReference],
+        locked: sheetCellLocks[cellReference]
     }));
     const restoreSheetCells = (cells = []) => {
         clearSheetCellValues();
         clearSheetCellStyles();
         clearSheetCellTypes();
-        cells.forEach(({cellReference, value, style, type}) => {
+        clearSheetCellLinks();
+        clearSheetCellLocks();
+        cells.forEach(({cellReference, value, style, type, link, locked}) => {
             sheetCellValues[cellReference] = String(value ?? "");
             if (style && typeof style === "object") sheetCellStyles[cellReference] = {...style};
             if (type) setSheetCellType(cellReference, type);
+            if (link) setSheetCellLink(cellReference, link);
+            if (locked) setSheetCellLocked(cellReference, true);
         });
     };
     const getSheetColumnWidth = (columnIndex = 0) => Math.min(
@@ -561,7 +633,10 @@
                 rowCells.push(div({
                     id: `editor-sheet-cell-wrap-${cellReference}`,
                     style: "editor-sheet-cell",
-                    content: input({id: `sheet-cell-${cellReference}`, style: "editor-sheet-cell-input", value: ""})
+                    content: children([
+                        input({id: `sheet-cell-${cellReference}`, style: "editor-sheet-cell-input", value: ""}),
+                        div({style: "editor-sheet-cell-lock-indicator", content: SHEET_LOCK_ICON})
+                    ])
                 }));
             }
             tableRows.push(div({id: `editor-sheet-data-row-${rowIndex}`, style: "editor-sheet-row", content: children(rowCells)}));
@@ -670,6 +745,29 @@
         refreshSheetCells();
         saveSheetPortalState();
     };
+    const applySheetLinkToSelection = (rawUrl = "") => {
+        const selectedReferences = getActiveSheetCellReferences();
+        if (!selectedReferences.length) return false;
+        const normalizedUrl = normalizeSheetHyperlinkUrl(rawUrl);
+        selectedReferences.forEach((cellReference) => {
+            setSheetCellLink(cellReference, normalizedUrl);
+            applySheetCellStyle(cellReference);
+        });
+        updateSheetToolbarState();
+        saveSheetPortalState();
+        return true;
+    };
+    const toggleSheetCellLock = (cellReference = activeSheetCell, shouldLock = true) => {
+        const cellInput = getSheetCellInput(cellReference);
+        if (cellInput && document.activeElement === cellInput) {
+            sheetCellValues[cellReference] = readSheetInputValue(cellReference);
+            cellInput.blur();
+        }
+        setActiveSheetCell(cellReference);
+        setSheetCellLocked(cellReference, shouldLock);
+        refreshSheetCells();
+        saveSheetPortalState();
+    };
     const getSheetSelectionCellType = () => {
         const selectedReferences = getActiveSheetCellReferences();
         if (!selectedReferences.length) return "";
@@ -696,15 +794,18 @@
         const textColorButton = document.getElementById("editor-sheet-style-color");
         const backgroundColorButton = document.getElementById("editor-sheet-style-background");
         const alignmentButton = document.getElementById("editor-sheet-style-align");
+        const linkButton = document.getElementById("editor-sheet-style-link");
         const typeSelect = document.getElementById("editor-sheet-cell-type");
         if (fontFamilySelect) fontFamilySelect.value = "Inter";
         if (fontSizeSelect) fontSizeSelect.value = String((activeStyle.fontSize || "12px").replace(/px$/i, ""));
         setSheetToolbarButtonState(boldButton, activeStyle.fontWeight === "bold");
         setSheetToolbarButtonState(italicButton, activeStyle.fontStyle === "italic");
         setSheetToolbarButtonState(underlineButton, activeStyle.textDecoration === "underline");
+        setSheetToolbarButtonState(linkButton, !!getSheetCellLink(activeSheetCell));
         syncSheetToolbarIconColor(boldButton);
         syncSheetToolbarIconColor(italicButton);
         syncSheetToolbarIconColor(underlineButton);
+        syncSheetToolbarIconColor(linkButton);
         if (textColorButton) {
             const resolvedTextColor = resolveSheetColor(activeStyle.color || "");
             textColorButton.className = `${activeStyle.color ? "tiny primary" : ""} naked align-bottom small-margin-right inner-radius`.trim();
@@ -733,6 +834,7 @@
         const cellWrap = getSheetCellWrap(cellReference);
         if (!cellInput || !cellWrap) return;
         const style = getSheetCellStyle(cellReference);
+        const isLocked = isSheetCellLocked(cellReference);
         cellWrap.style.backgroundColor = style.backgroundColor || "";
         cellInput.style.color = style.color || "";
         cellInput.style.textAlign = style.textAlign || "";
@@ -740,7 +842,46 @@
         cellInput.style.fontStyle = style.fontStyle || "";
         cellInput.style.textDecoration = style.textDecoration || "";
         cellInput.style.fontSize = style.fontSize || "";
-        cellWrap.dataset.styled = Object.keys(style).length ? "1" : "0";
+        cellInput.readOnly = isLocked;
+        cellInput.setAttribute("aria-readonly", isLocked ? "true" : "false");
+        cellWrap.classList.toggle("editor-sheet-cell-locked", isLocked);
+        const lockIndicator = cellWrap.querySelector(".editor-sheet-cell-lock-indicator");
+        if (lockIndicator) lockIndicator.setAttribute("aria-hidden", isLocked ? "false" : "true");
+        const linkUrl = getSheetCellLink(cellReference);
+        cellInput.classList.toggle("editor-sheet-cell-link", !!linkUrl);
+        if (linkUrl) {
+            cellInput.dataset.hyperlink = linkUrl;
+            if (!style.color) cellInput.style.color = "#2563eb";
+            if (!style.textDecoration) cellInput.style.textDecoration = "underline";
+        } else {
+            cellInput.removeAttribute("data-hyperlink");
+        }
+        if (isLocked) {
+            cellInput.title = linkUrl ? "Locked; Ctrl+click to open link" : "Locked";
+        } else if (linkUrl) {
+            cellInput.title = "Ctrl+click to open link";
+        } else {
+            cellInput.removeAttribute("title");
+        }
+        cellWrap.dataset.styled = Object.keys(style).length || linkUrl ? "1" : "0";
+    };
+    const openSheetHyperlink = (cellReference = "") => {
+        const linkUrl = getSheetCellLink(cellReference);
+        if (!linkUrl) return false;
+        window.open(linkUrl, "_blank", "noopener,noreferrer");
+        return true;
+    };
+    const showSheetHyperlinkDialogue = (cellReference = activeSheetCell) => {
+        if (cellReference && !isCellInActiveSheetRange(cellReference)) setActiveSheetCell(cellReference);
+        inputDialogue({
+            title: "Hyperlink",
+            placeholder: "Link",
+            value: getSheetCellLink(cellReference),
+            confirmation: (_, linkValue) => {
+                applySheetLinkToSelection(linkValue);
+            }
+        });
+        return true;
     };
     const parseSheetFormulaArguments = (text = "") => {
         const source = String(text || "");
@@ -1058,6 +1199,12 @@
         if (formulaInput && document.activeElement !== formulaInput) {
             formulaInput.value = sheetCellValues[activeSheetCell] ?? "";
         }
+        if (formulaInput) {
+            const isLocked = isSheetCellLocked(activeSheetCell);
+            formulaInput.readOnly = isLocked;
+            formulaInput.classList.toggle("editor-sheet-formula-locked", isLocked);
+            formulaInput.title = isLocked ? "Locked cell" : "";
+        }
         updateSheetToolbarState();
     };
     const updateSheetSelectionStyles = () => {
@@ -1134,14 +1281,16 @@
     const insertSheetRowAt = (rowIndex = 0) => {
         captureActiveSheetInput();
         const nextRowIndex = Math.max(0, Math.min(rowIndex, sheetRows));
-        const shiftedCells = collectSheetCells().map(({cellReference, value, style, type}) => {
+        const shiftedCells = collectSheetCells().map(({cellReference, value, style, type, link, locked}) => {
             const position = parseSheetCellReference(cellReference);
             const targetRowIndex = position.rowIndex >= nextRowIndex ? position.rowIndex + 1 : position.rowIndex;
             return {
                 cellReference: getSheetCellReference(targetRowIndex, position.columnIndex),
                 value,
                 style,
-                type
+                type,
+                link,
+                locked
             };
         });
         sheetRows += 1;
@@ -1155,7 +1304,7 @@
         if (sheetRows <= 1) return;
         captureActiveSheetInput();
         const nextRowIndex = Math.max(0, Math.min(rowIndex, sheetRows - 1));
-        const shiftedCells = collectSheetCells().flatMap(({cellReference, value, style, type}) => {
+        const shiftedCells = collectSheetCells().flatMap(({cellReference, value, style, type, link, locked}) => {
             const position = parseSheetCellReference(cellReference);
             if (position.rowIndex === nextRowIndex) return [];
             const targetRowIndex = position.rowIndex > nextRowIndex ? position.rowIndex - 1 : position.rowIndex;
@@ -1163,7 +1312,9 @@
                 cellReference: getSheetCellReference(targetRowIndex, position.columnIndex),
                 value,
                 style,
-                type
+                type,
+                link,
+                locked
             }];
         });
         sheetRows = Math.max(1, sheetRows - 1);
@@ -1177,14 +1328,16 @@
     const insertSheetColumnAt = (columnIndex = 0) => {
         captureActiveSheetInput();
         const nextColumnIndex = Math.max(0, Math.min(columnIndex, sheetColumns));
-        const shiftedCells = collectSheetCells().map(({cellReference, value, style, type}) => {
+        const shiftedCells = collectSheetCells().map(({cellReference, value, style, type, link, locked}) => {
             const position = parseSheetCellReference(cellReference);
             const targetColumnIndex = position.columnIndex >= nextColumnIndex ? position.columnIndex + 1 : position.columnIndex;
             return {
                 cellReference: getSheetCellReference(position.rowIndex, targetColumnIndex),
                 value,
                 style,
-                type
+                type,
+                link,
+                locked
             };
         });
         sheetColumns += 1;
@@ -1198,7 +1351,7 @@
         if (sheetColumns <= 1) return;
         captureActiveSheetInput();
         const nextColumnIndex = Math.max(0, Math.min(columnIndex, sheetColumns - 1));
-        const shiftedCells = collectSheetCells().flatMap(({cellReference, value, style, type}) => {
+        const shiftedCells = collectSheetCells().flatMap(({cellReference, value, style, type, link, locked}) => {
             const position = parseSheetCellReference(cellReference);
             if (position.columnIndex === nextColumnIndex) return [];
             const targetColumnIndex = position.columnIndex > nextColumnIndex ? position.columnIndex - 1 : position.columnIndex;
@@ -1206,7 +1359,9 @@
                 cellReference: getSheetCellReference(position.rowIndex, targetColumnIndex),
                 value,
                 style,
-                type
+                type,
+                link,
+                locked
             }];
         });
         sheetColumns = Math.max(1, sheetColumns - 1);
@@ -1238,6 +1393,7 @@
         const textColorButton = document.getElementById("editor-sheet-style-color");
         const backgroundColorButton = document.getElementById("editor-sheet-style-background");
         const alignmentButton = document.getElementById("editor-sheet-style-align");
+        const linkButton = document.getElementById("editor-sheet-style-link");
         const typeSelect = document.getElementById("editor-sheet-cell-type");
         if (fontSizeSelect && fontSizeSelect.dataset.bound !== "1") {
             fontSizeSelect.dataset.bound = "1";
@@ -1321,6 +1477,13 @@
                 }
             ]);
         }
+        if (linkButton && linkButton.dataset.bound !== "1") {
+            linkButton.dataset.bound = "1";
+            linkButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                showSheetHyperlinkDialogue(activeSheetCell);
+            });
+        }
         if (typeSelect && typeSelect.dataset.bound !== "1") {
             typeSelect.dataset.bound = "1";
             typeSelect.addEventListener("change", (event) => {
@@ -1390,7 +1553,10 @@
             rowNode.append(div({
                 id: `editor-sheet-cell-wrap-${cellReference}`,
                 style: "editor-sheet-cell",
-                content: input({id: `sheet-cell-${cellReference}`, style: "editor-sheet-cell-input", value: ""})
+                content: children([
+                    input({id: `sheet-cell-${cellReference}`, style: "editor-sheet-cell-input", value: ""}),
+                    div({style: "editor-sheet-cell-lock-indicator", content: SHEET_LOCK_ICON})
+                ])
             }));
         }
     };
@@ -1410,7 +1576,10 @@
             rowCells.push(div({
                 id: `editor-sheet-cell-wrap-${cellReference}`,
                 style: "editor-sheet-cell",
-                content: input({id: `sheet-cell-${cellReference}`, style: "editor-sheet-cell-input", value: ""})
+                content: children([
+                    input({id: `sheet-cell-${cellReference}`, style: "editor-sheet-cell-input", value: ""}),
+                    div({style: "editor-sheet-cell-lock-indicator", content: SHEET_LOCK_ICON})
+                ])
             }));
         }
         grid.append(div({id: `editor-sheet-data-row-${rowIndex}`, style: "editor-sheet-row", content: children(rowCells)}));
@@ -1464,6 +1633,7 @@
             if (activeElement && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable)) return;
             if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
                 if (Number.isInteger(activeSheetRow) || Number.isInteger(activeSheetColumn)) return;
+                if (isSheetCellLocked(activeSheetCell)) return;
                 const targetInput = getSheetCellInput(activeSheetCell);
                 if (!targetInput) return;
                 event.preventDefault();
@@ -1478,6 +1648,7 @@
             }
             if (event.key === "Delete") {
                 if (Number.isInteger(activeSheetRow) || Number.isInteger(activeSheetColumn)) return;
+                if (isSheetCellLocked(activeSheetCell)) return;
                 event.preventDefault();
                 sheetCellValues[activeSheetCell] = "";
                 refreshSheetCells();
@@ -1559,17 +1730,51 @@
                     setActiveSheetCell(cellReference);
                     cellInput.value = sheetCellValues[cellReference] ?? "";
                 });
-                cellInput.addEventListener("contextmenu", (event) => {
+                cellInput.addEventListener("click", (event) => {
+                    if (!event.ctrlKey) return;
+                    if (!openSheetHyperlink(cellReference)) return;
                     event.preventDefault();
                     event.stopPropagation();
-                    openSheetCellStyleEditor(cellReference, event);
+                    cellInput.blur();
                 });
+                cellInput.contextmenu([
+                    {
+                        label: "Hyperlink",
+                        icon: SHEET_LINK_ICON,
+                        action: () => showSheetHyperlinkDialogue(cellReference)
+                    },
+                    {
+                        label: "Lock Cell",
+                        icon: SHEET_LOCK_ICON,
+                        visible: () => !isSheetCellLocked(cellReference),
+                        action: () => toggleSheetCellLock(cellReference, true)
+                    },
+                    {
+                        label: "Unlock Cell",
+                        icon: SHEET_UNLOCK_ICON,
+                        visible: () => isSheetCellLocked(cellReference),
+                        action: () => toggleSheetCellLock(cellReference, false)
+                    },
+                    {
+                        label: "Style",
+                        action: (_, event) => openSheetCellStyleEditor(cellReference, event)
+                    }
+                ]);
                 cellInput.addEventListener("blur", () => {
+                    if (isSheetCellLocked(cellReference)) {
+                        refreshSheetCells();
+                        saveSheetPortalState();
+                        return;
+                    }
                     sheetCellValues[cellReference] = readSheetInputValue(cellReference);
                     refreshSheetCells();
                     saveSheetPortalState();
                 });
                 cellInput.addEventListener("keydown", (event) => {
+                    if (isSheetCellLocked(cellReference) && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                        event.preventDefault();
+                        return;
+                    }
                     if (event.key === "Escape") {
                         event.preventDefault();
                         event.stopPropagation();
@@ -1675,6 +1880,10 @@
         if (formulaInput && formulaInput.dataset.bound !== "1") {
             formulaInput.dataset.bound = "1";
             formulaInput.addEventListener("input", () => {
+                if (isSheetCellLocked(activeSheetCell)) {
+                    formulaInput.value = sheetCellValues[activeSheetCell] ?? "";
+                    return;
+                }
                 sheetCellValues[activeSheetCell] = formulaInput.value;
                 const activeInput = getSheetCellInput(activeSheetCell);
                 if (activeInput && document.activeElement === activeInput) {
@@ -1685,6 +1894,11 @@
             formulaInput.addEventListener("keydown", (event) => {
                 if (event.key !== "Enter") return;
                 event.preventDefault();
+                if (isSheetCellLocked(activeSheetCell)) {
+                    formulaInput.value = sheetCellValues[activeSheetCell] ?? "";
+                    getSheetCellInput(activeSheetCell)?.focus();
+                    return;
+                }
                 refreshSheetCells();
                 saveSheetPortalState();
                 getSheetCellInput(activeSheetCell)?.focus();
@@ -1745,6 +1959,7 @@
                                             button({id: "editor-sheet-style-color", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
                                             button({id: "editor-sheet-style-background", style: "naked align-bottom small-margin-right inner-radius", title: "Background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
                                             button({id: "editor-sheet-style-align", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: SHEET_ALIGN_ICONS.left}),
+                                            button({id: "editor-sheet-style-link", style: "naked align-bottom small-margin-right inner-radius", title: "Hyperlink", icon: SHEET_LINK_ICON}),
                                             div({style: "inline bordered-right small-margin-right small-margin-left", content: " "}),
                                             select({
                                                 id: "editor-sheet-cell-type",

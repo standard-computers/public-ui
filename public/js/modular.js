@@ -414,6 +414,12 @@ let modular = {
     error: m => modular.announce("error", m),
     success: m => modular.announce("success", m),
     message: m => pushMessage("", m),
+    invalidFileNameMessage: "File name cannot contain / or –",
+    validateFileName: (fileName = "") => {
+        if (!/[\/\u2013\u2014]/.test(String(fileName || ""))) return true;
+        modular.error(modular.invalidFileNameMessage);
+        return false;
+    },
     bringToFront: (element) => {
         if (!element) return;
         document.querySelectorAll('.draggable-window.window-focused').forEach(windowDiv => {

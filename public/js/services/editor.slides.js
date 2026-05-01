@@ -657,6 +657,7 @@
             placeholder: "slideshow.slds",
             value: "slideshow.slds",
             confirmation: async (_, inputFileName) => {
+                if (!modular.validateFileName(inputFileName)) return;
                 const safeFileName = sanitizeSlidesFileName(inputFileName) || "slideshow.slds";
                 await saveSlidesDeckToPath(`Documents/${safeFileName}`);
             }
