@@ -21,11 +21,11 @@
         media_widget: true,
         video_widget: true,
     }
+    window.StandardUI = window.StandardUI || {};
+    window.StandardUI.defaultTheme = {...default_settings_options};
     let ui_settings_options = {...default_settings_options};
     const user_theme = window.StandardUI?.currentTheme || await modular.user.theme();
-    if(user_theme != null){
-        ui_settings_options = {...default_settings_options, ...user_theme};
-    }
+    if(user_theme != null) ui_settings_options = {...default_settings_options, ...user_theme};
     const BACKGROUND_IMAGE_CACHE_KEY = "ui-background";
     const BACKGROUND_IMAGE_CACHE_INTERFACE = "com.standard.settings";
     const BACKGROUND_IMAGE_META_KEY = "ui-background-meta";
@@ -81,6 +81,63 @@
             seen.add(key);
             return true;
         });
+    };
+    const STANDARD_SHEETS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon brick" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5" /></svg>`;
+    const parseStandardDataPayload = (response) => {
+        if (typeof response !== "string") return response;
+        try {
+            return JSON.parse(response);
+        } catch (_) {
+            return response;
+        }
+    };
+    const flattenStandardRow = (value, prefix = "", output = {}) => {
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+            Object.entries(value).forEach(([key, childValue]) => {
+                flattenStandardRow(childValue, prefix ? `${prefix}.${key}` : key, output);
+            });
+            return output;
+        }
+        output[prefix || "value"] = Array.isArray(value) ? JSON.stringify(value) : (value ?? "");
+        return output;
+    };
+    const normalizeStandardRows = (standardData) => {
+        if (Array.isArray(standardData)) return standardData.map((item) => flattenStandardRow(item));
+        if (standardData && typeof standardData === "object") {
+            const nestedArray = Object.values(standardData).find(Array.isArray);
+            if (nestedArray) return nestedArray.map((item) => flattenStandardRow(item));
+            const entries = Object.entries(standardData);
+            if (entries.length && entries.every(([, value]) => value && typeof value === "object" && !Array.isArray(value))) {
+                return entries.map(([key, value]) => flattenStandardRow(value, "", {key}));
+            }
+            return [flattenStandardRow(standardData)];
+        }
+        return [{value: standardData ?? ""}];
+    };
+    const escapeCsvValue = (value = "") => {
+        const text = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value ?? "");
+        return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
+    };
+    const standardDataToCsv = (standardData) => {
+        const rows = normalizeStandardRows(standardData);
+        const headers = [];
+        rows.forEach((row) => Object.keys(row).forEach((key) => {
+            if (!headers.includes(key)) headers.push(key);
+        }));
+        if (!headers.length) headers.push("value");
+        return [
+            headers.map(escapeCsvValue).join(","),
+            ...rows.map((row) => headers.map((header) => escapeCsvValue(row?.[header] ?? "")).join(","))
+        ].join("\n");
+    };
+    const waitForSheetsCsvLoader = async () => {
+        if (typeof window.StandardSheets?.openCsvContent === "function") return window.StandardSheets.openCsvContent;
+        modular.start("com.standard.editor.sheet");
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+            if (typeof window.StandardSheets?.openCsvContent === "function") return window.StandardSheets.openCsvContent;
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        return null;
     };
     const getDocumentationSections = () => {
         if (!docsMap) return [];
@@ -216,13 +273,11 @@
             };
         }
         const fileSelect = document.getElementById("home-documentation-file-select");
-        if (fileSelect) {
-            fileSelect.onchange = (event) => {
-                const fileName = event.target?.value;
-                if (!fileName || !activeDocumentationEntry?.section) return;
-                openDocumentationEntry(activeDocumentationEntry.section, fileName);
-            };
-        }
+        if (fileSelect) fileSelect.onchange = (event) => {
+            const fileName = event.target?.value;
+            if (!fileName || !activeDocumentationEntry?.section) return;
+            openDocumentationEntry(activeDocumentationEntry.section, fileName);
+        };
         const openExternalButton = document.getElementById("home-doc-open-external");
         if (openExternalButton) {
             openExternalButton.onclick = () => {
@@ -272,13 +327,7 @@
         if (!normalizedReference) return;
         try {
             const response = await CLI.send(`[${normalizedReference}]`);
-            const standardData = typeof response === "string" ? (() => {
-                try {
-                    return JSON.parse(response);
-                } catch (_) {
-                    return response;
-                }
-            })() : response;
+            const standardData = parseStandardDataPayload(response);
             if (typeof window.StandardInternals?.openStandardData !== "function") {
                 modular.start("com.standard.internals");
                 for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -293,6 +342,22 @@
             }
         } catch (_) {
             modular.error("Unable to load standard data");
+        }
+    };
+    const openStandardDataInSheets = async (standardReference = "", standardName = "", triggerNode = null) => {
+        const normalizedReference = `${standardReference || ""}`.trim();
+        if (!normalizedReference) return;
+        try {
+            const response = await CLI.send(`[${normalizedReference}]`);
+            const standardData = parseStandardDataPayload(response);
+            const openCsvContent = await waitForSheetsCsvLoader();
+            if (typeof openCsvContent !== "function") {
+                modular.error("Sheets viewer is not ready yet");
+                return;
+            }
+            openCsvContent(standardDataToCsv(standardData), {title: `${standardName || normalizedReference} Data`, sourceNode: triggerNode});
+        } catch (_) {
+            modular.error("Unable to load standard data as sheet");
         }
     };
     const renderHistoryList = (files = [], mode = "Use", interfaceName = "") => {
@@ -359,13 +424,10 @@
                 return;
             }
             listRoot.innerHTML = standards.map(({name, reference}, index) => div({style: "brick bordered radius padded small-margin-bottom shadowed", content: children([
+                button({style: "tiny float-right inner-radius small-margin-left no-margin-top", title: "View as sheet", icon: STANDARD_SHEETS_ICON, onclick: event => openStandardDataInSheets(reference, name, event?.target)}),
                 button({style: "tiny float-right no-margin inner-radius", content: "Data", onclick: event => openStandardDataInInternals(reference, event?.target)}),
                 div({style: "inline margin-bottom", content: div({style: "brick", content: `<strong>${escapeHtml(name)}</strong><span class="faded"> ${escapeHtml(reference)}</span>`})}),
-                div({
-                    id: `home-standards-detail-${index}`,
-                    style: "faded small-padding",
-                    content: "Loading details..."
-                })
+                div({id: `home-standards-detail-${index}`, style: "faded small-padding", content: "Loading details..."})
             ])})).join("");
             await Promise.all(standards.map(async ({name, reference}, index) => {
                 const detailRoot = document.getElementById(`home-standards-detail-${index}`);
@@ -434,9 +496,7 @@
             const currentUserRecord = await getCurrentUserRecord();
             const rawUserId = `${modular.user.id() || currentUserRecord?.userid || ""}`.trim();
             const safeUserId = rawUserId.toLowerCase().replace(/[^a-z0-9_-]/g, "");
-            if (!safeUserId) {
-                throw new Error("Missing user ID");
-            }
+            if (!safeUserId) throw new Error("Missing user ID");
             const payload = JSON.stringify(JSON.stringify(ui_settings_options));
             await CLI.send(`[user] settings ${payload} <userid "${safeUserId}">`, false);
             if (typeof modular?.user?.cacheUserRecord === "function") {
@@ -1008,24 +1068,7 @@
                             div({style: "big-spacer"}),
                             switcher({id: "use-video-widget", checked: ui_settings_options.interface_state}),
                             label({style: "faded", content: "Use Video Widget"}),
-                            em({style: "faded", content: "Widget to stream video and control"}),
-                            div({style: "center", content: children([
-                                    button({style: "tiny inner-radius brick spaced", content: "Use Defaults", onclick: () => {
-                                        }
-                                    }),
-                                    div({style: "bi", content: children([
-                                            div({style: "bi", content: ""}),
-                                            div({style: "bi", content: ""}),
-                                        ])
-                                    }),
-                                    div({style: "bi", content: children([
-                                            div({style: "bi", content: ""}),
-                                            div({style: "bi", content: ""}),
-                                        ])
-                                    }),
-                                ])
-                            }),
-                            div({style: "big-spacer"}),
+                            em({style: "faded", content: "Widget to stream video and control"})
                         ])
                     }),
                     afterRender: () => {

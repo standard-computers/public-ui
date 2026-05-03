@@ -25,6 +25,7 @@
     const TEXT_PAGE_VIEW_MIN_HEIGHT = "11in";
     const TEXT_PAGE_VIEW_PADDING = "0.75in";
     const TEXT_PAGE_VIEW_GAP = "28px";
+    const TEXT_PAGE_VIEW_WIDTH_PX = 816;
     const TEXT_PAGE_VIEW_HEIGHT_PX = 1056;
     const TEXT_PAGE_VIEW_PADDING_PX = 72;
     const TEXT_PAGE_VIEW_GAP_PX = 28;
@@ -32,6 +33,7 @@
     const TEXT_PAGE_VIEW_BREAK_SPACER_PX = (TEXT_PAGE_VIEW_PADDING_PX * 2) + TEXT_PAGE_VIEW_GAP_PX;
     const TEXT_INPUT_SYNC_DEBOUNCE_MS = 120;
     const TEXT_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" style="fill:none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path fill="none" style="fill:none" stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>`;
+    const TEXT_TABLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75V5.25Zm0 4.5h16.5M3.75 14.25h16.5M9.25 5.25v13.5M14.75 5.25v13.5" /></svg>`;
     const TEXT_ALIGN_ICONS = {
         left: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M4 10.5h10M4 14.5h16M4 18.5h10" /></svg>`,
         center: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M7 10.5h10M4 14.5h16M7 18.5h10" /></svg>`,
@@ -44,6 +46,8 @@
     let textEditorSelectionChangeBound = false;
     let activeTextImageFrame = null;
     let activeTextImageResizeState = null;
+    let activeTextTableResizeState = null;
+    let activeTextTableResizeHandle = null;
     let activeTextPageViewEnabled = false;
     let textEditorDeferredSyncTimer = null;
     let textEditorLastRenderedPageCount = 0;
@@ -58,6 +62,12 @@
     const findTextEditorPageMeasure = () => document.getElementById("editor-text-page-measure");
     const normalizeTextFilePath = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
     const getTextFileName = (rawPath = "") => String(rawPath || "").split("/").pop() || "Text";
+    const getTextFileExtension = (rawPath = "") => {
+        const fileName = getTextFileName(rawPath).toLowerCase();
+        return fileName.includes(".") ? fileName.split(".").pop() : "";
+    };
+    const isPlainTextFilePath = (rawPath = "") => getTextFileExtension(rawPath) === "txt";
+    const getDefaultTextDocumentPageViewPreference = (rawPath = "") => !isPlainTextFilePath(rawPath);
     const getTextFileDirectory = (rawPath = "") => {
         const normalizedPath = normalizeTextFilePath(rawPath);
         if (!normalizedPath.includes("/")) return "";
@@ -100,13 +110,16 @@
         return writeStoredTextDocumentViewSettings(settings);
     };
     const loadTextDocumentPageViewPreference = (rawPath = "", fallback = false) => {
+        if (isPlainTextFilePath(rawPath)) {
+            activeTextPageViewEnabled = false;
+            return activeTextPageViewEnabled;
+        }
         const storedPreference = getStoredTextDocumentPageViewPreference(rawPath);
         activeTextPageViewEnabled = typeof storedPreference === "boolean" ? storedPreference : !!fallback;
         return activeTextPageViewEnabled;
     };
     const shouldHideTextEditorBar = (rawPath = "") => {
-        const fileName = getTextFileName(rawPath).toLowerCase();
-        const extension = fileName.includes(".") ? fileName.split(".").pop() : "";
+        const extension = getTextFileExtension(rawPath);
         return extension === "txt" || extension === "md";
     };
     const isRichTextDocument = (rawPath = activeTextEditorFilePath) => !shouldHideTextEditorBar(rawPath);
@@ -202,6 +215,7 @@
         clone.querySelectorAll(".editor-text-page-break-spacer").forEach((spacerNode) => spacerNode.remove());
         unwrapTextEditorImageFrames(clone);
         clone.querySelectorAll(".editor-text-image-handle").forEach((handleNode) => handleNode.remove());
+        clone.querySelectorAll(".editor-text-table-resize-handle").forEach((handleNode) => handleNode.remove());
         clone.querySelectorAll("[data-editor-image-selected=\"1\"]").forEach((node) => node.removeAttribute("data-editor-image-selected"));
         return clone.innerHTML;
     };
@@ -298,6 +312,71 @@
             if (frameNode) imageNode.replaceWith(frameNode);
         });
     };
+    const normalizeTextEditorTables = (rootNode = findTextEditorNode()) => {
+        if (!rootNode?.querySelectorAll) return;
+        rootNode.querySelectorAll("table").forEach((tableNode) => {
+            tableNode.classList.add("editor-text-table");
+            tableNode.querySelectorAll("th, td").forEach((cellNode) => {
+                cellNode.classList.add("editor-text-table-cell");
+                if (!cellNode.childNodes.length) cellNode.appendChild(document.createElement("br"));
+            });
+        });
+    };
+    const createTextEditorTable = (rowCount = 3, columnCount = 3) => {
+        const rows = Math.max(1, Math.min(Number(rowCount) || 3, 10));
+        const columns = Math.max(1, Math.min(Number(columnCount) || 3, 10));
+        const tableNode = document.createElement("table");
+        tableNode.className = "editor-text-table";
+        tableNode.style.width = "100%";
+        tableNode.style.tableLayout = "fixed";
+        const tbodyNode = document.createElement("tbody");
+        Array.from({length: rows}).forEach(() => {
+            const rowNode = document.createElement("tr");
+            Array.from({length: columns}).forEach(() => {
+                const cellNode = document.createElement("td");
+                cellNode.className = "editor-text-table-cell";
+                cellNode.appendChild(document.createElement("br"));
+                rowNode.appendChild(cellNode);
+            });
+            tbodyNode.appendChild(rowNode);
+        });
+        tableNode.appendChild(tbodyNode);
+        return tableNode;
+    };
+    const placeCaretInTextTable = (tableNode) => {
+        const firstCell = tableNode?.querySelector?.("th, td");
+        if (!firstCell) return false;
+        return placeCaretAtStart(firstCell);
+    };
+    const insertTextEditorTable = (rowCount = 3, columnCount = 3) => {
+        const textArea = findTextEditorNode();
+        if (!textArea || !isRichTextDocument()) return false;
+        restoreTextSelection();
+        textArea.focus();
+        const selection = window.getSelection();
+        const tableNode = createTextEditorTable(rowCount, columnCount);
+        const trailingParagraph = createTextEditorParagraphBreak();
+        const insertAfter = (targetNode) => {
+            if (targetNode?.parentNode) targetNode.after(tableNode, trailingParagraph);
+            else textArea.append(tableNode, trailingParagraph);
+            placeCaretInTextTable(tableNode);
+            rememberTextSelection();
+            syncTextEditorStateFromDom();
+            return true;
+        };
+        if (!selection?.rangeCount || !isSelectionInsideTextEditor(selection)) {
+            return insertAfter(textArea.lastChild);
+        }
+        const range = selection.getRangeAt(0);
+        range.collapse(false);
+        const lineNode = findTextLineNode(range.startContainer, textArea);
+        if (lineNode && lineNode !== textArea && lineNode.parentNode === textArea) return insertAfter(lineNode);
+        textArea.append(tableNode, trailingParagraph);
+        placeCaretInTextTable(tableNode);
+        rememberTextSelection();
+        syncTextEditorStateFromDom();
+        return true;
+    };
     const insertNodeAtTextCaret = (targetNode, insertedNode) => {
         if (!targetNode || !insertedNode) return false;
         targetNode.focus();
@@ -367,6 +446,7 @@
         if (isRichTextDocument()) {
             if (textArea.innerHTML !== nextContent) textArea.innerHTML = nextContent;
             ensureTextEditorImageFrames(textArea);
+            normalizeTextEditorTables(textArea);
             prepareEditorLinks(textArea);
             return;
         }
@@ -388,7 +468,10 @@
         const state = portal?.windowState?.() || {};
         if (state?.directive) activeTextEditorFilePath = normalizeTextFilePath(state.directive);
         if (typeof state?.cachedContent === "string") activeTextEditorContent = state.cachedContent;
-        loadTextDocumentPageViewPreference(activeTextEditorFilePath, state?.pageViewEnabled === true);
+        loadTextDocumentPageViewPreference(
+            activeTextEditorFilePath,
+            typeof state?.pageViewEnabled === "boolean" ? state.pageViewEnabled : getDefaultTextDocumentPageViewPreference(activeTextEditorFilePath)
+        );
     };
     const updateTextEditorPortalTitle = (editorPortal = findTextPortal()) => {
         if (editorPortal?.setTitle) {
@@ -633,10 +716,62 @@
         restoreTextEditorSelectionOffsets(textArea, edit.selectionStart, edit.selectionEnd);
         return true;
     };
+    const getTextTableCellAtSelection = () => {
+        const selection = window.getSelection();
+        const editorNode = findTextEditorNode();
+        if (!editorNode || !selection?.rangeCount || !isSelectionInsideTextEditor(selection)) return null;
+        const range = selection.getRangeAt(0);
+        if (!range.collapsed) return null;
+        const node = range.startContainer?.nodeType === Node.TEXT_NODE
+            ? range.startContainer.parentElement
+            : range.startContainer;
+        const cellNode = node?.closest?.("th, td") || null;
+        return cellNode && editorNode.contains(cellNode) ? cellNode : null;
+    };
+    const isTextTableCellCaretAtEnd = (cellNode) => {
+        const selection = window.getSelection();
+        if (!cellNode || !selection?.rangeCount) return false;
+        const range = selection.getRangeAt(0);
+        if (!range.collapsed) return false;
+        const afterRange = document.createRange();
+        afterRange.selectNodeContents(cellNode);
+        try {
+            afterRange.setStart(range.endContainer, range.endOffset);
+        } catch (_) {
+            afterRange.detach?.();
+            return false;
+        }
+        const remainingText = String(afterRange.toString() || "").replace(/\u200B/g, "").trim();
+        afterRange.detach?.();
+        return remainingText.length === 0;
+    };
+    const getNextTextTableCell = (cellNode) => {
+        const rowNode = cellNode?.parentElement;
+        const tableNode = cellNode?.closest?.("table");
+        if (!rowNode || !tableNode) return null;
+        const columnIndex = Array.from(rowNode.cells).indexOf(cellNode);
+        if (columnIndex < rowNode.cells.length - 1) return rowNode.cells[columnIndex + 1];
+        const nextRow = rowNode.nextElementSibling;
+        if (nextRow?.cells?.length) return nextRow.cells[0];
+        const columnCount = Math.max(1, rowNode.cells.length || tableNode.rows[0]?.cells?.length || 1);
+        const newRow = document.createElement("tr");
+        Array.from({length: columnCount}).forEach(() => newRow.appendChild(createTextTableCell()));
+        rowNode.after(newRow);
+        return newRow.cells[0] || null;
+    };
+    const moveTextTableCaretToNextCell = () => {
+        const cellNode = getTextTableCellAtSelection();
+        if (!cellNode || !isTextTableCellCaretAtEnd(cellNode)) return false;
+        const nextCell = getNextTextTableCell(cellNode);
+        if (!nextCell) return false;
+        placeCaretAtStart(nextCell);
+        return true;
+    };
     const insertTextEditorTab = (textArea = findTextEditorNode()) => {
         if (!textArea) return false;
         textArea.focus();
         restoreTextSelection();
+        if (moveTextTableCaretToNextCell()) return true;
         if (document.execCommand("insertText", false, "\t")) return true;
         const selection = window.getSelection();
         if (!selection?.rangeCount || !isSelectionInsideTextEditor(selection)) return false;
@@ -690,9 +825,73 @@
         const editorNode = findTextEditorNode();
         const selection = window.getSelection();
         if (!editorNode || !isSelectionInsideTextEditor(selection) || !selection.rangeCount) return editorNode;
+        const selectedCells = getSelectedTextTableCells();
+        if (selectedCells.length) return selectedCells[0];
         let node = selection.getRangeAt(0).startContainer;
         if (node?.nodeType === Node.TEXT_NODE) node = node.parentElement;
         return node?.nodeType === Node.ELEMENT_NODE ? node : editorNode;
+    };
+    const rangeContainsNodeContents = (range, node) => {
+        if (!range || !node) return false;
+        const nodeRange = document.createRange();
+        nodeRange.selectNodeContents(node);
+        const containsStart = range.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0;
+        const containsEnd = range.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0;
+        nodeRange.detach?.();
+        return containsStart && containsEnd;
+    };
+    const getSelectedTextTableCells = () => {
+        const editorNode = findTextEditorNode();
+        const selection = window.getSelection();
+        if (!editorNode || !selection?.rangeCount || !isSelectionInsideTextEditor(selection)) return [];
+        const range = selection.getRangeAt(0);
+        if (range.collapsed) return [];
+        return Array.from(editorNode.querySelectorAll("th, td")).filter((cellNode) => {
+            if (!range.intersectsNode(cellNode)) return false;
+            const startCell = range.startContainer?.nodeType === Node.TEXT_NODE
+                ? range.startContainer.parentElement?.closest?.("th, td")
+                : range.startContainer?.closest?.("th, td");
+            const endCell = range.endContainer?.nodeType === Node.TEXT_NODE
+                ? range.endContainer.parentElement?.closest?.("th, td")
+                : range.endContainer?.closest?.("th, td");
+            if (startCell === cellNode && endCell === cellNode) {
+                const selectedText = String(range.toString() || "").replace(/\s+/g, " ").trim();
+                const cellText = String(cellNode.innerText || cellNode.textContent || "").replace(/\s+/g, " ").trim();
+                if (selectedText && selectedText === cellText) return true;
+            }
+            return rangeContainsNodeContents(range, cellNode);
+        });
+    };
+    const getLegacyTextFontSizeCssValue = (legacyValue = "") => {
+        const legacySize = Number(legacyValue) || 3;
+        if (legacySize <= 1) return "8px";
+        if (legacySize === 2) return "10px";
+        if (legacySize === 3) return "12px";
+        if (legacySize === 4) return "16px";
+        if (legacySize === 5) return "22px";
+        if (legacySize === 6) return "36px";
+        return "48px";
+    };
+    const applyTextTableCellStyleCommand = (command, value = null) => {
+        const selectedCells = getSelectedTextTableCells();
+        if (!selectedCells.length) return false;
+        selectedCells.forEach((cellNode) => {
+            const style = getComputedStyle(cellNode);
+            const fontWeightValue = Number(style.fontWeight);
+            const isBold = style.fontWeight === "bold" || Number.isFinite(fontWeightValue) && fontWeightValue >= 600;
+            const textDecorationLine = String(style.textDecorationLine || style.textDecoration || "");
+            if (command === "bold") cellNode.style.fontWeight = isBold ? "normal" : "700";
+            else if (command === "italic") cellNode.style.fontStyle = style.fontStyle === "italic" || style.fontStyle === "oblique" ? "normal" : "italic";
+            else if (command === "underline") cellNode.style.textDecoration = textDecorationLine.includes("underline") ? "none" : "underline";
+            else if (command === "fontName") cellNode.style.fontFamily = value || "";
+            else if (command === "fontSize") cellNode.style.fontSize = getLegacyTextFontSizeCssValue(value);
+            else if (command === "foreColor") cellNode.style.color = !value || value === "inherit" ? "" : value;
+            else if (command === "hiliteColor" || command === "backColor") cellNode.style.backgroundColor = !value || value === "transparent" ? "" : value;
+            else if (command === "justifyLeft") cellNode.style.textAlign = "left";
+            else if (command === "justifyCenter") cellNode.style.textAlign = "center";
+            else if (command === "justifyRight") cellNode.style.textAlign = "right";
+        });
+        return true;
     };
     const getTextSelectionBlockTarget = (node) => {
         const editorNode = findTextEditorNode();
@@ -700,6 +899,7 @@
         while (current && current !== editorNode) {
             if (current.nodeType === Node.ELEMENT_NODE) {
                 const display = getComputedStyle(current).display;
+                if (["TD", "TH"].includes(current.tagName)) return current;
                 if (display === "block" || display === "list-item" || current.tagName === "DIV" || current.tagName === "P") return current;
             }
             current = current.parentElement;
@@ -913,6 +1113,11 @@
         if (!textArea || shouldHideTextEditorBar(activeTextEditorFilePath)) return false;
         restoreTextSelection();
         textArea.focus();
+        if (applyTextTableCellStyleCommand(command, value)) {
+            rememberTextSelection();
+            syncTextEditorStateFromDom();
+            return true;
+        }
         document.execCommand("styleWithCSS", false, true);
         const didApply = value === null
             ? document.execCommand(command, false, null)
@@ -939,6 +1144,26 @@
             textEditorLastRenderedPageCount = totalPages;
         }
         stageNode.classList.toggle("editor-text-stage-page-view", activeTextPageViewEnabled);
+        return true;
+    };
+    const ensureTextEditorPageWindowFits = (portal = findTextPortal()) => {
+        if (!activeTextPageViewEnabled || !portal || typeof portal.applyWindowState !== "function") return false;
+        const windowNode = portal.window?.();
+        const bodyNode = portal.body?.();
+        if (!(windowNode instanceof HTMLElement) || !(bodyNode instanceof HTMLElement)) return false;
+        const windowRect = windowNode.getBoundingClientRect();
+        const bodyWidth = bodyNode.clientWidth || bodyNode.getBoundingClientRect().width || 0;
+        const missingWidth = Math.ceil(TEXT_PAGE_VIEW_WIDTH_PX - bodyWidth);
+        if (missingWidth <= 0) return false;
+        const nextWidth = Math.ceil((windowRect.width || windowNode.clientWidth || 0) + missingWidth);
+        const nextState = {width: `${nextWidth}px`};
+        const currentLeft = Number.parseFloat(windowNode.style.left || `${windowRect.left || 0}`);
+        if (Number.isFinite(currentLeft) && nextWidth < window.innerWidth) {
+            nextState.left = `${Math.max(10, Math.min(currentLeft, window.innerWidth - nextWidth - 10))}px`;
+        } else if (nextWidth >= window.innerWidth) {
+            nextState.left = "10px";
+        }
+        portal.applyWindowState(nextState);
         return true;
     };
     const paginateTextEditorFlow = (textArea = findTextEditorNode()) => {
@@ -985,8 +1210,9 @@
         renderTextEditorPageBackdrop(requiredPages, stageNode, backdropNode);
         textArea.classList.toggle("editor-text-page-view", pageViewEnabled);
         if (stageNode) {
-            stageNode.style.width = pageViewEnabled ? `min(100%, ${TEXT_PAGE_VIEW_WIDTH})` : "";
+            stageNode.style.width = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
             stageNode.style.maxWidth = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
+            stageNode.style.minWidth = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
             stageNode.style.minHeight = pageViewEnabled ? `${totalPageHeight}px` : "";
             stageNode.style.height = "";
             stageNode.style.margin = pageViewEnabled ? `${TEXT_PAGE_VIEW_GAP} auto calc(${TEXT_PAGE_VIEW_GAP} * 1.5)` : "";
@@ -1001,8 +1227,11 @@
             backdropNode.style.display = pageViewEnabled ? "flex" : "none";
             backdropNode.style.minHeight = pageViewEnabled ? `${totalPageHeight}px` : "";
         }
-        textArea.style.width = pageViewEnabled ? `min(100%, ${TEXT_PAGE_VIEW_WIDTH})` : "";
+        const bodyNode = findTextPortal()?.body?.();
+        if (bodyNode) bodyNode.style.overflowX = pageViewEnabled ? "auto" : "";
+        textArea.style.width = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
         textArea.style.maxWidth = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
+        textArea.style.minWidth = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
         textArea.style.minHeight = pageViewEnabled ? `${totalPageHeight}px` : "";
         textArea.style.height = pageViewEnabled ? `${totalPageHeight}px` : "";
         textArea.style.padding = pageViewEnabled ? TEXT_PAGE_VIEW_PADDING : "";
@@ -1025,15 +1254,250 @@
         textArea.style.left = "";
         textArea.style.right = "";
         textArea.style.overflowY = pageViewEnabled ? "visible" : "";
+        if (pageViewEnabled) requestAnimationFrame(() => ensureTextEditorPageWindowFits());
         return true;
     };
     const toggleTextEditorPageView = (enabled = !activeTextPageViewEnabled, portal = findTextPortal()) => {
-        activeTextPageViewEnabled = !!enabled;
+        activeTextPageViewEnabled = isPlainTextFilePath(activeTextEditorFilePath) ? false : !!enabled;
         if (activeTextEditorFilePath) persistTextDocumentPageViewPreference(activeTextEditorFilePath, activeTextPageViewEnabled);
         applyTextEditorPageView(activeTextPageViewEnabled);
         syncEditorWindowState(portal);
         updateTextToolbarState();
         return activeTextPageViewEnabled;
+    };
+    const getTextTableContext = (targetNode) => {
+        const editorNode = findTextEditorNode();
+        const cellNode = targetNode?.closest?.("th, td") || null;
+        const tableNode = cellNode?.closest?.("table") || targetNode?.closest?.("table") || null;
+        if (!editorNode || !tableNode || !editorNode.contains(tableNode)) return null;
+        const rowNode = cellNode?.parentElement || null;
+        const rowIndex = rowNode ? Array.from(tableNode.rows).indexOf(rowNode) : -1;
+        const columnIndex = cellNode ? Array.from(rowNode?.cells || []).indexOf(cellNode) : -1;
+        return {tableNode, rowNode, cellNode, rowIndex, columnIndex};
+    };
+    const hasTextTableContext = (_, targetNode) => !!getTextTableContext(targetNode);
+    const createTextTableCell = () => {
+        const cellNode = document.createElement("td");
+        cellNode.className = "editor-text-table-cell";
+        cellNode.appendChild(document.createElement("br"));
+        return cellNode;
+    };
+    const syncTextTableEdit = () => {
+        normalizeTextEditorTables();
+        rememberTextSelection();
+        syncTextEditorStateFromDom();
+    };
+    const insertTextTableRow = (targetNode, after = true) => {
+        const context = getTextTableContext(targetNode);
+        if (!context?.tableNode) return false;
+        const sourceRow = context.rowNode || context.tableNode.rows[context.tableNode.rows.length - 1];
+        const columnCount = Math.max(1, sourceRow?.cells?.length || context.tableNode.rows[0]?.cells?.length || 1);
+        const rowNode = document.createElement("tr");
+        Array.from({length: columnCount}).forEach(() => rowNode.appendChild(createTextTableCell()));
+        if (sourceRow) sourceRow[after ? "after" : "before"](rowNode);
+        else context.tableNode.appendChild(rowNode);
+        placeCaretAtStart(rowNode.cells[Math.max(0, Math.min(context.columnIndex, columnCount - 1))]);
+        syncTextTableEdit();
+        return true;
+    };
+    const insertTextTableColumn = (targetNode, after = true) => {
+        const context = getTextTableContext(targetNode);
+        if (!context?.tableNode) return false;
+        const targetColumn = Math.max(0, context.columnIndex);
+        Array.from(context.tableNode.rows).forEach((rowNode) => {
+            const cellNode = createTextTableCell();
+            const referenceCell = rowNode.cells[targetColumn] || rowNode.cells[rowNode.cells.length - 1];
+            if (referenceCell) referenceCell[after ? "after" : "before"](cellNode);
+            else rowNode.appendChild(cellNode);
+        });
+        const focusRow = context.tableNode.rows[Math.max(0, context.rowIndex)] || context.tableNode.rows[0];
+        placeCaretAtStart(focusRow?.cells?.[after ? targetColumn + 1 : targetColumn]);
+        syncTextTableEdit();
+        return true;
+    };
+    const deleteTextTableRow = (targetNode) => {
+        const context = getTextTableContext(targetNode);
+        if (!context?.rowNode) return false;
+        if (context.tableNode.rows.length <= 1) {
+            context.tableNode.remove();
+        } else {
+            const nextFocusRow = context.rowNode.nextElementSibling || context.rowNode.previousElementSibling;
+            context.rowNode.remove();
+            placeCaretAtStart(nextFocusRow?.cells?.[Math.max(0, context.columnIndex)] || nextFocusRow?.cells?.[0]);
+        }
+        syncTextTableEdit();
+        return true;
+    };
+    const deleteTextTableColumn = (targetNode) => {
+        const context = getTextTableContext(targetNode);
+        if (!context?.tableNode || context.columnIndex < 0) return false;
+        const rowNodes = Array.from(context.tableNode.rows);
+        if ((rowNodes[0]?.cells?.length || 0) <= 1) {
+            context.tableNode.remove();
+        } else {
+            rowNodes.forEach((rowNode) => rowNode.cells[context.columnIndex]?.remove());
+            const focusRow = context.tableNode.rows[Math.max(0, Math.min(context.rowIndex, context.tableNode.rows.length - 1))];
+            placeCaretAtStart(focusRow?.cells?.[Math.max(0, context.columnIndex - 1)] || focusRow?.cells?.[0]);
+        }
+        syncTextTableEdit();
+        return true;
+    };
+    const deleteTextTable = (targetNode) => {
+        const context = getTextTableContext(targetNode);
+        if (!context?.tableNode) return false;
+        const paragraphNode = createTextEditorParagraphBreak();
+        context.tableNode.replaceWith(paragraphNode);
+        placeCaretAtStart(paragraphNode);
+        syncTextTableEdit();
+        return true;
+    };
+    const getTextTableResizeHandle = () => {
+        if (activeTextTableResizeHandle) return activeTextTableResizeHandle;
+        activeTextTableResizeHandle = document.createElement("div");
+        activeTextTableResizeHandle.className = "editor-text-table-resize-handle";
+        activeTextTableResizeHandle.contentEditable = "false";
+        document.body.appendChild(activeTextTableResizeHandle);
+        activeTextTableResizeHandle.addEventListener("mousedown", (event) => {
+            const cellNode = activeTextTableResizeHandle._cellNode;
+            const tableNode = cellNode?.closest?.("table");
+            const mode = activeTextTableResizeHandle.dataset.resizeMode;
+            if (!cellNode || !tableNode || !mode) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const rowNode = cellNode.parentElement;
+            activeTextTableResizeState = {
+                mode,
+                tableNode,
+                rowNode,
+                columnIndex: Array.from(rowNode.cells).indexOf(cellNode),
+                startX: event.clientX,
+                startY: event.clientY,
+                startWidth: cellNode.getBoundingClientRect().width,
+                startHeight: rowNode.getBoundingClientRect().height
+            };
+            activeTextTableResizeHandle.classList.add("is-dragging");
+        });
+        return activeTextTableResizeHandle;
+    };
+    const hideTextTableResizeHandle = () => {
+        if (!activeTextTableResizeHandle || activeTextTableResizeState) return;
+        activeTextTableResizeHandle.classList.remove("is-visible", "is-column", "is-row");
+        activeTextTableResizeHandle._cellNode = null;
+    };
+    const updateTextTableResizeHover = (event) => {
+        if (activeTextTableResizeState) return;
+        const textArea = findTextEditorNode();
+        if (activeTextTableResizeHandle?.contains?.(event.target)) return;
+        const cellNode = event.target?.closest?.("th, td");
+        if (!textArea || !cellNode || !textArea.contains(cellNode) || !cellNode.closest("table")) {
+            hideTextTableResizeHandle();
+            return;
+        }
+        const cellRect = cellNode.getBoundingClientRect();
+        const tableRect = cellNode.closest("table").getBoundingClientRect();
+        const nearRight = Math.abs(event.clientX - cellRect.right) <= 6;
+        const nearBottom = Math.abs(event.clientY - cellRect.bottom) <= 6;
+        if (!nearRight && !nearBottom) {
+            hideTextTableResizeHandle();
+            return;
+        }
+        const handleNode = getTextTableResizeHandle();
+        handleNode._cellNode = cellNode;
+        handleNode.dataset.resizeMode = nearRight ? "column" : "row";
+        handleNode.classList.toggle("is-column", nearRight);
+        handleNode.classList.toggle("is-row", !nearRight);
+        handleNode.classList.add("is-visible");
+        if (nearRight) {
+            handleNode.style.left = `${Math.round(cellRect.right - 3)}px`;
+            handleNode.style.top = `${Math.round(tableRect.top)}px`;
+            handleNode.style.width = "6px";
+            handleNode.style.height = `${Math.round(tableRect.height)}px`;
+        } else {
+            handleNode.style.left = `${Math.round(tableRect.left)}px`;
+            handleNode.style.top = `${Math.round(cellRect.bottom - 3)}px`;
+            handleNode.style.width = `${Math.round(tableRect.width)}px`;
+            handleNode.style.height = "6px";
+        }
+    };
+    const resizeTextTable = (event) => {
+        if (!activeTextTableResizeState) return;
+        event.preventDefault();
+        const state = activeTextTableResizeState;
+        if (state.mode === "column") {
+            const nextWidth = Math.max(36, state.startWidth + event.clientX - state.startX);
+            Array.from(state.tableNode.rows).forEach((rowNode) => {
+                const cellNode = rowNode.cells[state.columnIndex];
+                if (cellNode) cellNode.style.width = `${Math.round(nextWidth)}px`;
+            });
+        } else if (state.rowNode) {
+            const nextHeight = Math.max(28, state.startHeight + event.clientY - state.startY);
+            state.rowNode.style.height = `${Math.round(nextHeight)}px`;
+        }
+    };
+    const showTextTablePicker = (buttonNode) => {
+        if (!buttonNode) return false;
+        const existingPicker = document.querySelector(".editor-text-table-picker");
+        if (existingPicker) existingPicker.remove();
+        const pickerNode = document.createElement("div");
+        pickerNode.className = "custom-context-menu editor-text-table-picker";
+        pickerNode.innerHTML = `<div class="editor-text-table-picker-grid"></div><div class="editor-text-table-picker-label">1 x 1</div>`;
+        const gridNode = pickerNode.querySelector(".editor-text-table-picker-grid");
+        const labelNode = pickerNode.querySelector(".editor-text-table-picker-label");
+        const maxRows = 8;
+        const maxColumns = 8;
+        let selectedRows = 1;
+        let selectedColumns = 1;
+        Array.from({length: maxRows}).forEach((_, rowIndex) => {
+            Array.from({length: maxColumns}).forEach((__, columnIndex) => {
+                const cellNode = document.createElement("button");
+                cellNode.type = "button";
+                cellNode.className = "editor-text-table-picker-cell";
+                cellNode.dataset.row = String(rowIndex + 1);
+                cellNode.dataset.column = String(columnIndex + 1);
+                cellNode.setAttribute("aria-label", `${rowIndex + 1} by ${columnIndex + 1} table`);
+                gridNode.appendChild(cellNode);
+            });
+        });
+        const updateSelection = (rows, columns) => {
+            selectedRows = rows;
+            selectedColumns = columns;
+            labelNode.textContent = `${rows} x ${columns}`;
+            gridNode.querySelectorAll(".editor-text-table-picker-cell").forEach((cellNode) => {
+                const row = Number(cellNode.dataset.row) || 0;
+                const column = Number(cellNode.dataset.column) || 0;
+                cellNode.classList.toggle("is-selected", row <= rows && column <= columns);
+            });
+        };
+        pickerNode.addEventListener("mousemove", (event) => {
+            const cellNode = event.target?.closest?.(".editor-text-table-picker-cell");
+            if (!cellNode) return;
+            updateSelection(Number(cellNode.dataset.row) || 1, Number(cellNode.dataset.column) || 1);
+        });
+        pickerNode.addEventListener("click", (event) => {
+            const cellNode = event.target?.closest?.(".editor-text-table-picker-cell");
+            if (!cellNode) return;
+            event.preventDefault();
+            event.stopPropagation();
+            pickerNode.remove();
+            insertTextEditorTable(selectedRows, selectedColumns);
+        });
+        const closePicker = (event) => {
+            if (pickerNode.contains(event.target) || buttonNode.contains(event.target)) return;
+            pickerNode.remove();
+            document.removeEventListener("mousedown", closePicker, true);
+        };
+        document.body.appendChild(pickerNode);
+        const rect = buttonNode.getBoundingClientRect();
+        pickerNode.style.left = `${rect.left}px`;
+        pickerNode.style.top = `${rect.bottom + 6}px`;
+        requestAnimationFrame(() => {
+            updateSelection(1, 1);
+            const pickerRect = pickerNode.getBoundingClientRect();
+            if (pickerRect.right > window.innerWidth) pickerNode.style.left = `${Math.max(8, window.innerWidth - pickerRect.width - 8)}px`;
+            if (pickerRect.bottom > window.innerHeight) pickerNode.style.top = `${Math.max(8, rect.top - pickerRect.height - 6)}px`;
+        });
+        document.addEventListener("mousedown", closePicker, true);
+        return true;
     };
     const bindTextEditorInteractions = () => {
         const textArea = findTextEditorNode();
@@ -1049,6 +1513,7 @@
         const highlightButton = document.getElementById("editor-sheet-style-highlight");
         const listButton = document.getElementById("editor-sheet-style-list");
         const imageButton = document.getElementById("editor-sheet-style-image");
+        const tableButton = document.getElementById("editor-sheet-style-table");
         const otherButton = document.getElementById("editor-sheet-style-other");
         if (!textArea || textArea.dataset.bound === "1") return;
         textArea.dataset.bound = "1";
@@ -1085,7 +1550,53 @@
             icon: TEXT_LINK_ICON,
             visible: () => hasHighlightedTextSelection() && isRichTextDocument(),
             action: () => showTextEditorHyperlinkDialogue()
-        }]);
+        },
+            {
+                label: "Add Row Above",
+                icon: TEXT_TABLE_ICON,
+                visible: hasTextTableContext,
+                action: (_, __, target) => insertTextTableRow(target, false)
+            },
+            {
+                label: "Add Row Below",
+                icon: TEXT_TABLE_ICON,
+                visible: hasTextTableContext,
+                action: (_, __, target) => insertTextTableRow(target, true)
+            },
+            {
+                label: "Add Column Left",
+                icon: TEXT_TABLE_ICON,
+                visible: hasTextTableContext,
+                action: (_, __, target) => insertTextTableColumn(target, false)
+            },
+            {
+                label: "Add Column Right",
+                icon: TEXT_TABLE_ICON,
+                visible: hasTextTableContext,
+                action: (_, __, target) => insertTextTableColumn(target, true)
+            },
+            "separator",
+            {
+                label: "Delete Row",
+                icon: TEXT_TABLE_ICON,
+                visible: hasTextTableContext,
+                destructive: true,
+                action: (_, __, target) => deleteTextTableRow(target)
+            },
+            {
+                label: "Delete Column",
+                icon: TEXT_TABLE_ICON,
+                visible: hasTextTableContext,
+                destructive: true,
+                action: (_, __, target) => deleteTextTableColumn(target)
+            },
+            {
+                label: "Delete Table",
+                icon: TEXT_TABLE_ICON,
+                visible: hasTextTableContext,
+                destructive: true,
+                action: (_, __, target) => deleteTextTable(target)
+            }], "table, th, td");
         textArea.addEventListener("paste", async (event) => {
             const clipboard = event.clipboardData;
             const imageItems = Array.from(clipboard?.items || []).filter((item) => item.type?.startsWith("image/"));
@@ -1168,6 +1679,11 @@
                 updateTextToolbarState();
             });
             document.addEventListener("mousemove", (event) => {
+                if (activeTextTableResizeState) {
+                    resizeTextTable(event);
+                    return;
+                }
+                updateTextTableResizeHover(event);
                 if (!activeTextImageResizeState) return;
                 event.preventDefault();
                 const {handle, imageNode, startX, startY, startWidth, aspectRatio, frameNode} = activeTextImageResizeState;
@@ -1182,6 +1698,14 @@
                 imageNode.style.height = "auto";
             });
             document.addEventListener("mouseup", () => {
+                if (activeTextTableResizeState) {
+                    activeTextTableResizeState = null;
+                    activeTextTableResizeHandle?.classList.remove("is-dragging");
+                    hideTextTableResizeHandle();
+                    rememberTextSelection();
+                    syncTextEditorStateFromDom();
+                    return;
+                }
                 if (!activeTextImageResizeState) return;
                 activeTextImageResizeState = null;
                 rememberTextSelection();
@@ -1192,7 +1716,7 @@
                 clearActiveTextImageSelection();
             });
         }
-        [boldButton, italicButton, underlineButton, linkButton, textColorButton, backgroundColorButton, alignmentButton, highlightButton, listButton, imageButton, otherButton].forEach(bindTextToolbarButtonFocus);
+        [boldButton, italicButton, underlineButton, linkButton, textColorButton, backgroundColorButton, alignmentButton, highlightButton, listButton, imageButton, tableButton, otherButton].forEach(bindTextToolbarButtonFocus);
         if (fontFamilySelect && fontFamilySelect.dataset.bound !== "1") {
             fontFamilySelect.dataset.bound = "1";
             fontFamilySelect.addEventListener("change", () => execTextEditorCommand("fontName", fontFamilySelect.value || "Inter"));
@@ -1328,16 +1852,24 @@
                 fileInput.click();
             });
         }
+        if (tableButton && tableButton.dataset.bound !== "1") {
+            tableButton.dataset.bound = "1";
+            tableButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                rememberTextSelection();
+                showTextTablePicker(tableButton);
+            });
+        }
         if (otherButton && otherButton.dataset.bound !== "1") {
             otherButton.dataset.bound = "1";
             otherButton.popoutmenu([{
                 className: "context-menu-item-switch",
                 content: children([
-                    div({style: "inline", content: children([
+                    div({content: children([
+                        switcher({id: "editor-text-page-view-toggle", style: "menu-switcher float-right", checked: activeTextPageViewEnabled}),
                         `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon space-right" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3.75h10.5A2.25 2.25 0 0 1 19.5 6v12a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 18V6a2.25 2.25 0 0 1 2.25-2.25Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5h7.5M8.25 10.5h7.5M8.25 13.5h7.5M8.25 16.5h4.5" /></svg>`,
-                        `<span>Display As Pages</span>`
+                        `<span>Pages</span>`
                     ])}),
-                    switcher({id: "editor-text-page-view-toggle", style: "menu-switcher", checked: activeTextPageViewEnabled})
                 ]),
                 action: () => toggleTextEditorPageView()
             }]);
@@ -1382,6 +1914,7 @@
             return false;
         }
         activeTextEditorFilePath = normalizedPath;
+        if (isPlainTextFilePath(normalizedPath)) activeTextPageViewEnabled = false;
         activeTextEditorContent = readTextEditorContent();
         persistTextDocumentPageViewPreference(normalizedPath, activeTextPageViewEnabled);
         const persistedContent = encodeTextEditorContentForSave(activeTextEditorContent);
@@ -1433,7 +1966,7 @@
     const openFreshTextEditor = (sourceNode = null) => {
         activeTextEditorFilePath = "";
         activeTextEditorContent = "Edit Me";
-        activeTextPageViewEnabled = false;
+        activeTextPageViewEnabled = getDefaultTextDocumentPageViewPreference(activeTextEditorFilePath);
         clearActiveTextImageSelection({skipSync: true});
         skipNextTextStateRestore = true;
         const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
@@ -1445,7 +1978,7 @@
     window.StandardEditor.openFreshTextEditor = openFreshTextEditor;
     window.StandardEditor.openTextFilePath = (rawPath = "", content = "", sourceNode = null) => {
         activeTextEditorFilePath = normalizeTextFilePath(rawPath);
-        loadTextDocumentPageViewPreference(activeTextEditorFilePath, false);
+        loadTextDocumentPageViewPreference(activeTextEditorFilePath, getDefaultTextDocumentPageViewPreference(activeTextEditorFilePath));
         activeTextEditorContent = decodeTextEditorLoadedContent(content);
         clearActiveTextImageSelection({skipSync: true});
         skipNextTextStateRestore = true;
@@ -1483,6 +2016,7 @@
                                 button({id: "editor-sheet-style-highlight", style: "naked align-bottom small-margin-right inner-radius", title: "Highlight", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.494141 1.1171875 C 12.366141 1.1171875 12.238125 1.1661719 12.140625 1.2636719 L 9.1484375 4.2578125 C 8.0944375 5.3118125 7.299125 6.5957656 6.828125 8.0097656 L 5.5742188 11.775391 C 5.4752187 12.069391 5.3098438 12.338594 5.0898438 12.558594 L 3.3027344 14.345703 C 2.9117344 14.736703 2.9117344 15.369766 3.3027344 15.759766 L 3.8554688 16.3125 L 1.2851562 19.009766 C 0.78015625 19.540766 0.99835938 20.416438 1.6933594 20.648438 L 4.6074219 21.591797 C 4.9524219 21.706797 5.3316094 21.625906 5.5996094 21.378906 L 7.328125 19.783203 L 8.2539062 20.708984 C 8.4489063 20.903984 8.7049375 21.001953 8.9609375 21.001953 C 9.2169375 21.001953 9.4729687 20.903984 9.6679688 20.708984 L 11.455078 18.921875 C 11.675078 18.701875 11.941328 18.5355 12.236328 18.4375 L 16.001953 17.183594 C 17.415953 16.712594 18.700859 15.917281 19.755859 14.863281 L 22.748047 11.869141 C 22.943047 11.674141 22.943047 11.357109 22.748047 11.162109 C 22.552047 10.967109 22.236016 10.967109 22.041016 11.162109 L 19.048828 14.15625 C 19.040972 14.164106 19.031323 14.16991 19.023438 14.177734 L 9.8359375 4.9882812 C 9.8431253 4.981042 9.8482537 4.9720588 9.8554688 4.9648438 L 12.847656 1.9707031 C 13.042656 1.7757031 13.042656 1.4586719 12.847656 1.2636719 C 12.750156 1.1661719 12.622141 1.1171875 12.494141 1.1171875 z M 9.171875 5.7382812 L 18.273438 14.841797 C 17.49882 15.44921 16.624226 15.921729 15.685547 16.234375 L 11.919922 17.490234 C 11.477922 17.637234 11.076094 17.884844 10.746094 18.214844 L 8.9609375 20.001953 L 4.0097656 15.052734 L 5.796875 13.265625 C 6.125875 12.936625 6.3734844 12.533797 6.5214844 12.091797 L 7.7773438 8.3261719 C 8.0908498 7.387136 8.5643624 6.513116 9.171875 5.7382812 z"/></svg>`}),
                                 button({id: "editor-sheet-style-list", style: "naked align-bottom small-margin-right inner-radius", title: "List", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`}),
                                 button({id: "editor-sheet-style-image", style: "naked align-bottom small-margin-right inner-radius", title: "Image", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`}),
+                                button({id: "editor-sheet-style-table", style: "naked align-bottom small-margin-right inner-radius", title: "Table", icon: TEXT_TABLE_ICON}),
                                 button({id: "editor-sheet-style-other", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" /></svg>`}),
                             ])})
                     }),

@@ -73,13 +73,16 @@
                 if (!mapShell || !mapContainer) return;
                 const bodyNode = view?.body instanceof HTMLElement ? view.body : mapContainer.closest(".window-body");
                 const syncMapViewport = () => {
-                    const availableHeight = Math.max((bodyNode?.clientHeight || mapShell.clientHeight || mapContainer.clientHeight) - 12, 200);
+                    const availableHeight = Math.max(bodyNode?.clientHeight || mapShell.clientHeight || mapContainer.clientHeight, 200);
                     mapShell.style.width = "100%";
                     mapShell.style.height = `${availableHeight}px`;
                     mapShell.style.minHeight = `${availableHeight}px`;
+                    mapShell.style.boxSizing = "border-box";
+                    mapShell.style.overflow = "hidden";
                     mapContainer.style.width = "100%";
                     mapContainer.style.height = `${availableHeight}px`;
                     mapContainer.style.minHeight = `${availableHeight}px`;
+                    mapContainer.style.boxSizing = "border-box";
                 };
                 syncMapViewport();
                 if (activeMap && activeMapContainer === mapContainer) {

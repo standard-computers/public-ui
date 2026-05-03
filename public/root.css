@@ -124,6 +124,7 @@
 .none {display:none}
 .brick {display:block}
 .brick .float-right {margin-top:10px}
+.switcher:not(.adjust-top):not(.large-adjust-top) {margin-top:0}
 .hidden {overflow:hidden}
 .visible {overflow:visible}
 .on-top {z-index:2988}
@@ -133,6 +134,7 @@
 .spaced, .spacer {margin-top:15px}
 .big-spacer {padding-top:30px}
 .no-margin {margin:0 !important}
+.no-margin-top {margin:0 !important}
 .tiny-margin-right {margin-right:6px}
 .tiny-margin-left {margin-left:6px}
 .small-margin-right {margin-right:10px}

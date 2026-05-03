@@ -376,7 +376,7 @@ function createMarkupNode(markup = "") {
 }
 function switcher(n = {}) {
     const styleClasses = (n.style || "float-right").trim();
-    const mergedStyle = `${styleClasses} align-right inline`.trim();
+    const mergedStyle = `${styleClasses} switcher align-right inline`.trim();
     return div({
         style: mergedStyle,
         content: children([input({
@@ -385,7 +385,7 @@ function switcher(n = {}) {
             id: n.id,
             checked: n.checked,
             onchange: n.onchange
-        }), label({input: n.id, style: "inline"})])
+        }), label({input: n.id})])
     })
 }
 function inputDialogue(n) {
@@ -639,9 +639,163 @@ function showInlineStyleEditor(n = {}) {
     }, 0);
     return editorNode;
 }
-window.StandardPlastic = window.StandardPlastic || {};
-window.StandardPlastic.showInlineStyleEditor = showInlineStyleEditor;
-window.StandardPlastic.removeInlineStyleEditor = removeInlineStyleEditor;
+const PLASTIC_CHART_COLORS = ["#2563eb", "#16a34a", "#f97316", "#dc2626", "#7c3aed", "#0891b2", "#ca8a04", "#db2777"];
+function normalizePlasticChartData(data = []) {
+    return (Array.isArray(data) ? data : []).map((item, index) => {
+        if (item && typeof item === "object" && !Array.isArray(item)) {
+            const value = Number(item.value ?? item.y ?? item.amount);
+            return {
+                label: String(item.label ?? item.name ?? item.x ?? `Item ${index + 1}`),
+                value: Number.isFinite(value) ? value : 0,
+                color: item.color || PLASTIC_CHART_COLORS[index % PLASTIC_CHART_COLORS.length]
+            };
+        }
+        const value = Number(item);
+        return {
+            label: `Item ${index + 1}`,
+            value: Number.isFinite(value) ? value : 0,
+            color: PLASTIC_CHART_COLORS[index % PLASTIC_CHART_COLORS.length]
+        };
+    });
+}
+function getPlasticChartBounds(data = []) {
+    const values = normalizePlasticChartData(data).map((item) => item.value);
+    const minValue = Math.min(0, ...values);
+    const maxValue = Math.max(1, ...values);
+    const range = maxValue - minValue || 1;
+    return {minValue, maxValue, range};
+}
+function formatPlasticChartValue(value = 0) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return "0";
+    return Number.isInteger(numericValue) ? String(numericValue) : String(Number(numericValue.toFixed(2)));
+}
+function getPlasticChartItemTitle(item = {}) {
+    return `${item.label}: ${formatPlasticChartValue(item.value)}`;
+}
+function plasticSvgNode(n = {}) {
+    const namespace = "http://www.w3.org/2000/svg";
+    const node = document.createElementNS(namespace, n.tag || "svg");
+    Object.entries(n.attrs || {}).forEach(([key, value]) => {
+        if (value !== null && typeof value !== "undefined") node.setAttribute(key, String(value));
+    });
+    if (n.text) node.textContent = n.text;
+    (n.children || []).forEach((child) => node.append(child));
+    return node;
+}
+function appendPlasticSvgTitle(node, text = "") {
+    if (!node || !text) return node;
+    node.append(plasticSvgNode({tag: "title", text}));
+    return node;
+}
+function appendPlasticValueLabel(svg, text = "", x = 0, y = 0, anchor = "middle") {
+    svg.append(plasticSvgNode({
+        tag: "text",
+        text,
+        attrs: {x, y, class: "plastic-chart-value-label", "text-anchor": anchor}
+    }));
+}
+function createPlasticChartFrame(n = {}) {
+    const width = Number(n.width) || 360;
+    const height = Number(n.height) || 240;
+    const root = document.createElement("div");
+    root.className = `plastic-chart plastic-chart-${n.type || "bar"}`;
+    root.style.width = `${width}px`;
+    root.style.height = `${height}px`;
+    const title = String(n.title || "").trim();
+    if (title) {
+        const titleNode = document.createElement("div");
+        titleNode.className = "plastic-chart-title";
+        titleNode.textContent = title;
+        root.append(titleNode);
+    }
+    const svg = plasticSvgNode({attrs: {viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": title || "Chart"}});
+    root.append(svg);
+    return {root, svg, width, height};
+}
+function drawPlasticChartAxes(svg, width, height, inset = {}) {
+    const left = inset.left ?? 42;
+    const right = inset.right ?? 16;
+    const top = inset.top ?? 20;
+    const bottom = inset.bottom ?? 38;
+    svg.append(plasticSvgNode({tag: "line", attrs: {x1: left, y1: top, x2: left, y2: height - bottom, class: "plastic-chart-axis"}}));
+    svg.append(plasticSvgNode({tag: "line", attrs: {x1: left, y1: height - bottom, x2: width - right, y2: height - bottom, class: "plastic-chart-axis"}}));
+    return {left, right, top, bottom, plotWidth: width - left - right, plotHeight: height - top - bottom};
+}
+function barChart(n = {}) {
+    const data = normalizePlasticChartData(n.data);
+    const {root, svg, width, height} = createPlasticChartFrame({...n, type: "bar"});
+    const plot = drawPlasticChartAxes(svg, width, height);
+    const bounds = getPlasticChartBounds(data);
+    const slot = plot.plotWidth / Math.max(data.length, 1);
+    const barWidth = Math.max(8, slot * 0.58);
+    data.forEach((item, index) => {
+        const ratio = (item.value - bounds.minValue) / bounds.range;
+        const barHeight = Math.max(1, ratio * plot.plotHeight);
+        const x = plot.left + (slot * index) + ((slot - barWidth) / 2);
+        const y = plot.top + plot.plotHeight - barHeight;
+        svg.append(appendPlasticSvgTitle(plasticSvgNode({tag: "rect", attrs: {x, y, width: barWidth, height: barHeight, rx: 3, fill: item.color, class: "plastic-chart-value-mark"}}), getPlasticChartItemTitle(item)));
+        if (n.labelValues) appendPlasticValueLabel(svg, formatPlasticChartValue(item.value), x + (barWidth / 2), Math.max(plot.top + 12, y - 6));
+        svg.append(plasticSvgNode({tag: "text", text: item.label, attrs: {x: x + (barWidth / 2), y: height - 14, class: "plastic-chart-label", "text-anchor": "middle"}}));
+    });
+    return root;
+}
+function lineChart(n = {}) {
+    const data = normalizePlasticChartData(n.data);
+    const {root, svg, width, height} = createPlasticChartFrame({...n, type: "line"});
+    const plot = drawPlasticChartAxes(svg, width, height);
+    const bounds = getPlasticChartBounds(data);
+    const points = data.map((item, index) => {
+        const x = plot.left + (data.length <= 1 ? plot.plotWidth / 2 : (plot.plotWidth / (data.length - 1)) * index);
+        const y = plot.top + plot.plotHeight - (((item.value - bounds.minValue) / bounds.range) * plot.plotHeight);
+        return {x, y, item};
+    });
+    if (points.length) {
+        svg.append(plasticSvgNode({tag: "polyline", attrs: {points: points.map((point) => `${point.x},${point.y}`).join(" "), class: "plastic-chart-line"}}));
+    }
+    points.forEach((point, index) => {
+        svg.append(appendPlasticSvgTitle(plasticSvgNode({tag: "circle", attrs: {cx: point.x, cy: point.y, r: 4, fill: point.item.color || PLASTIC_CHART_COLORS[index % PLASTIC_CHART_COLORS.length], class: "plastic-chart-value-mark"}}), getPlasticChartItemTitle(point.item)));
+        if (n.labelValues) appendPlasticValueLabel(svg, formatPlasticChartValue(point.item.value), point.x, Math.max(plot.top + 12, point.y - 8));
+        svg.append(plasticSvgNode({tag: "text", text: point.item.label, attrs: {x: point.x, y: height - 14, class: "plastic-chart-label", "text-anchor": "middle"}}));
+    });
+    return root;
+}
+function areaChart(n = {}) {
+    const data = normalizePlasticChartData(n.data);
+    const {root, svg, width, height} = createPlasticChartFrame({...n, type: "area"});
+    const plot = drawPlasticChartAxes(svg, width, height);
+    const bounds = getPlasticChartBounds(data);
+    const points = data.map((item, index) => {
+        const x = plot.left + (data.length <= 1 ? plot.plotWidth / 2 : (plot.plotWidth / (data.length - 1)) * index);
+        const y = plot.top + plot.plotHeight - (((item.value - bounds.minValue) / bounds.range) * plot.plotHeight);
+        return {x, y, item};
+    });
+    if (points.length) {
+        const baseline = plot.top + plot.plotHeight;
+        const pathPoints = [`${plot.left},${baseline}`, ...points.map((point) => `${point.x},${point.y}`), `${plot.left + plot.plotWidth},${baseline}`];
+        svg.append(plasticSvgNode({tag: "polygon", attrs: {points: pathPoints.join(" "), class: "plastic-chart-area"}}));
+        svg.append(plasticSvgNode({tag: "polyline", attrs: {points: points.map((point) => `${point.x},${point.y}`).join(" "), class: "plastic-chart-line"}}));
+    }
+    points.forEach((point, index) => {
+        svg.append(appendPlasticSvgTitle(plasticSvgNode({tag: "circle", attrs: {cx: point.x, cy: point.y, r: 4, fill: point.item.color || PLASTIC_CHART_COLORS[index % PLASTIC_CHART_COLORS.length], class: "plastic-chart-value-mark"}}), getPlasticChartItemTitle(point.item)));
+        if (n.labelValues) appendPlasticValueLabel(svg, formatPlasticChartValue(point.item.value), point.x, Math.max(plot.top + 12, point.y - 8));
+    });
+    return root;
+}
+function scatterChart(n = {}) {
+    const data = normalizePlasticChartData(n.data);
+    const {root, svg, width, height} = createPlasticChartFrame({...n, type: "scatter"});
+    const plot = drawPlasticChartAxes(svg, width, height);
+    const bounds = getPlasticChartBounds(data);
+    data.forEach((item, index) => {
+        const x = plot.left + (data.length <= 1 ? plot.plotWidth / 2 : (plot.plotWidth / (data.length - 1)) * index);
+        const y = plot.top + plot.plotHeight - (((item.value - bounds.minValue) / bounds.range) * plot.plotHeight);
+        svg.append(appendPlasticSvgTitle(plasticSvgNode({tag: "circle", attrs: {cx: x, cy: y, r: 5, fill: item.color, class: "plastic-chart-value-mark"}}), getPlasticChartItemTitle(item)));
+        if (n.labelValues) appendPlasticValueLabel(svg, formatPlasticChartValue(item.value), x, Math.max(plot.top + 12, y - 8));
+        svg.append(plasticSvgNode({tag: "text", text: item.label, attrs: {x, y: height - 14, class: "plastic-chart-label", "text-anchor": "middle"}}));
+    });
+    return root;
+}
 function pie(n = {}) {
     const el = document.createElement("div");
     applyCommonAttributes(el, n);
@@ -678,3 +832,54 @@ function pie(n = {}) {
     }
     return el;
 }
+function pieChart(n = {}) {
+    const data = normalizePlasticChartData(n.data);
+    const {root, width, height} = createPlasticChartFrame({...n, type: "pie"});
+    const chartSize = Math.min(width, height) - 58;
+    const pieNode = pie({
+        data,
+        size: chartSize,
+        ariaLabel: n.ariaLabel || n.title || "Pie chart",
+        fallbackColor: "#9ca3af"
+    });
+    pieNode.classList.add("plastic-chart-pie-graphic");
+    pieNode.title = data.map(getPlasticChartItemTitle).join("\n");
+    root.append(pieNode);
+    const legend = document.createElement("div");
+    legend.className = "plastic-chart-legend";
+    data.slice(0, 6).forEach((item) => {
+        const entry = document.createElement("div");
+        entry.className = "plastic-chart-legend-item";
+        entry.title = getPlasticChartItemTitle(item);
+        entry.innerHTML = `<span style="background:${item.color}"></span>${escapeHtml(item.label)}${n.labelValues ? ` <strong>${escapeHtml(formatPlasticChartValue(item.value))}</strong>` : ""}`;
+        legend.append(entry);
+    });
+    root.append(legend);
+    return root;
+}
+function chart(n = {}) {
+    const type = String(n.type || "bar").toLowerCase();
+    if (type === "line") return lineChart(n);
+    if (type === "area") return areaChart(n);
+    if (type === "scatter") return scatterChart(n);
+    if (type === "pie") return pieChart(n);
+    return barChart(n);
+}
+function renderChart(target, n = {}) {
+    if (!target) return null;
+    target.innerHTML = "";
+    const node = chart(n);
+    target.append(node);
+    return node;
+}
+window.StandardPlastic = window.StandardPlastic || {};
+window.StandardPlastic.showInlineStyleEditor = showInlineStyleEditor;
+window.StandardPlastic.removeInlineStyleEditor = removeInlineStyleEditor;
+window.StandardPlastic.normalizeChartData = normalizePlasticChartData;
+window.StandardPlastic.barChart = barChart;
+window.StandardPlastic.lineChart = lineChart;
+window.StandardPlastic.areaChart = areaChart;
+window.StandardPlastic.scatterChart = scatterChart;
+window.StandardPlastic.pieChart = pieChart;
+window.StandardPlastic.chart = chart;
+window.StandardPlastic.renderChart = renderChart;

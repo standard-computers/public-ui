@@ -666,6 +666,8 @@ function getAppliedThemeBackgroundImageUrl() {
 async function applyThemeData(d) {
     if (!d) return false;
     window.StandardUI = window.StandardUI || {};
+    const defaultTheme = window.StandardUI.defaultTheme || defaultThemeData;
+    d = {...defaultTheme, ...d};
     window.StandardUI.currentTheme = d;
     document.documentElement.style.setProperty("--fs", `${d.font_size}px`);
     document.documentElement.style.setProperty("--fg", d.foreground);
@@ -790,6 +792,8 @@ const defaultThemeData = {
 };
 
 window.StandardUI = window.StandardUI || {};
+window.StandardUI.defaultTheme = window.StandardUI.defaultTheme || {...defaultThemeData};
+applyThemeData({...window.StandardUI.defaultTheme});
 window.StandardUI.setKioskMode = async (enabled = false) => {
     const shouldEnable = enabled === true;
     let electronApplied = false;
@@ -841,7 +845,7 @@ async function loadAndApplyTheme({attempt = 0, maxAttempts = 2, retryDelayMs = 2
         }
     } catch (_) {
     }
-    if (await applyThemeData(defaultThemeData)) return true;
+    if (await applyThemeData({...window.StandardUI.defaultTheme})) return true;
     if (attempt >= maxAttempts) return false;
     const delay = Math.min(retryDelayMs * Math.max(1, attempt + 1), 1000);
     await new Promise(resolve => setTimeout(resolve, delay));

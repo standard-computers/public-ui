@@ -196,11 +196,13 @@
             status.textContent = "Finishing startup";
             const startupTheme = await fetchStartupTheme();
             const cookieTheme = startupTheme || getThemeFromUserCookie();
-            if (cookieTheme && typeof applyThemeData === "function") {
+            const fallbackTheme = window.StandardUI?.defaultTheme ? {...window.StandardUI.defaultTheme} : null;
+            const themeToApply = cookieTheme || fallbackTheme;
+            if (themeToApply && typeof applyThemeData === "function") {
                 try {
-                    await applyThemeData(cookieTheme);
+                    await applyThemeData(themeToApply);
                 } catch (err) {
-                    console.error("Failed to apply cookie theme during startup", err);
+                    console.error("Failed to apply theme during startup", err);
                 }
             } else if (typeof window.StandardUI?.refreshTheme === "function") {
                 try {
@@ -211,10 +213,10 @@
             }
             startupFinished = true;
             updateProgress();
-            if (typeof windowStateManager?.restoreOpenWindows === "function") {
-                windowStateManager.restoreOpenWindows(true);
-            }
             await runRecordLoadingPhase();
+            if (typeof windowStateManager?.restoreOpenWindows === "function") {
+                await windowStateManager.restoreOpenWindows(true);
+            }
         };
         loadSequentially();
     });

@@ -12,17 +12,18 @@
         <link href="https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.css" rel="stylesheet">
         <script src="https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.js"></script>
         <script>
+            window.StandardServiceLoaderEnabled = true;
             window.StandardRuntimeConfig = {
                 mapboxAccessToken: {{{mapboxAccessTokenJson}}}
             };
         </script>
-        <script src="/js/plastic.js" async></script>
-        <script src="/js/arc-001.js" async></script>
-        <script src="/js/modular.js" async></script>
-        <script src="/js/ui.js" async></script>
-        <script src="/js/services.js" async></script>
-        <script src="/js/widgets.js" async></script>
-        <script src="/js/portal.js" async></script>
+        <script src="/js/plastic.js" defer></script>
+        <script src="/js/arc-001.js" defer></script>
+        <script src="/js/modular.js" defer></script>
+        <script src="/js/ui.js" defer></script>
+        <script src="/js/services.js" defer></script>
+        <script src="/js/widgets.js" defer></script>
+        <script src="/js/portal.js" defer></script>
         <script src="/js/service-loader.js" defer></script>
         <script src="/js/device-status.js" defer></script>
     </head>

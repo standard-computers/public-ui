@@ -21,6 +21,8 @@
     const sheetCellLocks = {};
     const sheetColumnWidths = {};
     const sheetRowHeights = {};
+    const sheetCharts = [];
+    const sheetImages = [];
     let sheetRows = DEFAULT_SHEET_ROWS;
     let sheetColumns = DEFAULT_SHEET_COLUMNS;
     let activeSheetCell = "A1";
@@ -29,13 +31,35 @@
     let activeSheetRangeStart = null;
     let activeSheetRangeEnd = null;
     let activeSheetFilePath = "";
+    let activeSheetDisplayTitle = "";
     let skipNextSheetStateRestore = false;
     let isGrowingSheetGrid = false;
     let sheetArrowNavigationBound = false;
+    let sheetStyleShortcutsBound = false;
     let isDraggingSheetSelection = false;
     let sheetSelectionAnchor = null;
     let activeSheetResize = null;
+    let activeSheetChartId = "";
+    let activeSheetImageId = "";
+    let activeSheetChartInteraction = null;
+    let activeSheetImageInteraction = null;
     const sheetResolvedColorCache = new Map();
+    const SHEET_CHART_DEFAULT_WIDTH = 360;
+    const SHEET_CHART_DEFAULT_HEIGHT = 240;
+    const SHEET_CHART_MIN_WIDTH = 180;
+    const SHEET_CHART_MIN_HEIGHT = 140;
+    const SHEET_IMAGE_DEFAULT_WIDTH = 260;
+    const SHEET_IMAGE_DEFAULT_HEIGHT = 160;
+    const SHEET_IMAGE_MIN_WIDTH = 80;
+    const SHEET_IMAGE_MIN_HEIGHT = 60;
+    const SHEET_IMAGE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`;
+    const SHEET_CHART_TYPES = [
+        {label: "Column", value: "bar"},
+        {label: "Line", value: "line"},
+        {label: "Area", value: "area"},
+        {label: "Scatter", value: "scatter"},
+        {label: "Pie", value: "pie"}
+    ];
     const SHEET_TEXT_COLORS = [
         {label: "Default", value: ""},
         {label: "Ink", value: "var(--fg)"},
@@ -57,6 +81,8 @@
         center: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M7 10.5h10M4 14.5h16M7 18.5h10" /></svg>`,
         right: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M10 10.5h10M4 14.5h16M10 18.5h10" /></svg>`
     };
+    const SHEET_DECIMAL_DECREASE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.75h8.5M5.25 10.25h5.25M4.5 15.75h.008v.008H4.5v-.008Zm3 0h.008v.008H7.5v-.008Zm3 0h.008v.008H10.5v-.008Zm3 0h.008v.008H13.5v-.008Zm5.25-6.25-3 3m0 0 3 3m-3-3h4.5" /></svg>`;
+    const SHEET_DECIMAL_INCREASE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.75h8.5M5.25 10.25h5.25M4.5 15.75h.008v.008H4.5v-.008Zm3 0h.008v.008H7.5v-.008Zm3 0h.008v.008H10.5v-.008Zm6.75-3.25 3 3m0 0-3 3m3-3h-4.5" /></svg>`;
     const SHEET_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" style="fill:none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path fill="none" style="fill:none" stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>`;
     const SHEET_LOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`;
     const SHEET_UNLOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`;
@@ -113,6 +139,14 @@
     const clearSheetRowHeights = () => {
         Object.keys(sheetRowHeights).forEach((key) => delete sheetRowHeights[key]);
     };
+    const clearSheetCharts = () => {
+        sheetCharts.splice(0, sheetCharts.length);
+        activeSheetChartId = "";
+    };
+    const clearSheetImages = () => {
+        sheetImages.splice(0, sheetImages.length);
+        activeSheetImageId = "";
+    };
     const normalizeSheetDimensionPayload = (rawDimensions = {}, maxCount = 0, minValue = 0, maxValue = Number.POSITIVE_INFINITY) => {
         if (!rawDimensions || typeof rawDimensions !== "object" || Array.isArray(rawDimensions)) return {};
         return Object.fromEntries(Object.entries(rawDimensions).flatMap(([rawIndex, rawValue]) => {
@@ -132,6 +166,50 @@
             return [[String(index), Math.round(value)]];
         })
     );
+    const normalizeSheetChart = (rawChart = {}) => {
+        if (!rawChart || typeof rawChart !== "object" || Array.isArray(rawChart)) return null;
+        const chartType = String(rawChart.type || "bar").toLowerCase();
+        const type = SHEET_CHART_TYPES.some((option) => option.value === chartType) ? chartType : "bar";
+        const id = String(rawChart.id || `sheet-chart-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
+        const data = (Array.isArray(rawChart.data) ? rawChart.data : []).map((item, index) => {
+            const value = Number(item?.value);
+            return {
+                label: String(item?.label ?? item?.name ?? `Item ${index + 1}`),
+                value: Number.isFinite(value) ? value : 0
+            };
+        });
+        const x = Math.max(0, Math.round(Number(rawChart.x) || 0));
+        const y = Math.max(0, Math.round(Number(rawChart.y) || 0));
+        const width = Math.max(SHEET_CHART_MIN_WIDTH, Math.round(Number(rawChart.width) || SHEET_CHART_DEFAULT_WIDTH));
+        const height = Math.max(SHEET_CHART_MIN_HEIGHT, Math.round(Number(rawChart.height) || SHEET_CHART_DEFAULT_HEIGHT));
+        return {
+            id,
+            type,
+            range: String(rawChart.range || "").toUpperCase(),
+            title: String(rawChart.title || "Chart"),
+            x,
+            y,
+            width,
+            height,
+            labelValues: rawChart.labelValues === true || rawChart.showValueLabels === true,
+            data
+        };
+    };
+    const normalizeSheetImage = (rawImage = {}) => {
+        if (!rawImage || typeof rawImage !== "object" || Array.isArray(rawImage)) return null;
+        const src = String(rawImage.src || rawImage.content || rawImage.url || "").trim();
+        if (!src) return null;
+        const id = String(rawImage.id || `sheet-image-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
+        return {
+            id,
+            src,
+            alt: String(rawImage.alt || ""),
+            x: Math.max(0, Math.round(Number(rawImage.x) || 0)),
+            y: Math.max(0, Math.round(Number(rawImage.y) || 0)),
+            width: Math.max(SHEET_IMAGE_MIN_WIDTH, Math.round(Number(rawImage.width) || SHEET_IMAGE_DEFAULT_WIDTH)),
+            height: Math.max(SHEET_IMAGE_MIN_HEIGHT, Math.round(Number(rawImage.height) || SHEET_IMAGE_DEFAULT_HEIGHT))
+        };
+    };
     const normalizeSheetCellStyle = (rawStyle = {}) => {
         if (!rawStyle || typeof rawStyle !== "object" || Array.isArray(rawStyle)) return {};
         const normalizedStyle = {};
@@ -152,6 +230,11 @@
         if (Number.isFinite(numericFontSize) && numericFontSize >= 8 && numericFontSize <= 72) {
             normalizedStyle.fontSize = `${numericFontSize}px`;
         }
+        const rawDecimalPlaces = rawStyle.decimalPlaces ?? rawStyle.d;
+        const decimalPlaces = Math.trunc(Number(rawDecimalPlaces));
+        if (Number.isFinite(decimalPlaces) && decimalPlaces >= 0 && decimalPlaces <= 12) {
+            normalizedStyle.decimalPlaces = decimalPlaces;
+        }
         return normalizedStyle;
     };
     const encodeSheetCellStyle = (rawStyle = {}) => {
@@ -164,6 +247,7 @@
         if (normalizedStyle.color) encodedStyle.c = normalizedStyle.color;
         if (normalizedStyle.backgroundColor) encodedStyle.g = normalizedStyle.backgroundColor;
         if (normalizedStyle.fontSize) encodedStyle.s = Number(String(normalizedStyle.fontSize).replace(/px$/i, ""));
+        if (Number.isInteger(normalizedStyle.decimalPlaces)) encodedStyle.d = normalizedStyle.decimalPlaces;
         return encodedStyle;
     };
     const normalizeSheetCellType = (rawType = "") => {
@@ -252,6 +336,8 @@
         locked: buildSheetLocksPayload(),
         columnWidths: buildSheetDimensionPayload(sheetColumnWidths, sheetColumns, getDefaultSheetColumnWidth()),
         rowHeights: buildSheetDimensionPayload(sheetRowHeights, sheetRows, SHEET_DEFAULT_ROW_HEIGHT),
+        charts: sheetCharts.map((chartItem) => ({...chartItem, data: (chartItem.data || []).map((item) => ({...item}))})),
+        images: sheetImages.map((imageItem) => ({...imageItem})),
         activeSheetCell,
         activeSheetRow,
         activeSheetColumn
@@ -264,6 +350,8 @@
         clearSheetCellLocks();
         clearSheetColumnWidths();
         clearSheetRowHeights();
+        clearSheetCharts();
+        clearSheetImages();
         const payloadCells = rawPayload?.cells;
         if (payloadCells && typeof payloadCells === "object") {
             Object.entries(payloadCells).forEach(([cell, value]) => {
@@ -305,11 +393,23 @@
         sheetColumns = Number.isInteger(rawPayload?.columns) && rawPayload.columns > 0 ? rawPayload.columns : DEFAULT_SHEET_COLUMNS;
         Object.assign(sheetColumnWidths, normalizeSheetDimensionPayload(rawPayload?.columnWidths, sheetColumns, SHEET_MIN_CELL_WIDTH, SHEET_MAX_CELL_WIDTH));
         Object.assign(sheetRowHeights, normalizeSheetDimensionPayload(rawPayload?.rowHeights, sheetRows, SHEET_MIN_ROW_HEIGHT, SHEET_MAX_ROW_HEIGHT));
+        if (Array.isArray(rawPayload?.charts)) {
+            rawPayload.charts.forEach((chartItem) => {
+                const normalizedChart = normalizeSheetChart(chartItem);
+                if (normalizedChart) sheetCharts.push(normalizedChart);
+            });
+        }
+        if (Array.isArray(rawPayload?.images)) {
+            rawPayload.images.forEach((imageItem) => {
+                const normalizedImage = normalizeSheetImage(imageItem);
+                if (normalizedImage) sheetImages.push(normalizedImage);
+            });
+        }
     };
     const updateSheetPortalTitle = () => {
         const sheetPortal = findSheetPortal();
         if (sheetPortal?.setTitle) {
-            sheetPortal.setTitle(activeSheetFilePath ? getSheetFileName(activeSheetFilePath) : "Sheet");
+            sheetPortal.setTitle(activeSheetFilePath ? getSheetFileName(activeSheetFilePath) : (activeSheetDisplayTitle || "Sheet"));
         }
     };
     const saveSheetPortalState = () => {
@@ -324,11 +424,14 @@
             locked: buildSheetLocksPayload(),
             columnWidths: buildSheetDimensionPayload(sheetColumnWidths, sheetColumns, getDefaultSheetColumnWidth()),
             rowHeights: buildSheetDimensionPayload(sheetRowHeights, sheetRows, SHEET_DEFAULT_ROW_HEIGHT),
+            charts: sheetCharts.map((chartItem) => ({...chartItem, data: (chartItem.data || []).map((item) => ({...item}))})),
+            images: sheetImages.map((imageItem) => ({...imageItem})),
             activeSheetCell,
             activeSheetRow,
             activeSheetColumn,
             rows: sheetRows,
-            columns: sheetColumns
+            columns: sheetColumns,
+            displayTitle: activeSheetDisplayTitle
         });
         updateSheetPortalTitle();
     };
@@ -346,6 +449,8 @@
             locked: state?.locked || {},
             columnWidths: state?.columnWidths || {},
             rowHeights: state?.rowHeights || {},
+            charts: state?.charts || [],
+            images: state?.images || [],
             activeSheetCell: state?.activeSheetCell,
             activeSheetRow: state?.activeSheetRow,
             activeSheetColumn: state?.activeSheetColumn,
@@ -353,6 +458,7 @@
             columns: state?.columns
         });
         activeSheetFilePath = normalizeSheetFilePath(state?.directive || "");
+        activeSheetDisplayTitle = activeSheetFilePath ? "" : String(state?.displayTitle || "");
         updateSheetPortalTitle();
     };
     const saveSheetToPath = async (targetPath = "") => {
@@ -386,6 +492,7 @@
             return false;
         }
         activeSheetFilePath = normalizedPath;
+        activeSheetDisplayTitle = "";
         saveSheetPortalState();
         updateSheetPortalTitle();
         modular.success(`Saved ${normalizedPath} (${bytes.length} bytes)`);
@@ -415,6 +522,7 @@
         if (!sheetPath) return false;
         parseSheetPayload(payload && typeof payload === "object" ? payload : {});
         activeSheetFilePath = sheetPath;
+        activeSheetDisplayTitle = "";
         window.StandardPlastic?.removeInlineStyleEditor?.(false);
         skipNextSheetStateRestore = true;
         modular.start(SERVICE_ID);
@@ -439,6 +547,86 @@
     window.StandardSheets = window.StandardSheets || {};
     window.StandardSheets.openSheetPath = (rawPath = "", sourceNode = null) => openSheetFilePath(rawPath, sourceNode);
     window.StandardSheets.openSheetPayload = (rawPath = "", payload = null, sourceNode = null) => applySheetPayload(rawPath, payload, sourceNode);
+    const parseCsvContent = (csvContent = "") => {
+        const rows = [];
+        let row = [];
+        let value = "";
+        let insideQuotes = false;
+        const text = String(csvContent || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        for (let index = 0; index < text.length; index += 1) {
+            const character = text[index];
+            if (insideQuotes) {
+                if (character === "\"" && text[index + 1] === "\"") {
+                    value += "\"";
+                    index += 1;
+                } else if (character === "\"") {
+                    insideQuotes = false;
+                } else {
+                    value += character;
+                }
+                continue;
+            }
+            if (character === "\"") {
+                insideQuotes = true;
+            } else if (character === ",") {
+                row.push(value);
+                value = "";
+            } else if (character === "\n") {
+                row.push(value);
+                rows.push(row);
+                row = [];
+                value = "";
+            } else {
+                value += character;
+            }
+        }
+        row.push(value);
+        if (row.length > 1 || row[0] !== "" || text.endsWith(",")) rows.push(row);
+        return rows;
+    };
+    const getCsvColumnLabel = (columnIndex = 0) => {
+        let value = columnIndex + 1;
+        let label = "";
+        while (value > 0) {
+            const remainder = (value - 1) % 26;
+            label = String.fromCharCode(65 + remainder) + label;
+            value = Math.floor((value - 1) / 26);
+        }
+        return label;
+    };
+    const buildSheetPayloadFromCsv = (csvContent = "") => {
+        const rows = parseCsvContent(csvContent);
+        const cells = {};
+        rows.forEach((rowValues, rowIndex) => {
+            rowValues.forEach((cellValue, columnIndex) => {
+                cells[`${getCsvColumnLabel(columnIndex)}${rowIndex + 1}`] = String(cellValue ?? "");
+            });
+        });
+        const columnCount = rows.reduce((count, rowValues) => Math.max(count, rowValues.length), 0);
+        return {
+            cells,
+            rows: Math.max(DEFAULT_SHEET_ROWS, rows.length || 1),
+            columns: Math.max(DEFAULT_SHEET_COLUMNS, columnCount || 1),
+            activeSheetCell: "A1"
+        };
+    };
+    window.StandardSheets.openCsvContent = (csvContent = "", options = {}) => {
+        parseSheetPayload(buildSheetPayloadFromCsv(csvContent));
+        activeSheetCell = "A1";
+        activeSheetRow = null;
+        activeSheetColumn = null;
+        activeSheetFilePath = "";
+        activeSheetDisplayTitle = String(options?.title || "Standard Data").trim() || "Standard Data";
+        activeSheetRangeStart = null;
+        activeSheetRangeEnd = null;
+        window.StandardPlastic?.removeInlineStyleEditor?.(false);
+        skipNextSheetStateRestore = true;
+        modular.show(SERVICE_ID, 0, {newInstance: true});
+        saveSheetPortalState();
+        refreshSheetCells();
+        updateSheetPortalTitle();
+        return true;
+    };
     window.StandardSheets.openFreshSheetEditor = (sourceNode = null) => {
         clearSheetCellValues();
         clearSheetCellStyles();
@@ -447,11 +635,14 @@
         clearSheetCellLocks();
         clearSheetColumnWidths();
         clearSheetRowHeights();
+        clearSheetCharts();
+        clearSheetImages();
         window.StandardPlastic?.removeInlineStyleEditor?.(false);
         activeSheetCell = "A1";
         activeSheetRow = null;
         activeSheetColumn = null;
         activeSheetFilePath = "";
+        activeSheetDisplayTitle = "";
         sheetRows = DEFAULT_SHEET_ROWS;
         sheetColumns = DEFAULT_SHEET_COLUMNS;
         sheetGridScrollBound = false;
@@ -501,6 +692,8 @@
     const setActiveSheetRange = (startReference = "", endReference = "") => {
         activeSheetRangeStart = String(startReference || "").toUpperCase() || null;
         activeSheetRangeEnd = String(endReference || "").toUpperCase() || null;
+        activeSheetChartId = "";
+        activeSheetImageId = "";
     };
     const collectSheetCells = () => [...new Set([
         ...Object.keys(sheetCellValues),
@@ -660,6 +853,8 @@
         bindSheetInteractions();
         syncSheetGridLayout();
         refreshSheetCells();
+        renderSheetCharts();
+        renderSheetImages();
     };
     const moveActiveSheetRangeBy = (rowDelta = 0, columnDelta = 0) => {
         const anchorReference = activeSheetRangeStart || activeSheetCell;
@@ -745,6 +940,58 @@
         refreshSheetCells();
         saveSheetPortalState();
     };
+    const getSheetNumberDecimalCount = (cellReference = "") => {
+        const style = getSheetCellStyle(cellReference);
+        if (Number.isInteger(style.decimalPlaces)) return style.decimalPlaces;
+        const displayValue = String(sheetCellValues[cellReference] ?? "").startsWith("=")
+            ? evaluateSheetCell(cellReference)
+            : sheetCellValues[cellReference];
+        const textValue = String(displayValue ?? "");
+        if (/e/i.test(textValue)) return 0;
+        const decimalText = textValue.split(".")[1] || "";
+        return Math.min(12, decimalText.length);
+    };
+    const canSheetCellConvertToNumber = (cellReference = "") => {
+        const rawValue = String(sheetCellValues[cellReference] ?? "").trim();
+        if (!rawValue) return true;
+        const evaluatedValue = evaluateSheetCell(cellReference);
+        return Number.isFinite(Number(rawValue.startsWith("=") ? evaluatedValue : rawValue));
+    };
+    const applySheetDecimalAdjustmentToSelection = (delta = 0) => {
+        const selectedReferences = getActiveSheetCellReferences();
+        if (!selectedReferences.length) return;
+        selectedReferences.forEach((cellReference) => {
+            const currentStyle = getSheetCellStyle(cellReference);
+            const currentPlaces = getSheetNumberDecimalCount(cellReference);
+            setSheetCellStyle(cellReference, {
+                ...currentStyle,
+                decimalPlaces: Math.min(12, Math.max(0, currentPlaces + delta))
+            });
+            setSheetCellType(cellReference, "number");
+            applySheetCellStyle(cellReference);
+        });
+        refreshSheetCells();
+        saveSheetPortalState();
+    };
+    const adjustSheetDecimalPlaces = (delta = 0) => {
+        captureActiveSheetInput();
+        const selectedReferences = getActiveSheetCellReferences();
+        if (!selectedReferences.length) return;
+        const nonNumberReferences = selectedReferences.filter((cellReference) => getSheetCellType(cellReference) !== "number");
+        if (!nonNumberReferences.length) {
+            applySheetDecimalAdjustmentToSelection(delta);
+            return;
+        }
+        if (!selectedReferences.every((cellReference) => canSheetCellConvertToNumber(cellReference))) {
+            modular.error("Selected cells cannot all be converted to numbers");
+            return;
+        }
+        confirmationDialogue({
+            title: "Convert to Number",
+            content: "Some selected cells are not number cells. Convert them to number type and adjust decimal rounding?",
+            confirmation: () => applySheetDecimalAdjustmentToSelection(delta)
+        });
+    };
     const applySheetLinkToSelection = (rawUrl = "") => {
         const selectedReferences = getActiveSheetCellReferences();
         if (!selectedReferences.length) return false;
@@ -795,6 +1042,10 @@
         const backgroundColorButton = document.getElementById("editor-sheet-style-background");
         const alignmentButton = document.getElementById("editor-sheet-style-align");
         const linkButton = document.getElementById("editor-sheet-style-link");
+        const decimalDecreaseButton = document.getElementById("editor-sheet-decimal-decrease");
+        const decimalIncreaseButton = document.getElementById("editor-sheet-decimal-increase");
+        const imageButton = document.getElementById("editor-sheet-add-image");
+        const chartButton = document.getElementById("editor-sheet-make-chart");
         const typeSelect = document.getElementById("editor-sheet-cell-type");
         if (fontFamilySelect) fontFamilySelect.value = "Inter";
         if (fontSizeSelect) fontSizeSelect.value = String((activeStyle.fontSize || "12px").replace(/px$/i, ""));
@@ -806,6 +1057,8 @@
         syncSheetToolbarIconColor(italicButton);
         syncSheetToolbarIconColor(underlineButton);
         syncSheetToolbarIconColor(linkButton);
+        syncSheetToolbarIconColor(decimalDecreaseButton);
+        syncSheetToolbarIconColor(decimalIncreaseButton);
         if (textColorButton) {
             const resolvedTextColor = resolveSheetColor(activeStyle.color || "");
             textColorButton.className = `${activeStyle.color ? "tiny primary" : ""} naked align-bottom small-margin-right inner-radius`.trim();
@@ -1187,10 +1440,477 @@
         if (cellType === "text") return rawValue;
         if (cellType === "number") {
             const numericValue = Number(rawValue.startsWith("=") ? evaluatedValue : rawValue);
-            return Number.isFinite(numericValue) ? String(numericValue) : String(rawValue.startsWith("=") ? evaluatedValue : rawValue);
+            if (!Number.isFinite(numericValue)) return String(rawValue.startsWith("=") ? evaluatedValue : rawValue);
+            const decimalPlaces = getSheetCellStyle(cellReference).decimalPlaces;
+            return Number.isInteger(decimalPlaces) ? numericValue.toFixed(decimalPlaces) : String(numericValue);
         }
         if (cellType === "date") return formatSheetDateValue(rawValue.startsWith("=") ? evaluatedValue : rawValue);
         return String(evaluatedValue);
+    };
+    const getSheetCellPosition = (cellReference = "A1") => {
+        const position = parseSheetCellReference(cellReference);
+        let x = SHEET_ROW_HEADER_WIDTH;
+        let y = SHEET_HEADER_HEIGHT;
+        for (let columnIndex = 0; columnIndex < position.columnIndex; columnIndex += 1) x += getSheetColumnWidth(columnIndex);
+        for (let rowIndex = 0; rowIndex < position.rowIndex; rowIndex += 1) y += getSheetRowHeight(rowIndex);
+        return {x, y};
+    };
+    const getSheetSelectionAnchorCell = () => {
+        if (activeSheetRangeStart) return activeSheetRangeStart;
+        return activeSheetCell || "A1";
+    };
+    const normalizeSheetRangeInput = (rangeText = "") => {
+        const text = String(rangeText || "").trim().toUpperCase();
+        if (/^[A-Z]+\d+$/.test(text)) return `${text}:${text}`;
+        return text;
+    };
+    const getChartDataFromReferences = (references = []) => {
+        const cleanReferences = [...new Set((references || []).map((reference) => String(reference || "").toUpperCase()).filter(Boolean))];
+        const positions = cleanReferences.map((reference) => ({reference, ...parseSheetCellReference(reference)}));
+        if (!positions.length) return [];
+        const rows = [...new Set(positions.map((position) => position.rowIndex))].sort((a, b) => a - b);
+        const columns = [...new Set(positions.map((position) => position.columnIndex))].sort((a, b) => a - b);
+        if (columns.length >= 2) {
+            const labelColumn = columns[0];
+            const valueColumn = columns[1];
+            return rows.map((rowIndex) => {
+                const labelReference = getSheetCellReference(rowIndex, labelColumn);
+                const valueReference = getSheetCellReference(rowIndex, valueColumn);
+                return {
+                    label: getSheetCellDisplayValue(labelReference) || labelReference,
+                    value: Number(evaluateSheetCell(valueReference)) || 0
+                };
+            }).filter((item) => item.label || item.value);
+        }
+        return positions.sort((a, b) => a.rowIndex - b.rowIndex || a.columnIndex - b.columnIndex).map(({reference}) => ({
+            label: reference,
+            value: Number(evaluateSheetCell(reference)) || 0
+        }));
+    };
+    const getChartDataFromRange = (rangeText = "") => {
+        const range = parseSheetRangeToken(normalizeSheetRangeInput(rangeText));
+        return range ? getChartDataFromReferences(range.references) : [];
+    };
+    const getSelectedChartSource = () => {
+        const references = getActiveSheetCellReferences();
+        const hasSelectionData = references.length > 1;
+        return {
+            hasSelectionData,
+            range: hasSelectionData ? getSheetSelectionLabel() : "",
+            references,
+            data: hasSelectionData ? getChartDataFromReferences(references) : []
+        };
+    };
+    const getSheetImageDisplaySrc = (src = "") => {
+        const imageSrc = String(src || "").trim();
+        if (!imageSrc) return "";
+        if (/^(?:https?:|data:|blob:|\/api\/files\/download)/i.test(imageSrc)) return imageSrc;
+        return `/api/files/download?path=${encodeURIComponent(normalizeSheetFilePath(imageSrc))}`;
+    };
+    const renderSheetImages = () => {
+        const grid = document.getElementById("editor-sheet-grid");
+        if (!grid) return;
+        grid.querySelectorAll(".editor-sheet-image").forEach((node) => node.remove());
+        sheetImages.forEach((imageItem) => {
+            const imageNode = document.createElement("div");
+            imageNode.id = imageItem.id;
+            imageNode.className = "editor-sheet-image";
+            imageNode.classList.toggle("selected", activeSheetImageId === imageItem.id);
+            imageNode.style.left = `${imageItem.x}px`;
+            imageNode.style.top = `${imageItem.y}px`;
+            imageNode.style.width = `${imageItem.width}px`;
+            imageNode.style.height = `${imageItem.height}px`;
+            imageNode.dataset.imageId = imageItem.id;
+            const img = document.createElement("img");
+            img.className = "editor-sheet-image-content";
+            img.src = getSheetImageDisplaySrc(imageItem.src);
+            img.alt = imageItem.alt || "";
+            imageNode.append(img);
+            imageNode.insertAdjacentHTML("beforeend", div({style: "editor-sheet-image-resize", content: ""}));
+            grid.append(imageNode);
+        });
+        bindSheetImageInteractions();
+    };
+    const promptForSheetImageFile = () => new Promise((resolve) => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "image/*";
+        fileInput.style.display = "none";
+        document.body.appendChild(fileInput);
+        fileInput.addEventListener("change", () => {
+            const selectedFile = fileInput.files?.[0] || null;
+            fileInput.remove();
+            resolve(selectedFile);
+        }, {once: true});
+        fileInput.click();
+    });
+    const uploadSheetImageFile = async (file) => {
+        if (!(file instanceof File)) return "";
+        const targetDirectory = getSheetFileDirectory(activeSheetFilePath) || "Documents";
+        const uploadUrl = targetDirectory ? `/api/upload?directory=${encodeURIComponent(targetDirectory)}` : "/api/upload";
+        if (typeof window.StandardUploads?.uploadFile === "function") {
+            const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
+                label: `Uploading ${file.name || "image"}`
+            });
+            if (!response?.ok) throw new Error(`Upload failed (${response?.status || 0})`);
+        } else {
+            const formData = new FormData();
+            formData.append("file", file);
+            const response = await fetch(uploadUrl, {method: "POST", body: formData});
+            if (!response.ok) throw new Error(`Upload failed (${response.status})`);
+        }
+        return targetDirectory ? `${targetDirectory}/${file.name}` : file.name;
+    };
+    const insertSheetImage = (src = "", alt = "") => {
+        const imageSrc = String(src || "").trim();
+        if (!imageSrc) return false;
+        const anchorPosition = getSheetCellPosition(getSheetSelectionAnchorCell());
+        const imageItem = normalizeSheetImage({
+            id: `sheet-image-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            src: imageSrc,
+            alt,
+            x: anchorPosition.x,
+            y: anchorPosition.y,
+            width: SHEET_IMAGE_DEFAULT_WIDTH,
+            height: SHEET_IMAGE_DEFAULT_HEIGHT
+        });
+        if (!imageItem) return false;
+        sheetImages.push(imageItem);
+        activeSheetImageId = imageItem.id;
+        activeSheetChartId = "";
+        renderSheetImages();
+        updateSheetSelectionStyles();
+        saveSheetPortalState();
+        return true;
+    };
+    const promptAndInsertSheetImage = async () => {
+        const selectedFile = await promptForSheetImageFile();
+        if (!selectedFile) return;
+        try {
+            const uploadedPath = await uploadSheetImageFile(selectedFile);
+            if (!uploadedPath) return;
+            insertSheetImage(uploadedPath, selectedFile.name || "");
+        } catch (error) {
+            console.error("Failed to upload sheet image:", error);
+            modular.error("Unable to upload image");
+        }
+    };
+    const clearActiveSheetImage = () => {
+        if (!activeSheetImageId) return false;
+        activeSheetImageId = "";
+        renderSheetImages();
+        saveSheetPortalState();
+        return true;
+    };
+    const deleteActiveSheetImage = () => {
+        if (!activeSheetImageId) return false;
+        const imageIndex = sheetImages.findIndex((item) => item.id === activeSheetImageId);
+        if (imageIndex < 0) return false;
+        sheetImages.splice(imageIndex, 1);
+        activeSheetImageId = "";
+        activeSheetImageInteraction = null;
+        renderSheetImages();
+        saveSheetPortalState();
+        return true;
+    };
+    const bindSheetImageInteractions = () => {
+        if (document.body?.dataset.sheetImageInteractionBound !== "1") {
+            document.body.dataset.sheetImageInteractionBound = "1";
+            document.addEventListener("mousemove", (event) => {
+                if (!activeSheetImageInteraction) return;
+                event.preventDefault();
+                const imageItem = sheetImages.find((item) => item.id === activeSheetImageInteraction.id);
+                if (!imageItem) return;
+                const deltaX = event.clientX - activeSheetImageInteraction.startX;
+                const deltaY = event.clientY - activeSheetImageInteraction.startY;
+                if (activeSheetImageInteraction.mode === "resize") {
+                    imageItem.width = Math.max(SHEET_IMAGE_MIN_WIDTH, activeSheetImageInteraction.startWidth + deltaX);
+                    imageItem.height = Math.max(SHEET_IMAGE_MIN_HEIGHT, activeSheetImageInteraction.startHeight + deltaY);
+                } else {
+                    imageItem.x = Math.max(0, activeSheetImageInteraction.startLeft + deltaX);
+                    imageItem.y = Math.max(0, activeSheetImageInteraction.startTop + deltaY);
+                }
+                const imageNode = document.getElementById(imageItem.id);
+                if (!imageNode) return;
+                imageNode.style.left = `${imageItem.x}px`;
+                imageNode.style.top = `${imageItem.y}px`;
+                imageNode.style.width = `${imageItem.width}px`;
+                imageNode.style.height = `${imageItem.height}px`;
+            });
+            document.addEventListener("mouseup", () => {
+                if (!activeSheetImageInteraction) return;
+                activeSheetImageInteraction = null;
+                renderSheetImages();
+                saveSheetPortalState();
+            });
+            document.addEventListener("mousedown", (event) => {
+                if (!activeSheetImageId) return;
+                if (event.target?.closest?.(".editor-sheet-image")) return;
+                activeSheetImageId = "";
+                renderSheetImages();
+            }, true);
+            document.addEventListener("keydown", (event) => {
+                if (!activeSheetImageId || !["Escape", "Delete"].includes(event.key)) return;
+                const activeElement = document.activeElement;
+                if (event.key === "Delete" && activeElement && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable)) return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (event.key === "Delete") deleteActiveSheetImage();
+                else clearActiveSheetImage();
+            }, true);
+            window.addEventListener("blur", clearActiveSheetImage);
+        }
+        document.querySelectorAll(".editor-sheet-image").forEach((imageNode) => {
+            if (imageNode.dataset.bound === "1") return;
+            imageNode.dataset.bound = "1";
+            imageNode.addEventListener("mousedown", (event) => {
+                const imageId = imageNode.dataset.imageId || "";
+                const imageItem = sheetImages.find((item) => item.id === imageId);
+                if (!imageItem) return;
+                event.preventDefault();
+                event.stopPropagation();
+                activeSheetImageId = imageId;
+                activeSheetChartId = "";
+                updateSheetSelectionStyles();
+                renderSheetImages();
+                activeSheetImageInteraction = {
+                    id: imageId,
+                    mode: event.target.closest(".editor-sheet-image-resize") ? "resize" : "move",
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    startLeft: imageItem.x,
+                    startTop: imageItem.y,
+                    startWidth: imageItem.width,
+                    startHeight: imageItem.height
+                };
+            });
+        });
+    };
+    const renderSheetCharts = () => {
+        const grid = document.getElementById("editor-sheet-grid");
+        if (!grid) return;
+        grid.querySelectorAll(".editor-sheet-chart").forEach((node) => node.remove());
+        sheetCharts.forEach((chartItem) => {
+            const chartNode = document.createElement("div");
+            chartNode.id = chartItem.id;
+            chartNode.className = "editor-sheet-chart";
+            chartNode.classList.toggle("selected", activeSheetChartId === chartItem.id);
+            chartNode.style.left = `${chartItem.x}px`;
+            chartNode.style.top = `${chartItem.y}px`;
+            chartNode.style.width = `${chartItem.width}px`;
+            chartNode.style.height = `${chartItem.height}px`;
+            chartNode.dataset.chartId = chartItem.id;
+            const chartBody = document.createElement("div");
+            chartBody.className = "editor-sheet-chart-body";
+            chartNode.append(chartBody);
+            if (typeof window.StandardPlastic?.renderChart === "function") {
+                window.StandardPlastic.renderChart(chartBody, {
+                    type: chartItem.type,
+                    title: chartItem.title,
+                    data: chartItem.data,
+                    width: chartItem.width,
+                    height: chartItem.height,
+                    labelValues: chartItem.labelValues
+                });
+            }
+            chartNode.insertAdjacentHTML("beforeend", div({style: "editor-sheet-chart-resize", content: ""}));
+            grid.append(chartNode);
+        });
+        bindSheetChartInteractions();
+    };
+    const insertSheetChart = ({type = "bar", range = "", data = [], title = "Chart", labelValues = false} = {}) => {
+        const sourceData = Array.isArray(data) && data.length ? data : getChartDataFromRange(range);
+        if (!sourceData.length) {
+            modular.error("Select a cell range with chart data");
+            return false;
+        }
+        const anchorPosition = getSheetCellPosition(getSheetSelectionAnchorCell());
+        const chartItem = normalizeSheetChart({
+            id: `sheet-chart-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            type,
+            range,
+            title,
+            x: anchorPosition.x,
+            y: anchorPosition.y,
+            width: SHEET_CHART_DEFAULT_WIDTH,
+            height: SHEET_CHART_DEFAULT_HEIGHT,
+            labelValues,
+            data: sourceData
+        });
+        if (!chartItem) return false;
+        sheetCharts.push(chartItem);
+        activeSheetChartId = chartItem.id;
+        activeSheetImageId = "";
+        renderSheetCharts();
+        saveSheetPortalState();
+        return true;
+    };
+    const showSheetChartPortal = () => {
+        captureActiveSheetInput();
+        const chartSource = getSelectedChartSource();
+        const initialType = "bar";
+        let selectedType = initialType;
+        let hasSubmittedChart = false;
+        const chartPortal = new Portal({
+            title: "Insert Chart",
+            dimensions: [380, chartSource.hasSelectionData ? 320 : 380],
+            route: () => div({style: "large-padding-top editor-portal-shell editor-sheet-chart-portal", content: children([
+                div({style: "padded", content: children([
+                    label({content: "Chart type"}),
+                    div({style: "editor-sheet-chart-type-grid", content: children(SHEET_CHART_TYPES.map((chartType) => button({
+                        style: `editor-sheet-chart-type${chartType.value === initialType ? " selected" : ""}`,
+                        type: "button",
+                        value: chartType.value,
+                        content: chartType.label
+                    })))}),
+                    chartSource.hasSelectionData ? div({style: "small-margin-top faded", content: `Data: ${chartSource.range}`}) : div({style: "small-margin-top", content: children([
+                        label({input: "editor-sheet-chart-range", content: "Range"}),
+                        input({id: "editor-sheet-chart-range", style: "fill", placeholder: "A1:B6", value: ""})
+                    ])}),
+                    div({style: "small-margin-top", content: children([
+                        label({input: "editor-sheet-chart-title", content: "Title"}),
+                        input({id: "editor-sheet-chart-title", style: "fill", placeholder: "Chart", value: "Chart"})
+                    ])}),
+                    div({style: "small-margin-top", content: children([
+                        input({id: "editor-sheet-chart-label-values", type: "checkbox"}),
+                        label({input: "editor-sheet-chart-label-values", style: "inline small-margin-left", content: "Label Values"})
+                    ])}),
+                    div({style: "float-right small-margin-top", content: children([
+                        button({id: "editor-sheet-chart-cancel", style: "secondary space-right", type: "button", content: "Cancel"}),
+                        button({id: "editor-sheet-chart-ok", style: "primary", type: "button", content: "OK"})
+                    ])})
+                ])})
+            ])}),
+            afterRender: (windowNode, routeContext) => {
+                windowNode.querySelectorAll(".editor-sheet-chart-type").forEach((typeButton) => {
+                    if (typeButton.dataset.bound === "1") return;
+                    typeButton.dataset.bound = "1";
+                    typeButton.addEventListener("click", (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        selectedType = typeButton.value || initialType;
+                        windowNode.querySelectorAll(".editor-sheet-chart-type").forEach((node) => node.classList.remove("selected"));
+                        typeButton.classList.add("selected");
+                    });
+                });
+                const cancelButton = windowNode.querySelector("#editor-sheet-chart-cancel");
+                if (cancelButton && cancelButton.dataset.bound !== "1") {
+                    cancelButton.dataset.bound = "1";
+                    cancelButton.addEventListener("click", (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        routeContext?.portal?.close?.();
+                    });
+                }
+                const okButton = windowNode.querySelector("#editor-sheet-chart-ok");
+                if (!okButton || okButton.dataset.bound === "1") return;
+                okButton.dataset.bound = "1";
+                okButton.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (hasSubmittedChart || okButton.dataset.submitting === "1") return;
+                    hasSubmittedChart = true;
+                    okButton.dataset.submitting = "1";
+                    const rangeValue = windowNode.querySelector("#editor-sheet-chart-range")?.value || chartSource.range;
+                    const titleValue = windowNode.querySelector("#editor-sheet-chart-title")?.value || "Chart";
+                    const labelValues = windowNode.querySelector("#editor-sheet-chart-label-values")?.checked === true;
+                    const inserted = insertSheetChart({
+                        type: selectedType,
+                        range: normalizeSheetRangeInput(rangeValue),
+                        data: chartSource.hasSelectionData ? chartSource.data : [],
+                        title: titleValue,
+                        labelValues
+                    });
+                    if (inserted) routeContext?.portal?.close?.();
+                    else {
+                        hasSubmittedChart = false;
+                        okButton.dataset.submitting = "0";
+                    }
+                });
+            }
+        });
+        chartPortal.show();
+    };
+    const bindSheetChartInteractions = () => {
+        if (document.body?.dataset.sheetChartInteractionBound !== "1") {
+            document.body.dataset.sheetChartInteractionBound = "1";
+            document.addEventListener("mousemove", (event) => {
+                if (!activeSheetChartInteraction) return;
+                event.preventDefault();
+                const chartItem = sheetCharts.find((item) => item.id === activeSheetChartInteraction.id);
+                if (!chartItem) return;
+                const deltaX = event.clientX - activeSheetChartInteraction.startX;
+                const deltaY = event.clientY - activeSheetChartInteraction.startY;
+                if (activeSheetChartInteraction.mode === "resize") {
+                    chartItem.width = Math.max(SHEET_CHART_MIN_WIDTH, activeSheetChartInteraction.startWidth + deltaX);
+                    chartItem.height = Math.max(SHEET_CHART_MIN_HEIGHT, activeSheetChartInteraction.startHeight + deltaY);
+                } else {
+                    chartItem.x = Math.max(0, activeSheetChartInteraction.startLeft + deltaX);
+                    chartItem.y = Math.max(0, activeSheetChartInteraction.startTop + deltaY);
+                }
+                const chartNode = document.getElementById(chartItem.id);
+                if (chartNode) {
+                    chartNode.style.left = `${chartItem.x}px`;
+                    chartNode.style.top = `${chartItem.y}px`;
+                    chartNode.style.width = `${chartItem.width}px`;
+                    chartNode.style.height = `${chartItem.height}px`;
+                    const chartBody = chartNode.querySelector(".editor-sheet-chart-body");
+                    if (chartBody && typeof window.StandardPlastic?.renderChart === "function") {
+                        window.StandardPlastic.renderChart(chartBody, {
+                            type: chartItem.type,
+                            title: chartItem.title,
+                            data: chartItem.data,
+                            width: chartItem.width,
+                            height: chartItem.height,
+                            labelValues: chartItem.labelValues
+                        });
+                    }
+                }
+            });
+            document.addEventListener("mouseup", () => {
+                if (!activeSheetChartInteraction) return;
+                activeSheetChartInteraction = null;
+                renderSheetCharts();
+                saveSheetPortalState();
+            });
+            document.addEventListener("keydown", (event) => {
+                if (event.key !== "Delete" || !activeSheetChartId) return;
+                const activeElement = document.activeElement;
+                if (activeElement && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable)) return;
+                const chartIndex = sheetCharts.findIndex((item) => item.id === activeSheetChartId);
+                if (chartIndex < 0) return;
+                event.preventDefault();
+                sheetCharts.splice(chartIndex, 1);
+                activeSheetChartId = "";
+                renderSheetCharts();
+                saveSheetPortalState();
+            });
+        }
+        document.querySelectorAll(".editor-sheet-chart").forEach((chartNode) => {
+            if (chartNode.dataset.bound === "1") return;
+            chartNode.dataset.bound = "1";
+            chartNode.addEventListener("mousedown", (event) => {
+                const chartId = chartNode.dataset.chartId || "";
+                const chartItem = sheetCharts.find((item) => item.id === chartId);
+                if (!chartItem) return;
+                event.preventDefault();
+                event.stopPropagation();
+                activeSheetChartId = chartId;
+                activeSheetImageId = "";
+                updateSheetSelectionStyles();
+                renderSheetCharts();
+                activeSheetChartInteraction = {
+                    id: chartId,
+                    mode: event.target.closest(".editor-sheet-chart-resize") ? "resize" : "move",
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    startLeft: chartItem.x,
+                    startTop: chartItem.y,
+                    startWidth: chartItem.width,
+                    startHeight: chartItem.height
+                };
+            });
+        });
     };
     const writeSheetEditorBar = () => {
         const cellLabel = document.getElementById("editor-sheet-active-cell");
@@ -1235,10 +1955,16 @@
                 const cellInput = getSheetCellInput(cellReference);
                 if (cellInput) cellInput.classList.add("active");
             });
-            return;
+        } else {
+            const activeInput = getSheetCellInput(activeSheetCell);
+            if (activeInput) activeInput.classList.add("active");
         }
-        const activeInput = getSheetCellInput(activeSheetCell);
-        if (activeInput) activeInput.classList.add("active");
+        document.querySelectorAll(".editor-sheet-chart").forEach((chartNode) => {
+            chartNode.classList.toggle("selected", chartNode.dataset.chartId === activeSheetChartId);
+        });
+        document.querySelectorAll(".editor-sheet-image").forEach((imageNode) => {
+            imageNode.classList.toggle("selected", imageNode.dataset.imageId === activeSheetImageId);
+        });
     };
     const refreshSheetCells = () => {
         for (let rowIndex = 0; rowIndex < sheetRows; rowIndex += 1) {
@@ -1253,11 +1979,15 @@
         }
         updateSheetSelectionStyles();
         writeSheetEditorBar();
+        renderSheetCharts();
+        renderSheetImages();
     };
     const setActiveSheetCell = (cellReference = "A1") => {
         activeSheetCell = cellReference;
         activeSheetRow = null;
         activeSheetColumn = null;
+        activeSheetChartId = "";
+        activeSheetImageId = "";
         clearActiveSheetRange();
         writeSheetEditorBar();
         updateSheetSelectionStyles();
@@ -1266,6 +1996,8 @@
         activeSheetRow = rowIndex;
         activeSheetColumn = null;
         activeSheetCell = getSheetCellReference(rowIndex, 0);
+        activeSheetChartId = "";
+        activeSheetImageId = "";
         clearActiveSheetRange();
         writeSheetEditorBar();
         updateSheetSelectionStyles();
@@ -1274,6 +2006,8 @@
         activeSheetColumn = columnIndex;
         activeSheetRow = null;
         activeSheetCell = getSheetCellReference(0, columnIndex);
+        activeSheetChartId = "";
+        activeSheetImageId = "";
         clearActiveSheetRange();
         writeSheetEditorBar();
         updateSheetSelectionStyles();
@@ -1394,6 +2128,10 @@
         const backgroundColorButton = document.getElementById("editor-sheet-style-background");
         const alignmentButton = document.getElementById("editor-sheet-style-align");
         const linkButton = document.getElementById("editor-sheet-style-link");
+        const decimalDecreaseButton = document.getElementById("editor-sheet-decimal-decrease");
+        const decimalIncreaseButton = document.getElementById("editor-sheet-decimal-increase");
+        const imageButton = document.getElementById("editor-sheet-add-image");
+        const chartButton = document.getElementById("editor-sheet-make-chart");
         const typeSelect = document.getElementById("editor-sheet-cell-type");
         if (fontSizeSelect && fontSizeSelect.dataset.bound !== "1") {
             fontSizeSelect.dataset.bound = "1";
@@ -1482,6 +2220,34 @@
             linkButton.addEventListener("click", (event) => {
                 event.preventDefault();
                 showSheetHyperlinkDialogue(activeSheetCell);
+            });
+        }
+        if (decimalDecreaseButton && decimalDecreaseButton.dataset.bound !== "1") {
+            decimalDecreaseButton.dataset.bound = "1";
+            decimalDecreaseButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                adjustSheetDecimalPlaces(-1);
+            });
+        }
+        if (decimalIncreaseButton && decimalIncreaseButton.dataset.bound !== "1") {
+            decimalIncreaseButton.dataset.bound = "1";
+            decimalIncreaseButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                adjustSheetDecimalPlaces(1);
+            });
+        }
+        if (imageButton && imageButton.dataset.bound !== "1") {
+            imageButton.dataset.bound = "1";
+            imageButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                promptAndInsertSheetImage();
+            });
+        }
+        if (chartButton && chartButton.dataset.bound !== "1") {
+            chartButton.dataset.bound = "1";
+            chartButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                showSheetChartPortal();
             });
         }
         if (typeSelect && typeSelect.dataset.bound !== "1") {
@@ -1624,14 +2390,15 @@
     const bindSheetArrowNavigation = () => {
         if (sheetArrowNavigationBound) return;
         sheetArrowNavigationBound = true;
-        document.addEventListener("keydown", (event) => {
+        window.addEventListener("keydown", (event) => {
             if (!document.getElementById("editor-sheet-grid-wrap")) return;
             if (!isSheetWindowShown()) return;
             const activeElement = document.activeElement;
             const activeElementId = String(activeElement?.id || "");
-            if (activeElementId.startsWith("sheet-cell-") || activeElementId === "editor-sheet-formula") return;
-            if (activeElement && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable)) return;
-            if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+            const isSheetCellInput = activeElementId.startsWith("sheet-cell-");
+            const isSheetFormulaInput = activeElementId === "editor-sheet-formula";
+            const isPrintableTyping = event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey;
+            if (isPrintableTyping && !isSheetCellInput && !isSheetFormulaInput) {
                 if (Number.isInteger(activeSheetRow) || Number.isInteger(activeSheetColumn)) return;
                 if (isSheetCellLocked(activeSheetCell)) return;
                 const targetInput = getSheetCellInput(activeSheetCell);
@@ -1646,7 +2413,14 @@
                 saveSheetPortalState();
                 return;
             }
+            if (isSheetCellInput || isSheetFormulaInput) return;
+            if (activeElement && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable)) return;
             if (event.key === "Delete") {
+                if (deleteActiveSheetImage()) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    return;
+                }
                 if (Number.isInteger(activeSheetRow) || Number.isInteger(activeSheetColumn)) return;
                 if (isSheetCellLocked(activeSheetCell)) return;
                 event.preventDefault();
@@ -1672,7 +2446,38 @@
             const nextColumn = Math.min(Math.max(activePosition.columnIndex + columnDelta, 0), sheetColumns - 1);
             setActiveSheetCell(getSheetCellReference(nextRow, nextColumn));
             saveSheetPortalState();
-        });
+        }, true);
+    };
+    const bindSheetStyleShortcuts = () => {
+        if (sheetStyleShortcutsBound) return;
+        sheetStyleShortcutsBound = true;
+        window.addEventListener("keydown", (event) => {
+            if (!document.getElementById("editor-sheet-grid-wrap")) return;
+            if (!isSheetWindowShown()) return;
+            if ((!event.ctrlKey && !event.metaKey) || event.altKey || event.repeat) return;
+            const buttonIdByKey = {
+                b: "editor-sheet-style-bold",
+                i: "editor-sheet-style-italic",
+                u: "editor-sheet-style-underline"
+            };
+            const buttonId = buttonIdByKey[String(event.key || "").toLowerCase()];
+            if (!buttonId) return;
+            const activeElement = document.activeElement;
+            const activeElementId = String(activeElement?.id || "");
+            const isSheetCellInput = activeElementId.startsWith("sheet-cell-");
+            const isSheetFormulaInput = activeElementId === "editor-sheet-formula";
+            const isEditingOutsideSheetCell = activeElement
+                && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable)
+                && !isSheetCellInput;
+            if (isSheetFormulaInput || isEditingOutsideSheetCell) return;
+            const buttonNode = document.getElementById(buttonId);
+            if (!buttonNode) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            captureActiveSheetInput();
+            buttonNode.click();
+            if (isSheetCellInput) activeElement.focus();
+        }, true);
     };
     const bindSheetInteractions = () => {
         if (document.body?.dataset.sheetSelectionBound !== "1") {
@@ -1905,6 +2710,7 @@
             });
         }
         bindSheetGridScrollGrowth();
+        bindSheetStyleShortcuts();
         bindSheetArrowNavigation();
         bindSheetToolbar();
         refreshSheetCells();
@@ -1970,6 +2776,9 @@
                                                     ...SHEET_CELL_TYPES
                                                 ]
                                             }),
+                                            button({id: "editor-sheet-decimal-decrease", style: "naked align-bottom small-margin-right inner-radius", title: "Decrease Decimal Count", icon: SHEET_DECIMAL_DECREASE_ICON}),
+                                            button({id: "editor-sheet-decimal-increase", style: "naked align-bottom small-margin-right inner-radius", title: "Increase Decimal Count", icon: SHEET_DECIMAL_INCREASE_ICON}),
+                                            button({id: "editor-sheet-add-image", style: "naked align-bottom small-margin-right inner-radius", title: "Add image", icon: SHEET_IMAGE_ICON}),
                                             button({id: "editor-sheet-make-chart", style: "naked align-bottom small-margin-right inner-radius", title: "Chart", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" /></svg>`}),
                                         ])})
                                 }),

@@ -14,6 +14,38 @@
         contactImageCacheKeys[String(contactId)] = Date.now();
     };
     const contactImageUrl = (contactId) => contactId ? `/api/records/images/${contactId}?cb=${contactId}-${getContactImageCacheKey(contactId)}` : defaultContactImage;
+    const phonePlaceholder = "+# (###) ###-####";
+    const formatContactPhone = (value = "") => {
+        const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+        if (digits.length <= 1) return digits ? `+${digits}` : "";
+        if (digits.length <= 4) return `+${digits[0]} (${digits.slice(1)}`;
+        if (digits.length <= 7) return `+${digits[0]} (${digits.slice(1, 4)}) ${digits.slice(4)}`;
+        return `+${digits[0]} (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    };
+    const bindPhoneFormatter = (id) => {
+        const field = document.getElementById(id);
+        if (!field) return;
+        field.placeholder = phonePlaceholder;
+        field.inputMode = "tel";
+        field.value = formatContactPhone(field.value);
+        field.oninput = () => field.value = formatContactPhone(field.value);
+    };
+    const birthdayPlaceholder = "MM/DD/YYYY";
+    const formatContactBirthday = (value = "") => {
+        const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
+        if (digits.length <= 2) return digits;
+        if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+        return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    };
+    const bindBirthdayFormatter = (id) => {
+        const field = document.getElementById(id);
+        if (!field) return;
+        field.placeholder = birthdayPlaceholder;
+        field.inputMode = "numeric";
+        field.value = formatContactBirthday(field.value);
+        field.oninput = () => field.value = formatContactBirthday(field.value);
+    };
+    const contactPreviewContacts = new Map();
     const renderNoContactsState = () => div({style: "contacts-empty-state", content: children([
         img({src: defaultContactImage, style: "contacts-empty-icon"}),
         div({style: "contacts-empty-label", content: "No contacts"})
@@ -32,8 +64,11 @@
     };
     const removeContactTile = (contactTile) => {
         if (!contactTile) return;
+        const contactIdText = String(contactTile.getAttribute("data") || "");
         const listContainer = contactTile.parentElement;
         contactTile.remove();
+        contactPreviewContacts.delete(contactIdText);
+        if (contactPreview.activeTile === contactTile) hideContactPreview();
         if (listContainer && !listContainer.querySelector(".contact.tile")) {
             renderNoContactsStateInto(listContainer);
         }
@@ -45,6 +80,8 @@
                 removeContactTile(contactTile);
             }
         });
+        contactPreviewContacts.delete(contactIdText);
+        if (contactPreview.activeTile?.getAttribute("data") === contactIdText) hideContactPreview();
     };
     const applyContactImageBackground = (element, imageUrl = defaultContactImage) => {
         if (!element) return;
@@ -53,6 +90,187 @@
         element.style.backgroundPosition = "center";
         element.style.backgroundRepeat = "no-repeat";
     };
+    const buildContactPreview = () => {
+        const preview = document.createElement("div");
+        preview.className = "contacts-hover-preview";
+        Object.assign(preview.style, {
+            position: "fixed",
+            display: "none",
+            zIndex: "91100",
+            width: "240px",
+            maxWidth: "calc(100vw - 24px)",
+            boxSizing: "border-box",
+            padding: "10px",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            background: "var(--secondary-bg)",
+            color: "var(--fg)",
+            boxShadow: "var(--shadow)",
+            pointerEvents: "none"
+        });
+
+        const header = document.createElement("div");
+        Object.assign(header.style, {
+            display: "grid",
+            gridTemplateColumns: "44px minmax(0, 1fr)",
+            gap: "10px",
+            alignItems: "center",
+            marginBottom: "8px"
+        });
+
+        const photo = document.createElement("img");
+        photo.className = "contacts-hover-preview-photo";
+        Object.assign(photo.style, {
+            width: "44px",
+            height: "44px",
+            borderRadius: "999px",
+            objectFit: "cover",
+            background: "var(--bg)"
+        });
+
+        const nameWrap = document.createElement("div");
+        nameWrap.style.minWidth = "0";
+
+        const name = document.createElement("div");
+        name.className = "contacts-hover-preview-name";
+        Object.assign(name.style, {
+            fontWeight: "700",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis"
+        });
+
+        const birthday = document.createElement("div");
+        birthday.className = "contacts-hover-preview-birthday";
+        Object.assign(birthday.style, {
+            opacity: "0.7",
+            fontSize: "calc(var(--fs) - 3px)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis"
+        });
+
+        nameWrap.append(name, birthday);
+        header.append(photo, nameWrap);
+
+        const details = document.createElement("div");
+        details.className = "contacts-hover-preview-details";
+        Object.assign(details.style, {
+            display: "grid",
+            gap: "4px",
+            fontSize: "calc(var(--fs) - 2px)"
+        });
+
+        ["company", "phone", "email", "address"].forEach(field => {
+            const row = document.createElement("div");
+            row.className = `contacts-hover-preview-${field}`;
+            Object.assign(row.style, {
+                opacity: "0.82",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: field === "address" ? "normal" : "nowrap",
+                overflowWrap: "anywhere"
+            });
+            details.appendChild(row);
+        });
+
+        preview.append(header, details);
+        document.body.appendChild(preview);
+        return preview;
+    };
+    const contactPreview = {
+        element: null,
+        activeTile: null,
+        pendingEvent: null,
+        frame: null
+    };
+    const ensureContactPreview = () => {
+        if (!contactPreview.element || !document.body.contains(contactPreview.element)) {
+            contactPreview.element = buildContactPreview();
+        }
+        return contactPreview.element;
+    };
+    const formatContactName = (contact = {}) => [contact.firstname, contact.middlename, contact.lastname].filter(Boolean).join(" ").trim() || "Unnamed Contact";
+    const updateContactPreviewContent = (tile, contact = {}) => {
+        const preview = ensureContactPreview();
+        const previewPhoto = preview.querySelector(".contacts-hover-preview-photo");
+        const sourcePhoto = tile?.querySelector("img");
+        if (previewPhoto) {
+            previewPhoto.src = sourcePhoto?.currentSrc || sourcePhoto?.src || defaultContactImage;
+            previewPhoto.alt = "";
+        }
+        const setText = (selector, value) => {
+            const element = preview.querySelector(selector);
+            if (!element) return;
+            const text = String(value || "").trim();
+            element.textContent = text;
+            element.style.display = text ? "" : "none";
+        };
+        setText(".contacts-hover-preview-name", formatContactName(contact));
+        setText(".contacts-hover-preview-birthday", contact.birthday);
+        setText(".contacts-hover-preview-company", contact.company);
+        setText(".contacts-hover-preview-phone", contact.phone);
+        setText(".contacts-hover-preview-email", contact.email);
+        setText(".contacts-hover-preview-address", contact.address);
+    };
+    const moveContactPreview = (event) => {
+        const preview = ensureContactPreview();
+        const margin = 12;
+        const offset = 16;
+        let left = event.clientX + offset;
+        let top = event.clientY + offset;
+        const rect = preview.getBoundingClientRect();
+        if (left + rect.width + margin > window.innerWidth) left = event.clientX - rect.width - offset;
+        if (top + rect.height + margin > window.innerHeight) top = event.clientY - rect.height - offset;
+        preview.style.left = `${Math.max(margin, left)}px`;
+        preview.style.top = `${Math.max(margin, top)}px`;
+    };
+    const scheduleContactPreviewMove = (event) => {
+        contactPreview.pendingEvent = event;
+        if (contactPreview.frame) return;
+        contactPreview.frame = requestAnimationFrame(() => {
+            contactPreview.frame = null;
+            if (!contactPreview.pendingEvent) return;
+            moveContactPreview(contactPreview.pendingEvent);
+        });
+    };
+    const showContactPreview = (tile, event) => {
+        if (!tile) return;
+        const contact = contactPreviewContacts.get(String(tile.getAttribute("data") || ""));
+        if (!contact) return;
+        contactPreview.activeTile = tile;
+        updateContactPreviewContent(tile, contact);
+        const preview = ensureContactPreview();
+        preview.style.display = "block";
+        moveContactPreview(event);
+    };
+    const hideContactPreview = () => {
+        if (contactPreview.frame) cancelAnimationFrame(contactPreview.frame);
+        contactPreview.frame = null;
+        contactPreview.pendingEvent = null;
+        contactPreview.activeTile = null;
+        if (contactPreview.element) contactPreview.element.style.display = "none";
+    };
+    document.addEventListener("mouseover", (event) => {
+        const tile = event.target.closest?.(".contact.tile");
+        if (!tile || tile === contactPreview.activeTile) return;
+        showContactPreview(tile, event);
+    });
+    document.addEventListener("mousemove", (event) => {
+        if (!contactPreview.activeTile) return;
+        const tile = event.target.closest?.(".contact.tile");
+        if (tile !== contactPreview.activeTile) return;
+        scheduleContactPreviewMove(event);
+    });
+    document.addEventListener("mouseout", (event) => {
+        if (!contactPreview.activeTile) return;
+        const relatedTarget = event.relatedTarget;
+        if (relatedTarget instanceof Node && contactPreview.activeTile.contains(relatedTarget)) return;
+        const leavingTile = event.target.closest?.(".contact.tile");
+        if (leavingTile === contactPreview.activeTile) hideContactPreview();
+    });
+    window.addEventListener("blur", hideContactPreview);
+    window.addEventListener("scroll", hideContactPreview, true);
     const deleteContact = (contact = {}, onSuccess = () => {}) => {
         if (!contact.id) {
             modular.error("Missing contact ID");
@@ -120,6 +338,14 @@
     };
     const openContact = (contact = {}) => {
         const fullName = [contact.firstname, contact.middlename, contact.lastname].filter(Boolean).join(" ").trim() || "View Contact";
+        const contactValue = (value) => String(value || "").trim();
+        const contactDetails = [
+            contactValue(contact.company) && div({style: "small-padding faded", content: contactValue(contact.company)}),
+            contactValue(contact.phone) && div({style: "small-padding faded", content: contactValue(contact.phone)}),
+            contactValue(contact.email) && div({style: "small-padding faded", content: contactValue(contact.email)}),
+            contactValue(contact.address) && div({style: "small-padding", content: contactValue(contact.address).replace(/\s*,\s*/g, "<br>")}),
+            contactValue(contact.birthday) && div({style: "small-padding faded", content: contactValue(contact.birthday)})
+        ].filter(Boolean);
         const detailsPortal = new Portal({title: fullName, dimensions: [350, 400], navigation: false, resizable: false,
             tools: [{
                 title: "Edit",
@@ -143,10 +369,7 @@
             route: () => div({content: children([
                     div({style: "center large-margin-top large-margin-bottom", content: children([img({style: "real-large-icon round inline", src: contactImageUrl(contact.id)})])}),
                     div({style: "small-padding bold large-margin-top", content: fullName}),
-                    div({style: "small-padding faded", content: contact.phone || "No phone"}),
-                    div({style: "small-padding faded", content: contact.email || "No email"}),
-                    div({style: "small-padding", content: contact.address || ""}),
-                    div({style: "small-padding faded", content: contact.birthday || ""}),
+                    ...contactDetails,
                 ])
             })
         });
@@ -177,6 +400,7 @@
                                     let as = []
                                     for (let i = 0; i < sortedContacts.length; i++) {
                                         const contact = sortedContacts[i];
+                                        contactPreviewContacts.set(String(contact.id), contact);
                                         as.push(div({style: "padded secondary-tile brick line small-spaced hover-shadowed contact tile", data: contact.id, onclick: (e) => {
                                                 if (e.target.closest("button")) return;
                                                 openContact(contact);
@@ -227,7 +451,7 @@
                     }),
                     div({content: children([
                             div({style: "bold small-padding", content: "Birthday"}),
-                            div({style: "padded", content: input({id: "birthday", style: "undecorated no-padding", placeholder: ""})})
+                            div({style: "padded", content: input({id: "birthday", style: "undecorated no-padding", placeholder: birthdayPlaceholder})})
                         ])
                     }),
                     div({content: children([
@@ -237,12 +461,17 @@
                     }),
                     div({content: children([
                             div({style: "bold small-padding", content: "Phone"}),
-                            div({style: "padded", content: input({id: "phone", style: "undecorated no-padding", placeholder: ""})})
+                            div({style: "padded", content: input({id: "phone", style: "undecorated no-padding", placeholder: phonePlaceholder})})
                         ])
                     }),
                     div({content: children([
                             div({style: "bold small-padding", content: "Email"}),
                             div({style: "padded", content: input({id: "email", style: "undecorated no-padding", placeholder: ""})})
+                        ])
+                    }),
+                    div({content: children([
+                            div({style: "bold small-padding", content: "Company"}),
+                            div({style: "padded", content: input({id: "company", style: "undecorated no-padding", placeholder: "Standard Computers LLC"})})
                         ])
                     }),
                     div({style: "spacer"}),
@@ -256,8 +485,9 @@
                             const address = document.getElementById("address").value.trim();
                             const phone = document.getElementById("phone").value.trim();
                             const email = document.getElementById("email").value.trim();
+                            const company = document.getElementById("company").value.trim();
                             try {
-                                const response = await CLI.send(`[contacts] + ("${fname}", "${mname}", "${lname}", "${bday}", "${address}", "${phone}", "${email}")`, false);
+                                const response = await CLI.send(`[contacts] + ("${fname}", "${mname}", "${lname}", "${bday}", "${address}", "${phone}", "${email}", "${company}")`, false);
                                 const createdContactId = response;
                                 if (!createdContactId) modular.error("Contact was created but no record ID was parsed; image upload skipped");
                                 if (addContactImageFile && createdContactId) {
@@ -306,6 +536,8 @@
                 ])
             }),
             afterRender: () => {
+                bindBirthdayFormatter("birthday");
+                bindPhoneFormatter("phone");
                 const photoEl = document.getElementById("add-contact-photo");
                 if (!photoEl) return;
                 const binding = resetPhotoPickerBinding(photoEl, "__addContactPhotoPicker");
@@ -367,7 +599,7 @@
                     }),
                     div({content: children([
                             div({style: "bold small-padding", content: "Birthday"}),
-                            div({style: "padded", content: input({id: "edit-birthday", style: "undecorated no-padding", placeholder: ""})})
+                            div({style: "padded", content: input({id: "edit-birthday", style: "undecorated no-padding", placeholder: birthdayPlaceholder})})
                         ])
                     }),
                     div({content: children([
@@ -377,12 +609,17 @@
                     }),
                     div({content: children([
                             div({style: "bold faded small-padding", content: "Phone"}),
-                            div({style: "padded", content: input({id: "edit-phone", style: "undecorated no-padding", placeholder: ""})})
+                            div({style: "padded", content: input({id: "edit-phone", style: "undecorated no-padding", placeholder: phonePlaceholder})})
                         ])
                     }),
                     div({content: children([
                             div({style: "bold small-padding", content: "Email"}),
                             div({style: "padded", content: input({id: "edit-email", style: "undecorated no-padding", placeholder: ""})})
+                        ])
+                    }),
+                    div({content: children([
+                            div({style: "bold small-padding", content: "Company"}),
+                            div({style: "padded", content: input({id: "edit-company", style: "undecorated no-padding", placeholder: ""})})
                         ])
                     }),
                     div({style: "spacer"}),
@@ -399,6 +636,7 @@
                             const address = document.getElementById("edit-address").value.trim();
                             const phone = document.getElementById("edit-phone").value.trim();
                             const email = document.getElementById("edit-email").value.trim();
+                            const company = document.getElementById("edit-company").value.trim();
                             const escaped = value => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\\"');
                             try {
                                 const updates = [
@@ -408,7 +646,8 @@
                                     CLI.send(`[contacts] birthday "${escaped(bday)}" <id ${contactId}>`),
                                     CLI.send(`[contacts] address "${escaped(address)}" <id ${contactId}>`),
                                     CLI.send(`[contacts] phone "${escaped(phone)}" <id ${contactId}>`),
-                                    CLI.send(`[contacts] email "${escaped(email)}" <id ${contactId}>`)
+                                    CLI.send(`[contacts] email "${escaped(email)}" <id ${contactId}>`),
+                                    CLI.send(`[contacts] company "${escaped(company)}" <id ${contactId}>`)
                                 ];
                                 const updateResponses = await Promise.all(updates);
                                 const hadUpdateFailure = updateResponses.some(response => response === 0);
@@ -430,7 +669,7 @@
                                 modular.error("Failed to save contact");
                                 return;
                             }
-                            selected_contact = {...selected_contact, id: contactId, firstname: fname, middlename: mname, lastname: lname, birthday: bday, address, phone, email};
+                            selected_contact = {...selected_contact, id: contactId, firstname: fname, middlename: mname, lastname: lname, birthday: bday, address, phone, email, company};
                             try {
                                 editContactImageFile = null;
                                 editContactImageChanged = false;
@@ -457,9 +696,12 @@
                 setValue("edit-middle-name", selected_contact.middlename);
                 setValue("edit-last-name", selected_contact.lastname);
                 setValue("edit-birthday", selected_contact.birthday);
+                bindBirthdayFormatter("edit-birthday");
                 setValue("edit-address", selected_contact.address);
                 setValue("edit-phone", selected_contact.phone);
+                bindPhoneFormatter("edit-phone");
                 setValue("edit-email", selected_contact.email);
+                setValue("edit-company", selected_contact.company);
                 if (photoEl) {
                     applyContactImageBackground(photoEl, contactImageUrl(selected_contact.id));
                     photoEl.style.cursor = "pointer";

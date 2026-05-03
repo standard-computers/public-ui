@@ -25,39 +25,58 @@
             if(!e)return;
             try{
                 let t=decodeURIComponent(e[1]),
-                    n=document.getElementById("username"),
-                    o=document.getElementById("login-form"),
-                    r=document.getElementById("click-me"),
-                    i=document.getElementById("login-error"),
-                    a=document.getElementById("retry-status");
-                if(!t||!n||!o||!r)return;
-                n.value=t;
-                if(!i){
-                    r.click();
+                    n=document.getElementById("username");
+                if(t&&n)n.value=t;
+            }catch(l){}
+        }();
+        !function(){
+            let e=document.getElementById("login-form"),
+                t=document.getElementById("username"),
+                n=document.getElementById("click-me"),
+                o=document.getElementById("login-error"),
+                r=document.getElementById("retry-status");
+            if(!e||!t||!n)return;
+            function i(e){
+                if(!r)return;
+                r.style.display=e?"block":"none";
+                r.textContent=e||"";
+            }
+            e.addEventListener("submit",async function(a){
+                a.preventDefault();
+                let s=t.value.trim();
+                if(!s){
+                    i("Username is required");
                     return;
                 }
-                let d=30;
-                if(a){
-                    a.style.display="block";
-                    a.textContent=`${i.textContent} Retrying in ${d} seconds...`;
+                n.disabled=!0;
+                i("Signing in...");
+                if(o)o.style.display="none";
+                try{
+                    let l=new URLSearchParams;
+                    l.set("username",s);
+                    let c=await fetch(e.action,{
+                        method:"POST",
+                        headers:{
+                            "Accept":"application/json",
+                            "Content-Type":"application/x-www-form-urlencoded;charset=UTF-8",
+                            "X-Requested-With":"XMLHttpRequest"
+                        },
+                        body:l.toString(),
+                        credentials:"same-origin"
+                    });
+                    let d=c.headers.get("content-type")||"",
+                        u=d.includes("application/json")?await c.json():null;
+                    if(c.ok&&u&&u.redirect){
+                        window.location.assign(u.redirect);
+                        return;
+                    }
+                    i((u&&u.error)||"Unable to login");
+                }catch(l){
+                    i("Unable to login");
+                }finally{
+                    n.disabled=!1;
                 }
-                let s=setInterval(function(){
-                    d-=1;
-                    if(!a)return;
-                    if(d>0){
-                        a.textContent=`${i.textContent} Retrying in ${d} seconds...`;
-                        return;
-                    }
-                    clearInterval(s);
-                },1e3);
-                setTimeout(function(){
-                    if(o.requestSubmit){
-                        o.requestSubmit();
-                        return;
-                    }
-                    r.click();
-                },3e4);
-            }catch(l){}
+            });
         }();
         </script>
     </body>

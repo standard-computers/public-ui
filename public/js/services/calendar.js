@@ -235,12 +235,157 @@
     };
     window.StandardCalendar = window.StandardCalendar || {};
     window.StandardCalendar.openEvent = (event, date = null) => openSelectedEventPortal(event, date);
+    const calendarEventPreviewEntries = new Map();
+    let calendarEventPreviewIndex = 0;
+    const buildCalendarEventPreview = () => {
+        const preview = document.createElement("div");
+        preview.className = "calendar-event-hover-preview";
+        Object.assign(preview.style, {
+            position: "fixed",
+            display: "none",
+            zIndex: "91100",
+            width: "260px",
+            maxWidth: "calc(100vw - 24px)",
+            boxSizing: "border-box",
+            padding: "10px",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            background: "var(--secondary-bg)",
+            color: "var(--fg)",
+            boxShadow: "var(--shadow)",
+            pointerEvents: "none"
+        });
+
+        const title = document.createElement("div");
+        title.className = "calendar-event-hover-preview-title";
+        Object.assign(title.style, {
+            fontWeight: "700",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            marginBottom: "6px"
+        });
+
+        const details = document.createElement("div");
+        details.className = "calendar-event-hover-preview-details";
+        Object.assign(details.style, {
+            display: "grid",
+            gap: "4px",
+            fontSize: "calc(var(--fs) - 2px)"
+        });
+
+        ["time", "category", "start", "end"].forEach(field => {
+            const row = document.createElement("div");
+            row.className = `calendar-event-hover-preview-${field}`;
+            Object.assign(row.style, {
+                opacity: "0.82",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
+            });
+            details.appendChild(row);
+        });
+
+        preview.append(title, details);
+        document.body.appendChild(preview);
+        return preview;
+    };
+    const calendarEventPreview = {
+        element: null,
+        activeChip: null,
+        pendingEvent: null,
+        frame: null
+    };
+    const ensureCalendarEventPreview = () => {
+        if (!calendarEventPreview.element || !document.body.contains(calendarEventPreview.element)) {
+            calendarEventPreview.element = buildCalendarEventPreview();
+        }
+        return calendarEventPreview.element;
+    };
+    const updateCalendarEventPreviewContent = (eventEntry, date) => {
+        const preview = ensureCalendarEventPreview();
+        const event = eventEntry?.event || {};
+        const setText = (selector, value, fallback = "") => {
+            const element = preview.querySelector(selector);
+            if (element) element.textContent = value || fallback;
+        };
+        const categoryName = event?.category?.name || "Uncategorized";
+        const startLabel = toDateTimeLabel(getEventBoundary(event, "start")) || "Not set";
+        const endLabel = toDateTimeLabel(getEventBoundary(event, "end")) || "Not set";
+        setText(".calendar-event-hover-preview-title", event?.name || "Untitled");
+        setText(".calendar-event-hover-preview-time", getEventTimeSummary(eventEntry, date), "Open");
+        setText(".calendar-event-hover-preview-category", categoryName);
+        setText(".calendar-event-hover-preview-start", `Start: ${startLabel}`);
+        setText(".calendar-event-hover-preview-end", `End: ${endLabel}`);
+        preview.style.borderColor = event?.category?.color || "var(--border)";
+    };
+    const moveCalendarEventPreview = event => {
+        const preview = ensureCalendarEventPreview();
+        const margin = 12;
+        const offset = 16;
+        let left = event.clientX + offset;
+        let top = event.clientY + offset;
+        const rect = preview.getBoundingClientRect();
+        if (left + rect.width + margin > window.innerWidth) left = event.clientX - rect.width - offset;
+        if (top + rect.height + margin > window.innerHeight) top = event.clientY - rect.height - offset;
+        preview.style.left = `${Math.max(margin, left)}px`;
+        preview.style.top = `${Math.max(margin, top)}px`;
+    };
+    const scheduleCalendarEventPreviewMove = event => {
+        calendarEventPreview.pendingEvent = event;
+        if (calendarEventPreview.frame) return;
+        calendarEventPreview.frame = requestAnimationFrame(() => {
+            calendarEventPreview.frame = null;
+            if (!calendarEventPreview.pendingEvent) return;
+            moveCalendarEventPreview(calendarEventPreview.pendingEvent);
+        });
+    };
+    const showCalendarEventPreview = (chip, event) => {
+        if (!chip) return;
+        const previewData = calendarEventPreviewEntries.get(chip.id);
+        if (!previewData) return;
+        calendarEventPreview.activeChip = chip;
+        updateCalendarEventPreviewContent(previewData.eventEntry, previewData.date);
+        const preview = ensureCalendarEventPreview();
+        preview.style.display = "block";
+        moveCalendarEventPreview(event);
+    };
+    const hideCalendarEventPreview = () => {
+        if (calendarEventPreview.frame) cancelAnimationFrame(calendarEventPreview.frame);
+        calendarEventPreview.frame = null;
+        calendarEventPreview.pendingEvent = null;
+        calendarEventPreview.activeChip = null;
+        if (calendarEventPreview.element) calendarEventPreview.element.style.display = "none";
+    };
+    document.addEventListener("mouseover", event => {
+        const chip = event.target.closest?.(".calendar-event-chip");
+        if (!chip || chip === calendarEventPreview.activeChip) return;
+        showCalendarEventPreview(chip, event);
+    });
+    document.addEventListener("mousemove", event => {
+        if (!calendarEventPreview.activeChip) return;
+        const chip = event.target.closest?.(".calendar-event-chip");
+        if (chip !== calendarEventPreview.activeChip) return;
+        scheduleCalendarEventPreviewMove(event);
+    });
+    document.addEventListener("mouseout", event => {
+        if (!calendarEventPreview.activeChip) return;
+        const relatedTarget = event.relatedTarget;
+        if (relatedTarget instanceof Node && calendarEventPreview.activeChip.contains(relatedTarget)) return;
+        const leavingChip = event.target.closest?.(".calendar-event-chip");
+        if (leavingChip === calendarEventPreview.activeChip) hideCalendarEventPreview();
+    });
+    window.addEventListener("blur", hideCalendarEventPreview);
+    window.addEventListener("scroll", hideCalendarEventPreview, true);
     const renderCalendarEventChip = (eventEntry, date, options = {}) => {
         const categoryColor = eventEntry?.event?.category?.color || "#7B61FF";
         const eventName = eventEntry?.event?.name || "Untitled";
         const timeSummary = getEventTimeSummary(eventEntry, date);
+        const previewId = `calendar-event-chip-${calendarEventPreviewIndex++}`;
+        calendarEventPreviewEntries.set(previewId, {eventEntry, date});
         return div({
-            style: `${options.compact ? "tiny-text" : ""} small-padding inner-radius text-white pointer hover-shadowed`,
+            id: previewId,
+            style: `${options.compact ? "tiny-text" : ""} calendar-event-chip small-padding inner-radius text-white pointer hover-shadowed`,
             background: categoryColor,
             title: `${eventName}${timeSummary ? `\n${timeSummary}` : ""}`,
             content: children([
@@ -498,18 +643,13 @@
                         setCalendarPortalTitle(0, `${currentMonthLabel} ${currentYear}`);
                         return div({style: "grid7 no-scrollbars larger-padding-top", id: "", content: () => CLI.send("[events]").then(eventsResponse => {
                             const eventsByDate = {};
-                            getEventsList(eventsResponse).forEach(event => {
-                                const startDate = toDateObject(getEventBoundary(event, "start"));
-                                const endDate = toDateObject(getEventBoundary(event, "end") || getEventBoundary(event, "start"));
-                                if (!startDate || !endDate) return;
-                                const eventStart = startDate <= endDate ? startDate : endDate;
-                                const eventEnd = endDate >= startDate ? endDate : startDate;
-                                const iterDate = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate());
-                                const lastDate = new Date(eventEnd.getFullYear(), eventEnd.getMonth(), eventEnd.getDate());
+                            getCalendarEventEntries(eventsResponse).forEach(eventEntry => {
+                                const iterDate = new Date(eventEntry.startDate.getFullYear(), eventEntry.startDate.getMonth(), eventEntry.startDate.getDate());
+                                const lastDate = new Date(eventEntry.endDate.getFullYear(), eventEntry.endDate.getMonth(), eventEntry.endDate.getDate());
                                 while (iterDate <= lastDate) {
                                     const dateKey = toLocalDateKey(iterDate);
                                     if (!eventsByDate[dateKey]) eventsByDate[dateKey] = [];
-                                    eventsByDate[dateKey].push(event);
+                                    eventsByDate[dateKey].push(eventEntry);
                                     iterDate.setDate(iterDate.getDate() + 1);
                                 }
                             });
@@ -534,11 +674,19 @@
                                                 div({style: "strong inline small-padding-left faded align-top", content: tileDate.getDate()}),
                                             ])
                                         }),
-                                        div({style: "small-padding-left small-padding-right small-padding-bottom", content: children(tileEvents.map(event => {
+                                        div({style: "small-padding-left small-padding-right small-padding-bottom", content: children(tileEvents.map(eventEntry => {
+                                                const event = eventEntry?.event || {};
                                                 const categoryColor = event?.category?.color || "#7B61FF";
-                                                return div({style: "tiny-text small-padding inner-radius text-white truncate pointer",
+                                                const eventName = event?.name || "Untitled";
+                                                const timeSummary = getEventTimeSummary(eventEntry, tileDate);
+                                                const previewId = `calendar-event-chip-${calendarEventPreviewIndex++}`;
+                                                calendarEventPreviewEntries.set(previewId, {eventEntry, date: tileDate});
+                                                return div({
+                                                    id: previewId,
+                                                    style: "calendar-event-chip tiny-text small-padding inner-radius text-white truncate pointer",
                                                     background: categoryColor,
-                                                    content: event?.name || "Untitled",
+                                                    title: `${eventName}${timeSummary ? `\n${timeSummary}` : ""}`,
+                                                    content: eventName,
                                                     oncontextmenu: e => {
                                                         e.preventDefault();
                                                         e.stopPropagation();

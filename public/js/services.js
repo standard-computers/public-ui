@@ -344,6 +344,7 @@ const windowStateManager = (() => {
     };
 })();
 const kickOffWindowRestore = () => {
+    if (window.StandardServiceLoaderEnabled) return;
     windowStateManager.ensureLoaded().then(() => windowStateManager.restoreOpenWindows());
 };
 if (document.readyState === 'loading') {

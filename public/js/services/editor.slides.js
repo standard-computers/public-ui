@@ -4,6 +4,24 @@
     const SLIDE_BORDER_DRAG_HIT_SIZE = 8;
     const SLIDE_TEXT_STYLE_KEYS = ["fontWeight", "fontStyle", "textDecoration", "color", "backgroundColor", "fontSize"];
     const SLIDE_FONT_SIZES = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72"];
+    const SLIDE_CHART_DEFAULT_WIDTH = 360;
+    const SLIDE_CHART_DEFAULT_HEIGHT = 240;
+    const SLIDE_CHART_MIN_WIDTH = 180;
+    const SLIDE_CHART_MIN_HEIGHT = 140;
+    const SLIDE_CHART_TYPES = [
+        {label: "Column", value: "bar"},
+        {label: "Line", value: "line"},
+        {label: "Area", value: "area"},
+        {label: "Scatter", value: "scatter"},
+        {label: "Pie", value: "pie"}
+    ];
+    const SLIDE_CHART_DEFAULT_DATA = [
+        {label: "Q1", value: 24},
+        {label: "Q2", value: 38},
+        {label: "Q3", value: 31},
+        {label: "Q4", value: 46}
+    ];
+    const SLIDE_CHART_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" /></svg>`;
     const SLIDE_TEXT_COLORS = [
         {label: "Default", value: ""},
         {label: "Ink", value: "var(--fg)"},
@@ -173,6 +191,28 @@
         block.content = getSlidePlainTextFromRuns(normalizedRuns) || block.content;
         block.runs = encodeSlideTextRuns(normalizedRuns, block.content);
         setSlideBlockTextStyle(block, block.textStyle || {});
+        return block;
+    };
+    const normalizeSlideChartData = (rawData = []) => {
+        const data = Array.isArray(rawData) ? rawData : [];
+        return data.map((item, index) => {
+            const value = Number(item?.value ?? item?.y ?? item?.amount);
+            return {
+                label: String(item?.label ?? item?.name ?? item?.x ?? `Item ${index + 1}`),
+                value: Number.isFinite(value) ? value : 0
+            };
+        }).filter((item) => item.label || item.value);
+    };
+    const normalizeSlideChartBlock = (block = {}) => {
+        if (block.type !== "chart") return block;
+        const chartType = String(block.chartType || block.content || "bar").trim().toLowerCase();
+        block.chartType = SLIDE_CHART_TYPES.some((option) => option.value === chartType) ? chartType : "bar";
+        block.title = String(block.title || "Chart");
+        block.data = normalizeSlideChartData(block.data).length ? normalizeSlideChartData(block.data) : SLIDE_CHART_DEFAULT_DATA.map((item) => ({...item}));
+        block.labelValues = block.labelValues === true || block.showValueLabels === true;
+        block.width = Math.max(SLIDE_CHART_MIN_WIDTH, Number(block.width) || SLIDE_CHART_DEFAULT_WIDTH);
+        block.height = Math.max(SLIDE_CHART_MIN_HEIGHT, Number(block.height) || SLIDE_CHART_DEFAULT_HEIGHT);
+        block.content = block.chartType;
         return block;
     };
     const decodeSlideTextRunsForBlock = (block = {}) => normalizeSlideTextRuns(block.runs, block.content);
@@ -584,7 +624,10 @@
         activeSlideDeck.forEach((slide) => {
             setSlideBackground(slide, slide?.background || null);
             slide.blocks = Array.isArray(slide?.blocks) ? slide.blocks : [];
-            slide.blocks.forEach((block) => normalizeSlideTextBlock(block));
+            slide.blocks.forEach((block) => {
+                normalizeSlideTextBlock(block);
+                normalizeSlideChartBlock(block);
+            });
         });
         if (!activeSlideDeck.some((slide) => slide.id === activeSlideId)) activeSlideId = activeSlideDeck[0]?.id || 1;
         const maxSlideId = activeSlideDeck.reduce((maxId, slide) => Math.max(maxId, Number(slide?.id) || 0), 0);
@@ -790,8 +833,8 @@
         const maxY = Math.max(0, bounds.height - block.height);
         block.x = Math.min(maxX, Math.max(0, snapSlideValue(block.x)));
         block.y = Math.min(maxY, Math.max(0, snapSlideValue(block.y)));
-        block.width = Math.max(SLIDE_GRID_SIZE * 3, snapSlideValue(block.width));
-        block.height = Math.max(SLIDE_GRID_SIZE * 2, snapSlideValue(block.height));
+        block.width = Math.max(block.type === "chart" ? SLIDE_CHART_MIN_WIDTH : SLIDE_GRID_SIZE * 3, snapSlideValue(block.width));
+        block.height = Math.max(block.type === "chart" ? SLIDE_CHART_MIN_HEIGHT : SLIDE_GRID_SIZE * 2, snapSlideValue(block.height));
     };
     const reorderSlides = (movingSlideId, targetSlideId) => {
         if (!movingSlideId || !targetSlideId || movingSlideId === targetSlideId) return false;
@@ -1183,6 +1226,12 @@
                 updateSlideToolbarState();
             });
             blockNode.appendChild(contentNode);
+        } else if (block.type === "chart") {
+            normalizeSlideChartBlock(block);
+            const chartNode = document.createElement("div");
+            chartNode.className = "editor-slide-chart-content";
+            renderSlideChartIntoNode(chartNode, block);
+            blockNode.appendChild(chartNode);
         } else {
             const imageNode = document.createElement("img");
             imageNode.className = "editor-slide-image-content";
@@ -1207,7 +1256,7 @@
             const borderHitPadding = Math.max(1, SLIDE_BORDER_DRAG_HIT_SIZE);
             const isBorderHit = Boolean(blockRect) && ((event.clientX - blockRect.left) <= borderHitPadding || (event.clientY - blockRect.top) <= borderHitPadding || (blockRect.right - event.clientX) <= borderHitPadding || (blockRect.bottom - event.clientY) <= borderHitPadding);
             const isResize = isOnResizeControl;
-            const isMove = wasSelected && isBorderHit && !isOnResizeControl;
+            const isMove = wasSelected && (block.type === "chart" || isBorderHit) && !isOnResizeControl;
             if (isResize) {
                 savedSlideSelectionOffsets = null;
                 blurSlideTextEditing();
@@ -1245,6 +1294,10 @@
                     activeBlockNode.style.top = `${block.y}px`;
                     activeBlockNode.style.width = `${block.width}px`;
                     activeBlockNode.style.height = `${block.height}px`;
+                    if (block.type === "chart") {
+                        const chartContentNode = activeBlockNode.querySelector(".editor-slide-chart-content");
+                        renderSlideChartIntoNode(chartContentNode, block);
+                    }
                 }
             };
             const upHandler = () => {
@@ -1257,6 +1310,237 @@
             window.addEventListener("mouseup", upHandler);
         });
         return blockNode;
+    };
+    const renderSlideChartIntoNode = (targetNode = null, block = {}) => {
+        if (!(targetNode instanceof HTMLElement)) return;
+        normalizeSlideChartBlock(block);
+        if (typeof window.StandardPlastic?.renderChart === "function") {
+            window.StandardPlastic.renderChart(targetNode, {
+                type: block.chartType,
+                title: block.title || "Chart",
+                data: block.data || [],
+                width: Math.max(SLIDE_CHART_MIN_WIDTH, Number(block.width) || SLIDE_CHART_DEFAULT_WIDTH),
+                height: Math.max(SLIDE_CHART_MIN_HEIGHT, Number(block.height) || SLIDE_CHART_DEFAULT_HEIGHT),
+                labelValues: block.labelValues === true
+            });
+            return;
+        }
+        targetNode.textContent = block.title || "Chart";
+    };
+    const getSlideChartInsertionPoint = () => {
+        const bounds = getSlideCanvasBounds();
+        if (!bounds.canvas) return {x: SLIDE_GRID_SIZE, y: SLIDE_GRID_SIZE};
+        const canvasRect = bounds.canvas.getBoundingClientRect();
+        const pointFromRect = (sourceRect = null) => {
+            if (!sourceRect) return null;
+            return {
+                x: snapSlideValue(sourceRect.left - canvasRect.left),
+                y: snapSlideValue(sourceRect.bottom - canvasRect.top + SLIDE_GRID_SIZE)
+            };
+        };
+        const contentNode = getSlideTextEditorFromSelection();
+        if (contentNode instanceof HTMLElement) {
+            const selection = window.getSelection();
+            if (selection?.rangeCount) {
+                const range = selection.getRangeAt(0);
+                if (contentNode.contains(range.startContainer)) {
+                    const rect = range.getBoundingClientRect();
+                    const fallbackRect = contentNode.getBoundingClientRect();
+                    const sourceRect = rect && (rect.width || rect.height) ? rect : fallbackRect;
+                    const livePoint = pointFromRect(sourceRect);
+                    if (livePoint) return livePoint;
+                }
+            }
+        }
+        if (savedSlideSelectionOffsets?.blockId) {
+            const savedContentNode = document.querySelector(`.editor-slide-text-content[data-block-id="${savedSlideSelectionOffsets.blockId}"]`);
+            if (savedContentNode instanceof HTMLElement) {
+                const offset = Math.max(savedSlideSelectionOffsets.start || 0, savedSlideSelectionOffsets.end || 0);
+                const savedPoint = resolveSlideSelectionPoint(savedContentNode, offset);
+                const range = document.createRange();
+                range.setStart(savedPoint.node, savedPoint.offset);
+                range.collapse(true);
+                const rect = range.getBoundingClientRect();
+                const fallbackRect = savedContentNode.getBoundingClientRect();
+                const savedRectPoint = pointFromRect(rect && (rect.width || rect.height) ? rect : fallbackRect);
+                range.detach?.();
+                if (savedRectPoint) return savedRectPoint;
+            }
+        }
+        const selectedBlock = getActiveSlide()?.blocks?.find((block) => block.id === selectedSlideBlockId);
+        if (selectedBlock) return {x: snapSlideValue(selectedBlock.x + SLIDE_GRID_SIZE), y: snapSlideValue(selectedBlock.y + SLIDE_GRID_SIZE)};
+        return {x: SLIDE_GRID_SIZE, y: SLIDE_GRID_SIZE};
+    };
+    const parseSlideChartDataInput = (rawText = "") => String(rawText || "").split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line, index) => {
+            const parts = line.split(/,|\t/).map((part) => part.trim());
+            const value = Number(parts[1] ?? parts[0]);
+            return {
+                label: parts.length > 1 ? (parts[0] || `Item ${index + 1}`) : `Item ${index + 1}`,
+                value: Number.isFinite(value) ? value : 0
+            };
+        }).filter((item) => item.label || item.value);
+    const serializeSlideChartData = (data = SLIDE_CHART_DEFAULT_DATA) => normalizeSlideChartData(data)
+        .map((item) => `${item.label}, ${item.value}`)
+        .join("\n");
+    const getSlideChartDataPlaceholder = (chartType = "bar") => {
+        if (chartType === "pie") return "Segment, Value\nHardware, 42\nSoftware, 33\nServices, 25";
+        if (chartType === "scatter") return "Point, Value\nA, 12\nB, 28\nC, 18";
+        return "Label, Value\nQ1, 24\nQ2, 38\nQ3, 31\nQ4, 46";
+    };
+    const insertSlideChart = ({type = "bar", title = "Chart", data = [], labelValues = false} = {}) => {
+        const activeSlide = getActiveSlide();
+        if (!activeSlide) return false;
+        const insertionPoint = getSlideChartInsertionPoint();
+        const block = normalizeSlideChartBlock({
+            id: slideBlockCounter,
+            type: "chart",
+            chartType: type,
+            title,
+            data,
+            labelValues,
+            x: insertionPoint.x,
+            y: insertionPoint.y,
+            width: SLIDE_CHART_DEFAULT_WIDTH,
+            height: SLIDE_CHART_DEFAULT_HEIGHT,
+            content: type
+        });
+        slideBlockCounter += 1;
+        clampSlideBlockToBounds(block);
+        activeSlide.blocks.push(block);
+        selectedSlideBlockId = block.id;
+        savedSlideSelectionOffsets = null;
+        blurSlideTextEditing();
+        renderSlideCanvas();
+        saveSlidePortalState();
+        return true;
+    };
+    const showSlideChartPortal = () => {
+        rememberSlideSelection();
+        let selectedType = "bar";
+        let activeTab = "type";
+        let hasSubmittedChart = false;
+        const chartPortal = new Portal({
+            title: "Insert Chart",
+            dimensions: [440, 500],
+            route: () => div({style: "padded large-padding-top editor-portal-shell editor-slide-chart-portal", content: children([
+                div({style: "padded", content: children([
+                    div({style: "editor-slide-chart-tabs", content: children([
+                        button({id: "editor-slide-chart-tab-type", style: "editor-slide-chart-tab selected", type: "button", content: "Type"}),
+                        button({id: "editor-slide-chart-tab-data", style: "editor-slide-chart-tab", type: "button", content: "Data"})
+                    ])}),
+                    div({id: "editor-slide-chart-type-panel", style: "editor-slide-chart-panel", content: children([
+                        label({content: "Chart type"}),
+                        div({style: "editor-sheet-chart-type-grid", content: children(SLIDE_CHART_TYPES.map((chartType) => button({
+                            style: `editor-sheet-chart-type${chartType.value === selectedType ? " selected" : ""}`,
+                            type: "button",
+                            value: chartType.value,
+                            content: chartType.label
+                        })))})
+                    ])}),
+                    div({id: "editor-slide-chart-data-panel", style: "editor-slide-chart-panel hidden", content: children([
+                        label({input: "editor-slide-chart-title", content: "Title"}),
+                        input({id: "editor-slide-chart-title", style: "fill", placeholder: "Chart", value: "Chart"}),
+                        label({input: "editor-slide-chart-data", style: "small-margin-top", content: "Data"}),
+                        textarea({id: "editor-slide-chart-data", style: "fill editor-slide-chart-data-input", placeholder: getSlideChartDataPlaceholder(selectedType), value: serializeSlideChartData(SLIDE_CHART_DEFAULT_DATA), rows: 7}),
+                        div({style: "small-margin-top", content: children([
+                            input({id: "editor-slide-chart-label-values", type: "checkbox"}),
+                            label({input: "editor-slide-chart-label-values", style: "inline small-margin-left", content: "Label Values"})
+                        ])})
+                    ])}),
+                    div({id: "editor-slide-chart-preview", style: "editor-slide-chart-preview"}),
+                    div({style: "float-right small-margin-top", content: children([
+                        button({id: "editor-slide-chart-cancel", style: "secondary space-right", type: "button", content: "Cancel"}),
+                        button({id: "editor-slide-chart-ok", style: "primary", type: "button", content: "OK"})
+                    ])})
+                ])})
+            ])}),
+            afterRender: (windowNode, routeContext) => {
+                const syncTabs = () => {
+                    windowNode.querySelector("#editor-slide-chart-tab-type")?.classList.toggle("selected", activeTab === "type");
+                    windowNode.querySelector("#editor-slide-chart-tab-data")?.classList.toggle("selected", activeTab === "data");
+                    windowNode.querySelector("#editor-slide-chart-type-panel")?.classList.toggle("hidden", activeTab !== "type");
+                    windowNode.querySelector("#editor-slide-chart-data-panel")?.classList.toggle("hidden", activeTab !== "data");
+                };
+                const renderPreview = () => {
+                    const previewNode = windowNode.querySelector("#editor-slide-chart-preview");
+                    const dataInput = windowNode.querySelector("#editor-slide-chart-data");
+                    const titleInput = windowNode.querySelector("#editor-slide-chart-title");
+                    renderSlideChartIntoNode(previewNode, {
+                        type: "chart",
+                        chartType: selectedType,
+                        title: titleInput?.value || "Chart",
+                        data: parseSlideChartDataInput(dataInput?.value || "") || SLIDE_CHART_DEFAULT_DATA,
+                        width: 360,
+                        height: 180,
+                        labelValues: windowNode.querySelector("#editor-slide-chart-label-values")?.checked === true
+                    });
+                };
+                windowNode.querySelectorAll(".editor-slide-chart-tab").forEach((tabButton) => {
+                    if (tabButton.dataset.bound === "1") return;
+                    tabButton.dataset.bound = "1";
+                    tabButton.addEventListener("click", (event) => {
+                        event.preventDefault();
+                        activeTab = tabButton.id.endsWith("data") ? "data" : "type";
+                        syncTabs();
+                    });
+                });
+                windowNode.querySelectorAll(".editor-sheet-chart-type").forEach((typeButton) => {
+                    if (typeButton.dataset.bound === "1") return;
+                    typeButton.dataset.bound = "1";
+                    typeButton.addEventListener("click", (event) => {
+                        event.preventDefault();
+                        selectedType = typeButton.value || "bar";
+                        windowNode.querySelectorAll(".editor-sheet-chart-type").forEach((node) => node.classList.remove("selected"));
+                        typeButton.classList.add("selected");
+                        const dataInput = windowNode.querySelector("#editor-slide-chart-data");
+                        if (dataInput instanceof HTMLTextAreaElement) dataInput.placeholder = getSlideChartDataPlaceholder(selectedType);
+                        renderPreview();
+                    });
+                });
+                ["#editor-slide-chart-title", "#editor-slide-chart-data", "#editor-slide-chart-label-values"].forEach((selector) => {
+                    const inputNode = windowNode.querySelector(selector);
+                    if (!inputNode || inputNode.dataset.bound === "1") return;
+                    inputNode.dataset.bound = "1";
+                    inputNode.addEventListener("input", renderPreview);
+                    inputNode.addEventListener("change", renderPreview);
+                });
+                const cancelButton = windowNode.querySelector("#editor-slide-chart-cancel");
+                if (cancelButton && cancelButton.dataset.bound !== "1") {
+                    cancelButton.dataset.bound = "1";
+                    cancelButton.addEventListener("click", (event) => {
+                        event.preventDefault();
+                        routeContext?.portal?.close?.();
+                    });
+                }
+                const okButton = windowNode.querySelector("#editor-slide-chart-ok");
+                if (okButton && okButton.dataset.bound !== "1") {
+                    okButton.dataset.bound = "1";
+                    okButton.addEventListener("click", (event) => {
+                        event.preventDefault();
+                        if (hasSubmittedChart) return;
+                        const data = parseSlideChartDataInput(windowNode.querySelector("#editor-slide-chart-data")?.value || "");
+                        if (!data.length) {
+                            modular.error("Enter chart data");
+                            return;
+                        }
+                        hasSubmittedChart = true;
+                        insertSlideChart({
+                            type: selectedType,
+                            title: windowNode.querySelector("#editor-slide-chart-title")?.value || "Chart",
+                            data,
+                            labelValues: windowNode.querySelector("#editor-slide-chart-label-values")?.checked === true
+                        });
+                        routeContext?.portal?.close?.();
+                    });
+                }
+                syncTabs();
+                renderPreview();
+            }
+        });
+        chartPortal.show();
     };
     const createSlidePresentationBlockNode = (block = {}) => {
         const blockNode = document.createElement("div");
@@ -1272,6 +1556,11 @@
             contentNode.className = "editor-slide-present-text";
             renderSlideTextBlockContent(contentNode, block);
             blockNode.appendChild(contentNode);
+        } else if (block.type === "chart") {
+            const chartNode = document.createElement("div");
+            chartNode.className = "editor-slide-present-chart";
+            renderSlideChartIntoNode(chartNode, block);
+            blockNode.appendChild(chartNode);
         } else {
             const imageNode = document.createElement("img");
             imageNode.className = "editor-slide-present-image";
@@ -1507,6 +1796,14 @@
                 }
             });
         }
+        const addChartButton = document.getElementById("editor-slide-add-chart");
+        if (addChartButton && addChartButton.dataset.bound !== "1") {
+            addChartButton.dataset.bound = "1";
+            addChartButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                showSlideChartPortal();
+            });
+        }
         [boldButton, italicButton, textColorButton, backgroundColorButton, alignmentButton].forEach(bindSlideToolbarButtonFocus);
         if (fontSizeSelect && fontSizeSelect.dataset.bound !== "1") {
             fontSizeSelect.dataset.bound = "1";
@@ -1630,7 +1927,7 @@
         new Portal({
             title: "Slides",
             hints: ["slides", "create slides", "create slideshow", "make a slideshow"],
-            dimensions: [900, 750],
+            dimensions: [1200, 800],
             horizontal_nav: true,
             centered_nav: true,
             tools: [{
@@ -1655,6 +1952,7 @@
                                 button({id: "editor-slide-add", style: "editor-slide-add-button float-right", content: "+ Slide"}),
                                 button({id: "editor-slide-add-text", style: "naked align-bottom small-margin-right inner-radius", title: "Add text", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 11.984375 2.9863281 A 1.0001 1.0001 0 0 0 11.841797 3 L 4.25 3 A 1.0001 1.0001 0 0 0 3.2578125 3.875 L 3.0078125 5.875 A 1.0001 1.0001 0 1 0 4.9921875 6.125 L 5.1328125 5 L 11 5 L 11 19 L 9 19 A 1.0001 1.0001 0 1 0 9 21 L 11.832031 21 A 1.0001 1.0001 0 0 0 12.158203 21 L 15 21 A 1.0001 1.0001 0 1 0 15 19 L 13 19 L 13 5 L 18.867188 5 L 19.007812 6.125 A 1.0001 1.0001 0 1 0 20.992188 5.875 L 20.742188 3.875 A 1.0001 1.0001 0 0 0 19.75 3 L 12.167969 3 A 1.0001 1.0001 0 0 0 11.984375 2.9863281 z"/></svg>`}),
                                 button({id: "editor-slide-add-image", style: "naked align-bottom small-margin-right inner-radius", title: "Add image", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`}),
+                                button({id: "editor-slide-add-chart", style: "naked align-bottom small-margin-right inner-radius", title: "Chart", icon: SLIDE_CHART_ICON}),
                                 select({id: "editor-slide-font-size", style: "small-margin-right inner-radius", value: "", options: [{label: "Size", value: ""}, ...SLIDE_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))]}),
                                 button({id: "editor-slide-style-bold", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`}),
                                 button({id: "editor-slide-style-italic", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.2558594 22.003906 L 14.0058594 22.003906 L 14.0058594 20.503906 L 13.2558594 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`}),

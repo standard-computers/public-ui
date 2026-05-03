@@ -286,6 +286,18 @@
     const getPortalCodeLineNumbers = (portal) => portal?.window?.()?.querySelector?.("#editor-code-lines") || null;
     const getPortalCodeHighlight = (portal) => portal?.window?.()?.querySelector?.("#editor-code-highlight") || null;
     const getPortalCodeStage = (portal) => portal?.window?.()?.querySelector?.("#editor-code-stage") || null;
+    const focusCodeEditorAtEnd = (portal) => {
+        const focusEditor = () => {
+            const codeEditorInput = getPortalCodeEditorInput(portal);
+            if (!codeEditorInput) return;
+            const contentEnd = codeEditorInput.value.length;
+            codeEditorInput.focus();
+            codeEditorInput.setSelectionRange(contentEnd, contentEnd);
+            codeEditorInput.scrollTop = codeEditorInput.scrollHeight;
+            syncCodeEditorPresentation(portal);
+        };
+        requestAnimationFrame(() => requestAnimationFrame(focusEditor));
+    };
     const syncCodeEditorPresentation = (portal) => {
         const codeEditorInput = getPortalCodeEditorInput(portal);
         const codeHighlight = getPortalCodeHighlight(portal);
@@ -481,6 +493,7 @@
             setPortalCodeState(portal, {directive: "", cachedContent: ""}, {merge: false});
             portal.refresh();
             updateCodeEditorPortalTitle(portal);
+            focusCodeEditorAtEnd(portal);
         }
         return true;
     };
@@ -496,6 +509,7 @@
             portal.refresh();
             hydrateCodeEditorFromState(portal);
             updateCodeEditorPortalTitle(portal);
+            focusCodeEditorAtEnd(portal);
         }
         return true;
     };
@@ -535,6 +549,7 @@
                 bindCodeEditorInteractions(this.portal);
                 hydrateCodeEditorFromState(this.portal);
                 updateCodeEditorPortalTitle(this.portal);
+                focusCodeEditorAtEnd(this.portal);
             }
         })
     ]));

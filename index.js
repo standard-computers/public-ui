@@ -483,6 +483,33 @@ function sanitizeUsername(username = "") {
     return `${username}`.trim().toLowerCase();
 }
 
+function resolveKnownUserId(username = "") {
+    const normalizedUsername = sanitizeUsername(username);
+    if (!normalizedUsername) return "";
+    const directUserId = knownUsernames.get(normalizedUsername);
+    if (directUserId) return directUserId;
+    for (const [knownUsername, knownUserId] of knownUsernames.entries()) {
+        if (sanitizeUsername(knownUsername) === normalizedUsername) {
+            return knownUserId;
+        }
+    }
+    return "";
+}
+
+function resolveUserFromUsers(username = "", users = []) {
+    const normalizedUsername = sanitizeUsername(username);
+    if (!normalizedUsername || !Array.isArray(users)) return null;
+    for (const user of users) {
+        if (!user) continue;
+        const candidateUsername = sanitizeUsername(user.username || "");
+        const candidateUserId = sanitizeUserId(user.userId || "");
+        if (candidateUsername === normalizedUsername || sanitizeUsername(candidateUserId) === normalizedUsername) {
+            return user;
+        }
+    }
+    return null;
+}
+
 function sanitizeSettingsUserFolder(userId = "") {
     return `${userId}`.trim().replace(/[^a-zA-Z0-9_-]/g, "");
 }
@@ -642,22 +669,34 @@ function extractUsers(data) {
     } catch (err) {
         return [];
     }
-    const users = Array.isArray(parsed)
-        ? parsed
-        : Array.isArray(parsed?.user)
-            ? parsed.user
-            : parsed && typeof parsed === "object"
-                ? [parsed]
-                : [];
+    const users = (() => {
+        if (Array.isArray(parsed)) return parsed;
+        if (!parsed || typeof parsed !== "object") return [];
+        if (Array.isArray(parsed.user)) return parsed.user;
+        if (Array.isArray(parsed.users)) return parsed.users;
+        if (Array.isArray(parsed.records)) return parsed.records;
+        if (Array.isArray(parsed.record)) return parsed.record;
+        if (Array.isArray(parsed.data)) return parsed.data;
+        if (Array.isArray(parsed.results)) return parsed.results;
+        if (Array.isArray(parsed.items)) return parsed.items;
+        const firstArrayEntry = Object.values(parsed).find(Array.isArray);
+        if (Array.isArray(firstArrayEntry)) return firstArrayEntry;
+        if (parsed.user && typeof parsed.user === "object") return [parsed.user];
+        if (parsed.record && typeof parsed.record === "object") return [parsed.record];
+        return [parsed];
+    })();
     return users
         .map(item => {
             if (typeof item === "string") {
                 const userId = sanitizeUserId(item);
-                return userId ? {userId, username: "", userFolder: userId} : null;
+                return userId ? {userId, username: userId, userFolder: userId} : null;
             }
             if (!item || typeof item !== "object") return null;
             const userId = sanitizeUserId(item.userid || item.userId || item.id || item.email || item.name || "");
-            const username = sanitizeUsername(item.username || "");
+            const displayName = [item.firstname, item.lastname].filter(Boolean).join(" ").trim();
+            const username = sanitizeUsername(
+                item.username || item.userName || item.displayName || displayName || item.name || item.email || item.userid || item.userId || item.id || ""
+            );
             const userFolder = sanitizeUserId(item.userid || item.userId || userId || item.id || "");
             if (!userId) return null;
             return {userId, username, userFolder: userFolder || userId};
@@ -869,23 +908,31 @@ function sendWsMessage(message, {relayContext, allowMissingRelayContext = false,
     });
 }
 
-async function refreshUsersFromSocket() {
-    if (!wsClient || wsClient.readyState !== WebSocket.OPEN) return;
-    if (isRelayMode && !resolveRelayContext()) return;
+async function refreshUsersFromSocket(req = null) {
+    if (!wsClient || wsClient.readyState !== WebSocket.OPEN) return [];
+    const relayContext = resolveRelayContext(req);
+    if (isRelayMode && !relayContext) return [];
     try {
-        const response = await sendWsMessage("[user]", {relayContext: resolveRelayContext(), allowMissingRelayContext: false});
+        const response = await sendWsMessage("[user]", {relayContext, allowMissingRelayContext: false, name: "login-refresh-users"});
         const users = extractUsers(response);
-        knownUsernames.clear();
-        knownUserFolders.clear();
+        const nextUsernames = new Map();
+        const nextUserFolders = new Map();
         await ensureUserDataRoot();
         await Promise.all(users.map(async ({userId, username, userFolder}) => {
-            if (username) knownUsernames.set(username, userId);
-            knownUserFolders.set(userId, userFolder);
+            if (username) nextUsernames.set(username, userId);
+            nextUsernames.set(userId, userId);
+            nextUserFolders.set(userId, userFolder);
             await ensureUserDir(userFolder);
         }));
+        knownUsernames.clear();
+        knownUserFolders.clear();
+        for (const [username, userId] of nextUsernames.entries()) knownUsernames.set(username, userId);
+        for (const [userId, userFolder] of nextUserFolders.entries()) knownUserFolders.set(userId, userFolder);
+        return users;
     } catch (err) {
         console.error("Failed to refresh users from Standard System:", err.message);
     }
+    return [];
 }
 
 function quoteCliPath(filePath) {
@@ -1415,28 +1462,43 @@ app.get("/login", (req, res) => {
     if (req.session && req.session.userId) {
         return res.redirect("/");
     }
-    res.render("login", {error: null});
+    res.render("login", {error: req.query?.error || null});
 });
+
+function wantsLoginJson(req) {
+    const accept = String(req.get("accept") || "").toLowerCase();
+    const requestedWith = String(req.get("x-requested-with") || "").toLowerCase();
+    return requestedWith === "xmlhttprequest" || accept.includes("application/json");
+}
+
+function redirectLoginError(req, res, message = "Unable to login", status = 303) {
+    if (wantsLoginJson(req)) {
+        const responseStatus = status >= 400 && status < 600 ? status : 400;
+        return res.status(responseStatus).json({error: message});
+    }
+    return res.redirect(status, `/login?error=${encodeURIComponent(message)}`);
+}
 
 app.post("/login", async (req, res) => {
     if (isDesktopSetupEnabled && !hasCompletedDesktopSetup(req)) {
+        if (wantsLoginJson(req)) return res.json({redirect: "/setup"});
         return res.redirect("/setup");
     }
     const username = sanitizeUsername(req.body.username || "");
     if (!username) {
-        return res.status(400).render("login", {error: "Username is required"});
+        return redirectLoginError(req, res, "Username is required", 400);
     }
-    if (!knownUsernames.size) {
-        await refreshUsersFromSocket();
+    const refreshedUsers = await refreshUsersFromSocket(req);
+    const matchedUser = resolveUserFromUsers(username, refreshedUsers);
+    let userId = sanitizeUserId(matchedUser?.userId || "") || resolveKnownUserId(username);
+    if (!knownUsernames.size && !refreshedUsers.length) {
+        return redirectLoginError(req, res, "Unable to verify users right now", 503);
     }
-    const userId = knownUsernames.get(username);
-    const userFolder = knownUserFolders.get(userId) || userId;
-    if (!knownUsernames.size) {
-        return res.status(503).render("login", {error: "Unable to verify users right now"});
+    if ((knownUsernames.size || refreshedUsers.length) && !userId) {
+        return redirectLoginError(req, res, "Unknown user", 401);
     }
-    if (knownUsernames.size && !userId) {
-        return res.status(401).render("login", {error: "Unknown user"});
-    }
+    const refreshedUser = matchedUser || refreshedUsers.find(user => sanitizeUserId(user.userId) === userId);
+    const userFolder = knownUserFolders.get(userId) || refreshedUser?.userFolder || userId;
     try {
         await ensureUserDir(userFolder);
         req.session = setSession(res, userId, userFolder);
@@ -1449,10 +1511,11 @@ app.post("/login", async (req, res) => {
         } catch (_) {
             writeUserDataCookie(res, null);
         }
+        if (wantsLoginJson(req)) return res.json({redirect: "/"});
         return res.redirect("/");
     } catch (err) {
-        console.error("Login failed:", err.message);
-        return res.status(500).render("login", {error: "Failed to start session"});
+        console.error("Login failed while starting session:", err.message);
+        return redirectLoginError(req, res, "Failed to start session", 500);
     }
 });
 
@@ -1730,21 +1793,27 @@ app.get("/api/weather/current", async (req, res) => {
     try {
         if (!Number.isFinite(queryLat) || !Number.isFinite(queryLon)) {
             const fallbackLocation = providedLocation || "Cincinnati";
-            const geoUrl = new URL("https://api.openweathermap.org/geo/1.0/direct");
-            geoUrl.searchParams.set("q", fallbackLocation);
-            geoUrl.searchParams.set("limit", "1");
+            const zipMatch = fallbackLocation.match(/^(\d{5}(?:-\d{4})?)(?:\s*,\s*([A-Za-z]{2}))?$/);
+            const geoUrl = new URL(zipMatch ? "https://api.openweathermap.org/geo/1.0/zip" : "https://api.openweathermap.org/geo/1.0/direct");
+            if (zipMatch) {
+                geoUrl.searchParams.set("zip", `${zipMatch[1].slice(0, 5)},${zipMatch[2] || "US"}`);
+            } else {
+                geoUrl.searchParams.set("q", fallbackLocation);
+                geoUrl.searchParams.set("limit", "1");
+            }
             geoUrl.searchParams.set("appid", OPENWEATHER_API_KEY);
             const geoRes = await fetch(geoUrl.toString());
             if (!geoRes.ok) {
                 return res.status(geoRes.status).json({error: "Failed to geocode location."});
             }
-            const geocoded = await geoRes.json();
-            if (!Array.isArray(geocoded) || geocoded.length === 0) {
+            const geocodedPayload = await geoRes.json();
+            const geocoded = Array.isArray(geocodedPayload) ? geocodedPayload[0] : geocodedPayload;
+            if (!geocoded || !Number.isFinite(Number.parseFloat(geocoded.lat)) || !Number.isFinite(Number.parseFloat(geocoded.lon))) {
                 return res.status(404).json({error: "Location not found."});
             }
-            queryLat = geocoded[0].lat;
-            queryLon = geocoded[0].lon;
-            locationLabel = geocoded[0].name || fallbackLocation;
+            queryLat = geocoded.lat;
+            queryLon = geocoded.lon;
+            locationLabel = geocoded.name || fallbackLocation;
         }
         const weatherUrl = new URL("https://api.openweathermap.org/data/2.5/weather");
         weatherUrl.searchParams.set("lat", `${queryLat}`);

@@ -5,8 +5,9 @@
     const WEATHER_INTERFACE_ICON = "/icons/interfaces/weather.png";
     const WEATHER_ICON_BASE_PATH = "/icons/weather";
     const WEATHER_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z" /></svg>`;
+    const LOCATION_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" /></svg>`;
     const listeners = new Set();
-    const state = {data: null, error: null, loading: false, initialized: false, lastUpdated: null, locationLabel: "Cincinnati, OH", coords: {...DEFAULT_COORDINATES}, usingBrowserLocation: false,};
+    const state = {data: null, error: null, loading: false, initialized: false, lastUpdated: null, locationLabel: "Cincinnati, OH", coords: {...DEFAULT_COORDINATES}, usingBrowserLocation: false, customLocation: "",};
     let inFlightRequest = null;
     let refreshTimer = null;
     let geolocationAttempt = null;
@@ -27,6 +28,15 @@
     const formatTemperature = value => Number.isFinite(value) ? `${Math.round(value)}\u00B0F` : "--\u00B0F";
     const formatPercent = value => Number.isFinite(value) ? `${Math.round(value)}%` : "--";
     const formatWind = value => Number.isFinite(value) ? `${Math.round(value)} mph` : "--";
+    const isGenericLocationLabel = value => typeof value === "string" && /^current\s+location$/i.test(value.trim());
+    const formatResolvedLocation = location => {
+        const name = pickValue(location?.name, location?.label, location?.city);
+        const region = pickValue(location?.region, location?.state, location?.admin1);
+        const country = pickValue(location?.country);
+        const suffix = pickValue(region, country);
+        if (!name) return "";
+        return suffix && name !== suffix ? `${name}, ${suffix}` : name;
+    };
     const formatTimestamp = value => {
         if (!value) return "Updated just now";
         const date = new Date(value);
@@ -58,9 +68,75 @@
         return "";
     };
     const buildWeatherEndpoint = coords => `https://standardcomputers.net/api/weather?lat=${encodeURIComponent(coords.lat)}&lon=${encodeURIComponent(coords.lon)}`;
+    const parseCoordinateInput = value => {
+        const match = `${value || ""}`.trim().match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
+        if (!match) return null;
+        const lat = Number.parseFloat(match[1]);
+        const lon = Number.parseFloat(match[2]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+        return {lat, lon};
+    };
+    const lookupWeatherLocation = async params => {
+        const url = new URL("/api/weather/current", window.location.origin);
+        Object.entries(params || {}).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, value);
+        });
+        const response = await fetch(url.toString(), {cache: "no-store"});
+        if (!response.ok) throw new Error(`Location lookup failed (${response.status})`);
+        return response.json();
+    };
+    const resolveLocationInput = async locationInput => {
+        const trimmed = `${locationInput || ""}`.trim();
+        const coordinateInput = parseCoordinateInput(trimmed);
+        if (coordinateInput) {
+            const payload = await lookupWeatherLocation(coordinateInput);
+            return {
+                coords: coordinateInput,
+                label: formatResolvedLocation(payload?.location) || trimmed,
+                usingBrowserLocation: false,
+            };
+        }
+        const payload = await lookupWeatherLocation({location: trimmed});
+        const resolvedCoords = {
+            lat: toNumber(payload?.location?.coordinates?.lat),
+            lon: toNumber(payload?.location?.coordinates?.lon),
+        };
+        if (!Number.isFinite(resolvedCoords.lat) || !Number.isFinite(resolvedCoords.lon)) throw new Error("Location lookup did not return coordinates.");
+        return {
+            coords: resolvedCoords,
+            label: formatResolvedLocation(payload?.location) || trimmed,
+            usingBrowserLocation: false,
+        };
+    };
+    const resolveBrowserLocationLabel = async coords => {
+        if (!coords?.usingBrowserLocation) return "";
+        try {
+            const payload = await lookupWeatherLocation({lat: coords.lat, lon: coords.lon});
+            return formatResolvedLocation(payload?.location);
+        } catch (error) {
+            console.warn("[weather] location label lookup failed", error);
+            return "";
+        }
+    };
+    const resolveFetchLocation = async () => {
+        const customLocation = `${state.customLocation || ""}`.trim();
+        if (customLocation) {
+            const resolved = await resolveLocationInput(customLocation);
+            setState({coords: {...resolved.coords}, locationLabel: resolved.label, usingBrowserLocation: false});
+            return resolved;
+        }
+        const coords = await ensureCoordinates();
+        const label = await resolveBrowserLocationLabel(coords);
+        if (label) setState({locationLabel: label});
+        return {
+            coords: {lat: coords.lat, lon: coords.lon},
+            label: label || state.locationLabel || "Cincinnati, OH",
+            usingBrowserLocation: Boolean(coords.usingBrowserLocation),
+        };
+    };
     const normalizeLocation = payload => {
         const location = payload?.location || payload?.metadata?.location || {};
-        const name = pickValue(location?.name, location?.label, location?.city, payload?.city, state.usingBrowserLocation ? "Current location" : "Cincinnati, OH");
+        const name = pickValue(location?.name, location?.label, location?.city, payload?.city, state.locationLabel, "Cincinnati, OH");
         const region = pickValue(location?.region, location?.state, location?.admin1, payload?.state, payload?.region, location?.country, payload?.country);
         return {name: region && name !== region ? `${name}, ${region}` : name};
     };
@@ -158,21 +234,22 @@
         console.log("[weather] fetchWeather", {force});
         if (inFlightRequest && !force) return inFlightRequest;
         setState({loading: true, error: null});
-        inFlightRequest = ensureCoordinates().then(coords => {
-            const endpoint = buildWeatherEndpoint({lat: coords.lat, lon: coords.lon});
+        inFlightRequest = resolveFetchLocation().then(location => {
+            const endpoint = buildWeatherEndpoint(location.coords);
             return fetch(endpoint, {cache: "no-store"});
         }).then(async response => {
             if (!response.ok) throw new Error(`Weather request failed (${response.status})`);
             return response.json();
         }).then(payload => {
             const normalized = normalizeWeatherResponse(payload);
+            if (isGenericLocationLabel(normalized?.location?.name)) normalized.location.name = state.locationLabel || "Weather";
             setState({
                 data: normalized,
                 error: null,
                 loading: false,
                 initialized: true,
                 lastUpdated: new Date().toISOString(),
-                locationLabel: normalized?.location?.name || (state.usingBrowserLocation ? "Current location" : "Cincinnati, OH"),
+                locationLabel: normalized?.location?.name || state.locationLabel || "Cincinnati, OH",
             });
             return normalized;
         }).catch(error => {
@@ -188,6 +265,68 @@
         });
         return inFlightRequest;
     };
+    const setWeatherLocation = locationInput => {
+        const customLocation = `${locationInput || ""}`.trim();
+        setState({customLocation});
+        return fetchWeather({force: true});
+    };
+    const openFallbackLocationDialogue = currentLocation => {
+        document.querySelectorAll(".weather-location-dialogue").forEach(dialogue => dialogue.remove());
+        const dialogue = document.createElement("div");
+        dialogue.className = "dialogue weather-location-dialogue padded";
+        dialogue.innerHTML = `
+            <label>Weather Location</label>
+            <input class="undecorated" placeholder="ZIP, city, or lat,lon" value="">
+            <div class="float-right">
+                <button class="undecorated space-right" type="button">Cancel</button>
+                <button class="primary" type="button">Confirm</button>
+            </div>
+        `;
+        const inputNode = dialogue.querySelector("input");
+        const cancelButton = dialogue.querySelectorAll("button")[0];
+        const confirmButton = dialogue.querySelectorAll("button")[1];
+        if (inputNode) inputNode.value = currentLocation;
+        const closeDialogue = () => {
+            document.removeEventListener("keydown", keydownHandler, true);
+            document.getElementById("cover")?.out?.();
+            dialogue.remove();
+        };
+        const keydownHandler = event => {
+            if (!dialogue.isConnected) return;
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeDialogue();
+            }
+            if (event.key === "Enter" && dialogue.contains(document.activeElement)) {
+                event.preventDefault();
+                confirmButton?.click();
+            }
+        };
+        cancelButton?.addEventListener("click", closeDialogue);
+        confirmButton?.addEventListener("click", () => {
+            const nextLocation = inputNode?.value || "";
+            closeDialogue();
+            window.standardWeather?.setLocation?.(nextLocation);
+        });
+        document.body.append(dialogue);
+        document.getElementById("cover")?.in?.();
+        document.addEventListener("keydown", keydownHandler, true);
+        inputNode?.focus();
+        inputNode?.select();
+    };
+    const promptForWeatherLocation = () => {
+        const currentLocation = state.customLocation || state.locationLabel || "";
+        if (typeof inputDialogue === "function") {
+            inputDialogue({
+                title: "Weather Location",
+                placeholder: "ZIP, city, or lat,lon",
+                value: currentLocation,
+                confirmation: (_, nextLocation) => window.standardWeather?.setLocation?.(nextLocation)
+            });
+            return;
+        }
+        openFallbackLocationDialogue(currentLocation);
+    };
     const initializeWeather = () => {
         if (!refreshTimer) {
             refreshTimer = window.setInterval(() => fetchWeather({force: true}), 10 * 60 * 1000);
@@ -197,6 +336,7 @@
     window.standardWeather = {
         initialize: initializeWeather,
         refresh: () => fetchWeather({force: true}),
+        setLocation: setWeatherLocation,
         subscribe(listener) {
             if (typeof listener !== "function") return () => {};
             listeners.add(listener);
@@ -318,6 +458,10 @@
             icon: WEATHER_INTERFACE_ICON,
             svg_icon: WEATHER_ICON,
             tools: [{
+                title: "Set weather location",
+                icon: LOCATION_ICON,
+                onclick: promptForWeatherLocation
+            }, {
                 title: "Refresh forecast",
                 icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>`,
                 onclick: () => window.standardWeather?.refresh?.()
