@@ -52,6 +52,7 @@ const SESSION_TTL_MS = Math.max(60 * 1000, Number(process.env.SESSION_TTL_MS || 
 const SESSION_PRUNE_INTERVAL_MS = Math.max(60 * 1000, Number(process.env.SESSION_PRUNE_INTERVAL_MS || 1000 * 60 * 10) || 1000 * 60 * 10);
 const USER_RECORD_CACHE_TTL_MS = Math.max(5 * 1000, Number(process.env.USER_RECORD_CACHE_TTL_MS || 1000 * 60 * 5) || 1000 * 60 * 5);
 const REQUEST_BODY_LIMIT = (process.env.REQUEST_BODY_LIMIT || "25mb").trim() || "25mb";
+const THEMES_REPO_PATH = path.join(__dirname, "public", "themes.json");
 const USER_DATA_ROOT = path.join(__dirname, "user_data");
 const SETTINGS_ARCHIVE_ROOT = USER_DATA_ROOT;
 const ELECTRON_SETUP_CONFIG_PATH = path.join(USER_DATA_ROOT, "desktop-setup.json");
@@ -447,6 +448,22 @@ function sessionMiddleware(req, res, next) {
 
 async function ensureUserDataRoot() {
     await fs.mkdir(USER_DATA_ROOT, {recursive: true, mode: 0o700});
+}
+
+async function readThemesRepo() {
+    try {
+        const raw = await fs.readFile(THEMES_REPO_PATH, "utf8");
+        const parsed = JSON.parse(raw);
+        return {themes: Array.isArray(parsed?.themes) ? parsed.themes : []};
+    } catch (err) {
+        if (err.code === "ENOENT") return {themes: []};
+        throw err;
+    }
+}
+
+async function writeThemesRepo(repo) {
+    await fs.mkdir(path.dirname(THEMES_REPO_PATH), {recursive: true});
+    await fs.writeFile(THEMES_REPO_PATH, JSON.stringify({themes: Array.isArray(repo?.themes) ? repo.themes : []}, null, 2));
 }
 
 const CRC32_TABLE = (() => {
@@ -2609,6 +2626,36 @@ app.get("/api/user/theme", async (req, res) => {
         console.error("Failed to fetch current user theme:", err.message);
         const status = err.message === "WebSocket not connected" ? 503 : 500;
         return res.status(status).json({error: "Failed to fetch current user theme"});
+    }
+});
+
+app.post("/api/themes", async (req, res) => {
+    if (!req.session || !req.session.userId) {
+        return res.status(401).json({error: "Unauthorized"});
+    }
+    try {
+        const name = `${req.body?.name || ""}`.trim();
+        const data = req.body?.data;
+        const user = sanitizeUserId(req.session.userId || "");
+        if (!name) return res.status(400).json({error: "Theme name is required"});
+        if (!user) return res.status(401).json({error: "Unauthorized"});
+        if (!data || typeof data !== "object" || Array.isArray(data)) {
+            return res.status(400).json({error: "Theme data is required"});
+        }
+        const repo = await readThemesRepo();
+        const theme = {
+            name,
+            user,
+            timestamp: new Date().toISOString(),
+            data
+        };
+        repo.themes.push(theme);
+        await writeThemesRepo(repo);
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        return res.status(201).json({theme, themes: repo.themes});
+    } catch (err) {
+        console.error("Failed to save theme:", err);
+        return res.status(500).json({error: "Failed to save theme"});
     }
 });
 

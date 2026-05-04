@@ -128,6 +128,7 @@
 .hidden {overflow:hidden}
 .visible {overflow:visible}
 .on-top {z-index:2988}
+.max-width {max-width:240px}
 
 /*SPACING MODIFIERS*/
 .small-spaced, .small-spacer {margin-top:0;margin-bottom:4px}

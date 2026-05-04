@@ -64,6 +64,9 @@
     let activeDocumentationEntry = null;
     let documentationViewerRequestVersion = 0;
     let standardsRequestVersion = 0;
+    let sharedThemes = [];
+    let themeTestTimer = null;
+    let themeTestCountdownTimer = null;
     const escapeHtml = (value = "") => `${value}`.replace(/[&<>"']/g, (character) => ({
         "&": "&amp;",
         "<": "&lt;",
@@ -519,6 +522,188 @@
             return false;
         }
     }
+    const cloneThemeData = (themeData = {}) => JSON.parse(JSON.stringify(themeData || {}));
+    const normalizeSharedThemeData = (theme = {}) => {
+        const candidate = theme?.data ?? theme?.theme ?? theme?.settings;
+        if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) return cloneThemeData(candidate);
+        if (typeof candidate !== "string") return null;
+        try {
+            const parsed = JSON.parse(candidate);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+        } catch (_) {
+        }
+        return null;
+    };
+    const loadSharedThemes = async () => {
+        try {
+            const response = await fetch(`/themes.json?t=${Date.now()}`, {cache: "no-store"});
+            if (!response.ok) throw new Error(`Theme repo failed (${response.status})`);
+            const payload = await response.json();
+            sharedThemes = Array.isArray(payload?.themes) ? payload.themes : [];
+        } catch (err) {
+            console.error("Failed to load themes:", err);
+            sharedThemes = [];
+        }
+        renderSharedThemes();
+    };
+    const renderThemeColorPreview = (themeData = {}) => {
+        const themeColors = [
+            {name: "Font", color: themeData.foreground},
+            {name: "Accent", color: themeData.primary},
+            {name: "Background", color: themeData.background},
+            {name: "Border", color: themeData.border_color}
+        ].filter(({color}) => `${color || ""}`.trim());
+        if (!themeColors.length) return "";
+        return div({
+            style: "colors settings-theme-colors",
+            content: children(themeColors.map(({name, color}) => div({
+                style: "color-option animated",
+                background: color,
+                primary: color,
+                secondary: color,
+                title: `${name}: ${color}`,
+                content: div({style: "color-name no-wrap hidden", content: name})
+            })))
+        });
+    };
+    const renderThemeMetricPreview = (themeData = {}) => {
+        const metrics = [
+            {label: "Font", value: themeData.font_size, suffix: "px"},
+            {label: "Radius", value: themeData.border_radius, suffix: "px"},
+            {label: "Border", value: themeData.border_width, suffix: "px"}
+        ].filter(({value}) => value !== undefined && value !== null && value !== "");
+        if (!metrics.length) return "";
+        return div({
+            style: "settings-theme-metrics faded center",
+            content: children(metrics.map(({label, value, suffix}) => div({
+                style: "inline border inner-radius tiny small-padding space-right tiny-text",
+                content: `${label} ${escapeHtml(value)}${suffix}`
+            })))
+        });
+    };
+    const renderSharedThemes = () => {
+        const list = document.getElementById("settings-themes-list");
+        if (!list) return;
+        if (!sharedThemes.length) {
+            list.innerHTML = div({style: "faded small-padding", content: "No themes saved yet."});
+            return;
+        }
+        list.innerHTML = children(sharedThemes.map((theme, index) => {
+            const themeData = normalizeSharedThemeData(theme) || {};
+            return div({
+                style: "settings-theme-option bordered radius padded spaced hover-zoom hover-shadow pointer max-width",
+                index: index + 1,
+                content: children([
+                    strong({content: escapeHtml(theme?.name || "Untitled Theme")}),
+                    div({style: "spacer"}),
+                    renderThemeColorPreview(themeData),
+                    div({style: "spacer"}),
+                    renderThemeMetricPreview(themeData)
+                ])
+            });
+        }));
+        list.querySelectorAll(".settings-theme-option").forEach((themeNode) => {
+            themeNode.contextmenu([
+                {label: "Test", action: (_, event, target) => {
+                    const index = Number(themeNode.getAttribute("item-index")) - 1;
+                    testSharedTheme(sharedThemes[index]);
+                }},
+                {label: "Apply", action: (_, event, target) => {
+                    const index = Number(themeNode.getAttribute("item-index")) - 1;
+                    applySharedTheme(sharedThemes[index]);
+                }}
+            ]);
+            themeNode.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                themeNode.dispatchEvent(new MouseEvent("contextmenu", {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: event.clientX,
+                    clientY: event.clientY
+                }));
+            });
+        });
+    };
+    const cancelThemeTestTimers = () => {
+        if (themeTestTimer) clearTimeout(themeTestTimer);
+        if (themeTestCountdownTimer) clearInterval(themeTestCountdownTimer);
+        themeTestTimer = null;
+        themeTestCountdownTimer = null;
+    };
+    const testSharedTheme = (theme) => {
+        const themeData = normalizeSharedThemeData(theme);
+        if (!themeData) {
+            modular.error("Theme data is unavailable");
+            return;
+        }
+        cancelThemeTestTimers();
+        const previousTheme = cloneThemeData(ui_settings_options);
+        ui_settings_options = {...default_settings_options, ...themeData};
+        refreshUITheme();
+        renderBackgroundImageThumbnail();
+        let remaining = 10;
+        modular.message(`Testing ${theme?.name || "theme"} for ${remaining} seconds`);
+        themeTestCountdownTimer = setInterval(() => {
+            remaining -= 1;
+            if (remaining > 0) modular.message(`Theme test ends in ${remaining} seconds`);
+        }, 1000);
+        themeTestTimer = setTimeout(() => {
+            cancelThemeTestTimers();
+            ui_settings_options = previousTheme;
+            refreshUITheme();
+            renderBackgroundImageThumbnail();
+            modular.message("Theme test ended");
+        }, 10000);
+    };
+    const applySharedTheme = async (theme) => {
+        const themeData = normalizeSharedThemeData(theme);
+        if (!themeData) {
+            modular.error("Theme data is unavailable");
+            return;
+        }
+        cancelThemeTestTimers();
+        ui_settings_options = {...default_settings_options, ...themeData};
+        refreshUITheme();
+        renderBackgroundImageThumbnail();
+        await saveSettings({successMessage: "Theme applied"});
+    };
+    const saveSharedTheme = () => {
+        inputDialogue({
+            title: "Save Theme",
+            placeholder: "Theme name",
+            confirmation: async (_, value) => {
+                const name = `${value || ""}`.trim();
+                if (!name) {
+                    modular.error("Theme name is required");
+                    return;
+                }
+                try {
+                    const currentUserRecord = await getCurrentUserRecord();
+                    const rawUserId = `${modular.user.id() || currentUserRecord?.userid || currentUserRecord?.id || ""}`.trim();
+                    const response = await fetch("/api/themes", {
+                        method: "POST",
+                        credentials: "same-origin",
+                        cache: "no-store",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({
+                            name,
+                            user: rawUserId,
+                            data: cloneThemeData(ui_settings_options)
+                        })
+                    });
+                    if (!response.ok) throw new Error(`Theme save failed (${response.status})`);
+                    const payload = await response.json();
+                    sharedThemes = Array.isArray(payload?.themes) ? payload.themes : [...sharedThemes, payload?.theme].filter(Boolean);
+                    renderSharedThemes();
+                    modular.success("Theme saved");
+                } catch (err) {
+                    console.error("Failed to save theme:", err);
+                    modular.error("Unable to save theme");
+                }
+            }
+        });
+    };
     const updateKioskMode = async (enabled = false) => {
         ui_settings_options.kiosk_mode = enabled === true;
         const applied = await window.StandardUI?.setKioskMode?.(ui_settings_options.kiosk_mode);
@@ -962,8 +1147,12 @@
                                             saveSettings();
                                         }
                                     }),
+                                    button({style: "tiny inner-radius brick spaced float-right small-margin-right", content: "Save Theme", onclick: () => saveSharedTheme()}),
                                 ])
                             }),
+                            div({style: "big-spacer"}),
+                            label({style: "faded", content: "Themes"}),
+                            div({id: "settings-themes-list", style: "brick small-padding-top", content: div({style: "faded small-padding", content: "Loading themes..."})}),
                             div({style: "big-spacer"}),
                             label({style: "faded", content: "Font"}),
                             div({style: "big-spacer"}),
@@ -1045,6 +1234,7 @@
                             refreshUITheme();
                             saveSettings();
                         });
+                        loadSharedThemes();
                         renderBackgroundImageThumbnail();
                     }
                 }, {
