@@ -4,7 +4,8 @@
     let editContactImageFile = null;
     let editContactImageChanged = false;
     const contactImageCacheKeys = {};
-    const defaultContactImage = "/icons/interfaces/contacts.png";
+    const contactServiceIcon = "/icons/interfaces/contacts.png";
+    const defaultContactImage = "/images/blank_contact.png";
     const getContactImageCacheKey = (contactId) => {
         const cacheKey = contactImageCacheKeys[String(contactId)];
         return cacheKey ?? "cached";
@@ -14,6 +15,15 @@
         contactImageCacheKeys[String(contactId)] = Date.now();
     };
     const contactImageUrl = (contactId) => contactId ? `/api/records/images/${contactId}?cb=${contactId}-${getContactImageCacheKey(contactId)}` : defaultContactImage;
+    const setContactImageFallback = (imageEl) => {
+        if (!imageEl || imageEl.src.endsWith(defaultContactImage)) return;
+        imageEl.src = defaultContactImage;
+    };
+    document.addEventListener("error", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLImageElement) || !target.classList.contains("contact-image")) return;
+        setContactImageFallback(target);
+    }, true);
     const phonePlaceholder = "+# (###) ###-####";
     const formatContactPhone = (value = "") => {
         const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
@@ -47,7 +57,7 @@
     };
     const contactPreviewContacts = new Map();
     const renderNoContactsState = () => div({style: "contacts-empty-state", content: children([
-        img({src: defaultContactImage, style: "contacts-empty-icon"}),
+        img({src: contactServiceIcon, style: "contacts-empty-icon"}),
         div({style: "contacts-empty-label", content: "No contacts"})
     ])});
     const renderNoContactsStateInto = (container) => {
@@ -83,12 +93,23 @@
         contactPreviewContacts.delete(contactIdText);
         if (contactPreview.activeTile?.getAttribute("data") === contactIdText) hideContactPreview();
     };
-    const applyContactImageBackground = (element, imageUrl = defaultContactImage) => {
+    const setContactImageBackground = (element, imageUrl = defaultContactImage) => {
         if (!element) return;
+        element.dataset.contactImageSource = imageUrl;
         element.style.backgroundImage = `url("${imageUrl}")`;
         element.style.backgroundSize = "cover";
         element.style.backgroundPosition = "center";
         element.style.backgroundRepeat = "no-repeat";
+    };
+    const applyContactImageBackground = (element, imageUrl = defaultContactImage) => {
+        const resolvedImageUrl = imageUrl || defaultContactImage;
+        setContactImageBackground(element, resolvedImageUrl);
+        if (!resolvedImageUrl || resolvedImageUrl === defaultContactImage || resolvedImageUrl.startsWith("blob:")) return;
+        const probe = new Image();
+        probe.onerror = () => {
+            if (element?.dataset?.contactImageSource === resolvedImageUrl) setContactImageBackground(element, defaultContactImage);
+        };
+        probe.src = resolvedImageUrl;
     };
     const buildContactPreview = () => {
         const preview = document.createElement("div");
@@ -119,7 +140,7 @@
         });
 
         const photo = document.createElement("img");
-        photo.className = "contacts-hover-preview-photo";
+        photo.className = "contacts-hover-preview-photo contact-image";
         Object.assign(photo.style, {
             width: "44px",
             height: "44px",
@@ -367,7 +388,7 @@
             }],
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25" /></svg>`,
             route: () => div({content: children([
-                    div({style: "center large-margin-top large-margin-bottom", content: children([img({style: "real-large-icon round inline", src: contactImageUrl(contact.id)})])}),
+                    div({style: "center large-margin-top large-margin-bottom", content: children([img({style: "contact-image real-large-icon round inline", src: contactImageUrl(contact.id)})])}),
                     div({style: "small-padding bold large-margin-top", content: fullName}),
                     ...contactDetails,
                 ])
@@ -412,7 +433,7 @@
                                                         deleteContact(contact, () => removeContactTile(e.target.closest(".contact.tile")));
                                                     }
                                                 }),
-                                                img({style: "icon float-left round space-right cover", src: contactImageUrl(contact.id)}),
+                                                img({style: "contact-image icon float-left round space-right cover", src: contactImageUrl(contact.id)}),
                                                 label({content: contact.firstname}),
                                                 div({style: "faded", content: contact.lastname}),
                                             ])
@@ -540,6 +561,7 @@
                 bindPhoneFormatter("phone");
                 const photoEl = document.getElementById("add-contact-photo");
                 if (!photoEl) return;
+                applyContactImageBackground(photoEl, defaultContactImage);
                 const binding = resetPhotoPickerBinding(photoEl, "__addContactPhotoPicker");
                 const fileInput = binding?.input;
                 if (!fileInput) return;

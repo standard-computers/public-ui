@@ -330,6 +330,326 @@ function pushMessage(type, t) {
     setTimeout(() => message.remove(), 1800);
 }
 window.StandardUI = window.StandardUI || {};
+window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
+    "Inter",
+    "Arial",
+    "Aptos",
+    "Calibri",
+    "Cambria",
+    "Candara",
+    "Century Gothic",
+    "Consolas",
+    "Courier New",
+    "Georgia",
+    "Helvetica",
+    "Lucida Console",
+    "Palatino Linotype",
+    "Segoe UI",
+    "Tahoma",
+    "Times New Roman",
+    "Trebuchet MS",
+    "Verdana"
+];
+
+(function () {
+    const payloads = {};
+    let comboIndex = 0;
+
+    function escapeComboHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function normalizeOption(option = {}) {
+        const value = String(option?.value ?? option?.name ?? option?.label ?? "");
+        const label = String(option?.label ?? option?.name ?? option?.value ?? value);
+        return {label, value, disabled: option?.disabled === true};
+    }
+
+    function getPayload(input) {
+        const comboId = input?.getAttribute?.("data-search-combobox-id") || "";
+        return comboId && payloads[comboId] ? payloads[comboId] : null;
+    }
+
+    function getDropdown(input) {
+        const comboId = input?.getAttribute?.("data-search-combobox-id") || "";
+        return comboId ? document.getElementById(`search-combobox-options-${comboId}`) : null;
+    }
+
+    function getFilteredOptions(input) {
+        const payload = getPayload(input);
+        if (!payload) return [];
+        const query = String(input?.value || "").toLowerCase().trim();
+        return payload.options.filter((option) => {
+            if (option.disabled) return false;
+            if (!query) return true;
+            return option.label.toLowerCase().includes(query) || option.value.toLowerCase().includes(query);
+        });
+    }
+
+    function canUseCustomValue(input) {
+        const payload = getPayload(input);
+        const value = String(input?.value || "").trim();
+        return !!payload?.allowCustom && !!value;
+    }
+
+    function setActiveOption(input, index = 0) {
+        const dropdown = getDropdown(input);
+        if (!dropdown) return;
+        const options = Array.from(dropdown.querySelectorAll(".search-combobox-option"));
+        const boundedIndex = options.length ? Math.max(0, Math.min(index, options.length - 1)) : -1;
+        input.dataset.searchComboboxActiveIndex = String(boundedIndex);
+        options.forEach((option, optionIndex) => {
+            const isActive = optionIndex === boundedIndex;
+            option.classList.toggle("active", isActive);
+            option.setAttribute("aria-selected", isActive ? "true" : "false");
+            if (isActive) option.scrollIntoView({block: "nearest"});
+        });
+    }
+
+    function renderOptions(input) {
+        const dropdown = getDropdown(input);
+        if (!dropdown) return;
+        const filteredOptions = getFilteredOptions(input);
+        dropdown.innerHTML = filteredOptions.map((option) => {
+            return `<button type="button" class="search-combobox-option" role="option" data-search-combobox-value="${escapeComboHtml(option.value)}" data-search-combobox-label="${escapeComboHtml(option.label)}" style="font-family:${escapeComboHtml(option.value)}">${escapeComboHtml(option.label)}</button>`;
+        }).join("");
+        if (!filteredOptions.length) {
+            const customValue = String(input?.value || "").trim();
+            dropdown.innerHTML = canUseCustomValue(input)
+                ? `<button type="button" class="search-combobox-option" role="option" data-search-combobox-custom="1" data-search-combobox-value="${escapeComboHtml(customValue)}" data-search-combobox-label="${escapeComboHtml(customValue)}">Use ${escapeComboHtml(customValue)}</button>`
+                : `<div class="search-combobox-option-empty">No matches</div>`;
+        }
+        dropdown.style.display = "block";
+        input.setAttribute("aria-expanded", "true");
+        setActiveOption(input, 0);
+    }
+
+    function hideOptions(input) {
+        const dropdown = getDropdown(input);
+        if (dropdown) dropdown.style.display = "none";
+        input?.setAttribute?.("aria-expanded", "false");
+    }
+
+    function commitOption(input, option, {dispatch = true} = {}) {
+        if (!input || !option) return false;
+        input.value = option.label;
+        input.setAttribute("value", option.label);
+        input.dataset.searchComboboxSelectedValue = option.value;
+        input.dataset.searchComboboxSelectedLabel = option.label;
+        hideOptions(input);
+        if (dispatch) {
+            input.dataset.searchComboboxCommitting = "1";
+            input.dispatchEvent(new Event("change", {bubbles: true}));
+            delete input.dataset.searchComboboxCommitting;
+        }
+        return true;
+    }
+
+    function commitCustomValue(input, {dispatch = true} = {}) {
+        const value = String(input?.value || "").trim();
+        if (!input || !canUseCustomValue(input)) return false;
+        return commitOption(input, {label: value, value}, {dispatch});
+    }
+
+    function findOptionByValue(input, value = "") {
+        const payload = getPayload(input);
+        const normalizedValue = String(value || "").trim().toLowerCase();
+        if (!payload || !normalizedValue) return null;
+        return payload.options.find((option) => option.value.toLowerCase() === normalizedValue || option.label.toLowerCase() === normalizedValue) || null;
+    }
+
+    function getActiveOption(input) {
+        const options = getFilteredOptions(input);
+        if (!options.length) return null;
+        const activeIndex = Number(input?.dataset?.searchComboboxActiveIndex || 0);
+        return options[Math.max(0, Math.min(activeIndex, options.length - 1))] || null;
+    }
+
+    function getInputForOption(optionNode) {
+        const wrapper = optionNode?.closest?.(".search-combobox-wrapper");
+        return wrapper?.querySelector?.("input[data-search-combobox-id]") || null;
+    }
+
+    function commitOptionNode(optionNode, event = null) {
+        if (!optionNode) return false;
+        event?.preventDefault?.();
+        const input = getInputForOption(optionNode);
+        if (optionNode.getAttribute("data-search-combobox-custom") === "1") {
+            return commitCustomValue(input);
+        }
+        const value = optionNode.getAttribute("data-search-combobox-value") || "";
+        const label = optionNode.getAttribute("data-search-combobox-label") || "";
+        if (input?.dataset?.searchComboboxSelectedValue === value && input.value === label) {
+            hideOptions(input);
+            input?.focus?.();
+            return true;
+        }
+        const didCommit = commitOption(input, {
+            value,
+            label
+        });
+        if (didCommit) input?.focus?.();
+        return didCommit;
+    }
+
+    window.StandardUI.getSearchComboBoxValue = (input) => {
+        if (!input) return "";
+        return input.dataset.searchComboboxSelectedValue || input.value || "";
+    };
+
+    window.StandardUI.setSearchComboBoxValue = (input, value = "", options = {}) => {
+        const matchedOption = findOptionByValue(input, value);
+        if (matchedOption) return commitOption(input, matchedOption, {dispatch: options.dispatch === true});
+        const payload = getPayload(input);
+        const nextValue = String(value || "");
+        input.value = nextValue;
+        if (payload?.allowCustom && nextValue) {
+            input.dataset.searchComboboxSelectedValue = nextValue;
+            input.dataset.searchComboboxSelectedLabel = nextValue;
+        } else {
+            input.dataset.searchComboboxSelectedValue = nextValue;
+            input.dataset.searchComboboxSelectedLabel = nextValue;
+        }
+        if (options.dispatch === true) {
+            input.dataset.searchComboboxCommitting = "1";
+            input.dispatchEvent(new Event("change", {bubbles: true}));
+            delete input.dataset.searchComboboxCommitting;
+        }
+        return false;
+    };
+
+    window.searchComboBox = function (config = {}) {
+        const comboId = `combo-${comboIndex++}`;
+        const wrapper = document.createElement("div");
+        wrapper.className = config.wrapperStyle || "search-combobox-wrapper searchbox-wrapper";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.autocomplete = "off";
+        input.setAttribute("role", "combobox");
+        input.setAttribute("aria-autocomplete", "list");
+        input.setAttribute("aria-expanded", "false");
+        input.setAttribute("data-search-combobox-id", comboId);
+        if (config.allow_custom === true) input.setAttribute("data-search-combobox-allow-custom", "true");
+        if (config.id) input.id = config.id;
+        if (config.name) input.name = config.name;
+        if (config.title) input.title = config.title;
+        if (config.placeholder) input.placeholder = config.placeholder;
+        if (config.style) input.className = config.style;
+        if (config.value) input.value = config.value;
+        const dropdown = document.createElement("div");
+        dropdown.id = `search-combobox-options-${comboId}`;
+        dropdown.className = config.dropdownStyle || "search-combobox-options searchbox-options";
+        dropdown.setAttribute("role", "listbox");
+        dropdown.style.display = "none";
+        wrapper.append(input, dropdown);
+        payloads[comboId] = {
+            allowCustom: config.allow_custom === true,
+            options: (Array.isArray(config.options) ? config.options : []).map(normalizeOption)
+        };
+        if (config.value) {
+            const matchedOption = payloads[comboId].options.find((option) => option.value === config.value || option.label === config.value);
+            if (matchedOption) {
+                input.value = matchedOption.label;
+                input.dataset.searchComboboxSelectedValue = matchedOption.value;
+                input.dataset.searchComboboxSelectedLabel = matchedOption.label;
+            }
+        }
+        return wrapper.outerHTML;
+    };
+
+    document.addEventListener("input", (event) => {
+        const input = event.target?.closest?.("input[data-search-combobox-id]");
+        if (!input) return;
+        renderOptions(input);
+    });
+
+    document.addEventListener("change", (event) => {
+        const input = event.target?.closest?.("input[data-search-combobox-id]");
+        if (!input || input.dataset.searchComboboxCommitting === "1") return;
+        const matchedOption = findOptionByValue(input, input.value);
+        if (matchedOption) {
+            commitOption(input, matchedOption);
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+        if (commitCustomValue(input)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+        if (input.dataset.searchComboboxSelectedLabel) {
+            input.value = input.dataset.searchComboboxSelectedLabel;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+    }, true);
+
+    document.addEventListener("focusin", (event) => {
+        const input = event.target?.closest?.("input[data-search-combobox-id]");
+        if (!input) return;
+        renderOptions(input);
+        input.select?.();
+    });
+
+    document.addEventListener("keydown", (event) => {
+        const input = event.target?.closest?.("input[data-search-combobox-id]");
+        if (!input) return;
+        if (event.key === "Escape") {
+            hideOptions(input);
+            return;
+        }
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            renderOptions(input);
+            const currentIndex = Number(input.dataset.searchComboboxActiveIndex || 0);
+            setActiveOption(input, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
+            return;
+        }
+        if (event.key === "Enter") {
+            const matchedOption = findOptionByValue(input, input.value) || getActiveOption(input);
+            if (!matchedOption && commitCustomValue(input)) {
+                event.preventDefault();
+                return;
+            }
+            if (!matchedOption) return;
+            event.preventDefault();
+            commitOption(input, matchedOption);
+        }
+    });
+
+    document.addEventListener("pointerdown", (event) => {
+        const optionNode = event.target?.closest?.(".search-combobox-option");
+        if (!optionNode) return;
+        commitOptionNode(optionNode, event);
+    });
+
+    document.addEventListener("click", (event) => {
+        const optionNode = event.target?.closest?.(".search-combobox-option");
+        if (!optionNode) return;
+        commitOptionNode(optionNode, event);
+    });
+
+    document.addEventListener("click", (event) => {
+        document.querySelectorAll("input[data-search-combobox-id]").forEach((input) => {
+            if (!input.closest(".search-combobox-wrapper")?.contains(event.target)) hideOptions(input);
+        });
+    });
+
+    document.addEventListener("focusout", (event) => {
+        const input = event.target?.closest?.("input[data-search-combobox-id]");
+        if (!input) return;
+        window.setTimeout(() => {
+            if (!input.closest(".search-combobox-wrapper")?.contains(document.activeElement)) hideOptions(input);
+        }, 0);
+    });
+})();
+
 window.StandardUI.altSync = window.StandardUI.altSync || (() => {
     const OVERLAY_CLASS = "alt-sync-overlay";
     const ATTRIBUTE_NAME = "alt-sync";
@@ -490,6 +810,7 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
     };
 })();
 let activeUploadProgressToken = 0;
+let activeMultiUploadProgressToken = 0;
 function ensureUploadProgress() {
     let root = document.getElementById("file-upload-progress");
     if (root) return root;
@@ -527,7 +848,110 @@ function hideUploadProgress(token = 0) {
     if (!root) return;
     root.classList.remove("show");
 }
+function ensureMultiUploadProgress() {
+    let root = document.getElementById("multi-file-upload-progress");
+    if (root) return root;
+    root = document.createElement("div");
+    root.id = "multi-file-upload-progress";
+    root.className = "file-open-progress file-upload-multi-progress interactive";
+    root.innerHTML = `
+        <div class="file-open-progress-header file-upload-multi-header">
+            <button class="file-upload-multi-toggle naked" type="button" title="Show pending uploads" aria-expanded="false">+</button>
+            <div class="file-upload-multi-title">
+                <div class="file-open-progress-label">Uploading files</div>
+                <div class="file-upload-multi-current">Preparing upload</div>
+            </div>
+            <div class="file-open-progress-value">0%</div>
+        </div>
+        <div class="file-open-progress-track" aria-hidden="true">
+            <div class="file-open-progress-bar"></div>
+        </div>
+        <div class="file-upload-multi-pending" hidden>
+            <div class="file-upload-multi-pending-label">Pending files</div>
+            <div class="file-upload-multi-pending-list"></div>
+        </div>
+    `;
+    document.body.appendChild(root);
+    return root;
+}
+function createMultiFileProgress(files = []) {
+    const root = ensureMultiUploadProgress();
+    const token = ++activeMultiUploadProgressToken;
+    const fileList = Array.from(files || []);
+    const toggleNode = root.querySelector(".file-upload-multi-toggle");
+    const labelNode = root.querySelector(".file-open-progress-label");
+    const currentNode = root.querySelector(".file-upload-multi-current");
+    const valueNode = root.querySelector(".file-open-progress-value");
+    const barNode = root.querySelector(".file-open-progress-bar");
+    const pendingNode = root.querySelector(".file-upload-multi-pending");
+    const pendingListNode = root.querySelector(".file-upload-multi-pending-list");
+    let expanded = false;
+    const renderPending = (currentIndex = 0) => {
+        if (!pendingListNode) return;
+        const pendingFiles = fileList.slice(currentIndex + 1);
+        pendingListNode.replaceChildren();
+        if (!pendingFiles.length) {
+            const emptyNode = document.createElement("div");
+            emptyNode.className = "file-upload-multi-pending-empty";
+            emptyNode.textContent = "No pending files";
+            pendingListNode.appendChild(emptyNode);
+            return;
+        }
+        pendingFiles.forEach((pendingFile, offset) => {
+            const itemNode = document.createElement("div");
+            itemNode.className = "file-upload-multi-pending-item";
+            const indexNode = document.createElement("span");
+            indexNode.className = "file-upload-multi-pending-index";
+            indexNode.textContent = String(currentIndex + offset + 2);
+            const nameNode = document.createElement("span");
+            nameNode.className = "file-upload-multi-pending-name";
+            nameNode.textContent = pendingFile?.name || "file";
+            itemNode.append(indexNode, nameNode);
+            pendingListNode.appendChild(itemNode);
+        });
+    };
+    const setExpanded = nextExpanded => {
+        expanded = !!nextExpanded;
+        root.classList.toggle("expanded", expanded);
+        if (pendingNode) pendingNode.hidden = !expanded;
+        if (toggleNode) {
+            toggleNode.textContent = expanded ? "-" : "+";
+            toggleNode.setAttribute("aria-expanded", expanded ? "true" : "false");
+            toggleNode.setAttribute("title", expanded ? "Hide pending uploads" : "Show pending uploads");
+        }
+    };
+    if (toggleNode) {
+        toggleNode.onclick = event => {
+            event.preventDefault();
+            event.stopPropagation();
+            setExpanded(!expanded);
+        };
+    }
+    setExpanded(false);
+    renderPending(0);
+    return {
+        update({currentIndex = 0, file = null, loaded = 0, total = 0, indeterminate = false} = {}) {
+            const currentFile = file || fileList[currentIndex] || null;
+            const totalFiles = fileList.length || 1;
+            const safeIndex = Math.max(0, Math.min(totalFiles - 1, Number(currentIndex) || 0));
+            const percent = total > 0 ? Math.max(0, Math.min(100, Math.round((loaded / total) * 100))) : 0;
+            if (labelNode) labelNode.textContent = `Uploading ${safeIndex + 1} of ${totalFiles}`;
+            if (currentNode) currentNode.textContent = currentFile?.name || "file";
+            if (valueNode) valueNode.textContent = indeterminate ? "Uploading" : `${percent}%`;
+            root.classList.toggle("indeterminate", !!indeterminate);
+            if (barNode && !indeterminate) barNode.style.width = `${percent}%`;
+            renderPending(safeIndex);
+            root.classList.add("show");
+        },
+        hide(delay = 220) {
+            window.setTimeout(() => {
+                if (token === activeMultiUploadProgressToken) root.classList.remove("show");
+            }, delay);
+        }
+    };
+}
 window.StandardUploads = window.StandardUploads || {};
+window.StandardUploads.createMultiFileProgress = createMultiFileProgress;
 window.StandardUploads.uploadFile = (file, url, options = {}) => new Promise((resolve, reject) => {
     if (!(file instanceof File)) {
         reject(new Error("A file is required"));
@@ -550,35 +974,37 @@ window.StandardUploads.uploadFile = (file, url, options = {}) => new Promise((re
             formData.append(key, value);
         });
     }
-    updateUploadProgress({label, loaded: 0, total: file.size || 0, indeterminate: !(file.size > 0), token});
+    const reportProgress = progressState => {
+        if (typeof options?.onProgress === "function") options.onProgress(progressState);
+        if (!options?.suppressProgress) updateUploadProgress({...progressState, token});
+    };
+    reportProgress({label, loaded: 0, total: file.size || 0, indeterminate: !(file.size > 0)});
     const xhr = new XMLHttpRequest();
     xhr.open(String(options?.method || "POST"), uploadUrl, true);
     xhr.upload.onprogress = event => {
-        updateUploadProgress({
+        reportProgress({
             label,
             loaded: Number(event?.loaded) || 0,
             total: Number(event?.total) || file.size || 0,
-            indeterminate: !event?.lengthComputable,
-            token
+            indeterminate: !event?.lengthComputable
         });
     };
     xhr.onerror = () => {
-        hideUploadProgress(token);
+        if (!options?.suppressProgress) hideUploadProgress(token);
         reject(new Error("Upload failed"));
     };
     xhr.onabort = () => {
-        hideUploadProgress(token);
+        if (!options?.suppressProgress) hideUploadProgress(token);
         reject(new Error("Upload aborted"));
     };
     xhr.onload = () => {
-        updateUploadProgress({
+        reportProgress({
             label,
             loaded: file.size || 1,
             total: file.size || 1,
-            indeterminate: false,
-            token
+            indeterminate: false
         });
-        window.setTimeout(() => hideUploadProgress(token), 220);
+        if (!options?.suppressProgress) window.setTimeout(() => hideUploadProgress(token), 220);
         resolve({
             ok: xhr.status >= 200 && xhr.status < 300,
             status: xhr.status,

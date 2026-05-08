@@ -1,6 +1,6 @@
 (async () => {
     const SERVICE_ID = "com.standard.editor.text";
-    const TEXT_FONT_FAMILIES = ["Inter", "Georgia", "Times New Roman", "Courier New", "Verdana"];
+    const TEXT_FONT_FAMILIES = window.StandardUI?.fontFamilies || ["Inter", "Georgia", "Times New Roman", "Courier New", "Verdana"];
     const TEXT_FONT_SIZES = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72"];
     const TEXT_TEXT_COLORS = [
         {label: "Default", value: ""},
@@ -41,7 +41,6 @@
     };
     let activeTextEditorFilePath = "";
     let activeTextEditorContent = "";
-    let skipNextTextStateRestore = false;
     let savedTextSelectionRange = null;
     let textEditorSelectionChangeBound = false;
     let activeTextImageFrame = null;
@@ -50,16 +49,25 @@
     let activeTextTableResizeHandle = null;
     let activeTextPageViewEnabled = false;
     let textEditorDeferredSyncTimer = null;
-    let textEditorLastRenderedPageCount = 0;
     const resolvedTextColorCache = new Map();
     const findTextPortal = () => [...Array.from(document.querySelectorAll(".draggable-window"))]
         .reverse()
         .find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID)
         ?.portal;
-    const findTextEditorNode = () => document.getElementById("editor-text-content");
-    const findTextEditorStage = () => document.getElementById("editor-text-stage");
-    const findTextEditorPageBackdrop = () => document.getElementById("editor-text-page-backdrop");
-    const findTextEditorPageMeasure = () => document.getElementById("editor-text-page-measure");
+    const findTextPortalNode = (portal = findTextPortal(), selector = "") => {
+        return portal?.window?.()?.querySelector?.(selector) || document.querySelector(selector);
+    };
+    const prioritizePortalDomForLegacyLookups = (portal = null) => {
+        const windowNode = portal?.window?.();
+        const parentNode = windowNode?.parentElement;
+        if (!windowNode || !parentNode || parentNode.firstElementChild === windowNode) return;
+        parentNode.insertBefore(windowNode, parentNode.firstElementChild);
+        if (typeof modular?.bringToFront === "function") modular.bringToFront(windowNode);
+    };
+    const findTextEditorNode = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-content");
+    const findTextEditorStage = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-stage");
+    const findTextEditorPageBackdrop = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-page-backdrop");
+    const findTextEditorPageMeasure = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-page-measure");
     const normalizeTextFilePath = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
     const getTextFileName = (rawPath = "") => String(rawPath || "").split("/").pop() || "Text";
     const getTextFileExtension = (rawPath = "") => {
@@ -452,19 +460,19 @@
         }
         if (textArea.textContent !== nextContent) textArea.textContent = nextContent;
     };
-    const syncEditorWindowState = (portal = findTextPortal()) => {
+    const getActiveTextEditorState = () => ({
+        directive: activeTextEditorFilePath,
+        cachedContent: activeTextEditorContent,
+        pageViewEnabled: activeTextPageViewEnabled
+    });
+    const setTextEditorPortalState = (portal = findTextPortal(), options = {}) => {
         if (!portal || typeof portal.setWindowState !== "function") return;
-        portal.setWindowState({
-            directive: activeTextEditorFilePath,
-            cachedContent: activeTextEditorContent,
-            pageViewEnabled: activeTextPageViewEnabled
-        });
+        portal.setWindowState(getActiveTextEditorState(), options);
+    };
+    const syncEditorWindowState = (portal = findTextPortal()) => {
+        setTextEditorPortalState(portal);
     };
     const restoreEditorWindowState = (portal = findTextPortal()) => {
-        if (skipNextTextStateRestore) {
-            skipNextTextStateRestore = false;
-            return;
-        }
         const state = portal?.windowState?.() || {};
         if (state?.directive) activeTextEditorFilePath = normalizeTextFilePath(state.directive);
         if (typeof state?.cachedContent === "string") activeTextEditorContent = state.cachedContent;
@@ -885,6 +893,7 @@
             else if (command === "underline") cellNode.style.textDecoration = textDecorationLine.includes("underline") ? "none" : "underline";
             else if (command === "fontName") cellNode.style.fontFamily = value || "";
             else if (command === "fontSize") cellNode.style.fontSize = getLegacyTextFontSizeCssValue(value);
+            else if (command === "fontSizePx") cellNode.style.fontSize = `${normalizeTextFontSizeInput(value)}px`;
             else if (command === "foreColor") cellNode.style.color = !value || value === "inherit" ? "" : value;
             else if (command === "hiliteColor" || command === "backColor") cellNode.style.backgroundColor = !value || value === "transparent" ? "" : value;
             else if (command === "justifyLeft") cellNode.style.textAlign = "left";
@@ -1000,9 +1009,13 @@
     const mapComputedFontSizeToToolbarValue = (rawFontSize = "") => {
         const numericValue = Number(String(rawFontSize || "").replace(/px$/i, ""));
         if (!Number.isFinite(numericValue)) return "12";
-        return TEXT_FONT_SIZES.reduce((bestOption, option) => {
-            return Math.abs(Number(option) - numericValue) < Math.abs(Number(bestOption) - numericValue) ? option : bestOption;
-        }, "12");
+        return `${Math.round(numericValue * 10) / 10}`.replace(/\.0$/, "");
+    };
+    const normalizeTextFontSizeInput = (rawFontSize = "") => {
+        const numericValue = Number(String(rawFontSize || "").replace(/px$/i, "").trim());
+        if (!Number.isFinite(numericValue)) return "";
+        const boundedValue = Math.max(1, Math.min(400, numericValue));
+        return `${Math.round(boundedValue * 10) / 10}`.replace(/\.0$/, "");
     };
     const getLegacyTextFontSizeValue = (rawFontSize = "") => {
         const numericValue = Number(String(rawFontSize || "").replace(/px$/i, ""));
@@ -1017,7 +1030,7 @@
     };
     const normalizeFontFamilyForToolbar = (fontFamily = "") => {
         const primaryFont = String(fontFamily || "").split(",")[0].replace(/^["']|["']$/g, "").trim();
-        return TEXT_FONT_FAMILIES.includes(primaryFont) ? primaryFont : "Inter";
+        return TEXT_FONT_FAMILIES.includes(primaryFont) ? primaryFont : (primaryFont || "Inter");
     };
     const updateTextToolbarState = () => {
         const editorNode = findTextEditorNode();
@@ -1044,8 +1057,8 @@
         const textColor = style.color && style.color !== "rgba(0, 0, 0, 0)" ? style.color : "";
         const backgroundColor = style.backgroundColor && style.backgroundColor !== "rgba(0, 0, 0, 0)" ? style.backgroundColor : "";
         const alignment = ["center", "right"].includes(blockStyle.textAlign) ? blockStyle.textAlign : "left";
-        if (fontFamilySelect) fontFamilySelect.value = normalizeFontFamilyForToolbar(style.fontFamily);
-        if (fontSizeSelect) fontSizeSelect.value = mapComputedFontSizeToToolbarValue(style.fontSize);
+        if (fontFamilySelect) window.StandardUI?.setSearchComboBoxValue?.(fontFamilySelect, normalizeFontFamilyForToolbar(style.fontFamily));
+        if (fontSizeSelect) window.StandardUI?.setSearchComboBoxValue?.(fontSizeSelect, mapComputedFontSizeToToolbarValue(style.fontSize));
         setTextToolbarButtonState(boldButton, isBold);
         setTextToolbarButtonState(italicButton, style.fontStyle === "italic" || style.fontStyle === "oblique");
         setTextToolbarButtonState(underlineButton, textDecorationLine.includes("underline"));
@@ -1126,6 +1139,37 @@
         syncTextEditorStateFromDom();
         return didApply;
     };
+    const execTextEditorFontSize = (rawFontSize = "12") => {
+        const normalizedFontSize = normalizeTextFontSizeInput(rawFontSize);
+        const textArea = findTextEditorNode();
+        if (!normalizedFontSize || !textArea || shouldHideTextEditorBar(activeTextEditorFilePath)) {
+            updateTextToolbarState();
+            return false;
+        }
+        restoreTextSelection();
+        textArea.focus();
+        if (applyTextTableCellStyleCommand("fontSizePx", normalizedFontSize)) {
+            rememberTextSelection();
+            syncTextEditorStateFromDom();
+            return true;
+        }
+        textArea.querySelectorAll('font[size="7"]').forEach((node) => {
+            node.dataset.editorPreserveFontSize = "1";
+        });
+        document.execCommand("styleWithCSS", false, false);
+        const didApply = document.execCommand("fontSize", false, "7");
+        textArea.querySelectorAll('font[size="7"]').forEach((node) => {
+            if (node.dataset.editorPreserveFontSize === "1") {
+                delete node.dataset.editorPreserveFontSize;
+                return;
+            }
+            node.removeAttribute("size");
+            node.style.fontSize = `${normalizedFontSize}px`;
+        });
+        rememberTextSelection();
+        syncTextEditorStateFromDom();
+        return didApply;
+    };
     const bindTextToolbarButtonFocus = (buttonNode) => {
         if (!buttonNode || buttonNode.dataset.selectionBound === "1") return;
         buttonNode.dataset.selectionBound = "1";
@@ -1137,11 +1181,12 @@
     const renderTextEditorPageBackdrop = (pageCount = 1, stageNode = findTextEditorStage(), backdropNode = findTextEditorPageBackdrop()) => {
         if (!stageNode || !backdropNode) return false;
         const totalPages = Math.max(1, Number(pageCount) || 1);
-        if (textEditorLastRenderedPageCount !== totalPages) {
+        const renderedPageCount = Number(backdropNode.dataset.renderedPageCount || 0);
+        if (renderedPageCount !== totalPages) {
             backdropNode.innerHTML = Array.from({length: totalPages}, (_, index) => {
                 return `<div class="editor-text-page-card" data-page-number="${index + 1}" style="height:${TEXT_PAGE_VIEW_HEIGHT_PX}px;"></div>`;
             }).join("");
-            textEditorLastRenderedPageCount = totalPages;
+            backdropNode.dataset.renderedPageCount = String(totalPages);
         }
         stageNode.classList.toggle("editor-text-stage-page-view", activeTextPageViewEnabled);
         return true;
@@ -1196,11 +1241,11 @@
         pageCount = Math.max(pageCount, pagesFromScrollHeight);
         return pageCount;
     };
-    const applyTextEditorPageView = (enabled = activeTextPageViewEnabled, textArea = findTextEditorNode()) => {
+    const applyTextEditorPageView = (enabled = activeTextPageViewEnabled, textArea = findTextEditorNode(), portal = findTextPortal()) => {
         if (!textArea) return false;
-        const stageNode = findTextEditorStage();
-        const backdropNode = findTextEditorPageBackdrop();
-        const measureNode = findTextEditorPageMeasure();
+        const stageNode = findTextEditorStage(portal);
+        const backdropNode = findTextEditorPageBackdrop(portal);
+        const measureNode = findTextEditorPageMeasure(portal);
         const pageViewEnabled = !!enabled;
         const requiredPages = pageViewEnabled ? paginateTextEditorFlow(textArea) : 1;
         const totalPageHeight = requiredPages > 0
@@ -1227,7 +1272,7 @@
             backdropNode.style.display = pageViewEnabled ? "flex" : "none";
             backdropNode.style.minHeight = pageViewEnabled ? `${totalPageHeight}px` : "";
         }
-        const bodyNode = findTextPortal()?.body?.();
+        const bodyNode = portal?.body?.();
         if (bodyNode) bodyNode.style.overflowX = pageViewEnabled ? "auto" : "";
         textArea.style.width = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
         textArea.style.maxWidth = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
@@ -1254,13 +1299,13 @@
         textArea.style.left = "";
         textArea.style.right = "";
         textArea.style.overflowY = pageViewEnabled ? "visible" : "";
-        if (pageViewEnabled) requestAnimationFrame(() => ensureTextEditorPageWindowFits());
+        if (pageViewEnabled) requestAnimationFrame(() => ensureTextEditorPageWindowFits(portal));
         return true;
     };
     const toggleTextEditorPageView = (enabled = !activeTextPageViewEnabled, portal = findTextPortal()) => {
         activeTextPageViewEnabled = isPlainTextFilePath(activeTextEditorFilePath) ? false : !!enabled;
         if (activeTextEditorFilePath) persistTextDocumentPageViewPreference(activeTextEditorFilePath, activeTextPageViewEnabled);
-        applyTextEditorPageView(activeTextPageViewEnabled);
+        applyTextEditorPageView(activeTextPageViewEnabled, findTextEditorNode(portal), portal);
         syncEditorWindowState(portal);
         updateTextToolbarState();
         return activeTextPageViewEnabled;
@@ -1499,22 +1544,24 @@
         document.addEventListener("mousedown", closePicker, true);
         return true;
     };
-    const bindTextEditorInteractions = () => {
-        const textArea = findTextEditorNode();
-        const fontFamilySelect = document.getElementById("editor-sheet-font-family");
-        const fontSizeSelect = document.getElementById("editor-sheet-font-size");
-        const boldButton = document.getElementById("editor-sheet-style-bold");
-        const italicButton = document.getElementById("editor-sheet-style-italic");
-        const underlineButton = document.getElementById("editor-sheet-style-underline");
-        const linkButton = document.getElementById("editor-sheet-style-link");
-        const textColorButton = document.getElementById("editor-sheet-style-color");
-        const backgroundColorButton = document.getElementById("editor-sheet-style-background");
-        const alignmentButton = document.getElementById("editor-sheet-style-align");
-        const highlightButton = document.getElementById("editor-sheet-style-highlight");
-        const listButton = document.getElementById("editor-sheet-style-list");
-        const imageButton = document.getElementById("editor-sheet-style-image");
-        const tableButton = document.getElementById("editor-sheet-style-table");
-        const otherButton = document.getElementById("editor-sheet-style-other");
+    const bindTextEditorInteractions = (portal = findTextPortal()) => {
+        const windowNode = portal?.window?.();
+        const findInPortal = (selector) => windowNode?.querySelector?.(selector) || document.querySelector(selector);
+        const textArea = findTextEditorNode(portal);
+        const fontFamilySelect = findInPortal("#editor-sheet-font-family");
+        const fontSizeSelect = findInPortal("#editor-sheet-font-size");
+        const boldButton = findInPortal("#editor-sheet-style-bold");
+        const italicButton = findInPortal("#editor-sheet-style-italic");
+        const underlineButton = findInPortal("#editor-sheet-style-underline");
+        const linkButton = findInPortal("#editor-sheet-style-link");
+        const textColorButton = findInPortal("#editor-sheet-style-color");
+        const backgroundColorButton = findInPortal("#editor-sheet-style-background");
+        const alignmentButton = findInPortal("#editor-sheet-style-align");
+        const highlightButton = findInPortal("#editor-sheet-style-highlight");
+        const listButton = findInPortal("#editor-sheet-style-list");
+        const imageButton = findInPortal("#editor-sheet-style-image");
+        const tableButton = findInPortal("#editor-sheet-style-table");
+        const otherButton = findInPortal("#editor-sheet-style-other");
         if (!textArea || textArea.dataset.bound === "1") return;
         textArea.dataset.bound = "1";
         textArea.addEventListener("keydown", (event) => {
@@ -1645,7 +1692,7 @@
         });
         textArea.addEventListener("focusout", () => {
             window.setTimeout(() => {
-                const editorNode = findTextEditorNode();
+                const editorNode = findTextEditorNode(portal);
                 if (!editorNode?.contains(document.activeElement)) clearActiveTextImageSelection();
             }, 0);
         });
@@ -1719,11 +1766,11 @@
         [boldButton, italicButton, underlineButton, linkButton, textColorButton, backgroundColorButton, alignmentButton, highlightButton, listButton, imageButton, tableButton, otherButton].forEach(bindTextToolbarButtonFocus);
         if (fontFamilySelect && fontFamilySelect.dataset.bound !== "1") {
             fontFamilySelect.dataset.bound = "1";
-            fontFamilySelect.addEventListener("change", () => execTextEditorCommand("fontName", fontFamilySelect.value || "Inter"));
+            fontFamilySelect.addEventListener("change", () => execTextEditorCommand("fontName", window.StandardUI?.getSearchComboBoxValue?.(fontFamilySelect) || fontFamilySelect.value || "Inter"));
         }
         if (fontSizeSelect && fontSizeSelect.dataset.bound !== "1") {
             fontSizeSelect.dataset.bound = "1";
-            fontSizeSelect.addEventListener("change", () => execTextEditorCommand("fontSize", getLegacyTextFontSizeValue(fontSizeSelect.value || "12")));
+            fontSizeSelect.addEventListener("change", () => execTextEditorFontSize(window.StandardUI?.getSearchComboBoxValue?.(fontSizeSelect) || fontSizeSelect.value || "12"));
         }
         if (boldButton && boldButton.dataset.bound !== "1") {
             boldButton.dataset.bound = "1";
@@ -1871,17 +1918,18 @@
                         `<span>Pages</span>`
                     ])}),
                 ]),
-                action: () => toggleTextEditorPageView()
+                action: () => toggleTextEditorPageView(undefined, portal)
             }]);
         }
         updateTextToolbarState();
     };
     const updateTextEditorView = (portal = findTextPortal()) => {
-        const pathLabel = document.getElementById("editor-text-path");
+        const pathLabel = portal?.window?.()?.querySelector?.("#editor-text-path") || document.getElementById("editor-text-path");
         if (pathLabel) pathLabel.textContent = activeTextEditorFilePath || "No file loaded";
-        writeTextEditorContent();
-        applyTextEditorPageView(activeTextPageViewEnabled);
-        const textToolbar = document.getElementById("editor-text-toolbar");
+        const textArea = findTextEditorNode(portal);
+        writeTextEditorContent(textArea);
+        applyTextEditorPageView(activeTextPageViewEnabled, textArea, portal);
+        const textToolbar = portal?.window?.()?.querySelector?.("#editor-text-toolbar") || document.getElementById("editor-text-toolbar");
         if (textToolbar) {
             const previousPosition = textToolbar.style.position;
             const previousTop = textToolbar.style.top;
@@ -1899,6 +1947,19 @@
         }
         updateTextEditorPortalTitle(portal);
         updateTextToolbarState();
+    };
+    const getTextEditorPortals = () => [...Array.from(document.querySelectorAll(".draggable-window"))]
+        .map((windowNode) => windowNode?.portal)
+        .filter((portal) => portal?.serviceId?.() === SERVICE_ID);
+    const refreshTextEditorPortalsFromState = () => {
+        const portals = getTextEditorPortals();
+        portals.forEach((portal) => {
+            restoreEditorWindowState(portal);
+            updateTextEditorView(portal);
+        });
+    };
+    const scheduleTextEditorPortalStateRefresh = () => {
+        requestAnimationFrame(() => requestAnimationFrame(refreshTextEditorPortalsFromState));
     };
     const sanitizeNewTextFileName = (rawName = "") => {
         const trimmedName = String(rawName || "").trim().replace(/\\/g, "/");
@@ -1968,23 +2029,27 @@
         activeTextEditorContent = "Edit Me";
         activeTextPageViewEnabled = getDefaultTextDocumentPageViewPreference(activeTextEditorFilePath);
         clearActiveTextImageSelection({skipSync: true});
-        skipNextTextStateRestore = true;
         const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
+        prioritizePortalDomForLegacyLookups(portal);
         syncEditorWindowState(portal);
         updateTextEditorView(portal);
+        scheduleTextEditorPortalStateRefresh();
         return true;
     };
     window.StandardEditor = window.StandardEditor || {};
     window.StandardEditor.openFreshTextEditor = openFreshTextEditor;
     window.StandardEditor.openTextFilePath = (rawPath = "", content = "", sourceNode = null) => {
-        activeTextEditorFilePath = normalizeTextFilePath(rawPath);
+        const nextFilePath = normalizeTextFilePath(rawPath);
+        const nextContent = decodeTextEditorLoadedContent(content);
+        activeTextEditorFilePath = nextFilePath;
         loadTextDocumentPageViewPreference(activeTextEditorFilePath, getDefaultTextDocumentPageViewPreference(activeTextEditorFilePath));
-        activeTextEditorContent = decodeTextEditorLoadedContent(content);
+        activeTextEditorContent = nextContent;
         clearActiveTextImageSelection({skipSync: true});
-        skipNextTextStateRestore = true;
-        const portal = modular.start(SERVICE_ID);
-        syncEditorWindowState(portal);
+        const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
+        prioritizePortalDomForLegacyLookups(portal);
+        setTextEditorPortalState(portal, {merge: false});
         updateTextEditorView(portal);
+        scheduleTextEditorPortalStateRefresh();
         return true;
     };
     modular.register(new Service(SERVICE_ID, [
@@ -2004,8 +2069,8 @@
             icon: "/icons/interfaces/editor.png",
             route: () => div({style: "large-padding-top", content: children([
                     div({id: "editor-text-toolbar", style: "bordered shadowed radius small-padding blurred", content: div({style: "faded", content: children([
-                                select({id: "editor-sheet-font-family", style: "small-margin-right inner-radius", value: "Inter", options: TEXT_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
-                                select({id: "editor-sheet-font-size", style: "small-margin-right inner-radius", value: "12", options: TEXT_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
+                                searchComboBox({id: "editor-sheet-font-family", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: TEXT_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
+                                searchComboBox({id: "editor-sheet-font-size", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: TEXT_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
                                 button({id: "editor-sheet-style-bold", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`}),
                                 button({id: "editor-sheet-style-italic", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.2558594 22.003906 L 14.0058594 22.003906 L 14.0058594 20.503906 L 13.2558594 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`}),
                                 button({id: "editor-sheet-style-underline", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 6.0058594 2 L 6.0058594 2.75 L 6.0058594 12.585938 C 6.0058594 15.618894 8.7446099 18.001953 12.003906 18.001953 C 15.263203 18.001953 18.003906 15.618893 18.003906 12.585938 L 18.003906 2.75 L 18.003906 2 L 16.503906 2 L 16.503906 2.75 L 16.503906 12.585938 C 16.503906 14.706981 14.54261 16.501953 12.003906 16.501953 C 9.4652032 16.501953 7.5058594 14.70698 7.5058594 12.585938 L 7.5058594 2.75 L 7.5058594 2 L 6.0058594 2 z M 4.9980469 20.003906 L 4.9980469 21.503906 L 5.7480469 21.503906 L 18.251953 21.503906 L 19.001953 21.503906 L 19.001953 20.003906 L 18.251953 20.003906 L 5.7480469 20.003906 L 4.9980469 20.003906 z"/></svg>`}),
@@ -2030,7 +2095,7 @@
             afterRender: function () {
                 restoreEditorWindowState(this.portal);
                 updateTextEditorView(this.portal);
-                bindTextEditorInteractions();
+                bindTextEditorInteractions(this.portal);
             }
         })
     ]));

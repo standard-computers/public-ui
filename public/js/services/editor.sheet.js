@@ -2,6 +2,8 @@
     const SERVICE_ID = "com.standard.editor.sheet";
     const DEFAULT_SHEET_ROWS = 25;
     const DEFAULT_SHEET_COLUMNS = 12;
+    const SHEET_FONT_FAMILIES = window.StandardUI?.fontFamilies || ["Inter", "Arial", "Georgia", "Times New Roman", "Courier New", "Verdana"];
+    const SHEET_FONT_SIZES = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72"];
     const SHEET_ROW_GROWTH = 25;
     const SHEET_COLUMN_GROWTH = 6;
     const SHEET_SCROLL_BUFFER = 120;
@@ -32,7 +34,6 @@
     let activeSheetRangeEnd = null;
     let activeSheetFilePath = "";
     let activeSheetDisplayTitle = "";
-    let skipNextSheetStateRestore = false;
     let isGrowingSheetGrid = false;
     let sheetArrowNavigationBound = false;
     let sheetStyleShortcutsBound = false;
@@ -97,6 +98,13 @@
         .reverse()
         .find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID) || null;
     const findSheetPortal = () => findSheetWindow()?.portal;
+    const prioritizePortalDomForLegacyLookups = (portal = null) => {
+        const windowNode = portal?.window?.();
+        const parentNode = windowNode?.parentElement;
+        if (!windowNode || !parentNode || parentNode.firstElementChild === windowNode) return;
+        parentNode.insertBefore(windowNode, parentNode.firstElementChild);
+        if (typeof modular?.bringToFront === "function") modular.bringToFront(windowNode);
+    };
     const isSheetWindowShown = () => {
         const sheetWindow = findSheetWindow();
         return !!(sheetWindow
@@ -221,14 +229,16 @@
         if (fontStyle) normalizedStyle.fontStyle = fontStyle;
         const textDecoration = rawStyle.textDecoration === "underline" || rawStyle.u === 1 || rawStyle.u === true ? "underline" : "";
         if (textDecoration) normalizedStyle.textDecoration = textDecoration;
+        const fontFamily = String(rawStyle.fontFamily || rawStyle.f || "").trim();
+        if (fontFamily) normalizedStyle.fontFamily = fontFamily;
         const color = String(rawStyle.color || rawStyle.c || "").trim();
         if (color && color !== "transparent") normalizedStyle.color = color;
         const backgroundColor = String(rawStyle.backgroundColor || rawStyle.g || "").trim();
         if (backgroundColor && backgroundColor !== "transparent") normalizedStyle.backgroundColor = backgroundColor;
         const rawFontSize = rawStyle.fontSize || rawStyle.s || "";
         const numericFontSize = Number(String(rawFontSize).replace(/px$/i, ""));
-        if (Number.isFinite(numericFontSize) && numericFontSize >= 8 && numericFontSize <= 72) {
-            normalizedStyle.fontSize = `${numericFontSize}px`;
+        if (Number.isFinite(numericFontSize) && numericFontSize >= 1 && numericFontSize <= 400) {
+            normalizedStyle.fontSize = `${Math.round(numericFontSize * 10) / 10}px`;
         }
         const rawDecimalPlaces = rawStyle.decimalPlaces ?? rawStyle.d;
         const decimalPlaces = Math.trunc(Number(rawDecimalPlaces));
@@ -244,6 +254,7 @@
         if (normalizedStyle.fontWeight === "bold") encodedStyle.b = 1;
         if (normalizedStyle.fontStyle === "italic") encodedStyle.i = 1;
         if (normalizedStyle.textDecoration === "underline") encodedStyle.u = 1;
+        if (normalizedStyle.fontFamily) encodedStyle.f = normalizedStyle.fontFamily;
         if (normalizedStyle.color) encodedStyle.c = normalizedStyle.color;
         if (normalizedStyle.backgroundColor) encodedStyle.g = normalizedStyle.backgroundColor;
         if (normalizedStyle.fontSize) encodedStyle.s = Number(String(normalizedStyle.fontSize).replace(/px$/i, ""));
@@ -262,6 +273,12 @@
         return `https://${trimmedUrl}`;
     };
     const getSheetCellStyle = (cellReference = "") => normalizeSheetCellStyle(sheetCellStyles[cellReference]);
+    const normalizeSheetFontSizeInput = (rawFontSize = "") => {
+        const numericValue = Number(String(rawFontSize || "").replace(/px$/i, "").trim());
+        if (!Number.isFinite(numericValue)) return "";
+        const boundedValue = Math.max(1, Math.min(400, numericValue));
+        return `${Math.round(boundedValue * 10) / 10}`.replace(/\.0$/, "");
+    };
     const setSheetCellStyle = (cellReference = "", nextStyle = {}) => {
         const encodedStyle = encodeSheetCellStyle(nextStyle);
         if (Object.keys(encodedStyle).length) {
@@ -406,14 +423,12 @@
             });
         }
     };
-    const updateSheetPortalTitle = () => {
-        const sheetPortal = findSheetPortal();
+    const updateSheetPortalTitle = (sheetPortal = findSheetPortal()) => {
         if (sheetPortal?.setTitle) {
             sheetPortal.setTitle(activeSheetFilePath ? getSheetFileName(activeSheetFilePath) : (activeSheetDisplayTitle || "Sheet"));
         }
     };
-    const saveSheetPortalState = () => {
-        const portal = findSheetPortal();
+    const saveSheetPortalState = (portal = findSheetPortal()) => {
         if (!portal || typeof portal.setWindowState !== "function") return;
         portal.setWindowState({
             directive: activeSheetFilePath,
@@ -433,14 +448,10 @@
             columns: sheetColumns,
             displayTitle: activeSheetDisplayTitle
         });
-        updateSheetPortalTitle();
+        updateSheetPortalTitle(portal);
     };
-    const restoreSheetPortalState = () => {
-        if (skipNextSheetStateRestore) {
-            skipNextSheetStateRestore = false;
-            return;
-        }
-        const state = findSheetPortal()?.windowState?.() || {};
+    const restoreSheetPortalState = (portal = findSheetPortal()) => {
+        const state = portal?.windowState?.() || {};
         parseSheetPayload({
             cells: state?.cells || {},
             styles: state?.styles || {},
@@ -459,7 +470,7 @@
         });
         activeSheetFilePath = normalizeSheetFilePath(state?.directive || "");
         activeSheetDisplayTitle = activeSheetFilePath ? "" : String(state?.displayTitle || "");
-        updateSheetPortalTitle();
+        updateSheetPortalTitle(portal);
     };
     const saveSheetToPath = async (targetPath = "") => {
         const normalizedPath = normalizeSheetFilePath(targetPath);
@@ -524,11 +535,11 @@
         activeSheetFilePath = sheetPath;
         activeSheetDisplayTitle = "";
         window.StandardPlastic?.removeInlineStyleEditor?.(false);
-        skipNextSheetStateRestore = true;
-        modular.start(SERVICE_ID);
-        saveSheetPortalState();
+        const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
+        prioritizePortalDomForLegacyLookups(portal);
+        saveSheetPortalState(portal);
         refreshSheetCells();
-        updateSheetPortalTitle();
+        updateSheetPortalTitle(portal);
         return true;
     };
     const openSheetFilePath = async (rawPath = "", sourceNode = null) => {
@@ -620,7 +631,6 @@
         activeSheetRangeStart = null;
         activeSheetRangeEnd = null;
         window.StandardPlastic?.removeInlineStyleEditor?.(false);
-        skipNextSheetStateRestore = true;
         modular.show(SERVICE_ID, 0, {newInstance: true});
         saveSheetPortalState();
         refreshSheetCells();
@@ -647,7 +657,6 @@
         sheetColumns = DEFAULT_SHEET_COLUMNS;
         sheetGridScrollBound = false;
         isGrowingSheetGrid = false;
-        skipNextSheetStateRestore = true;
         modular.show(SERVICE_ID, 0, {newInstance: true});
         saveSheetPortalState();
         refreshSheetCells();
@@ -1047,8 +1056,8 @@
         const imageButton = document.getElementById("editor-sheet-add-image");
         const chartButton = document.getElementById("editor-sheet-make-chart");
         const typeSelect = document.getElementById("editor-sheet-cell-type");
-        if (fontFamilySelect) fontFamilySelect.value = "Inter";
-        if (fontSizeSelect) fontSizeSelect.value = String((activeStyle.fontSize || "12px").replace(/px$/i, ""));
+        if (fontFamilySelect) window.StandardUI?.setSearchComboBoxValue?.(fontFamilySelect, activeStyle.fontFamily || "Inter");
+        if (fontSizeSelect) window.StandardUI?.setSearchComboBoxValue?.(fontSizeSelect, normalizeSheetFontSizeInput(activeStyle.fontSize || "12px") || "12");
         setSheetToolbarButtonState(boldButton, activeStyle.fontWeight === "bold");
         setSheetToolbarButtonState(italicButton, activeStyle.fontStyle === "italic");
         setSheetToolbarButtonState(underlineButton, activeStyle.textDecoration === "underline");
@@ -1094,6 +1103,7 @@
         cellInput.style.fontWeight = style.fontWeight || "";
         cellInput.style.fontStyle = style.fontStyle || "";
         cellInput.style.textDecoration = style.textDecoration || "";
+        cellInput.style.fontFamily = style.fontFamily || "";
         cellInput.style.fontSize = style.fontSize || "";
         cellInput.readOnly = isLocked;
         cellInput.setAttribute("aria-readonly", isLocked ? "true" : "false");
@@ -2120,6 +2130,7 @@
         });
     };
     const bindSheetToolbar = () => {
+        const fontFamilySelect = document.getElementById("editor-sheet-font-family");
         const fontSizeSelect = document.getElementById("editor-sheet-font-size");
         const boldButton = document.getElementById("editor-sheet-style-bold");
         const italicButton = document.getElementById("editor-sheet-style-italic");
@@ -2133,13 +2144,27 @@
         const imageButton = document.getElementById("editor-sheet-add-image");
         const chartButton = document.getElementById("editor-sheet-make-chart");
         const typeSelect = document.getElementById("editor-sheet-cell-type");
+        if (fontFamilySelect && fontFamilySelect.dataset.bound !== "1") {
+            fontFamilySelect.dataset.bound = "1";
+            fontFamilySelect.addEventListener("change", (event) => {
+                const nextFontFamily = window.StandardUI?.getSearchComboBoxValue?.(fontFamilySelect) || event?.target?.value || "Inter";
+                applySheetStyleToSelection((style) => ({
+                    ...style,
+                    fontFamily: nextFontFamily || ""
+                }));
+            });
+        }
         if (fontSizeSelect && fontSizeSelect.dataset.bound !== "1") {
             fontSizeSelect.dataset.bound = "1";
             fontSizeSelect.addEventListener("change", (event) => {
-                const nextSize = String(event?.target?.value || "").trim();
+                const nextSize = normalizeSheetFontSizeInput(window.StandardUI?.getSearchComboBoxValue?.(fontSizeSelect) || event?.target?.value || "");
+                if (!nextSize) {
+                    updateSheetToolbarState();
+                    return;
+                }
                 applySheetStyleToSelection((style) => ({
                     ...style,
-                    fontSize: nextSize ? `${nextSize}px` : ""
+                    fontSize: `${nextSize}px`
                 }));
             });
         }
@@ -2733,32 +2758,13 @@
             }],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5" /></svg>`,
             icon: "/icons/sprdshts.png",
-            route: () => {
-                restoreSheetPortalState();
+            route: function () {
+                restoreSheetPortalState(this.portal);
                 return div({style: "large-padding-top editor-portal-shell", content: children([
                         div({style: "editor-sheet-shell", content: children([
                                 div({id: "editor-text-toolbar", style: "bordered shadowed radius small-padding", content: div({style: "faded", content: children([
-                                            select({id: "editor-sheet-font-family", style: "small-margin-right inner-radius", value: "Inter", options: [{label: "Inter", value: "Inter"}]}),
-                                            select({id: "editor-sheet-font-size", style: "small-margin-right inner-radius", value: "12",
-                                                options: [
-                                                    {label: "8", value: "8"},
-                                                    {label: "9", value: "9"},
-                                                    {label: "10", value: "10"},
-                                                    {label: "11", value: "11"},
-                                                    {label: "12", value: "12"},
-                                                    {label: "14", value: "14"},
-                                                    {label: "16", value: "16"},
-                                                    {label: "18", value: "18"},
-                                                    {label: "20", value: "20"},
-                                                    {label: "22", value: "22"},
-                                                    {label: "24", value: "24"},
-                                                    {label: "26", value: "26"},
-                                                    {label: "28", value: "28"},
-                                                    {label: "36", value: "36"},
-                                                    {label: "48", value: "48"},
-                                                    {label: "72", value: "72"},
-                                                ]
-                                            }),
+                                            searchComboBox({id: "editor-sheet-font-family", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: SHEET_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
+                                            searchComboBox({id: "editor-sheet-font-size", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: SHEET_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
                                             button({id: "editor-sheet-style-bold", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`}),
                                             button({id: "editor-sheet-style-italic", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.255859 22.003906 L 14.005859 22.003906 L 14.005859 20.503906 L 13.255859 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`}),
                                             button({id: "editor-sheet-style-underline", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 6.0058594 2 L 6.0058594 2.75 L 6.0058594 12.585938 C 6.0058594 15.618894 8.7446099 18.001953 12.003906 18.001953 C 15.263203 18.001953 18.003906 15.618893 18.003906 12.585938 L 18.003906 2.75 L 18.003906 2 L 16.503906 2 L 16.503906 2.75 L 16.503906 12.585938 C 16.503906 14.706981 14.54261 16.501953 12.003906 16.501953 C 9.4652032 16.501953 7.5058594 14.70698 7.5058594 12.585938 L 7.5058594 2.75 L 7.5058594 2 L 6.0058594 2 z M 4.9980469 20.003906 L 4.9980469 21.503906 L 5.7480469 21.503906 L 18.251953 21.503906 L 19.001953 21.503906 L 19.001953 20.003906 L 18.251953 20.003906 L 5.7480469 20.003906 L 4.9980469 20.003906 z"/></svg>`}),

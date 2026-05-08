@@ -765,32 +765,52 @@ initGlobalFileDrop(async (files) => {
     globalDropUploadInFlight = true;
     try {
         if (typeof window.StandardFilesUploadSelectedFiles === "function") {
-            await window.StandardFilesUploadSelectedFiles(droppedFiles);
+            await window.StandardFilesUploadSelectedFiles(droppedFiles, {multiFileProgress: droppedFiles.length > 1});
             return;
         }
         const defaultDirectory = String(modular?.working_directory || "Documents").trim().replace(/\\/g, "/").replace(/\/+$/, "").replace(/^\/+/, "") || "Documents";
-        for (const file of droppedFiles) {
-            const uploadUrl = `/api/upload?directory=${encodeURIComponent(defaultDirectory)}`;
-            if (typeof window.StandardUploads?.uploadFile === "function") {
-                const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
-                    label: `Uploading ${file.name || "file"}`
-                });
-                if (!response?.ok) {
-                    modular.error(`Upload failed (${response?.status || 0})`);
-                    return;
-                }
-            } else {
-                const formData = new FormData();
-                formData.append("file", file);
-                const res = await fetch(uploadUrl, {
-                    method: "POST",
-                    body: formData
-                });
-                if (!res.ok) {
-                    modular.error(`Upload failed (${res.status})`);
-                    return;
+        const multiProgress = droppedFiles.length > 1 && typeof window.StandardUploads?.createMultiFileProgress === "function"
+            ? window.StandardUploads.createMultiFileProgress(droppedFiles)
+            : null;
+        try {
+            for (let index = 0; index < droppedFiles.length; index++) {
+                const file = droppedFiles[index];
+                const uploadUrl = `/api/upload?directory=${encodeURIComponent(defaultDirectory)}`;
+                if (typeof window.StandardUploads?.uploadFile === "function") {
+                    const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
+                        label: `Uploading ${file.name || "file"}`,
+                        suppressProgress: !!multiProgress,
+                        onProgress: multiProgress
+                            ? progress => multiProgress.update({
+                                currentIndex: index,
+                                file,
+                                loaded: progress?.loaded || 0,
+                                total: progress?.total || file.size || 0,
+                                indeterminate: !!progress?.indeterminate
+                            })
+                            : null
+                    });
+                    if (!response?.ok) {
+                        modular.error(`Upload failed (${response?.status || 0})`);
+                        return;
+                    }
+                } else {
+                    if (multiProgress) multiProgress.update({currentIndex: index, file, loaded: 0, total: file.size || 0, indeterminate: true});
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    const res = await fetch(uploadUrl, {
+                        method: "POST",
+                        body: formData
+                    });
+                    if (!res.ok) {
+                        modular.error(`Upload failed (${res.status})`);
+                        return;
+                    }
+                    if (multiProgress) multiProgress.update({currentIndex: index, file, loaded: file.size || 1, total: file.size || 1});
                 }
             }
+        } finally {
+            if (multiProgress) multiProgress.hide();
         }
         modular.refresh("com.standard.files");
     } finally {
@@ -861,10 +881,18 @@ function focusSearchBoxForTyping() {
     searchBox.focus();
     return searchBox;
 }
-function getFocusedPortalSaveTool() {
+function getFocusedPortalToolByTitle(title = "") {
     const focusedWindow = document.querySelector(".draggable-window.window-focused:not(.widget-window)");
     if (!focusedWindow) return null;
-    return focusedWindow.querySelector("[data-portal-tool-title='save'], [aria-label='Save'], [title='Save']");
+    const normalizedTitle = `${title || ""}`.trim().toLowerCase();
+    if (!normalizedTitle) return null;
+    return focusedWindow.querySelector(`[data-portal-tool-title='${normalizedTitle}'], [aria-label='${title}'], [title='${title}']`);
+}
+function getFocusedPortalSaveTool() {
+    return getFocusedPortalToolByTitle("Save");
+}
+function getFocusedPortalEditTool() {
+    return getFocusedPortalToolByTitle("Edit");
 }
 function getFocusedPortalWindow() {
     return document.querySelector(".draggable-window.window-focused:not(.widget-window)");
@@ -911,6 +939,17 @@ document.addEventListener("keydown", function (e) {
             saveTool.click();
         } else {
             modular.error("No save in this app");
+        }
+        return;
+    }
+
+    if (e.ctrlKey && !e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "m") {
+        const editTool = getFocusedPortalEditTool();
+        e.preventDefault();
+        if (editTool) {
+            editTool.click();
+        } else {
+            modular.error("No edit in this app");
         }
         return;
     }

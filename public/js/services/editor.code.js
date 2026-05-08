@@ -500,7 +500,7 @@
     window.StandardCodeEditor = window.StandardCodeEditor || {};
     window.StandardCodeEditor.openFreshCodeEditor = openFreshCodeEditor;
     window.StandardCodeEditor.openCodeFilePath = (rawPath = "", content = "") => {
-        const portal = modular.start(SERVICE_ID);
+        const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
         if (portal) {
             setPortalCodeState(portal, {
                 directive: normalizeCodeFilePath(rawPath),

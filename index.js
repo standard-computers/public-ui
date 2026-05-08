@@ -72,6 +72,7 @@ let reconnectTimer = null;
 let wsConnectTimer = null;
 let connectionStatus = "connecting";
 const statusSubscribers = new Set();
+const pushSubscribers = new Set();
 const userSessions = new Map();
 const knownUsernames = new Map();
 const knownUserFolders = new Map();
@@ -895,6 +896,7 @@ function enqueueWsRequest({
 }
 
 function dispatchWsMessage(data, isBinary = false) {
+    if (handleInboundPushCommand(data, isBinary)) return;
     if (!activeWsRequest || typeof activeWsRequest.onMessage !== "function") {
         console.warn("[ws-dispatch:unhandled-message]", {
             activeRequestId: activeWsRequest?.id || null,
@@ -1204,6 +1206,63 @@ function broadcastStatus(status) {
     for (const res of statusSubscribers) {
         res.write(payload);
     }
+}
+
+function parseInboundPushCommand(data, isBinary = false) {
+    if (isBinary) return null;
+    const raw = String(data ?? "").trim();
+    if (!raw) return null;
+    let targetSerial = null;
+    let commandText = raw;
+    if (isRelayMode) {
+        const relayMatch = raw.match(/^@([^\s]+)\s+(.+)$/);
+        if (!relayMatch) return null;
+        targetSerial = relayMatch[1].trim();
+        commandText = relayMatch[2].trim();
+        if (!targetSerial || !commandText) return null;
+    }
+    const startMatch = commandText.match(/^start\s+([a-z0-9][a-z0-9_.-]*)(?:\s*)$/i);
+    if (!startMatch) return null;
+    const serviceId = startMatch[1].trim();
+    if (!/^com\.standard\.[a-z0-9_.-]+$/i.test(serviceId)) return null;
+    return {
+        command: "start",
+        serviceId,
+        targetSerial,
+        receivedAt: Date.now()
+    };
+}
+
+function broadcastPushCommand(pushCommand) {
+    if (!pushCommand) return false;
+    const payload = `data: ${JSON.stringify({
+        command: pushCommand.command,
+        serviceId: pushCommand.serviceId,
+        timestamp: pushCommand.receivedAt || Date.now()
+    })}\n\n`;
+    let delivered = false;
+    for (const subscriber of pushSubscribers) {
+        if (isRelayMode) {
+            const subscriberSerial = subscriber?.relayContext?.deviceSerial;
+            if (!subscriberSerial || subscriberSerial !== pushCommand.targetSerial) continue;
+        }
+        subscriber.res.write(payload);
+        delivered = true;
+    }
+    return delivered;
+}
+
+function handleInboundPushCommand(data, isBinary = false) {
+    const pushCommand = parseInboundPushCommand(data, isBinary);
+    if (!pushCommand) return false;
+    const delivered = broadcastPushCommand(pushCommand);
+    console.log("[ws-push-command]", {
+        command: pushCommand.command,
+        serviceId: pushCommand.serviceId,
+        targetSerial: pushCommand.targetSerial || null,
+        delivered
+    });
+    return true;
 }
 
 function updateConnectionStatus(nextStatus) {
@@ -1733,6 +1792,27 @@ app.get("/events/device-status", (req, res) => {
     res.write(`data: ${JSON.stringify({status: connectionStatus, timestamp: Date.now()})}\n\n`);
     req.on("close", () => {
         statusSubscribers.delete(res);
+    });
+});
+
+app.get("/events/push", (req, res) => {
+    const relayContext = isRelayMode ? (req.relayContext || resolveRelayContext(req)) : null;
+    if (isRelayMode && !relayContext) {
+        return res.status(403).end();
+    }
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    if (res.flushHeaders) res.flushHeaders();
+    const subscriber = {
+        res,
+        userId: req.session?.userId || null,
+        relayContext
+    };
+    pushSubscribers.add(subscriber);
+    res.write(`data: ${JSON.stringify({command: "ready", timestamp: Date.now()})}\n\n`);
+    req.on("close", () => {
+        pushSubscribers.delete(subscriber);
     });
 });
 

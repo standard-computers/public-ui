@@ -19,6 +19,7 @@
     let activeImageFetchToken = 0;
     let activeImageIntrinsicSize = null;
     let activeImageIsSvg = false;
+    let activeImageNeedsWindowAutosize = false;
     let activeVideoFilePath = "";
     let activeVideoFileSource = "";
     let activeVideoObjectUrl = "";
@@ -30,8 +31,13 @@
     const getPathForDownload = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
     const getFileName = (rawPath = "") => String(rawPath || "").split("/").pop() || "Internals";
     const findInternalsWindow = (portalIndex = 0) => [...Array.from(document.querySelectorAll(".draggable-window"))].reverse().find((windowNode) => typeof windowNode?.portal?.serviceId === "function" && windowNode.portal.serviceId() === "com.standard.internals" && windowNode.portal.portalIndex() === portalIndex);
-    const updatePortalTitle = (portalIndex, filePath = "") => {
-        const portal = findInternalsWindow(portalIndex)?.portal;
+    const getPortalFromSource = (sourceNode = null, portalIndex = 0) => {
+        const sourcePortal = sourceNode?.closest?.(".draggable-window")?.portal;
+        if (sourcePortal?.serviceId?.() === "com.standard.internals" && sourcePortal?.portalIndex?.() === portalIndex) return sourcePortal;
+        return findInternalsWindow(portalIndex)?.portal || null;
+    };
+    const updatePortalTitle = (portalIndex, filePath = "", portal = null) => {
+        portal = portal || findInternalsWindow(portalIndex)?.portal;
         if (portal && typeof portal.setTitle === "function") portal.setTitle(getFileName(filePath));
     };
     const shouldRenderTextPreviewAsHtml = (filePath = "") => HTML_TEXT_VIEW_PATTERN.test(String(filePath || ""));
@@ -134,33 +140,36 @@
         const decodedContent = decodeTextDocumentContent(content);
         return shouldRenderTextPreviewAsHtml(filePath) ? sanitizeTextPreviewMarkup(decodedContent) : decodedContent;
     };
-    const updateTextPreview = () => {
-        const textPreview = document.getElementById("internals-text-preview");
+    const updateTextPreview = (portal = findInternalsWindow(0)?.portal) => {
+        const root = portal?.window?.() || document;
+        const textPreview = root.querySelector("#internals-text-preview");
         if (!textPreview) return;
         if (shouldRenderTextPreviewAsHtml(activeTextFilePath)) {
             textPreview.innerHTML = sanitizeTextPreviewMarkup(activeTextFileContent);
         } else {
             textPreview.textContent = activeTextFileContent;
         }
-        const pathLabel = document.getElementById("internals-text-preview-path");
+        const pathLabel = root.querySelector("#internals-text-preview-path");
         if (pathLabel) pathLabel.textContent = activeTextFilePath || "No file selected";
-        updatePortalTitle(0, activeTextFilePath);
-        updateTextEditToolState();
+        updatePortalTitle(0, activeTextFilePath, portal);
+        updateTextEditToolState(portal);
     };
-    const updateTextEditToolState = () => {
-        const textWindow = findInternalsWindow(0);
-        const editTool = textWindow?.querySelector('[aria-label="Edit in Editor"]');
+    const updateTextEditToolState = (portal = findInternalsWindow(0)?.portal) => {
+        const textWindow = portal?.window?.() || findInternalsWindow(0);
+        const editTool = textWindow?.querySelector('[aria-label="Edit"]');
         if (!editTool) return;
         const isReadOnly = activeTextReadOnly === true;
         editTool.style.opacity = isReadOnly ? "0.4" : "";
         editTool.style.pointerEvents = isReadOnly ? "none" : "";
         editTool.setAttribute("aria-disabled", isReadOnly ? "true" : "false");
-        editTool.title = isReadOnly ? "Read-only cache preview" : "Edit in Editor";
+        editTool.title = isReadOnly ? "Read-only cache preview" : "Edit";
     };
-    const updateImagePreview = () => {
-        const previewHost = document.getElementById("internals-image-preview-host");
+    const updateImagePreview = ({autoSizeWindow = activeImageNeedsWindowAutosize, portal = findInternalsWindow(1)?.portal} = {}) => {
+        const root = portal?.window?.() || document;
+        const previewHost = root.querySelector("#internals-image-preview-host");
         if (!previewHost) return;
         previewHost.innerHTML = "";
+        activeImageNeedsWindowAutosize = false;
         const svgMarkup = getSvgMarkupFromSource(activeImageFileSource);
         const shouldRenderSvg = SVG_FILE_PATTERN.test(String(activeImageFilePath || ""));
         if (shouldRenderSvg) {
@@ -169,23 +178,23 @@
             if (svgPreview) {
                 svgPreview.style.display = "block";
                 svgPreview.style.borderRadius = "inherit";
-                autoSizeImagePortalToImage(svgPreview);
+                autoSizeImagePortalToImage(svgPreview, {resizeWindow: autoSizeWindow, portal});
             }
         } else if (activeImageFileSource) {
             const imagePreview = document.createElement("img");
-            imagePreview.className = "fill radius";
+            imagePreview.className = "radius";
             imagePreview.style.display = "";
             imagePreview.alt = activeImageFilePath || "Image preview";
-            imagePreview.onload = () => autoSizeImagePortalToImage(imagePreview);
+            imagePreview.onload = () => autoSizeImagePortalToImage(imagePreview, {resizeWindow: autoSizeWindow, portal});
             imagePreview.src = activeImageFileSource;
             previewHost.appendChild(imagePreview);
             if (imagePreview.complete && imagePreview.naturalWidth > 0 && imagePreview.naturalHeight > 0) {
-                autoSizeImagePortalToImage(imagePreview);
+                autoSizeImagePortalToImage(imagePreview, {resizeWindow: autoSizeWindow, portal});
             }
         }
-        const pathLabel = document.getElementById("internals-image-preview-path");
+        const pathLabel = root.querySelector("#internals-image-preview-path");
         if (pathLabel) pathLabel.textContent = activeImageFilePath || "No file selected";
-        updatePortalTitle(1, activeImageFilePath);
+        updatePortalTitle(1, activeImageFilePath, portal);
     };
     const imageDownloadUrl = (filePath = "", cacheBust = false) => {
         if (!filePath) return "";
@@ -259,7 +268,7 @@
         const blob = await response.blob();
         return resolveImageSourceFromContent(filePath, blob);
     };
-    const refreshImageCacheInBackground = async (filePath = "", expectedToken = 0) => {
+    const refreshImageCacheInBackground = async (filePath = "", expectedToken = 0, portal = findInternalsWindow(1)?.portal) => {
         if (!filePath || expectedToken !== activeImageFetchToken) return;
         try {
             const latestContent = await fetchImageContentSource(filePath, {cacheBust: true});
@@ -269,21 +278,23 @@
                 activeImageFileSource = latestContent.source;
                 activeImageIntrinsicSize = latestContent.intrinsicSize;
                 activeImageIsSvg = latestContent.isSvg === true;
-                updateImagePreview();
+                activeImageNeedsWindowAutosize = true;
+                updateImagePreview({autoSizeWindow: true, portal});
             }
-            const savedState = findInternalsWindow(1)?.portal?.windowState?.() || {};
-            if (savedState?.cachedContent !== latestContent.source || savedState?.directive !== filePath) syncPortalWindowState(1, {directive: filePath, cachedContent: latestContent.source});
+            const savedState = portal?.windowState?.() || {};
+            if (savedState?.cachedContent !== latestContent.source || savedState?.directive !== filePath) syncPortalWindowState(1, {directive: filePath, cachedContent: latestContent.source}, portal);
         } catch (_) {
         }
     };
-    const autoSizeImagePortalToImage = (imagePreview) => {
+    const autoSizeImagePortalToImage = (imagePreview, {resizeWindow = true, portal = findInternalsWindow(1)?.portal} = {}) => {
         const imageWidth = imagePreview?.naturalWidth || activeImageIntrinsicSize?.width || 0;
         const imageHeight = imagePreview?.naturalHeight || activeImageIntrinsicSize?.height || 0;
         if (!(imageWidth > 0) || !(imageHeight > 0)) return;
-        const windowNode = findInternalsWindow(1);
+        const windowNode = portal?.window?.() || findInternalsWindow(1);
         if (!windowNode) return;
         const bodyNode = windowNode.querySelector(".window-body");
         if (!bodyNode) return;
+        const routeShell = windowNode.querySelector("#internals-image-preview-shell");
         const fitScale = Math.min(1, IMAGE_VIEWER_MAX_WIDTH / imageWidth, IMAGE_VIEWER_MAX_HEIGHT / imageHeight);
         const targetImageWidth = Math.max(1, Math.round(imageWidth * fitScale));
         const targetImageHeight = Math.max(1, Math.round(imageHeight * fitScale));
@@ -292,19 +303,38 @@
         imagePreview.style.maxWidth = "none";
         imagePreview.style.maxHeight = "none";
         imagePreview.style.display = "block";
+        const bodyStyles = window.getComputedStyle(bodyNode);
+        const shellStyles = routeShell ? window.getComputedStyle(routeShell) : null;
+        const bodyPaddingX = (Number.parseFloat(bodyStyles.paddingLeft) || 0) + (Number.parseFloat(bodyStyles.paddingRight) || 0);
+        const bodyPaddingY = (Number.parseFloat(bodyStyles.paddingTop) || 0) + (Number.parseFloat(bodyStyles.paddingBottom) || 0);
+        const shellPaddingX = shellStyles ? (Number.parseFloat(shellStyles.paddingLeft) || 0) + (Number.parseFloat(shellStyles.paddingRight) || 0) : 0;
+        const shellPaddingY = shellStyles ? (Number.parseFloat(shellStyles.paddingTop) || 0) + (Number.parseFloat(shellStyles.paddingBottom) || 0) : 0;
+        const requiredBodyWidth = Math.ceil(targetImageWidth + shellPaddingX + bodyPaddingX);
+        const requiredBodyHeight = Math.ceil(targetImageHeight + shellPaddingY + bodyPaddingY);
+        if (!resizeWindow) {
+            const shellRect = routeShell?.getBoundingClientRect?.();
+            const availableWidth = Math.max(1, (shellRect?.width || bodyNode.clientWidth) - shellPaddingX);
+            const availableHeight = Math.max(1, (shellRect?.height || bodyNode.clientHeight) - shellPaddingY);
+            const viewScale = Math.min(availableWidth / imageWidth, availableHeight / imageHeight);
+            imagePreview.style.width = `${Math.max(1, Math.round(imageWidth * viewScale))}px`;
+            imagePreview.style.height = `${Math.max(1, Math.round(imageHeight * viewScale))}px`;
+            bodyNode.style.overflow = "hidden";
+            return;
+        }
         bodyNode.style.width = "";
         bodyNode.style.height = "";
         bodyNode.style.minHeight = "";
         bodyNode.style.maxHeight = "";
-        const bodyStyles = window.getComputedStyle(bodyNode);
-        const bodyPaddingX = (Number.parseFloat(bodyStyles.paddingLeft) || 0) + (Number.parseFloat(bodyStyles.paddingRight) || 0);
-        const bodyPaddingY = (Number.parseFloat(bodyStyles.paddingTop) || 0) + (Number.parseFloat(bodyStyles.paddingBottom) || 0);
-        const requiredBodyWidth = Math.ceil(targetImageWidth + bodyPaddingX);
-        const requiredBodyHeight = Math.ceil(targetImageHeight + bodyPaddingY);
-        const chromeWidth = Math.max(0, windowNode.offsetWidth - bodyNode.clientWidth);
-        const chromeHeight = Math.max(0, windowNode.offsetHeight - bodyNode.clientHeight);
-        windowNode.style.width = `${requiredBodyWidth + chromeWidth}px`;
-        windowNode.style.height = `${requiredBodyHeight + chromeHeight}px`;
+        const contentNode = bodyNode.parentElement;
+        const contentStyles = contentNode ? window.getComputedStyle(contentNode) : null;
+        const contentRightExtras = contentStyles
+            ? (Number.parseFloat(contentStyles.marginRight) || 0) + (Number.parseFloat(contentStyles.paddingRight) || 0) + (Number.parseFloat(contentStyles.borderRightWidth) || 0)
+            : 0;
+        const contentBottomExtras = contentStyles
+            ? (Number.parseFloat(contentStyles.marginBottom) || 0) + (Number.parseFloat(contentStyles.paddingBottom) || 0) + (Number.parseFloat(contentStyles.borderBottomWidth) || 0)
+            : 0;
+        windowNode.style.width = `${Math.ceil(requiredBodyWidth + bodyNode.offsetLeft + contentRightExtras)}px`;
+        windowNode.style.height = `${Math.ceil(requiredBodyHeight + bodyNode.offsetTop + contentBottomExtras)}px`;
         bodyNode.style.overflow = "hidden";
         bodyNode.style.minHeight = `${requiredBodyHeight}px`;
         bodyNode.style.maxHeight = `${requiredBodyHeight}px`;
@@ -450,8 +480,8 @@
         if (referenceLabel) referenceLabel.textContent = activeStandardDataReference || "No standard selected";
         updatePortalTitle(3, activeStandardDataReference ? `Data ${activeStandardDataReference}` : "Data Portal");
     };
-    const syncPortalWindowState = (portalIndex, context = {}) => {
-        const portal = findInternalsWindow(portalIndex)?.portal;
+    const syncPortalWindowState = (portalIndex, context = {}, portal = null) => {
+        portal = portal || findInternalsWindow(portalIndex)?.portal;
         if (!portal || typeof portal.setWindowState !== "function") return;
         portal.setWindowState(context);
     };
@@ -459,17 +489,18 @@
         const portal = sourceNode?.closest?.(".draggable-window")?.portal || findInternalsWindow(0)?.portal;
         if (portal?.serviceId?.() === "com.standard.internals" && portal?.portalIndex?.() === 0 && typeof portal.hide === "function") portal.hide();
     };
-    const restoreTextStateFromPortal = () => {
-        const state = findInternalsWindow(0)?.portal?.windowState?.() || {};
+    const restoreTextStateFromPortal = (portal = findInternalsWindow(0)?.portal) => {
+        const state = portal?.windowState?.() || {};
         if (state?.directive) activeTextFilePath = String(state.directive);
         if (typeof state?.cachedContent === "string") activeTextFileContent = normalizeTextPreviewContent(state.cachedContent, state?.directive || activeTextFilePath);
         activeTextReadOnly = state?.readOnly === true;
     };
-    const restoreImageStateFromPortal = () => {
-        const state = findInternalsWindow(1)?.portal?.windowState?.() || {};
+    const restoreImageStateFromPortal = (portal = findInternalsWindow(1)?.portal) => {
+        const state = portal?.windowState?.() || {};
         activeImageFetchToken += 1;
         if (state?.directive) activeImageFilePath = String(state.directive);
-        if (typeof state?.cachedContent === "string" && state.cachedContent.trim() !== "") {
+        const restoredCachedSource = typeof state?.cachedContent === "string" && state.cachedContent.trim() !== "";
+        if (restoredCachedSource) {
             activeImageFileSource = state.cachedContent;
             activeImageObjectUrl = state.cachedContent.startsWith("blob:") ? state.cachedContent : "";
             activeImageIsSvg = SVG_MARKUP_PATTERN.test(state.cachedContent) || state.cachedContent.startsWith("data:image/svg+xml");
@@ -480,8 +511,8 @@
             activeImageIntrinsicSize = null;
             activeImageIsSvg = SVG_FILE_PATTERN.test(activeImageFilePath);
         }
-        if (activeImageFilePath) {
-            void refreshImageCacheInBackground(activeImageFilePath, activeImageFetchToken);
+        if (activeImageFilePath && !restoredCachedSource) {
+            void refreshImageCacheInBackground(activeImageFilePath, activeImageFetchToken, portal);
         }
     };
     const restoreVideoStateFromPortal = () => {
@@ -503,15 +534,21 @@
         if (state?.cachedContent !== undefined) activeStandardDataPayload = state.cachedContent;
     };
     const openTextInEditorApp = async sourceNode => {
-        if (activeTextReadOnly) {
+        const sourcePortal = getPortalFromSource(sourceNode, 0);
+        const sourceState = sourcePortal?.windowState?.() || {};
+        const hasSourceState = !!(sourceState?.directive || sourceState?.cachedContent !== undefined);
+        const sourceFilePath = String(sourceState?.directive || activeTextFilePath || "");
+        const sourceContent = typeof sourceState?.cachedContent === "string" ? sourceState.cachedContent : activeTextFileContent;
+        const sourceReadOnly = hasSourceState ? sourceState?.readOnly === true : activeTextReadOnly === true;
+        if (sourceReadOnly) {
             modular.error("This preview is read-only");
             return;
         }
-        if (!activeTextFilePath) {
+        if (!sourceFilePath) {
             modular.error("Open a text file first");
             return;
         }
-        const shouldOpenInCodeEditor = CODE_FILE_PATTERN.test(String(activeTextFilePath || ""));
+        const shouldOpenInCodeEditor = CODE_FILE_PATTERN.test(String(sourceFilePath || ""));
         if (shouldOpenInCodeEditor) {
             if (typeof window.StandardCodeEditor?.openCodeFilePath !== "function") {
                 if (typeof modular?.start === "function") modular.start("com.standard.editor.code");
@@ -521,7 +558,7 @@
                 }
             }
             if (typeof window.StandardCodeEditor?.openCodeFilePath === "function") {
-                const opened = window.StandardCodeEditor.openCodeFilePath(activeTextFilePath, activeTextFileContent, sourceNode);
+                const opened = window.StandardCodeEditor.openCodeFilePath(sourceFilePath, sourceContent, sourceNode);
                 if (opened !== false) hideTextPortal(sourceNode);
                 return;
             }
@@ -534,7 +571,7 @@
             }
         }
         if (typeof window.StandardEditor?.openTextFilePath === "function") {
-            const opened = window.StandardEditor.openTextFilePath(activeTextFilePath, activeTextFileContent, sourceNode);
+            const opened = window.StandardEditor.openTextFilePath(sourceFilePath, sourceContent, sourceNode);
             if (opened !== false) hideTextPortal(sourceNode);
         }
     };
@@ -548,9 +585,9 @@
             activeTextFilePath = filePath;
             activeTextFileContent = normalizeTextPreviewContent(new TextDecoder().decode(fileBuffer), filePath);
             activeTextReadOnly = false;
-            modular.show("com.standard.internals", 0);
-            syncPortalWindowState(0, {directive: filePath, cachedContent: activeTextFileContent, readOnly: false});
-            updateTextPreview();
+            const portal = modular.show("com.standard.internals", 0, {newInstance: true});
+            syncPortalWindowState(0, {directive: filePath, cachedContent: activeTextFileContent, readOnly: false}, portal);
+            updateTextPreview(portal);
             return true;
         } catch (_) {
             modular.error("Unable to open file in Internals");
@@ -562,9 +599,9 @@
         activeTextFilePath = String(title || "Cache Preview");
         activeTextFileContent = normalizeTextPreviewContent(content, activeTextFilePath);
         activeTextReadOnly = readOnly;
-        modular.show("com.standard.internals", 0);
-        syncPortalWindowState(0, {directive: activeTextFilePath, cachedContent: activeTextFileContent, readOnly});
-        updateTextPreview();
+        const portal = modular.show("com.standard.internals", 0, {newInstance: true});
+        syncPortalWindowState(0, {directive: activeTextFilePath, cachedContent: activeTextFileContent, readOnly}, portal);
+        updateTextPreview(portal);
         return true;
     };
     const openImageSource = (source = "", options = {}) => {
@@ -579,9 +616,10 @@
         activeImageObjectUrl = !isSvgMarkup && options?.isObjectUrl ? imageSource : "";
         activeImageIsSvg = isSvgMarkup || imageSource.startsWith("data:image/svg+xml") || SVG_FILE_PATTERN.test(activeImageFilePath);
         activeImageIntrinsicSize = activeImageIsSvg ? getSvgIntrinsicSize(getSvgMarkupFromSource(imageSource) || rawImageSource) : null;
-        modular.show("com.standard.internals", 1);
-        syncPortalWindowState(1, {directive: activeImageFilePath, cachedContent: imageSource});
-        updateImagePreview();
+        activeImageNeedsWindowAutosize = true;
+        const portal = modular.show("com.standard.internals", 1, {newInstance: true});
+        syncPortalWindowState(1, {directive: activeImageFilePath, cachedContent: imageSource}, portal);
+        updateImagePreview({autoSizeWindow: true, portal});
         return true;
     };
     const openImageFilePath = (rawPath = "", sourceNode = null) => {
@@ -593,10 +631,11 @@
         activeImageFileSource = SVG_FILE_PATTERN.test(filePath) ? "" : imageDownloadUrl(filePath);
         activeImageIntrinsicSize = null;
         activeImageIsSvg = SVG_FILE_PATTERN.test(filePath);
-        modular.show("com.standard.internals", 1);
-        syncPortalWindowState(1, {directive: filePath});
-        updateImagePreview();
-        void refreshImageCacheInBackground(filePath, activeImageFetchToken);
+        activeImageNeedsWindowAutosize = true;
+        const portal = modular.show("com.standard.internals", 1, {newInstance: true});
+        syncPortalWindowState(1, {directive: filePath}, portal);
+        updateImagePreview({autoSizeWindow: true, portal});
+        void refreshImageCacheInBackground(filePath, activeImageFetchToken, portal);
         return true;
     };
     const openVideoFilePath = async (rawPath = "", sourceNode = null) => {
@@ -664,14 +703,14 @@
             dimensions: [520, 460],
             navigation: false,
             tools: [{
-                title: "Edit in Editor",
+                title: "Edit",
                 icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><g transform="scale(0.9) translate(1.333 1.333) translate(0.25 0.6)"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75a2.121 2.121 0 1 1 3 3L9 17.25 4.5 18.75 6 14.25 16.5 3.75Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 5.25l3 3" /></g></svg>`,
                 onclick: (event) => openTextInEditorApp(event?.target)
             }],
             route: () => div({style: "large-padding-top small-padding", content: children([div({id: "internals-text-preview", style: "padded", content: activeTextFileContent})])}),
-            afterRender: () => {
-                restoreTextStateFromPortal();
-                updateTextPreview();
+            afterRender: function () {
+                restoreTextStateFromPortal(this.portal);
+                updateTextPreview(this.portal);
             }
         }),
         new Portal({
@@ -679,10 +718,10 @@
             internal: true,
             dimensions: [720, 540],
             navigation: false,
-            route: () => div({style: "large-padding-top fill", content: children([div({style: "fit-center", content: div({id: "internals-image-preview-host", style: "radius"})})])}),
-            afterRender: () => {
-                restoreImageStateFromPortal();
-                updateImagePreview();
+            route: () => div({id: "internals-image-preview-shell", style: "internals-image-viewer-shell large-padding-top fill", content: children([div({style: "internals-image-viewer-center", content: div({id: "internals-image-preview-host", style: "internals-image-preview-host radius"})})])}),
+            afterRender: function () {
+                restoreImageStateFromPortal(this.portal);
+                updateImagePreview({portal: this.portal});
             }
         }),
         new Portal({

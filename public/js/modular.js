@@ -79,6 +79,10 @@ let modular = {
         const route = modular.resolveLegacyServiceRoute(sId, options?.portalIndex ?? 0);
         const targetServiceId = route?.serviceId || sId;
         const targetPortalIndex = Number.isFinite(Number(route?.portalIndex)) ? Number(route.portalIndex) : 0;
+        if (window.StandardPlatformInterfaces && !window.StandardPlatformInterfaces.isEnabled(targetServiceId)) {
+            console.warn(`${targetServiceId} is disabled`);
+            return null;
+        }
         if (sId !== null) {
             for (let i = 0; i < modular.running.length; i++) {
                 const ls = modular.running[i];
@@ -96,6 +100,10 @@ let modular = {
         const route = modular.resolveLegacyServiceRoute(sId, index);
         const targetServiceId = route?.serviceId || sId;
         const targetPortalIndex = Number.isFinite(Number(route?.portalIndex)) ? Number(route.portalIndex) : 0;
+        if (window.StandardPlatformInterfaces && !window.StandardPlatformInterfaces.isEnabled(targetServiceId)) {
+            console.warn(`${targetServiceId} is disabled`);
+            return null;
+        }
         if (sId !== null) {
             for (let i = 0; i < modular.running.length; i++) {
                 const ls = modular.running[i];
@@ -149,7 +157,10 @@ let modular = {
     renderInterfaceShortcuts: () => {
         const container = document.getElementById("interface-shortcuts");
         if (!container) return;
-        const services = (modular.running || []).map(service => service?.interfaceShortcut?.()).filter(shortcut => shortcut?.serviceId && shortcut?.icon);
+        const services = (modular.running || [])
+            .filter(service => !window.StandardPlatformInterfaces || window.StandardPlatformInterfaces.isEnabled(service?.name?.()))
+            .map(service => service?.interfaceShortcut?.())
+            .filter(shortcut => shortcut?.serviceId && shortcut?.icon);
         container.innerHTML = "";
         services.forEach(shortcut => {
             const icon = document.createElement("div");

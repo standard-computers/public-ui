@@ -339,27 +339,47 @@
     const isSvgFilePath = (rawPath = "") => /\.svg$/i.test(String(rawPath || ""));
     const isVideoFilePath = (rawPath = "") => /\.(mp4|webm|mov|m4v|avi|mkv|mpeg|mpg|ogv)$/i.test(String(rawPath || ""));
     const getDefaultUploadDirectory = () => normalizeUploadDirectory(window.StandardFilesUploadDirectory || active_upload_directory || modular.working_directory || "Documents");
-    const uploadSelectedFiles = async fileList => {
+    const uploadSelectedFiles = async (fileList, options = {}) => {
         const files = Array.from(fileList || []);
         if (!files.length) return;
         const targetDirectory = getDefaultUploadDirectory();
         setActiveUploadDirectory(targetDirectory);
-        for (const file of files) {
-            const uploadUrl = `/api/upload?directory=${encodeURIComponent(targetDirectory)}`;
-            if (typeof window.StandardUploads?.uploadFile === "function") {
-                const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
-                    label: `Uploading ${file.name || "file"}`
-                });
-                if (!response?.ok) throw new Error(`Upload failed (${response?.status || 0})`);
-            } else {
-                const formData = new FormData();
-                formData.append("file", file);
-                const response = await fetch(uploadUrl, {
-                    method: "POST",
-                    body: formData
-                });
-                if (!response.ok) throw new Error(`Upload failed (${response.status})`);
+        const multiProgress = options?.multiFileProgress && files.length > 1 && typeof window.StandardUploads?.createMultiFileProgress === "function"
+            ? window.StandardUploads.createMultiFileProgress(files)
+            : null;
+        try {
+            for (let index = 0; index < files.length; index++) {
+                const file = files[index];
+                const uploadUrl = `/api/upload?directory=${encodeURIComponent(targetDirectory)}`;
+                if (typeof window.StandardUploads?.uploadFile === "function") {
+                    const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
+                        label: `Uploading ${file.name || "file"}`,
+                        suppressProgress: !!multiProgress,
+                        onProgress: multiProgress
+                            ? progress => multiProgress.update({
+                                currentIndex: index,
+                                file,
+                                loaded: progress?.loaded || 0,
+                                total: progress?.total || file.size || 0,
+                                indeterminate: !!progress?.indeterminate
+                            })
+                            : null
+                    });
+                    if (!response?.ok) throw new Error(`Upload failed (${response?.status || 0})`);
+                } else {
+                    if (multiProgress) multiProgress.update({currentIndex: index, file, loaded: 0, total: file.size || 0, indeterminate: true});
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    const response = await fetch(uploadUrl, {
+                        method: "POST",
+                        body: formData
+                    });
+                    if (!response.ok) throw new Error(`Upload failed (${response.status})`);
+                    if (multiProgress) multiProgress.update({currentIndex: index, file, loaded: file.size || 1, total: file.size || 1});
+                }
             }
+        } finally {
+            if (multiProgress) multiProgress.hide();
         }
         modular.refresh("com.standard.files");
     };
@@ -767,16 +787,31 @@
             deleteFile(path, tile);
         }
     }];
+    const getImageSourceFromTile = sourceNode => {
+        const tile = sourceNode?.closest?.(".file-folder") || sourceNode;
+        const image = sourceNode?.matches?.("img") ? sourceNode : tile?.querySelector?.("img");
+        return String(image?.currentSrc || image?.src || image?.getAttribute?.("src") || "").trim();
+    };
     const openPhotoInImageViewer = async (rawPath = "", sourceNode = null) => {
-        if (typeof window.StandardInternals?.openImageFilePath === "function") {
-            return window.StandardInternals.openImageFilePath(rawPath, sourceNode);
-        }
+        const openRenderedPhoto = () => {
+            const renderedSource = getImageSourceFromTile(sourceNode);
+            if (!renderedSource || typeof window.StandardInternals?.openImageSource !== "function") return false;
+            return window.StandardInternals.openImageSource(renderedSource, {
+                path: getFilePathForRemoveCommand(rawPath),
+                title: String(rawPath || "").split("/").pop() || "Photo",
+                isObjectUrl: renderedSource.startsWith("blob:"),
+                revokePrevious: false,
+                sourceNode
+            });
+        };
+        if (openRenderedPhoto()) return true;
         if (typeof modular?.start === "function") modular.start("com.standard.internals");
         for (let attempt = 0; attempt < 20; attempt++) {
-            if (typeof window.StandardInternals?.openImageFilePath === "function") {
-                return window.StandardInternals.openImageFilePath(rawPath, sourceNode);
-            }
+            if (openRenderedPhoto()) return true;
             await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        if (typeof window.StandardInternals?.openImageFilePath === "function") {
+            return window.StandardInternals.openImageFilePath(rawPath, sourceNode);
         }
         return false;
     };
