@@ -1099,26 +1099,27 @@
             syncTextToolbarIconColor(listButton);
         }
     };
-    const runTextEditorStateSync = () => {
-        activeTextEditorContent = readTextEditorContent();
-        if (activeTextPageViewEnabled) applyTextEditorPageView(true);
-        syncEditorWindowState();
+    const runTextEditorStateSync = (portal = findTextPortal()) => {
+        restoreEditorWindowState(portal);
+        activeTextEditorContent = readTextEditorContent(findTextEditorNode(portal));
+        if (activeTextPageViewEnabled) applyTextEditorPageView(true, findTextEditorNode(portal), portal);
+        syncEditorWindowState(portal);
         updateTextToolbarState();
     };
-    const syncTextEditorStateFromDom = ({deferHeavyWork = false} = {}) => {
+    const syncTextEditorStateFromDom = ({deferHeavyWork = false, portal = findTextPortal()} = {}) => {
         if (!deferHeavyWork) {
             if (textEditorDeferredSyncTimer) {
                 window.clearTimeout(textEditorDeferredSyncTimer);
                 textEditorDeferredSyncTimer = null;
             }
-            runTextEditorStateSync();
+            runTextEditorStateSync(portal);
             return;
         }
         updateTextToolbarState();
         if (textEditorDeferredSyncTimer) window.clearTimeout(textEditorDeferredSyncTimer);
         textEditorDeferredSyncTimer = window.setTimeout(() => {
             textEditorDeferredSyncTimer = null;
-            runTextEditorStateSync();
+            runTextEditorStateSync(portal);
         }, TEXT_INPUT_SYNC_DEBOUNCE_MS);
     };
     const execTextEditorCommand = (command, value = null) => {
@@ -1658,7 +1659,7 @@
         });
         textArea.addEventListener("input", () => {
             rememberTextSelection();
-            syncTextEditorStateFromDom({deferHeavyWork: true});
+            syncTextEditorStateFromDom({deferHeavyWork: true, portal});
         });
         textArea.addEventListener("keyup", () => {
             rememberTextSelection();
@@ -1974,9 +1975,12 @@
             modular.error("File name is required");
             return false;
         }
+        const state = portal?.windowState?.() || {};
         activeTextEditorFilePath = normalizedPath;
-        if (isPlainTextFilePath(normalizedPath)) activeTextPageViewEnabled = false;
-        activeTextEditorContent = readTextEditorContent();
+        activeTextPageViewEnabled = isPlainTextFilePath(normalizedPath)
+            ? false
+            : (typeof state?.pageViewEnabled === "boolean" ? state.pageViewEnabled : activeTextPageViewEnabled);
+        activeTextEditorContent = readTextEditorContent(findTextEditorNode(portal));
         persistTextDocumentPageViewPreference(normalizedPath, activeTextPageViewEnabled);
         const persistedContent = encodeTextEditorContentForSave(activeTextEditorContent);
         const bytes = new TextEncoder().encode(persistedContent);
@@ -2018,11 +2022,13 @@
         });
     };
     const saveLoadedTextFile = async (portal = findTextPortal()) => {
-        if (!activeTextEditorFilePath) {
+        const state = portal?.windowState?.() || {};
+        const portalPath = normalizeTextFilePath(state?.directive || "");
+        if (!portalPath) {
             saveNewTextFileToDocuments(portal);
             return;
         }
-        await saveTextEditorContentToPath(activeTextEditorFilePath, portal);
+        await saveTextEditorContentToPath(portalPath, portal);
     };
     const openFreshTextEditor = (sourceNode = null) => {
         activeTextEditorFilePath = "";

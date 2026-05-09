@@ -526,6 +526,9 @@ class Portal {
     #isResizable() {
         return !(this.#struct?.resizable === false || this.#struct?.resizable === "false");
     }
+    #isMaximizeEnforced() {
+        return this.#struct?.maximized === true || this.#struct?.maximized === "true";
+    }
     setTitle(title = "") {
         this.#struct = {...this.#struct, title};
         if (this.#titleElement) this.#titleElement.textContent = title;
@@ -899,6 +902,7 @@ class Portal {
                 handle.className = `resize-handle ${position}`;
                 resizer.appendChild(handle);
                 const startResize = (e) => {
+                    if (this.#isMaximizeEnforced()) return;
                     if (e.cancelable) e.preventDefault();
                     e.stopPropagation();
                     const getPoint = (event) => {
@@ -979,7 +983,7 @@ class Portal {
             return target?.closest('button, .closer, .resizer, [data-no-drag], a, input, textarea, select, option');
         };
         const startDrag = (e) => {
-            if (this.#isPinned || isInteractiveTarget(e.target)) return;
+            if (this.#isPinned || this.#isMaximizeEnforced() || isInteractiveTarget(e.target)) return;
             const {x, y} = getClientPosition(e);
             dragState.offsetX = x - element.offsetLeft;
             dragState.offsetY = y - element.offsetTop;
@@ -1038,6 +1042,7 @@ class Portal {
         this.#installResizeObserver();
         if (!wasAttached) this.#ensureWindowFrameHeight(this.#windowBody?.style?.height || this.#struct?.dimensions?.[1]);
         this.#applyCursorCenteredPlacement(wasAttached);
+        if (this.#isMaximizeEnforced()) this.#maximizeWindow();
         if (typeof modular?.bringToFront === "function") {
             modular.bringToFront(this.#windowDiv);
         }
@@ -1146,21 +1151,9 @@ class Portal {
         this.#persistWindowState();
     }
     #toggleMaximize(topMargin = 50) {
-        const bodyMargin = 10;
-        const availableHeight = Math.max(window.innerHeight - topMargin - bodyMargin, 200);
+        if (this.#isMaximizeEnforced() && this.#isMaximized) return;
         if (!this.#isMaximized) {
-            this.#savedWindowState = this.#captureRestoreState();
-            this.#windowDiv.classList.remove("minimized");
-            this.#applyWindowLayout({
-                transform: "scale(1)",
-                transition: "all 150ms ease-in-out",
-                width: `calc(100vw - ${bodyMargin * 2}px)`,
-                left: `${bodyMargin}px`,
-                top: `${topMargin}px`,
-                height: `${availableHeight}px`,
-                overflow: "visible",
-            }, {minBodyHeight: 150});
-            this.#isMaximized = true;
+            this.#maximizeWindow(topMargin);
         } else if (this.#savedWindowState) {
             this.#applyWindowLayout({
                 transition: "all 150ms ease-in-out",
@@ -1177,8 +1170,28 @@ class Portal {
         this.#updateMaximizeMenuItem();
         this.#scheduleAfterRender();
     }
+    #maximizeWindow(topMargin = 50) {
+        const bodyMargin = 10;
+        const availableHeight = Math.max(window.innerHeight - topMargin - bodyMargin, 200);
+        if (!this.#isMaximized) {
+            this.#savedWindowState = this.#captureRestoreState();
+        }
+        this.#windowDiv.classList.remove("minimized");
+        this.#applyWindowLayout({
+            transform: "scale(1)",
+            transition: "all 150ms ease-in-out",
+            width: `calc(100vw - ${bodyMargin * 2}px)`,
+            left: `${bodyMargin}px`,
+            top: `${topMargin}px`,
+            height: `${availableHeight}px`,
+            overflow: "visible",
+        }, {minBodyHeight: 150});
+        this.#isMaximized = true;
+        this.#updateMaximizeMenuItem();
+        this.#scheduleAfterRender();
+    }
     tile(direction) {
-        if (!this.#windowDiv || this.#isPinned) return;
+        if (!this.#windowDiv || this.#isPinned || this.#isMaximizeEnforced()) return;
         const outerMargin = 10;
         const topMargin = 50;
         const bottomMargin = 10;
@@ -1306,6 +1319,7 @@ class Portal {
         if (state.bodyHeight && this.#windowBody) nextLayout.bodyHeight = state.bodyHeight;
         this.#applyWindowLayout(nextLayout, {minBodyHeight: 150});
         this.#setPinnedState(state.pinned);
+        if (this.#isMaximizeEnforced()) this.#maximizeWindow();
     }
     #setPinnedState(isPinned) {
         this.#isPinned = Boolean(isPinned);

@@ -37,6 +37,7 @@
     let isGrowingSheetGrid = false;
     let sheetArrowNavigationBound = false;
     let sheetStyleShortcutsBound = false;
+    let sheetSelectionShortcutsBound = false;
     let isDraggingSheetSelection = false;
     let sheetSelectionAnchor = null;
     let activeSheetResize = null;
@@ -693,6 +694,17 @@
     };
     const getSheetCellInput = (cellReference = "") => document.getElementById(`sheet-cell-${cellReference}`);
     const getSheetCellWrap = (cellReference = "") => document.getElementById(`editor-sheet-cell-wrap-${cellReference}`);
+    const getSheetFocusedInputState = () => {
+        const activeElement = document.activeElement;
+        const activeElementId = String(activeElement?.id || "");
+        return {
+            activeElement,
+            activeElementId,
+            isSheetCellInput: activeElementId.startsWith("sheet-cell-"),
+            isSheetFormulaInput: activeElementId === "editor-sheet-formula",
+            isEditingInput: !!(activeElement && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable))
+        };
+    };
     const isSheetRangeSelectionActive = () => !!(activeSheetRangeStart && activeSheetRangeEnd);
     const clearActiveSheetRange = () => {
         activeSheetRangeStart = null;
@@ -877,6 +889,45 @@
         activeSheetColumn = null;
         setActiveSheetRange(anchorReference, nextReference);
     };
+    const getSheetUsedRangeBounds = () => {
+        const usedPositions = Object.entries(sheetCellValues)
+            .filter(([, value]) => String(value ?? "").trim())
+            .map(([cellReference]) => parseSheetCellReference(cellReference))
+            .filter((position) => position.rowIndex >= 0 && position.rowIndex < sheetRows && position.columnIndex >= 0 && position.columnIndex < sheetColumns);
+        if (!usedPositions.length) return null;
+        return usedPositions.reduce((bounds, position) => ({
+            minRow: Math.min(bounds.minRow, position.rowIndex),
+            maxRow: Math.max(bounds.maxRow, position.rowIndex),
+            minColumn: Math.min(bounds.minColumn, position.columnIndex),
+            maxColumn: Math.max(bounds.maxColumn, position.columnIndex)
+        }), {
+            minRow: usedPositions[0].rowIndex,
+            maxRow: usedPositions[0].rowIndex,
+            minColumn: usedPositions[0].columnIndex,
+            maxColumn: usedPositions[0].columnIndex
+        });
+    };
+    const selectActiveSheetRangeToDataBoundary = (direction = "") => {
+        captureActiveSheetInput();
+        const anchorReference = activeSheetRangeStart || activeSheetCell;
+        const activePosition = parseSheetCellReference(activeSheetCell);
+        const usedBounds = getSheetUsedRangeBounds();
+        const targetPosition = {...activePosition};
+        if (direction === "ArrowUp") targetPosition.rowIndex = usedBounds ? Math.min(activePosition.rowIndex, usedBounds.minRow) : 0;
+        if (direction === "ArrowDown") targetPosition.rowIndex = usedBounds ? Math.max(activePosition.rowIndex, usedBounds.maxRow) : sheetRows - 1;
+        if (direction === "ArrowLeft") targetPosition.columnIndex = usedBounds ? Math.min(activePosition.columnIndex, usedBounds.minColumn) : 0;
+        if (direction === "ArrowRight") targetPosition.columnIndex = usedBounds ? Math.max(activePosition.columnIndex, usedBounds.maxColumn) : sheetColumns - 1;
+        targetPosition.rowIndex = Math.min(Math.max(targetPosition.rowIndex, 0), sheetRows - 1);
+        targetPosition.columnIndex = Math.min(Math.max(targetPosition.columnIndex, 0), sheetColumns - 1);
+        const targetReference = getSheetCellReference(targetPosition.rowIndex, targetPosition.columnIndex);
+        activeSheetCell = targetReference;
+        activeSheetRow = null;
+        activeSheetColumn = null;
+        setActiveSheetRange(anchorReference, targetReference);
+        writeSheetEditorBar();
+        updateSheetSelectionStyles();
+        saveSheetPortalState();
+    };
     const isCellInActiveSheetRange = (cellReference = "") => isSheetRangeSelectionActive()
         && getSheetRangeReferences(activeSheetRangeStart, activeSheetRangeEnd).includes(String(cellReference || "").toUpperCase());
     const getSheetSelectionLabel = () => {
@@ -898,6 +949,21 @@
             return getSheetRangeReferences(activeSheetRangeStart, activeSheetRangeEnd);
         }
         return activeSheetCell ? [activeSheetCell] : [];
+    };
+    const clearActiveSheetSelectedCells = () => {
+        const selectedReferences = getActiveSheetCellReferences();
+        if (!selectedReferences.length) return false;
+        captureActiveSheetInput();
+        let didClearCell = false;
+        selectedReferences.forEach((cellReference) => {
+            if (isSheetCellLocked(cellReference)) return;
+            sheetCellValues[cellReference] = "";
+            didClearCell = true;
+        });
+        if (!didClearCell) return false;
+        refreshSheetCells();
+        saveSheetPortalState();
+        return true;
     };
     const readSheetInputValue = (cellReference = "") => {
         const input = getSheetCellInput(cellReference);
@@ -2447,11 +2513,9 @@
                     return;
                 }
                 if (Number.isInteger(activeSheetRow) || Number.isInteger(activeSheetColumn)) return;
-                if (isSheetCellLocked(activeSheetCell)) return;
+                if (!clearActiveSheetSelectedCells()) return;
                 event.preventDefault();
-                sheetCellValues[activeSheetCell] = "";
-                refreshSheetCells();
-                saveSheetPortalState();
+                event.stopImmediatePropagation();
                 return;
             }
             if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
@@ -2502,6 +2566,52 @@
             captureActiveSheetInput();
             buttonNode.click();
             if (isSheetCellInput) activeElement.focus();
+        }, true);
+    };
+    const bindSheetSelectionShortcuts = () => {
+        if (sheetSelectionShortcutsBound) return;
+        sheetSelectionShortcutsBound = true;
+        window.addEventListener("keydown", (event) => {
+            if (!document.getElementById("editor-sheet-grid-wrap")) return;
+            if (!isSheetWindowShown()) return;
+            if (event.altKey || event.metaKey || event.repeat) return;
+            const {activeElement, isSheetCellInput, isSheetFormulaInput, isEditingInput} = getSheetFocusedInputState();
+            const isEditingOutsideSheetCell = isEditingInput && !isSheetCellInput && !isSheetFormulaInput;
+            if (isEditingOutsideSheetCell || isSheetFormulaInput) return;
+            const key = String(event.key || "");
+            if (event.shiftKey && !event.ctrlKey && key === " ") {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                captureActiveSheetInput();
+                const activePosition = parseSheetCellReference(activeSheetCell);
+                setActiveSheetRow(activePosition.rowIndex);
+                saveSheetPortalState();
+                activeElement?.blur?.();
+                return;
+            }
+            if (event.ctrlKey && !event.shiftKey && key === " ") {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                captureActiveSheetInput();
+                const activePosition = parseSheetCellReference(activeSheetCell);
+                setActiveSheetColumn(activePosition.columnIndex);
+                saveSheetPortalState();
+                activeElement?.blur?.();
+                return;
+            }
+            if (event.ctrlKey && !event.shiftKey && (key === "-" || event.code === "Minus" || event.code === "NumpadSubtract")) {
+                if (!Number.isInteger(activeSheetRow) && !Number.isInteger(activeSheetColumn)) return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                if (Number.isInteger(activeSheetRow)) deleteSheetRowAt(activeSheetRow);
+                else if (Number.isInteger(activeSheetColumn)) deleteSheetColumnAt(activeSheetColumn);
+                return;
+            }
+            if (event.ctrlKey && event.shiftKey && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(key)) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                selectActiveSheetRangeToDataBoundary(key);
+            }
         }, true);
     };
     const bindSheetInteractions = () => {
@@ -2603,6 +2713,12 @@
                 cellInput.addEventListener("keydown", (event) => {
                     if (isSheetCellLocked(cellReference) && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
                         event.preventDefault();
+                        return;
+                    }
+                    if (event.key === "Delete" && isSheetRangeSelectionActive()) {
+                        if (!clearActiveSheetSelectedCells()) return;
+                        event.preventDefault();
+                        event.stopPropagation();
                         return;
                     }
                     if (event.key === "Escape") {
@@ -2736,6 +2852,7 @@
         }
         bindSheetGridScrollGrowth();
         bindSheetStyleShortcuts();
+        bindSheetSelectionShortcuts();
         bindSheetArrowNavigation();
         bindSheetToolbar();
         refreshSheetCells();

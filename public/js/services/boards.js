@@ -396,6 +396,7 @@
             dimensions: [900, 650],
             horizontal_nav: true,
             centered_nav: true,
+            maximized: true,
             tools: [{
                 title: "Save",
                 icon: modular.icons.save,
