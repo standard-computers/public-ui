@@ -345,6 +345,7 @@ function searchablePortals() {
 }
 
 let activeSearchResultIndex = -1;
+let articleSearchRequestVersion = 0;
 
 function getSearchResultElements() {
     return Array.from(document.querySelectorAll("#search-results .search-result"));
@@ -529,8 +530,186 @@ function renderCalculatorSearchResult(calculation) {
     }, `${calculation.expression} = ${calculation.result}`);
 }
 
+function escapeArticleSearchValue(value = "") {
+    return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').trim();
+}
+
+function getArticleSearchTerms(rawQuery = "") {
+    const normalizedQuery = String(rawQuery || "").replace(/\s+/g, " ").trim();
+    if (!normalizedQuery) return [];
+    const terms = normalizedQuery
+        .split(" ")
+        .map(term => term.trim())
+        .filter(Boolean);
+    if (terms.length > 1) terms.push(normalizedQuery);
+    return [...new Set(terms)];
+}
+
+function buildArticleSearchCommand(rawQuery = "") {
+    const terms = getArticleSearchTerms(rawQuery);
+    if (!terms.length) return "";
+    const titleCondition = terms
+        .map((term, index) => `${index === 0 ? "title " : ""}CONTAINS "${escapeArticleSearchValue(term)}" IGNORE CASE`)
+        .join(" OR ");
+    return `[articles] <${titleCondition}, LIMIT 10>`;
+}
+
+function levenshteinDistance(left = "", right = "") {
+    const a = String(left || "").toLowerCase();
+    const b = String(right || "").toLowerCase();
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+
+    let previous = Array.from({length: b.length + 1}, (_, index) => index);
+    for (let i = 1; i <= a.length; i += 1) {
+        const current = [i];
+        for (let j = 1; j <= b.length; j += 1) {
+            const substitutionCost = a[i - 1] === b[j - 1] ? 0 : 1;
+            current[j] = Math.min(
+                previous[j] + 1,
+                current[j - 1] + 1,
+                previous[j - 1] + substitutionCost
+            );
+        }
+        previous = current;
+    }
+    return previous[b.length];
+}
+
+function resolveArticleRecords(response) {
+    if (Array.isArray(response)) return response;
+    if (!response || typeof response !== "object") return [];
+    if (Array.isArray(response.articles)) return response.articles;
+    const firstArrayEntry = Object.values(response).find(Array.isArray);
+    return Array.isArray(firstArrayEntry) ? firstArrayEntry : [];
+}
+
+async function sendArticleCliCommand(command = "") {
+    const normalizedCommand = String(command || "").trim();
+    if (!normalizedCommand) return "";
+    const usePost = normalizedCommand.length > 1500;
+    const url = usePost
+        ? `/api/cli?_=${Date.now()}`
+        : `/api/cli?query=${encodeURIComponent(normalizedCommand)}&_=${Date.now()}`;
+    const options = {
+        method: usePost ? "POST" : "GET",
+        cache: "no-store",
+        headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    };
+    if (usePost) {
+        options.headers["Content-Type"] = "application/json";
+        options.body = JSON.stringify({query: normalizedCommand});
+    }
+    const response = await fetch(url, options);
+    if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(`HTTP ${response.status}: ${response.statusText}${errorText ? ` - ${errorText.slice(0, 200)}` : ""}`);
+    }
+    const responseText = await response.text();
+    const normalizedText = responseText.replace(/^\uFEFF/, "").trim();
+    if (!normalizedText) return "";
+    try {
+        return JSON.parse(normalizedText);
+    } catch (_) {
+        return responseText;
+    }
+}
+
+function buildArticlePortal(article = {}) {
+    const title = `${article?.title || ""}`.trim() || "Untitled Article";
+    return {
+        title,
+        svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25A8.966 8.966 0 0 1 18 3.75c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>`,
+        recordMatches: [{
+            command: "articles",
+            id: article?.id,
+            primaryLabel: title,
+            secondaryLabel: `${article?.description || article?.link || article?.source || ""}`.trim(),
+            record: article
+        }]
+    };
+}
+
+async function appendArticleSearchResults(rawQuery = "", requestVersion = 0) {
+    const command = buildArticleSearchCommand(rawQuery);
+    if (!command) return [];
+    try {
+        const response = await sendArticleCliCommand(command);
+        if (requestVersion !== articleSearchRequestVersion) return [];
+        const normalizedQuery = String(rawQuery || "").replace(/\s+/g, " ").trim();
+        const articles = resolveArticleRecords(response)
+            .filter(article => article && typeof article === "object")
+            .sort((left, right) => {
+                const leftDistance = levenshteinDistance(left?.title || "", normalizedQuery);
+                const rightDistance = levenshteinDistance(right?.title || "", normalizedQuery);
+                if (leftDistance !== rightDistance) return leftDistance - rightDistance;
+                return `${left?.title || ""}`.localeCompare(`${right?.title || ""}`);
+            });
+        articles.forEach(article => renderSearchResult(buildArticlePortal(article)));
+        return articles;
+    } catch (error) {
+        if (requestVersion === articleSearchRequestVersion) {
+            console.error("Failed to search articles:", error);
+        }
+        return [];
+    }
+}
+
+function renderCachedSearchResults(rawQuery = "") {
+    const query = String(rawQuery || "").trim().toLowerCase();
+    const matchingPortals = searchablePortals().map((portal) => {
+        const recordMatches = window.StandardRecordSearch?.getPortalMatches?.(portal, query) || [];
+        const matchingHint = (portal.hints || []).find((hint) => hint.toLowerCase().includes(query));
+        const exactHint = (portal.hints || []).find((hint) => hint.toLowerCase() === query);
+        return {
+            portal: {...portal, recordMatches},
+            matchingHint,
+            exactHint,
+            hasMatch: Boolean(matchingHint) || recordMatches.length > 0
+        };
+    }).filter(({hasMatch}) => Boolean(hasMatch));
+
+    const calculation = evaluateCalculatorExpression(rawQuery);
+    renderCalculatorSearchResult(calculation);
+    matchingPortals.forEach(({portal, matchingHint}) => {
+        renderSearchResult(portal, matchingHint);
+    });
+    if (calculation || matchingPortals.length) {
+        setActiveSearchResult(0);
+    } else {
+        resetActiveSearchResult();
+    }
+    return {calculation, matchingPortals};
+}
+
+function renderArticleSearchResults(rawQuery = "", requestVersion = 0, cachedSearch = {}) {
+    return appendArticleSearchResults(rawQuery, requestVersion).then((articles) => {
+        if (requestVersion !== articleSearchRequestVersion) return [];
+        const hasCachedResults = Boolean(cachedSearch?.calculation) || Boolean(cachedSearch?.matchingPortals?.length);
+        if (!hasCachedResults && articles.length) {
+            setActiveSearchResult(0);
+        }
+        return articles;
+    });
+}
+
 function openPortal(portal) {
     const primaryRecordMatch = Array.isArray(portal?.recordMatches) ? portal.recordMatches[0] : null;
+    if (primaryRecordMatch?.command === "articles") {
+        const article = primaryRecordMatch?.record || {};
+        if (typeof window.StandardInternals?.openArticle === "function") {
+            window.StandardInternals.openArticle(article);
+        } else {
+            modular.start("com.standard.internals");
+            setTimeout(() => window.StandardInternals?.openArticle?.(article), 100);
+        }
+        return;
+    }
     if (primaryRecordMatch?.command === "notes") {
         if (primaryRecordMatch?.record && typeof window.StandardNotes?.openNote === "function") {
             window.StandardNotes.openNote(primaryRecordMatch.record);
@@ -659,6 +838,7 @@ function updateSearchResults() {
     const searchStatus = document.getElementById("search-status");
     const searchBox = document.getElementById("search-box");
     const searchResults = document.getElementById("search-results");
+    const currentArticleSearchVersion = ++articleSearchRequestVersion;
     searchStatus.isLoading();
     const rawQuery = searchBox.value.trim();
     const query = rawQuery.toLowerCase();
@@ -668,38 +848,20 @@ function updateSearchResults() {
         searchStatus.isLoading(false);
         return;
     }
-    const matchingPortals = searchablePortals().map((portal) => {
-        const recordMatches = window.StandardRecordSearch?.getPortalMatches?.(portal, query) || [];
-        const matchingHint = (portal.hints || []).find((hint) => hint.toLowerCase().includes(query));
-        const exactHint = (portal.hints || []).find((hint) => hint.toLowerCase() === query);
-        return {
-            portal: {...portal, recordMatches},
-            matchingHint,
-            exactHint,
-            hasMatch: Boolean(matchingHint) || recordMatches.length > 0
-        };
-    }).filter(({hasMatch}) => Boolean(hasMatch));
 
-    const exactMatch = matchingPortals.find(({exactHint}) => Boolean(exactHint));
-    if (exactMatch) {
-        openPortal(exactMatch.portal);
-        searchBox.value = "";
+    let cachedSearch = {calculation: null, matchingPortals: []};
+    try {
+        cachedSearch = renderCachedSearchResults(rawQuery);
+    } catch (error) {
+        console.error("Failed to search cached records:", error);
         resetActiveSearchResult();
-        searchBox.blur();
-        searchStatus.isLoading(false);
-        return;
     }
-    const calculation = evaluateCalculatorExpression(rawQuery);
-    renderCalculatorSearchResult(calculation);
-    matchingPortals.forEach(({portal, matchingHint}) => {
-        renderSearchResult(portal, matchingHint);
+
+    renderArticleSearchResults(rawQuery, currentArticleSearchVersion, cachedSearch).finally(() => {
+        if (currentArticleSearchVersion === articleSearchRequestVersion) {
+            searchStatus.isLoading(false);
+        }
     });
-    if (calculation || matchingPortals.length) {
-        setActiveSearchResult(0);
-    } else {
-        resetActiveSearchResult();
-    }
-    searchStatus.isLoading(false);
 }
 
 document.getElementById("search-box").addEventListener("input", () => {

@@ -10,6 +10,8 @@
     const VIDEO_PROGRESS_SAVE_INTERVAL_MS = 1500;
     const HTML_TEXT_VIEW_PATTERN = /\.(wrds|html)$/i;
     const TEXT_DOCUMENT_CONTENT_PREFIX = "__STD_TEXT_EDITOR_B64__:";
+    const DEFAULT_ARTICLE_ICON = "/images/blank_contact.png";
+    const EDIT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><g transform="scale(0.9) translate(1.333 1.333) translate(0.25 0.6)"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75a2.121 2.121 0 1 1 3 3L9 17.25 4.5 18.75 6 14.25 16.5 3.75Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 5.25l3 3" /></g></svg>`;
     let activeTextFilePath = "";
     let activeTextFileContent = "Select a file to preview.";
     let activeTextReadOnly = false;
@@ -28,6 +30,10 @@
     let activeVideoLastSavedTime = -1;
     let activeStandardDataReference = "";
     let activeStandardDataPayload = {};
+    let activeArticleRecord = {};
+    let activeArticleIconFile = null;
+    let activeArticleIconChanged = false;
+    const articleIconCacheKeys = {};
     const getPathForDownload = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
     const getFileName = (rawPath = "") => String(rawPath || "").split("/").pop() || "Internals";
     const findInternalsWindow = (portalIndex = 0) => [...Array.from(document.querySelectorAll(".draggable-window"))].reverse().find((windowNode) => typeof windowNode?.portal?.serviceId === "function" && windowNode.portal.serviceId() === "com.standard.internals" && windowNode.portal.portalIndex() === portalIndex);
@@ -51,6 +57,46 @@
         } catch (_) {
             return "";
         }
+    };
+    const escapeHtml = (value = "") => `${value ?? ""}`.replace(/[&<>"']/g, character => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[character] || character));
+    const sanitizeArticleUrl = (value = "") => {
+        const raw = String(value || "").trim();
+        if (/^https?:\/\//i.test(raw)) return raw;
+        return "";
+    };
+    const getArticleIconCacheKey = (articleId) => {
+        const cacheKey = articleIconCacheKeys[String(articleId)];
+        return cacheKey ?? "cached";
+    };
+    const bumpArticleIconCacheKey = (articleId) => {
+        if (!articleId) return;
+        articleIconCacheKeys[String(articleId)] = Date.now();
+    };
+    const articleIconUrl = (articleId) => articleId ? `/api/records/images/${encodeURIComponent(articleId)}?cb=${encodeURIComponent(`${articleId}-${getArticleIconCacheKey(articleId)}`)}` : DEFAULT_ARTICLE_ICON;
+    const articleIconSrc = (article = {}) => article?.id ? articleIconUrl(article.id) : DEFAULT_ARTICLE_ICON;
+    const setArticleIconFallback = (imageEl) => {
+        if (!imageEl || imageEl.src.endsWith(DEFAULT_ARTICLE_ICON)) return;
+        imageEl.src = DEFAULT_ARTICLE_ICON;
+    };
+    document.addEventListener("error", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLImageElement) || !target.classList.contains("article-icon")) return;
+        setArticleIconFallback(target);
+    }, true);
+    const resetArticleIconPickerBinding = (iconEl, bindingKey) => {
+        if (!iconEl) return null;
+        const previousBinding = iconEl[bindingKey];
+        if (previousBinding?.input?.remove) previousBinding.input.remove();
+        if (typeof previousBinding?.objectUrl === "string") URL.revokeObjectURL(previousBinding.objectUrl);
+        iconEl.onclick = null;
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "image/*";
+        fileInput.style.display = "none";
+        document.body.appendChild(fileInput);
+        const binding = {input: fileInput, objectUrl: null};
+        iconEl[bindingKey] = binding;
+        return binding;
     };
     const sanitizeTextPreviewMarkup = (markup = "") => {
         const parser = new DOMParser();
@@ -480,6 +526,190 @@
         if (referenceLabel) referenceLabel.textContent = activeStandardDataReference || "No standard selected";
         updatePortalTitle(3, activeStandardDataReference ? `Data ${activeStandardDataReference}` : "Data Portal");
     };
+    const autoSizeArticlePortalToContent = (portal = findInternalsWindow(4)?.portal) => {
+        const windowNode = portal?.window?.() || findInternalsWindow(4);
+        if (!windowNode) return;
+        const bodyNode = windowNode.querySelector(".window-body");
+        const articlePreview = windowNode.querySelector("#internals-article-preview");
+        if (!bodyNode || !articlePreview) return;
+        bodyNode.style.height = "";
+        bodyNode.style.minHeight = "";
+        bodyNode.style.maxHeight = "";
+        bodyNode.style.overflow = "visible";
+        const bodyStyles = window.getComputedStyle(bodyNode);
+        const contentNode = bodyNode.parentElement;
+        const contentStyles = contentNode ? window.getComputedStyle(contentNode) : null;
+        const bodyPaddingY = (Number.parseFloat(bodyStyles.paddingTop) || 0) + (Number.parseFloat(bodyStyles.paddingBottom) || 0);
+        const contentBottomExtras = contentStyles
+            ? (Number.parseFloat(contentStyles.marginBottom) || 0) + (Number.parseFloat(contentStyles.paddingBottom) || 0) + (Number.parseFloat(contentStyles.borderBottomWidth) || 0)
+            : 0;
+        const routeShell = articlePreview.parentElement;
+        const requiredBodyHeight = Math.max(220, Math.ceil((routeShell?.scrollHeight || articlePreview.scrollHeight) + bodyPaddingY));
+        windowNode.style.height = `${Math.ceil(requiredBodyHeight + bodyNode.offsetTop + contentBottomExtras)}px`;
+        bodyNode.style.minHeight = `${requiredBodyHeight}px`;
+        bodyNode.style.maxHeight = `${requiredBodyHeight}px`;
+        bodyNode.style.height = `${requiredBodyHeight}px`;
+    };
+    const normalizeArticleRecord = (article = {}) => {
+        if (!article || typeof article !== "object" || Array.isArray(article)) return {};
+        return {
+            id: article.id ?? "",
+            title: article.title ?? "",
+            description: article.description ?? "",
+            link: article.link ?? "",
+            content: article.content ?? "",
+            source: article.source ?? "",
+            priority: article.priority ?? "",
+            created: article.created ?? ""
+        };
+    };
+    const escapeCliQuotedValue = (value = "") => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const articleTextField = (id = "", labelText = "", value = "", {textareaField = false} = {}) => {
+        return div({content: children([
+            div({style: "bold small-padding", content: labelText}),
+            div({style: "padded", content: textareaField
+                ? textarea({id, style: "undecorated no-padding internals-article-edit-textarea", value: String(value ?? "")})
+                : input({id, style: "undecorated no-padding", value: String(value ?? "")})
+            })
+        ])});
+    };
+    const getArticleEditFieldValue = (id = "") => document.getElementById(id)?.value?.trim?.() || "";
+    const updateArticlePreview = (portal = findInternalsWindow(4)?.portal) => {
+        const root = portal?.window?.() || document;
+        const articlePreview = root.querySelector("#internals-article-preview");
+        if (!articlePreview) return;
+        const article = normalizeArticleRecord(activeArticleRecord);
+        const title = String(article.title || "Untitled Article").trim();
+        articlePreview.innerHTML = [
+            `<div class="internals-article-header">`,
+            `<div class="internals-article-meta">`,
+            article.description ? `<div class="faded">${escapeHtml(article.description)}</div>` : "",
+            `</div>`,
+            `<img class="article-icon internals-article-icon" src="${escapeHtml(articleIconSrc(article))}" alt="${escapeHtml(title)}" />`,
+            `<h2>${escapeHtml(title)}</h2>`,
+            sanitizeArticleUrl(article.link) ? `<a href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.link)}</a>` : `<div>${escapeHtml(article.link)}</div>`,
+            `</div>`,
+            `<div class="internals-article-content">${escapeHtml(article.content)}</div>`,
+            `<div class="internals-article-source faded">`,
+            sanitizeArticleUrl(article.source) ? `<a href="${escapeHtml(article.source)}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.source)}</a>` : escapeHtml(article.source),
+            `</div>`
+        ].join("");
+        requestAnimationFrame(() => requestAnimationFrame(() => autoSizeArticlePortalToContent(portal)));
+    };
+    const bindArticleModifyPortal = () => {
+        const article = normalizeArticleRecord(activeArticleRecord);
+        const portalWindow = findInternalsWindow(5);
+        const bindingKey = `${article.id || "new"}`;
+        if (portalWindow?.dataset?.articleModifyBound === bindingKey) return;
+        if (portalWindow?.dataset) portalWindow.dataset.articleModifyBound = bindingKey;
+        const setValue = (id, value) => {
+            const field = document.getElementById(id);
+            if (field) field.value = value ?? "";
+        };
+        setValue("modify-article-title", article.title);
+        setValue("modify-article-description", article.description);
+        setValue("modify-article-link", article.link);
+        setValue("modify-article-content", article.content);
+        setValue("modify-article-source", article.source);
+        setValue("modify-article-priority", article.priority);
+        const iconEl = document.getElementById("modify-article-icon");
+        if (!iconEl) return;
+        iconEl.src = articleIconUrl(article.id);
+        iconEl.style.cursor = "pointer";
+        activeArticleIconFile = null;
+        activeArticleIconChanged = false;
+        const binding = resetArticleIconPickerBinding(iconEl, "__modifyArticleIconPicker");
+        const fileInput = binding?.input;
+        if (!fileInput) return;
+        iconEl.onclick = () => fileInput.click();
+        fileInput.onchange = () => {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) return;
+            if (!file.type || !file.type.startsWith("image/")) {
+                activeArticleIconFile = null;
+                activeArticleIconChanged = false;
+                fileInput.value = "";
+                return;
+            }
+            activeArticleIconFile = file;
+            activeArticleIconChanged = true;
+            if (binding.objectUrl) URL.revokeObjectURL(binding.objectUrl);
+            binding.objectUrl = URL.createObjectURL(file);
+            iconEl.src = binding.objectUrl;
+            fileInput.value = "";
+        };
+    };
+    const closeModifyArticlePortal = () => {
+        const portal = findInternalsWindow(5)?.portal;
+        if (typeof portal?.close === "function") {
+            portal.close();
+            return true;
+        }
+        if (typeof portal?.hide === "function") {
+            portal.hide();
+            return true;
+        }
+        return false;
+    };
+    const saveModifiedArticle = async () => {
+        const articleId = activeArticleRecord?.id;
+        if (!articleId) {
+            modular.error("No article selected");
+            return;
+        }
+        const nextArticle = normalizeArticleRecord({
+            id: articleId,
+            title: getArticleEditFieldValue("modify-article-title"),
+            description: getArticleEditFieldValue("modify-article-description"),
+            link: getArticleEditFieldValue("modify-article-link"),
+            content: document.getElementById("modify-article-content")?.value || "",
+            source: getArticleEditFieldValue("modify-article-source"),
+            priority: getArticleEditFieldValue("modify-article-priority"),
+            created: activeArticleRecord?.created ?? ""
+        });
+        try {
+            const updates = [
+                CLI.send(`[articles] title "${escapeCliQuotedValue(nextArticle.title)}" <id ${articleId}>`),
+                CLI.send(`[articles] description "${escapeCliQuotedValue(nextArticle.description)}" <id ${articleId}>`),
+                CLI.send(`[articles] link "${escapeCliQuotedValue(nextArticle.link)}" <id ${articleId}>`),
+                CLI.send(`[articles] content "${escapeCliQuotedValue(nextArticle.content)}" <id ${articleId}>`),
+                CLI.send(`[articles] source "${escapeCliQuotedValue(nextArticle.source)}" <id ${articleId}>`),
+                CLI.send(`[articles] priority ${Number.parseInt(nextArticle.priority, 10) || 0} <id ${articleId}>`)
+            ];
+            const updateResponses = await Promise.all(updates);
+            if (updateResponses.some(response => response === 0)) {
+                modular.error("Failed to update one or more article fields");
+                return;
+            }
+            if (activeArticleIconChanged && activeArticleIconFile) {
+                const formData = new FormData();
+                formData.append("file", activeArticleIconFile);
+                const uploadResponse = typeof window.StandardUploads?.uploadFile === "function"
+                    ? await window.StandardUploads.uploadFile(activeArticleIconFile, `/api/upload/temp/${encodeURIComponent(articleId)}`, {label: `Uploading ${activeArticleIconFile.name || "article icon"}`})
+                    : await fetch(`/api/upload/temp/${encodeURIComponent(articleId)}`, {method: "POST", body: formData}).then(response => ({ok: response.ok, status: response.status}));
+                if (!uploadResponse.ok) {
+                    modular.error(`Icon upload failed (${uploadResponse.status})`);
+                    return;
+                }
+                bumpArticleIconCacheKey(articleId);
+            }
+        } catch (error) {
+            modular.error("Failed to save article");
+            return;
+        }
+        activeArticleRecord = nextArticle;
+        activeArticleIconFile = null;
+        activeArticleIconChanged = false;
+        closeModifyArticlePortal();
+        const displayPortal = findInternalsWindow(4)?.portal;
+        if (displayPortal) {
+            syncPortalWindowState(4, {directive: String(activeArticleRecord.title || "Untitled Article").trim(), cachedContent: activeArticleRecord}, displayPortal);
+            updateArticlePreview(displayPortal);
+        } else {
+            openArticle(activeArticleRecord);
+        }
+        modular.success("Saved article");
+    };
     const syncPortalWindowState = (portalIndex, context = {}, portal = null) => {
         portal = portal || findInternalsWindow(portalIndex)?.portal;
         if (!portal || typeof portal.setWindowState !== "function") return;
@@ -532,6 +762,10 @@
         const state = findInternalsWindow(3)?.portal?.windowState?.() || {};
         if (state?.directive) activeStandardDataReference = String(state.directive);
         if (state?.cachedContent !== undefined) activeStandardDataPayload = state.cachedContent;
+    };
+    const restoreArticleStateFromPortal = (portal = findInternalsWindow(4)?.portal) => {
+        const state = portal?.windowState?.() || {};
+        if (state?.cachedContent !== undefined) activeArticleRecord = normalizeArticleRecord(state.cachedContent);
     };
     const openTextInEditorApp = async sourceNode => {
         const sourcePortal = getPortalFromSource(sourceNode, 0);
@@ -678,6 +912,14 @@
         updateStandardDataPreview();
         return true;
     };
+    const openArticle = (article = {}, sourceNode = null) => {
+        activeArticleRecord = normalizeArticleRecord(article);
+        const title = String(activeArticleRecord.title || "Untitled Article").trim();
+        const portal = modular.show("com.standard.internals", 4, {newInstance: true});
+        syncPortalWindowState(4, {directive: title, cachedContent: activeArticleRecord}, portal);
+        updateArticlePreview(portal);
+        return true;
+    };
     window.StandardInternals = window.StandardInternals || {};
     window.StandardInternals.openTextFilePath = (rawPath = "", sourceNode = null) => openTextFilePath(rawPath, sourceNode);
     window.StandardInternals.openTextContent = (title = "", content = "", options = {}) => openTextContent(title, content, options);
@@ -691,6 +933,7 @@
         revokeActiveObjectUrl("video");
     });
     window.StandardInternals.openStandardData = (standardReference = "", payload = {}, options = {}) => openStandardData(standardReference, payload, options?.sourceNode || null);
+    window.StandardInternals.openArticle = (article = {}, options = {}) => openArticle(article, options?.sourceNode || null);
     window.StandardInternals.openFilePath = (rawPath = "", sourceNode = null) => {
         if (IMAGE_FILE_PATTERN.test(String(rawPath || ""))) return openImageFilePath(rawPath, sourceNode);
         if (VIDEO_FILE_PATTERN.test(String(rawPath || ""))) return openVideoFilePath(rawPath, sourceNode);
@@ -704,7 +947,7 @@
             navigation: false,
             tools: [{
                 title: "Edit",
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><g transform="scale(0.9) translate(1.333 1.333) translate(0.25 0.6)"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75a2.121 2.121 0 1 1 3 3L9 17.25 4.5 18.75 6 14.25 16.5 3.75Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 5.25l3 3" /></g></svg>`,
+                icon: EDIT_ICON,
                 onclick: (event) => openTextInEditorApp(event?.target)
             }],
             route: () => div({style: "large-padding-top small-padding", content: children([div({id: "internals-text-preview", style: "padded", content: activeTextFileContent})])}),
@@ -745,6 +988,49 @@
                 restoreStandardDataStateFromPortal();
                 updateStandardDataPreview();
             }
+        }),
+        new Portal({
+            title: "Article",
+            internal: true,
+            dimensions: [680, 560],
+            navigation: false,
+            tools: [{
+                title: "Modify",
+                icon: EDIT_ICON,
+                onclick: () => modular.show("com.standard.internals", 5, {newInstance: true})
+            }],
+            route: () => div({style: "large-padding-top small-padding", content: div({id: "internals-article-preview", style: "internals-article-preview"})}),
+            afterRender: function () {
+                restoreArticleStateFromPortal(this.portal);
+                updateArticlePreview(this.portal);
+            }
+        }),
+        new Portal({
+            title: "Modify Article",
+            internal: true,
+            dimensions: [520, 680],
+            navigation: false,
+            tools: [{
+                title: "Save",
+                icon: modular.icons.save,
+                onclick: saveModifiedArticle
+            }],
+            route: () => div({style: "large-padding-top small-padding", content: children([
+                div({style: "internals-article-modify-header", content: children([
+                    img({id: "modify-article-icon", style: "article-icon internals-article-modify-icon round inline cover", src: articleIconSrc(activeArticleRecord)}),
+                    div({style: "internals-article-modify-title-fields", content: children([
+                        articleTextField("modify-article-title", "Title", activeArticleRecord?.title),
+                        articleTextField("modify-article-link", "Link", activeArticleRecord?.link)
+                    ])})
+                ])}),
+                articleTextField("modify-article-description", "Description", activeArticleRecord?.description),
+                div({style: "internals-article-edit-full", content: articleTextField("modify-article-content", "Content", activeArticleRecord?.content, {textareaField: true})}),
+                articleTextField("modify-article-source", "Source", activeArticleRecord?.source),
+                articleTextField("modify-article-priority", "Priority", activeArticleRecord?.priority),
+                div({style: "spacer"}),
+                div({style: "spacer"})
+            ])}),
+            afterRender: bindArticleModifyPortal
         })
     ]));
 })();

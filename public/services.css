@@ -195,6 +195,19 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .search-result-icon-svg svg {width:24px;height:24px;display:block}
 .search-result-body {min-width:0;flex:1 1 auto}
 .search-result-records {font-size:calc(var(--fs) - 3px);margin-top:2px;word-break:break-word}
+.internals-article-preview {overflow:visible}
+.internals-article-header {margin:0 0 12px;overflow:auto}
+.internals-article-header h2 {font-size:24px;line-height:1.2;margin:0 0 6px}
+.internals-article-header a {overflow-wrap:anywhere}
+.internals-article-meta {float:right;max-width:45%;margin:0 0 8px 16px;text-align:right;overflow-wrap:anywhere}
+.internals-article-icon {float:left;width:56px;height:56px;object-fit:cover;border-radius:50%;margin:0 12px 8px 0;background:var(--secondary-background)}
+.internals-article-content {white-space:pre-wrap;line-height:1.45;clear:both}
+.internals-article-source {margin-top:12px;overflow-wrap:anywhere}
+.internals-article-modify-header {display:flex;align-items:flex-start;gap:12px;margin:8px 0 12px}
+.internals-article-modify-icon {width:88px;height:88px;object-fit:cover;background:var(--secondary-background);flex:0 0 88px}
+.internals-article-modify-title-fields {min-width:0;flex:1}
+.internals-article-edit-full, .internals-article-edit-full > div, .internals-article-edit-full .padded {width:100%;box-sizing:border-box}
+.internals-article-edit-textarea {min-height:180px;resize:vertical;width:100%;box-sizing:border-box}
 .option {width:max-content;box-sizing:border-box;transition:all 100ms;box-shadow:var(--shadow);background:#fff;border:1px solid var(--border);padding:8px;cursor:pointer;border-radius:var(--radius);margin-bottom:8px}
 .option:hover {transform:Scale(1.075);background:var(--secondary-background)}
 .option svg {width:22px;height:22px;display:inline-block;vertical-align:bottom}

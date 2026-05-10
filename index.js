@@ -54,7 +54,6 @@ const USER_RECORD_CACHE_TTL_MS = Math.max(5 * 1000, Number(process.env.USER_RECO
 const REQUEST_BODY_LIMIT = (process.env.REQUEST_BODY_LIMIT || "25mb").trim() || "25mb";
 const THEMES_REPO_PATH = path.join(__dirname, "public", "themes.json");
 const USER_DATA_ROOT = path.join(__dirname, "user_data");
-const SETTINGS_ARCHIVE_ROOT = USER_DATA_ROOT;
 const ELECTRON_SETUP_CONFIG_PATH = path.join(USER_DATA_ROOT, "desktop-setup.json");
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(origin => origin.trim()).filter(Boolean);
 const LOCAL_HOSTNAME = (process.env.LOCAL_HOSTNAME || "standard").replace(/\.local$/i, "").trim();
@@ -467,18 +466,6 @@ async function writeThemesRepo(repo) {
     await fs.writeFile(THEMES_REPO_PATH, JSON.stringify({themes: Array.isArray(repo?.themes) ? repo.themes : []}, null, 2));
 }
 
-const CRC32_TABLE = (() => {
-    const table = new Uint32Array(256);
-    for (let i = 0; i < 256; i += 1) {
-        let value = i;
-        for (let bit = 0; bit < 8; bit += 1) {
-            value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
-        }
-        table[i] = value >>> 0;
-    }
-    return table;
-})();
-
 function createServer() {
     if (!isElectronRuntime && (isRelayMode || Number(PORT) === 443)) {
         try {
@@ -534,142 +521,6 @@ function sanitizeSettingsUserFolder(userId = "") {
 
 function resolveSessionUserFolder(session) {
     return sanitizeUserId(session?.userFolder || session?.userId || "");
-}
-
-function crc32(buffer) {
-    let crc = 0xffffffff;
-    for (const byte of buffer) {
-        crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
-    }
-    return (crc ^ 0xffffffff) >>> 0;
-}
-
-function getZipDateParts(date = new Date()) {
-    const safeDate = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
-    const year = Math.max(1980, safeDate.getFullYear());
-    const dosTime = (safeDate.getHours() << 11) | (safeDate.getMinutes() << 5) | Math.floor(safeDate.getSeconds() / 2);
-    const dosDate = ((year - 1980) << 9) | ((safeDate.getMonth() + 1) << 5) | safeDate.getDate();
-    return {dosTime, dosDate};
-}
-
-async function collectZipEntries(rootDir, archiveRoot = "") {
-    const dirEntries = await fs.readdir(rootDir, {withFileTypes: true});
-    dirEntries.sort((a, b) => a.name.localeCompare(b.name));
-    const zipEntries = [];
-    for (const dirEntry of dirEntries) {
-        const sourcePath = path.join(rootDir, dirEntry.name);
-        const archivePath = archiveRoot ? `${archiveRoot}/${dirEntry.name}` : dirEntry.name;
-        if (dirEntry.isDirectory()) {
-            const stats = await fs.stat(sourcePath);
-            zipEntries.push({
-                name: `${archivePath}/`,
-                data: Buffer.alloc(0),
-                isDirectory: true,
-                modifiedAt: stats.mtime
-            });
-            zipEntries.push(...await collectZipEntries(sourcePath, archivePath));
-            continue;
-        }
-        if (!dirEntry.isFile()) {
-            continue;
-        }
-        const [stats, data] = await Promise.all([fs.stat(sourcePath), fs.readFile(sourcePath)]);
-        zipEntries.push({
-            name: archivePath,
-            data,
-            isDirectory: false,
-            modifiedAt: stats.mtime
-        });
-    }
-    return zipEntries;
-}
-
-async function createUserSettingsZip(userFolder) {
-    const safeUserFolder = sanitizeSettingsUserFolder(userFolder);
-    if (!safeUserFolder) {
-        throw new Error("Invalid user folder");
-    }
-    const sourceDir = path.normalize(path.join(SETTINGS_ARCHIVE_ROOT, safeUserFolder));
-    const normalizedRoot = path.normalize(SETTINGS_ARCHIVE_ROOT + path.sep);
-    if (!sourceDir.startsWith(normalizedRoot)) {
-        throw new Error("Invalid user folder path");
-    }
-    const stats = await fs.stat(sourceDir).catch(() => null);
-    if (!stats || !stats.isDirectory()) {
-        return null;
-    }
-
-    const entries = [{
-        name: `${safeUserFolder}/`,
-        data: Buffer.alloc(0),
-        isDirectory: true,
-        modifiedAt: stats.mtime
-    }, ...await collectZipEntries(sourceDir, safeUserFolder)];
-
-    const localParts = [];
-    const centralParts = [];
-    let offset = 0;
-
-    for (const entry of entries) {
-        const nameBuffer = Buffer.from(entry.name.replace(/\\/g, "/"), "utf8");
-        const dataBuffer = entry.data || Buffer.alloc(0);
-        const {dosTime, dosDate} = getZipDateParts(entry.modifiedAt);
-        const compressedSize = dataBuffer.length;
-        const uncompressedSize = dataBuffer.length;
-        const checksum = entry.isDirectory ? 0 : crc32(dataBuffer);
-
-        const localHeader = Buffer.alloc(30);
-        localHeader.writeUInt32LE(0x04034b50, 0);
-        localHeader.writeUInt16LE(20, 4);
-        localHeader.writeUInt16LE(0, 6);
-        localHeader.writeUInt16LE(0, 8);
-        localHeader.writeUInt16LE(dosTime, 10);
-        localHeader.writeUInt16LE(dosDate, 12);
-        localHeader.writeUInt32LE(checksum, 14);
-        localHeader.writeUInt32LE(compressedSize, 18);
-        localHeader.writeUInt32LE(uncompressedSize, 22);
-        localHeader.writeUInt16LE(nameBuffer.length, 26);
-        localHeader.writeUInt16LE(0, 28);
-        localParts.push(localHeader, nameBuffer, dataBuffer);
-
-        const centralHeader = Buffer.alloc(46);
-        centralHeader.writeUInt32LE(0x02014b50, 0);
-        centralHeader.writeUInt16LE(20, 4);
-        centralHeader.writeUInt16LE(20, 6);
-        centralHeader.writeUInt16LE(0, 8);
-        centralHeader.writeUInt16LE(0, 10);
-        centralHeader.writeUInt16LE(dosTime, 12);
-        centralHeader.writeUInt16LE(dosDate, 14);
-        centralHeader.writeUInt32LE(checksum, 16);
-        centralHeader.writeUInt32LE(compressedSize, 20);
-        centralHeader.writeUInt32LE(uncompressedSize, 24);
-        centralHeader.writeUInt16LE(nameBuffer.length, 28);
-        centralHeader.writeUInt16LE(0, 30);
-        centralHeader.writeUInt16LE(0, 32);
-        centralHeader.writeUInt16LE(0, 34);
-        centralHeader.writeUInt16LE(0, 36);
-        centralHeader.writeUInt32LE(entry.isDirectory ? 0x10 : 0x20, 38);
-        centralHeader.writeUInt32LE(offset, 42);
-        centralParts.push(centralHeader, nameBuffer);
-
-        offset += localHeader.length + nameBuffer.length + dataBuffer.length;
-    }
-
-    const centralDirectory = Buffer.concat(centralParts);
-    const endOfCentralDirectory = Buffer.alloc(22);
-    endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
-    endOfCentralDirectory.writeUInt16LE(0, 4);
-    endOfCentralDirectory.writeUInt16LE(0, 6);
-    endOfCentralDirectory.writeUInt16LE(entries.length, 8);
-    endOfCentralDirectory.writeUInt16LE(entries.length, 10);
-    endOfCentralDirectory.writeUInt32LE(centralDirectory.length, 12);
-    endOfCentralDirectory.writeUInt32LE(offset, 16);
-    endOfCentralDirectory.writeUInt16LE(0, 20);
-
-    return {
-        fileName: `${safeUserFolder}.zip`,
-        buffer: Buffer.concat([...localParts, centralDirectory, endOfCentralDirectory])
-    };
 }
 
 async function ensureUserDir(userId) {
@@ -1678,24 +1529,6 @@ app.use((req, res, next) => {
         return next();
     }
     return res.redirect("/setup");
-});
-
-app.get("/mysettings", async (req, res) => {
-    if (isRelayMode) return res.status(404).send("Not found");
-    try {
-        const archive = await createUserSettingsZip(req.query.user);
-        if (!archive) return res.status(404).send("User settings folder not found");
-        res.status(200);
-        res.setHeader("Content-Type", "application/zip");
-        res.setHeader("Content-Disposition", `attachment; filename="${archive.fileName}"`);
-        res.setHeader("Content-Length", archive.buffer.length);
-        res.setHeader("Content-Transfer-Encoding", "binary");
-        res.setHeader("X-Content-Type-Options", "nosniff");
-        return res.end(archive.buffer, "binary");
-    } catch (err) {
-        console.error("Failed to create settings archive:", err);
-        return res.status(400).send("Unable to create settings archive");
-    }
 });
 
 app.use(requireLogin);
