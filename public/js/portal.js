@@ -83,25 +83,15 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
     let cacheState = {updatedAt: "", records: {}};
     let cacheLoaded = false;
 
-    const createCacheEndpoint = ({serviceId = CACHE_INTERFACE, key = CACHE_KEY, format = "json"} = {}) => {
-        const params = new URLSearchParams();
-        if (format) params.set("format", format);
-        return `/api/cache/${encodeURIComponent(serviceId)}/${encodeURIComponent(key)}${params.toString() ? `?${params.toString()}` : ""}`;
-    };
     const readCache = async () => {
-        const response = await fetch(createCacheEndpoint(), {cache: "no-store"});
-        if (response.status === 404) return null;
-        if (!response.ok) throw new Error(`Failed to read record cache (${response.status})`);
-        return response.json();
+        return window.StandardBrowserCache?.get?.(CACHE_INTERFACE, CACHE_KEY, {format: "json"}) || null;
     };
     const writeCache = async (payload) => {
-        const response = await fetch(createCacheEndpoint(), {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(payload ?? {}, null, 2)
+        return window.StandardBrowserCache?.set?.(CACHE_INTERFACE, CACHE_KEY, payload ?? {}, {
+            format: "json",
+            contentType: "application/json",
+            label: "Search records"
         });
-        if (!response.ok) throw new Error(`Failed to write record cache (${response.status})`);
-        return response.json();
     };
     const setCacheState = (nextState = {}) => {
         cacheState = {
@@ -346,6 +336,21 @@ function searchablePortals() {
 
 let activeSearchResultIndex = -1;
 let articleSearchRequestVersion = 0;
+let clientContextPromise = null;
+
+function getClientContext() {
+    if (!clientContextPromise) {
+        clientContextPromise = fetch("/api/client-context", {cache: "no-store"})
+            .then(response => response.ok ? response.json() : {})
+            .catch(() => ({}));
+    }
+    return clientContextPromise;
+}
+
+function articleImageUrl(articleId = "") {
+    const normalizedId = `${articleId || ""}`.trim();
+    return normalizedId ? `/api/records/images/${encodeURIComponent(normalizedId)}?cb=${encodeURIComponent(`${normalizedId}-${Date.now()}`)}` : "";
+}
 
 function getSearchResultElements() {
     return Array.from(document.querySelectorAll("#search-results .search-result"));
@@ -635,6 +640,29 @@ function buildArticlePortal(article = {}) {
     };
 }
 
+function enhanceArticleSearchResultIcon(result, article = {}, requestVersion = 0) {
+    const articleId = `${article?.id || ""}`.trim();
+    if (!result || !articleId) return;
+    getClientContext().then((context = {}) => {
+        if (context?.isRelayMode === true || requestVersion !== articleSearchRequestVersion) return;
+        const nextIconUrl = articleImageUrl(articleId);
+        if (!nextIconUrl) return;
+        const probe = new Image();
+        probe.onload = () => {
+            if (requestVersion !== articleSearchRequestVersion || !document.body.contains(result)) return;
+            const iconContainer = result.querySelector(".search-result-icon");
+            if (!iconContainer) return;
+            iconContainer.innerHTML = "";
+            const image = document.createElement("img");
+            image.src = nextIconUrl;
+            image.alt = article?.title || "Article";
+            image.className = "search-result-icon-image";
+            iconContainer.append(image);
+        };
+        probe.src = nextIconUrl;
+    });
+}
+
 async function appendArticleSearchResults(rawQuery = "", requestVersion = 0) {
     const command = buildArticleSearchCommand(rawQuery);
     if (!command) return [];
@@ -650,7 +678,10 @@ async function appendArticleSearchResults(rawQuery = "", requestVersion = 0) {
                 if (leftDistance !== rightDistance) return leftDistance - rightDistance;
                 return `${left?.title || ""}`.localeCompare(`${right?.title || ""}`);
             });
-        articles.forEach(article => renderSearchResult(buildArticlePortal(article)));
+        articles.forEach(article => {
+            const result = renderSearchResult(buildArticlePortal(article));
+            enhanceArticleSearchResultIcon(result, article, requestVersion);
+        });
         return articles;
     } catch (error) {
         if (requestVersion === articleSearchRequestVersion) {
@@ -809,6 +840,7 @@ function renderSearchResult(portal, matchingHint) {
         document.getElementById("search-box").blur();
     };
     document.getElementById("search-results").append(result);
+    return result;
 }
 
 document.getElementById("search-box").addEventListener("keydown", event => {

@@ -30,13 +30,7 @@
     const BACKGROUND_IMAGE_CACHE_INTERFACE = "com.standard.settings";
     const BACKGROUND_IMAGE_META_KEY = "ui-background-meta";
     let latestDeviceInfo = null;
-    const defaultDeviceInfo = {
-        serial: "Unknown",
-        config: {},
-        network: {},
-        storage: {},
-        volume: {}
-    };
+    const defaultDeviceInfo = {serial: "Unknown", config: {}, network: {}, storage: {}, volume: {}};
     const getDeviceInfo = () => CLI.send("status").then((response) => {
         latestDeviceInfo = response;
         return response;
@@ -89,6 +83,7 @@
     const INTERFACES_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>`;
     const fallbackPlatformInterfaces = [
         {serviceId: "com.standard.internals", title: "Internals", icon: "/icons/interfaces/cli.png", internal: true},
+        {serviceId: "com.standard.stopwatch", title: "Stopwatch", icon: "/icons/interfaces/alarms.png", internal: true},
         {serviceId: "com.standard.files", title: "Files", icon: "/icons/interfaces/files.png"},
         {serviceId: "com.standard.calendar", title: "Calendar", icon: "/icons/interfaces/calendar.png"},
         {serviceId: "com.standard.contacts", title: "Contacts", icon: "/icons/interfaces/contacts.png"},
@@ -105,9 +100,7 @@
         {serviceId: "com.standard.settings", title: "Settings", icon: "/icons/interfaces/settings.png", required: true},
     ];
     const getPlatformInterfaces = () => {
-        const interfaces = typeof window.StandardPlatformInterfaces?.all === "function"
-            ? window.StandardPlatformInterfaces.all()
-            : fallbackPlatformInterfaces;
+        const interfaces = typeof window.StandardPlatformInterfaces?.all === "function" ? window.StandardPlatformInterfaces.all() : fallbackPlatformInterfaces;
         return interfaces.filter(item => item?.serviceId && item?.title);
     };
     const isPlatformInterfaceEnabled = (serviceId) => {
@@ -119,9 +112,7 @@
     const renderInterfaceIcon = (app) => {
         const icon = `${app?.icon || ""}`.trim();
         if (!icon) return INTERFACES_ICON;
-        return icon.startsWith("<svg")
-            ? icon
-            : `<img src="${escapeHtml(icon)}" alt="${escapeHtml(app.title || "")}" />`;
+        return icon.startsWith("<svg") ? icon : `<img src="${escapeHtml(icon)}" style="cover" alt="${escapeHtml(app.title || "")}" />`;
     };
     const renderInterfacesList = () => {
         const root = document.getElementById("settings-interfaces-list");
@@ -408,13 +399,47 @@
             if (document.getElementById("home-documentation-viewer")) document.getElementById("home-documentation-viewer").innerHTML = div({style: "faded", content: "Unable to load documentation map."});
         });
     };
-    const openCacheFileInInternals = async (interfaceName = "", cacheKey = "", triggerNode = null) => {
+    const formatBytes = (value = 0) => {
+        const bytes = Number(value) || 0;
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+    const formatCacheTimestamp = (value = "") => {
+        if (!value) return "";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleString();
+    };
+    const openCacheFileInInternals = async (entry = {}, triggerNode = null) => {
+        const interfaceName = entry?.interfaceName || "";
+        const cacheKey = entry?.key || "";
         if (!interfaceName || !cacheKey) return;
         try {
-            const response = await fetch(`/api/cache/${encodeURIComponent(interfaceName)}/${encodeURIComponent(cacheKey)}`);
-            if (!response.ok) throw new Error(`Failed to read cache file (${response.status})`);
-            const fileBuffer = await response.arrayBuffer();
-            const decoded = new TextDecoder().decode(fileBuffer);
+            if (entry.kind === "image") {
+                const source = await window.StandardBrowserCache?.get?.(interfaceName, cacheKey, {format: entry.format || "", responseType: "objectUrl"});
+                if (!source) throw new Error("Cache image not found");
+                if (typeof window.StandardInternals?.openImageSource === "function") {
+                    window.StandardInternals.openImageSource(source, {
+                        title: entry.label || cacheKey,
+                        path: `cache/${interfaceName}/${cacheKey}`,
+                        isObjectUrl: true,
+                        revokePrevious: true,
+                        sourceNode: triggerNode
+                    });
+                } else {
+                    modular.start("com.standard.internals");
+                    modular.error("Internals viewer is not ready yet");
+                }
+                return;
+            }
+            const value = await window.StandardBrowserCache?.get?.(interfaceName, cacheKey, {
+                format: entry.format || "",
+                responseType: entry.kind === "blob" ? "blob" : ""
+            });
+            const decoded = value instanceof Blob
+                ? `Binary cache entry\n\nInterface: ${interfaceName}\nKey: ${cacheKey}\nType: ${entry.contentType || value.type || "application/octet-stream"}\nSize: ${formatBytes(entry.size || value.size || 0)}`
+                : (typeof value === "string" ? value : JSON.stringify(value ?? {}, null, 2));
             if (typeof window.StandardInternals?.openTextContent === "function") {
                 window.StandardInternals.openTextContent(`cache/${interfaceName}/${cacheKey}`, decoded, {readOnly: true, sourceNode: triggerNode});
             } else {
@@ -463,28 +488,83 @@
             modular.error("Unable to load standard data as sheet");
         }
     };
-    const renderHistoryList = (files = [], mode = "Use", interfaceName = "") => {
+    const deleteCacheEntry = async (entry = {}) => {
+        if (!entry.interfaceName || !entry.key) return;
+        try {
+            await window.StandardBrowserCache?.delete?.(entry.interfaceName, entry.key, {format: entry.format || ""});
+            modular.success("Cache entry deleted");
+            initializeHistoryRoute();
+        } catch (_) {
+            modular.error("Unable to delete cache entry");
+        }
+    };
+    const renderHistoryList = (entries = [], mode = "Use") => {
         const historyList = document.getElementById("home-history-cache-list");
         if (!historyList) return;
         if (mode !== "Cache") {
             historyList.innerHTML = div({style: "faded small-padding", content: "Select Cache mode to browse cached files."});
             return;
         }
-        if (!files.length) {
-            historyList.innerHTML = div({style: "faded small-padding", content: "No cache files found."});
+        if (!entries.length) {
+            historyList.innerHTML = div({style: "faded small-padding", content: "No browser cache entries found."});
             return;
         }
-        historyList.innerHTML = div({content: files.map((fileName) => '<button type="button" class="padded radius bordered hover-background pointer hover-shadowed hover-zoom align-left fill" data-cache-key="' + encodeURIComponent(fileName) + '">' + fileName + '</button>').join("")});
-        historyList.querySelectorAll("[data-cache-key]").forEach((node) => {
-            node.onclick = () => openCacheFileInInternals(interfaceName, decodeURIComponent(node.getAttribute("data-cache-key") || ""), node);
+        historyList.innerHTML = div({content: entries.map((entry, index) => {
+            const label = escapeHtml(entry.label || entry.key || "Cache entry");
+            const detail = [
+                entry.interfaceName,
+                entry.kind || "cache",
+                entry.contentType || "",
+                formatBytes(entry.size || 0),
+                formatCacheTimestamp(entry.updatedAt || "")
+            ].filter(Boolean).map(escapeHtml).join(" · ");
+            const source = entry.source ? `<div class="faded" style="font-size:12px;margin-top:4px;">${escapeHtml(entry.source)}</div>` : "";
+            return `<div class="padded radius bordered hover-background align-left fill" data-cache-index="${index}">
+                <div style="display:flex;gap:8px;align-items:flex-start;justify-content:space-between;">
+                    <button type="button" class="naked pointer align-left" data-cache-open="${index}" style="flex:1;color:inherit;">
+                        <strong>${label}</strong>
+                        <div class="faded" style="font-size:12px;margin-top:4px;">${detail}</div>
+                        ${source}
+                    </button>
+                    <button type="button" class="tiny inner-radius" data-cache-delete="${index}" title="Delete cache entry">Delete</button>
+                </div>
+            </div>`;
+        }).join("")});
+        historyList.querySelectorAll("[data-cache-open]").forEach((node) => {
+            const entry = entries[Number(node.getAttribute("data-cache-open"))];
+            node.onclick = () => openCacheFileInInternals(entry, node);
+        });
+        historyList.querySelectorAll("[data-cache-delete]").forEach((node) => {
+            const entry = entries[Number(node.getAttribute("data-cache-delete"))];
+            node.onclick = event => {
+                event.preventDefault();
+                event.stopPropagation();
+                deleteCacheEntry(entry);
+            };
         });
     };
     const initializeHistoryRoute = () => {
         const interfaceSelect = document.getElementById("home-history-interface-select");
         const modeSelect = document.getElementById("home-history-mode-select");
         const historyList = document.getElementById("home-history-cache-list");
+        const refreshButton = document.getElementById("home-history-refresh-cache");
+        const clearButton = document.getElementById("home-history-clear-cache");
         if (!interfaceSelect || !modeSelect || !historyList) return;
         let requestVersion = 0;
+        const populateInterfaces = async () => {
+            const cachedEntries = await window.StandardBrowserCache?.list?.() || [];
+            const cachedInterfaces = Array.from(new Set(cachedEntries.map(entry => entry.interfaceName).filter(Boolean))).sort((left, right) => left.localeCompare(right));
+            const runningOptions = Array.from(interfaceSelect.options || []).map(option => ({label: option.textContent || option.value, value: option.value}));
+            const optionMap = new Map();
+            optionMap.set("", "All cached interfaces");
+            runningOptions.forEach(option => {
+                if (option.value) optionMap.set(option.value, option.label || option.value);
+            });
+            cachedInterfaces.forEach(interfaceName => {
+                if (!optionMap.has(interfaceName)) optionMap.set(interfaceName, interfaceName);
+            });
+            interfaceSelect.innerHTML = Array.from(optionMap.entries()).map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("");
+        };
         const refreshCacheList = async () => {
             const mode = modeSelect.value;
             const selectedInterface = interfaceSelect.value;
@@ -492,26 +572,32 @@
                 renderHistoryList([], mode);
                 return;
             }
-            if (!selectedInterface) {
-                historyList.innerHTML = div({style: "faded small-padding", content: "Select an interface to load cache files."});
-                return;
-            }
             const currentRequest = ++requestVersion;
-            historyList.innerHTML = div({style: "faded small-padding", content: "Loading cache files..."});
+            historyList.innerHTML = div({style: "faded small-padding", content: "Loading browser cache..."});
             try {
-                const response = await fetch(`/api/cache/${encodeURIComponent(selectedInterface)}`);
-                if (!response.ok) throw new Error(`Failed to fetch cache list (${response.status})`);
-                const payload = await response.json();
+                const entries = await window.StandardBrowserCache?.list?.({interfaceName: selectedInterface}) || [];
                 if (currentRequest !== requestVersion) return;
-                renderHistoryList(Array.isArray(payload?.files) ? payload.files : [], mode, selectedInterface);
+                renderHistoryList(entries, mode);
             } catch (_) {
                 if (currentRequest !== requestVersion) return;
-                historyList.innerHTML = div({style: "faded small-padding", content: "Unable to load cache files."});
+                historyList.innerHTML = div({style: "faded small-padding", content: "Unable to load browser cache."});
             }
         };
+        populateInterfaces().then(refreshCacheList).catch(refreshCacheList);
         interfaceSelect.onchange = refreshCacheList;
         modeSelect.onchange = refreshCacheList;
-        refreshCacheList();
+        if (refreshButton) refreshButton.onclick = () => populateInterfaces().then(refreshCacheList).catch(refreshCacheList);
+        if (clearButton) clearButton.onclick = async () => {
+            const selectedInterface = interfaceSelect.value;
+            try {
+                const removedCount = await window.StandardBrowserCache?.clear?.({interfaceName: selectedInterface}) || 0;
+                modular.success(removedCount ? "Browser cache cleared" : "No cache entries to clear");
+                await populateInterfaces();
+                await refreshCacheList();
+            } catch (_) {
+                modular.error("Unable to clear browser cache");
+            }
+        };
     };
     const initializeStandardsRoute = async () => {
         const listRoot = document.getElementById("home-standards-list");
@@ -887,12 +973,6 @@
             return "";
         }
     };
-    const buildBackgroundCacheEndpoint = (key, {format = ""} = {}) => {
-        const params = new URLSearchParams();
-        if (format) params.set("format", format);
-        params.set("_", `${Date.now()}`);
-        return `/api/cache/${encodeURIComponent(BACKGROUND_IMAGE_CACHE_INTERFACE)}/${encodeURIComponent(key)}?${params.toString()}`;
-    };
     const saveBackgroundImageCache = async (file) => {
         const previousMetadata = await loadBackgroundImageMetadata();
         const previousFormat = sanitizeBackgroundImageFormat(previousMetadata?.format || "");
@@ -902,37 +982,19 @@
             mimeType: `${file?.type || ""}`.trim() || `image/${format}`,
             updatedAt: new Date().toISOString()
         };
-        const imageResponse = await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_CACHE_KEY, {format}), {
-            method: "POST",
-            credentials: "same-origin",
-            cache: "no-store",
-            headers: {
-                "Content-Type": metadata.mimeType
-            },
-            body: file
+        await window.StandardBrowserCache?.set?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_CACHE_KEY, file, {
+            format,
+            contentType: metadata.mimeType,
+            label: "Background image"
         });
-        if (!imageResponse.ok) {
-            throw new Error(`Image upload failed (${imageResponse.status})`);
-        }
-        const metadataResponse = await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_META_KEY, {format: "json"}), {
-            method: "POST",
-            credentials: "same-origin",
-            cache: "no-store",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(metadata, null, 2)
+        await window.StandardBrowserCache?.set?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_META_KEY, metadata, {
+            format: "json",
+            contentType: "application/json",
+            label: "Background image metadata"
         });
-        if (!metadataResponse.ok) {
-            throw new Error(`Metadata upload failed (${metadataResponse.status})`);
-        }
         if (previousFormat && previousFormat !== format) {
             try {
-                await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_CACHE_KEY, {format: previousFormat}), {
-                    method: "DELETE",
-                    credentials: "same-origin",
-                    cache: "no-store"
-                });
+                await window.StandardBrowserCache?.delete?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_CACHE_KEY, {format: previousFormat});
             } catch (_) {
             }
         }
@@ -940,13 +1002,7 @@
     };
     const loadBackgroundImageMetadata = async () => {
         try {
-            const response = await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_META_KEY, {format: "json"}), {
-                credentials: "same-origin",
-                cache: "no-store"
-            });
-            if (response.status === 404) return null;
-            if (!response.ok) throw new Error(`Metadata fetch failed (${response.status})`);
-            return await response.json();
+            return await window.StandardBrowserCache?.get?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_META_KEY, {format: "json"});
         } catch (error) {
             console.error("Failed to load background image metadata:", error);
             return null;
@@ -956,23 +1012,9 @@
         const metadata = await loadBackgroundImageMetadata();
         const format = sanitizeBackgroundImageFormat(metadata?.format || "");
         if (format) {
-            const imageResponse = await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_CACHE_KEY, {format}), {
-                method: "DELETE",
-                credentials: "same-origin",
-                cache: "no-store"
-            });
-            if (!(imageResponse.ok || imageResponse.status === 404)) {
-                throw new Error(`Image delete failed (${imageResponse.status})`);
-            }
+            await window.StandardBrowserCache?.delete?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_CACHE_KEY, {format});
         }
-        const metadataResponse = await fetch(buildBackgroundCacheEndpoint(BACKGROUND_IMAGE_META_KEY, {format: "json"}), {
-            method: "DELETE",
-            credentials: "same-origin",
-            cache: "no-store"
-        });
-        if (!(metadataResponse.ok || metadataResponse.status === 404)) {
-            throw new Error(`Metadata delete failed (${metadataResponse.status})`);
-        }
+        await window.StandardBrowserCache?.delete?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_META_KEY, {format: "json"});
     };
     const getAppliedBackgroundImageUrl = () => {
         if (typeof window.StandardUI?.getAppliedBackgroundImageUrl === "function") {
@@ -1467,7 +1509,9 @@
                         return div({style: "small-padding", content: children([
                             div({style: "margin-bottom", content: children([
                                 select({id: "home-history-interface-select", style: "home-documentation-select small-margin-right", options: interfaces}),
-                                select({id: "home-history-mode-select", style: "home-documentation-select", options: [{label: "Cache", value: "Cache"}, {label: "Use", value: "Use"}]})
+                                select({id: "home-history-mode-select", style: "home-documentation-select small-margin-right", options: [{label: "Cache", value: "Cache"}, {label: "Use", value: "Use"}]}),
+                                button({id: "home-history-refresh-cache", style: "tiny inner-radius small-margin-right", content: "Refresh"}),
+                                button({id: "home-history-clear-cache", style: "tiny inner-radius", content: "Clear"})
                             ])}),
                             div({id: "home-history-cache-list", style: "brick padded", content: div({style: "faded small-padding", content: "Select Cache mode to browse cached files."})})
                         ])});

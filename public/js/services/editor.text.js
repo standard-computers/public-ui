@@ -510,6 +510,20 @@
         savedTextSelectionRange = range.cloneRange();
         return true;
     };
+    const focusTextEditorAtEnd = (portal = findTextPortal()) => {
+        const editorNode = findTextEditorNode(portal);
+        if (!editorNode) return false;
+        editorNode.focus();
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(editorNode);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        savedTextSelectionRange = range.cloneRange();
+        updateTextToolbarState();
+        return true;
+    };
     const getActiveTextSelectionRange = () => {
         const editorNode = findTextEditorNode();
         const selection = window.getSelection();
@@ -2102,6 +2116,7 @@
                 restoreEditorWindowState(this.portal);
                 updateTextEditorView(this.portal);
                 bindTextEditorInteractions(this.portal);
+                requestAnimationFrame(() => focusTextEditorAtEnd(this.portal));
             }
         })
     ]));

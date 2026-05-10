@@ -8,7 +8,6 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .table .table-row:last-of-type {border-bottom:0}
 .table .table-row .cell {padding:10px;border:1px solid var(--secondary-bg);cursor:pointer;white-space:nowrap;text-overline-style:ellipsis;border-radius:var(--radius);overflow:hidden}
 .table .table-row .cell:hover {border:1px solid var(--secondary-border)}
-.table .table-header {}
 .table .table-header .cell {font-weight:bold}
 .line-loader {width:100px;height:14px;border-radius:var(--radius);background-color:var(--secondary-bg);position:relative;overflow:hidden;border:1px solid var(--border)}
 .line-loader-bar {width:40px;height:100%;position:absolute;top:0;left:0;background-color:var(--primary);border-radius:var(--radius);animation:slide 0.69s infinite linear}
@@ -120,7 +119,7 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .service-loader.hidden {display:none}
 .service-loader-card {background:var(--secondary-bg);padding:16px 18px;width:320px;max-width:90%}
 .service-loader-text {margin:0 0 10px 0;font-weight:600}
-.service-loader-bar {border:1px solid var(--light-border);border-radius:var(--radius);height:8px;overflow:hidden;background:var(--secondary-background)}
+.service-loader-bar {border:1px solid var(--light-border);border-radius:var(--radius);height:8px;overflow:hidden;background:var(--secondary-bg)}
 .service-loader-bar-progress {height:100%;width:0%;background:var(--primary);transition:width 200ms ease}
 .service-loader-status {margin:8px 0 0 0;font-size:14px;opacity:0.8}
 #search-box {padding:8px 4px 8px 4px;min-width:350px;width:100%;display:inline-block;text-overflow:clip}
@@ -181,7 +180,7 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .window-body .view {transition:all 100ms;border-radius:var(--radius);padding:10px}
 .window-body .actionable {position:relative}
 .window-body .actionable .ios-switch {margin-right:-10px}
-.window-body .actionable:hover {background-color:var(--secondary-background)}
+.window-body .actionable:hover {background-color:var(--secondary-bg)}
 .window-content-barred > .window-body .bordered {border:1px solid var(--border);margin:10px 5px 0 5px}
 .reserve {width:50px;height:50px}
 .small-shadowed {box-shadow:var(--small-shadow)}
@@ -200,16 +199,23 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .internals-article-header h2 {font-size:24px;line-height:1.2;margin:0 0 6px}
 .internals-article-header a {overflow-wrap:anywhere}
 .internals-article-meta {float:right;max-width:45%;margin:0 0 8px 16px;text-align:right;overflow-wrap:anywhere}
-.internals-article-icon {float:left;width:56px;height:56px;object-fit:cover;border-radius:50%;margin:0 12px 8px 0;background:var(--secondary-background)}
-.internals-article-content {white-space:pre-wrap;line-height:1.45;clear:both}
+.internals-article-icon {float:left;width:56px;height:56px;object-fit:cover;border-radius:var(--radius);margin:0 12px 8px 0;background:none}
+.internals-article-content {line-height:1.45;clear:both}
+.internals-article-content p {margin:0 0 12px}
+.internals-article-content h1, .internals-article-content h2, .internals-article-content h3, .internals-article-content h4, .internals-article-content h5, .internals-article-content h6 {margin:14px 0 8px}
+.internals-article-content ul, .internals-article-content ol {margin:0 0 12px 1.3rem;padding-left:1.1rem}
+.internals-article-content li {margin:4px 0}
+.internals-article-content blockquote {margin:0 0 12px;padding-left:12px;border-left:3px solid var(--border)}
+.internals-article-content pre {white-space:pre-wrap;overflow:auto}
+.internals-article-content img {max-width:100%;height:auto;border-radius:var(--radius)}
 .internals-article-source {margin-top:12px;overflow-wrap:anywhere}
 .internals-article-modify-header {display:flex;align-items:flex-start;gap:12px;margin:8px 0 12px}
-.internals-article-modify-icon {width:88px;height:88px;object-fit:cover;background:var(--secondary-background);flex:0 0 88px}
+.internals-article-modify-icon {width:65px;height:65px;object-fit:contain;border-radius:var(--radius);background:var(--secondary-bg);flex:0 0 65px}
 .internals-article-modify-title-fields {min-width:0;flex:1}
 .internals-article-edit-full, .internals-article-edit-full > div, .internals-article-edit-full .padded {width:100%;box-sizing:border-box}
-.internals-article-edit-textarea {min-height:180px;resize:vertical;width:100%;box-sizing:border-box}
+.internals-article-edit-textarea {height:auto;overflow:hidden;resize:none;width:100%;box-sizing:border-box}
 .option {width:max-content;box-sizing:border-box;transition:all 100ms;box-shadow:var(--shadow);background:#fff;border:1px solid var(--border);padding:8px;cursor:pointer;border-radius:var(--radius);margin-bottom:8px}
-.option:hover {transform:Scale(1.075);background:var(--secondary-background)}
+.option:hover {transform:Scale(1.075);background:var(--secondary-bg)}
 .option svg {width:22px;height:22px;display:inline-block;vertical-align:bottom}
 .option div {display:inline-block;vertical-align:top;padding:1px 0 0 5px}
 @keyframes wave { 0%, 100% { transform:translateY(0)} 50% { transform:translateY(-5px)}}
@@ -219,11 +225,15 @@ body.drag-active::before {content:"";position:fixed;inset:0;pointer-events:none;
 .service-window-parked {transition:left 200ms ease, top 200ms ease, transform 200ms ease, opacity 200ms ease;transform:scale(0.96);opacity:0.93}
 .monospaced {font-family:Consolas, serif !important}
 .cli-holder {width:100%;overflow:hidden}
+.cli-command-row {display:flex;align-items:center;gap:6px;box-sizing:border-box}
+.cli-command-prompt {flex:0 0 auto}
+.cli-command-input {flex:1 1 auto;min-width:0;width:auto !important}
+.cli-command-loader {flex:0 0 32px;width:32px;min-height:30px;text-align:center}
 @keyframes fadeIn {
     from {
         opacity:0;
         transform:scale(0.9);
-   }
+    }
     to {
         opacity:1;
         transform:scale(1);
@@ -253,7 +263,6 @@ body.drag-active::before {content:"";position:fixed;inset:0;pointer-events:none;
 .weather-day-label {font-size:16px;font-weight:700;margin-bottom:4px}
 .weather-day-high {font-weight:700}
 .weather-empty-state {text-align:center}
-
 .weather-widget {padding:4px 8px}
 .weather-widget-location {font-size:12px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .weather-widget-temp {font-size:30px;font-weight:700;line-height:1.1}

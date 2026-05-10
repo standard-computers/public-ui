@@ -1,6 +1,7 @@
 (async () => {
     const NOTE_CONTENT_PREFIX = "__STD_NOTE_B64__:";
     let photoCascadeObserver = null;
+    const photoObjectUrls = new Set();
     const decodeNoteContent = value => {
         const raw = String(value || "");
         if (!raw.startsWith(NOTE_CONTENT_PREFIX)) return raw;
@@ -815,38 +816,55 @@
         }
         return false;
     };
-    const getPhotoCacheKey = (photo = {}) => String(photo?.name || photo?.path || "").split("/").pop().trim();
-    const blobToDataUrl = blob => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-        reader.onerror = () => reject(reader.error || new Error("Failed to read image data"));
-        reader.readAsDataURL(blob);
-    });
-    const fetchPhotoDataUrlFromDevice = async rawPath => {
+    const revokePhotoObjectUrls = () => {
+        photoObjectUrls.forEach(url => {
+            try {
+                URL.revokeObjectURL(url);
+            } catch (_) {
+            }
+        });
+        photoObjectUrls.clear();
+    };
+    const getPhotoCacheKey = (photo = {}) => {
+        const rawPath = typeof photo === "string" ? photo : (photo?.path || photo?.name || "");
+        const normalizedPath = getFilePathForRemoveCommand(rawPath);
+        const hash = normalizedPath ? createStableCacheHash(normalizedPath) : "";
+        return hash ? `photo-${hash}` : "";
+    };
+    const createTrackedPhotoObjectUrl = blob => {
+        const objectUrl = URL.createObjectURL(blob);
+        photoObjectUrls.add(objectUrl);
+        return objectUrl;
+    };
+    const fetchPhotoBlobFromDevice = async rawPath => {
         const filePath = getFilePathForRemoveCommand(rawPath);
-        if (!filePath) return "";
+        if (!filePath) return null;
         const response = await fetch(`/api/files/download?path=${encodeURIComponent(filePath)}`);
         if (!response.ok) throw new Error(`Failed to download photo (${response.status})`);
-        return blobToDataUrl(await response.blob());
+        return response.blob();
     };
     const resolvePhotoImageSource = async (photo = {}, cache = null) => {
         const cacheKey = getPhotoCacheKey(photo);
         const deviceUrl = `/api/files/download?path=${encodeURIComponent(getFilePathForRemoveCommand(photo?.path || ""))}`;
         if (!cacheKey) return deviceUrl;
         try {
-            const cachedPhoto = await cache?.get?.(cacheKey);
-            if (typeof cachedPhoto === "string" && cachedPhoto.trim()) return cachedPhoto;
+            const cachedPhoto = await cache?.get?.(cacheKey, {responseType: "blob"});
+            if (cachedPhoto instanceof Blob && cachedPhoto.size) return createTrackedPhotoObjectUrl(cachedPhoto);
         } catch (_) {
         }
         try {
-            const downloadedPhoto = await fetchPhotoDataUrlFromDevice(photo?.path || "");
+            const downloadedPhoto = await fetchPhotoBlobFromDevice(photo?.path || "");
             if (downloadedPhoto && cache?.create) {
                 try {
-                    await cache.create(cacheKey, downloadedPhoto);
+                    await cache.create(cacheKey, downloadedPhoto, {
+                        contentType: downloadedPhoto.type || "image/*",
+                        label: String(photo?.name || photo?.path || "Photo").split("/").pop(),
+                        source: getFilePathForRemoveCommand(photo?.path || "")
+                    });
                 } catch (_) {
                 }
             }
-            if (downloadedPhoto) return downloadedPhoto;
+            if (downloadedPhoto) return createTrackedPhotoObjectUrl(downloadedPhoto);
         } catch (_) {
         }
         return deviceUrl;
@@ -1244,6 +1262,7 @@
                         id: "photos",
                         style: "masonry",
                         content: () => CLI.send("tree Photos").then(async photos => {
+                            revokePhotoObjectUrls();
                             const photoFiles = (photos?.children || []).filter(file => !isDirectory(file) && isImageFilePath(file?.path));
                             const photoTiles = await Promise.all(photoFiles.map(async photo => {
                                 const photoSource = await resolvePhotoImageSource(photo, context?.cache);
@@ -1427,5 +1446,6 @@
             photoCascadeObserver.disconnect();
             photoCascadeObserver = null;
         }
+        revokePhotoObjectUrls();
     });
 })();

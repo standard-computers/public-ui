@@ -33,6 +33,7 @@
     let activeArticleRecord = {};
     let activeArticleIconFile = null;
     let activeArticleIconChanged = false;
+    let activeArticleIconPreview = {articleId: "", source: ""};
     const articleIconCacheKeys = {};
     const getPathForDownload = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
     const getFileName = (rawPath = "") => String(rawPath || "").split("/").pop() || "Internals";
@@ -64,6 +65,99 @@
         if (/^https?:\/\//i.test(raw)) return raw;
         return "";
     };
+    const normalizeArticleMarkdownSource = (value = "") => {
+        const raw = String(value || "");
+        return raw
+            .replace(/\r\n/g, "\n")
+            .replace(/\r/g, "\n")
+            .replace(/\\n/g, "\n");
+    };
+    const renderArticleMarkdownInline = (value = "") => {
+        return escapeHtml(value)
+            .replace(/`([^`]+)`/g, "<code>$1</code>")
+            .replace(/(\*\*|__)(?=\S)(.+?\S)\1/g, "<strong>$2</strong>")
+            .replace(/(\*|_)(?=\S)(.+?\S)\1/g, "<em>$2</em>")
+            .replace(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g, (_match, alt, url) => `<img src="${escapeHtml(url)}" alt="${alt}" loading="lazy">`)
+            .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_match, text, url) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`);
+    };
+    const renderArticleMarkdown = (value = "") => {
+        const lines = normalizeArticleMarkdownSource(value).split("\n");
+        const html = [];
+        let paragraph = [];
+        let listType = "";
+        let inCode = false;
+        let codeLines = [];
+        const flushParagraph = () => {
+            if (!paragraph.length) return;
+            html.push(`<p>${paragraph.map(renderArticleMarkdownInline).join("<br>")}</p>`);
+            paragraph = [];
+        };
+        const closeList = () => {
+            if (!listType) return;
+            html.push(`</${listType}>`);
+            listType = "";
+        };
+        const flushCode = () => {
+            html.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+            codeLines = [];
+        };
+        lines.forEach((line) => {
+            if (/^\s*```/.test(line)) {
+                if (inCode) {
+                    flushCode();
+                    inCode = false;
+                } else {
+                    flushParagraph();
+                    closeList();
+                    inCode = true;
+                    codeLines = [];
+                }
+                return;
+            }
+            if (inCode) {
+                codeLines.push(line);
+                return;
+            }
+            if (!line.trim()) {
+                flushParagraph();
+                closeList();
+                return;
+            }
+            const heading = line.match(/^(#{1,6})\s*(.+)$/);
+            if (heading) {
+                flushParagraph();
+                closeList();
+                html.push(`<h${heading[1].length}>${renderArticleMarkdownInline(heading[2])}</h${heading[1].length}>`);
+                return;
+            }
+            const quote = line.match(/^>\s?(.+)$/);
+            if (quote) {
+                flushParagraph();
+                closeList();
+                html.push(`<blockquote>${renderArticleMarkdownInline(quote[1])}</blockquote>`);
+                return;
+            }
+            const unordered = line.match(/^\s*[-*]\s+(.+)$/);
+            const ordered = line.match(/^\s*\d+\.\s+(.+)$/);
+            if (unordered || ordered) {
+                flushParagraph();
+                const nextType = unordered ? "ul" : "ol";
+                if (listType && listType !== nextType) closeList();
+                if (!listType) {
+                    html.push(`<${nextType}>`);
+                    listType = nextType;
+                }
+                html.push(`<li>${renderArticleMarkdownInline((unordered || ordered)[1])}</li>`);
+                return;
+            }
+            closeList();
+            paragraph.push(line);
+        });
+        if (inCode) flushCode();
+        flushParagraph();
+        closeList();
+        return html.join("");
+    };
     const getArticleIconCacheKey = (articleId) => {
         const cacheKey = articleIconCacheKeys[String(articleId)];
         return cacheKey ?? "cached";
@@ -73,7 +167,12 @@
         articleIconCacheKeys[String(articleId)] = Date.now();
     };
     const articleIconUrl = (articleId) => articleId ? `/api/records/images/${encodeURIComponent(articleId)}?cb=${encodeURIComponent(`${articleId}-${getArticleIconCacheKey(articleId)}`)}` : DEFAULT_ARTICLE_ICON;
-    const articleIconSrc = (article = {}) => article?.id ? articleIconUrl(article.id) : DEFAULT_ARTICLE_ICON;
+    const cachedArticleIconSource = (articleId = "") => activeArticleIconPreview.articleId === String(articleId || "") ? activeArticleIconPreview.source : "";
+    const articleIconSrc = (article = {}, {preferPreview = false} = {}) => {
+        const articleId = String(article?.id || "");
+        const previewSource = preferPreview ? cachedArticleIconSource(articleId) : "";
+        return previewSource || (articleId ? articleIconUrl(articleId) : DEFAULT_ARTICLE_ICON);
+    };
     const setArticleIconFallback = (imageEl) => {
         if (!imageEl || imageEl.src.endsWith(DEFAULT_ARTICLE_ICON)) return;
         imageEl.src = DEFAULT_ARTICLE_ICON;
@@ -97,6 +196,27 @@
         const binding = {input: fileInput, objectUrl: null};
         iconEl[bindingKey] = binding;
         return binding;
+    };
+    const cacheArticleIconSource = (articleId = "", source = "") => {
+        const normalizedId = String(articleId || "");
+        const normalizedSource = String(source || "");
+        activeArticleIconPreview = normalizedId && normalizedSource ? {articleId: normalizedId, source: normalizedSource} : {articleId: "", source: ""};
+    };
+    const getArticleIconCarryoverSource = (windowNode = findInternalsWindow(4)) => {
+        const image = windowNode?.querySelector?.(".internals-article-icon");
+        if (!(image instanceof HTMLImageElement)) return "";
+        const imageSrc = String(image.currentSrc || image.src || "");
+        if (!imageSrc || imageSrc.endsWith(DEFAULT_ARTICLE_ICON) || image.naturalWidth <= 0 || image.naturalHeight <= 0) return "";
+        try {
+            const canvas = document.createElement("canvas");
+            canvas.width = image.naturalWidth;
+            canvas.height = image.naturalHeight;
+            const context = canvas.getContext("2d");
+            context.drawImage(image, 0, 0);
+            return canvas.toDataURL("image/png");
+        } catch (_) {
+            return imageSrc;
+        }
     };
     const sanitizeTextPreviewMarkup = (markup = "") => {
         const parser = new DOMParser();
@@ -402,22 +522,11 @@
     };
     const readFilesCache = async (key = "", {format = ""} = {}) => {
         if (!key) return null;
-        const params = new URLSearchParams();
-        if (format) params.set("format", format);
-        const response = await fetch(`/api/cache/${encodeURIComponent(FILES_CACHE_INTERFACE)}/${encodeURIComponent(key)}${params.toString() ? `?${params}` : ""}`);
-        if (response.status === 404) return null;
-        if (!response.ok) throw new Error("Unable to read cache");
-        const contentType = `${response.headers.get("content-type") || ""}`.toLowerCase();
-        if (contentType.includes("application/json")) return response.json();
-        return response.text();
+        return window.StandardBrowserCache?.get?.(FILES_CACHE_INTERFACE, key, {format}) || null;
     };
     const writeFilesCache = async (key = "", value = null, {format = "", contentType = "application/json"} = {}) => {
         if (!key) return null;
-        const params = new URLSearchParams();
-        if (format) params.set("format", format);
-        const response = await fetch(`/api/cache/${encodeURIComponent(FILES_CACHE_INTERFACE)}/${encodeURIComponent(key)}${params.toString() ? `?${params}` : ""}`, {method: "POST", headers: {"Content-Type": contentType}, body: typeof value === "string" ? value : JSON.stringify(value ?? {}, null, 2)});
-        if (!response.ok) throw new Error("Unable to write cache");
-        return response.json();
+        return window.StandardBrowserCache?.set?.(FILES_CACHE_INTERFACE, key, value, {format, contentType, label: key});
     };
     const getResumeTimeFromProgress = progressRecord => {
         const duration = Number(progressRecord?.duration) || 0;
@@ -568,10 +677,22 @@
         return div({content: children([
             div({style: "bold small-padding", content: labelText}),
             div({style: "padded", content: textareaField
-                ? textarea({id, style: "undecorated no-padding internals-article-edit-textarea", value: String(value ?? "")})
-                : input({id, style: "undecorated no-padding", value: String(value ?? "")})
+                ? textarea({id, style: "undecorated no-padding internals-article-edit-textarea fill", value: String(value ?? "")})
+                : input({id, style: "undecorated no-padding fill", value: String(value ?? "")})
             })
         ])});
+    };
+    const autoSizeArticleTextarea = (field) => {
+        if (!(field instanceof HTMLTextAreaElement)) return;
+        field.style.height = "auto";
+        field.style.height = `${field.scrollHeight}px`;
+    };
+    const bindArticleTextareaAutosize = () => {
+        const contentField = document.getElementById("modify-article-content");
+        if (!(contentField instanceof HTMLTextAreaElement)) return;
+        autoSizeArticleTextarea(contentField);
+        contentField.addEventListener("input", () => autoSizeArticleTextarea(contentField));
+        requestAnimationFrame(() => autoSizeArticleTextarea(contentField));
     };
     const getArticleEditFieldValue = (id = "") => document.getElementById(id)?.value?.trim?.() || "";
     const updateArticlePreview = (portal = findInternalsWindow(4)?.portal) => {
@@ -585,11 +706,11 @@
             `<div class="internals-article-meta">`,
             article.description ? `<div class="faded">${escapeHtml(article.description)}</div>` : "",
             `</div>`,
-            `<img class="article-icon internals-article-icon" src="${escapeHtml(articleIconSrc(article))}" alt="${escapeHtml(title)}" />`,
+            `<img class="article-icon internals-article-icon" src="${escapeHtml(articleIconSrc(article, {preferPreview: true}))}" alt="${escapeHtml(title)}" />`,
             `<h2>${escapeHtml(title)}</h2>`,
             sanitizeArticleUrl(article.link) ? `<a href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.link)}</a>` : `<div>${escapeHtml(article.link)}</div>`,
             `</div>`,
-            `<div class="internals-article-content">${escapeHtml(article.content)}</div>`,
+            `<div class="internals-article-content">${renderArticleMarkdown(article.content)}</div>`,
             `<div class="internals-article-source faded">`,
             sanitizeArticleUrl(article.source) ? `<a href="${escapeHtml(article.source)}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.source)}</a>` : escapeHtml(article.source),
             `</div>`
@@ -610,11 +731,12 @@
         setValue("modify-article-description", article.description);
         setValue("modify-article-link", article.link);
         setValue("modify-article-content", article.content);
+        bindArticleTextareaAutosize();
         setValue("modify-article-source", article.source);
         setValue("modify-article-priority", article.priority);
         const iconEl = document.getElementById("modify-article-icon");
         if (!iconEl) return;
-        iconEl.src = articleIconUrl(article.id);
+        iconEl.src = articleIconSrc(article, {preferPreview: true});
         iconEl.style.cursor = "pointer";
         activeArticleIconFile = null;
         activeArticleIconChanged = false;
@@ -636,6 +758,7 @@
             if (binding.objectUrl) URL.revokeObjectURL(binding.objectUrl);
             binding.objectUrl = URL.createObjectURL(file);
             iconEl.src = binding.objectUrl;
+            cacheArticleIconSource(article.id, binding.objectUrl);
             fileInput.value = "";
         };
     };
@@ -692,6 +815,7 @@
                     return;
                 }
                 bumpArticleIconCacheKey(articleId);
+                if (cachedArticleIconSource(articleId)) cacheArticleIconSource(articleId, cachedArticleIconSource(articleId));
             }
         } catch (error) {
             modular.error("Failed to save article");
@@ -709,6 +833,38 @@
             openArticle(activeArticleRecord);
         }
         modular.success("Saved article");
+    };
+    const deleteModifiedArticle = () => {
+        const articleId = activeArticleRecord?.id;
+        if (!articleId) {
+            modular.error("No article selected");
+            return;
+        }
+        const articleTitle = String(activeArticleRecord?.title || "this article").trim() || "this article";
+        confirmationDialogue({title: "Delete Article", content: `You're sure you want to delete ${articleTitle}?`, confirmation: async () => {
+                try {
+                    const response = await CLI.send(`[articles] - <id ${articleId}>`);
+                    if (response === 0) {
+                        modular.error("Failed to delete article");
+                        return;
+                    }
+                    closeModifyArticlePortal();
+                    const displayPortal = findInternalsWindow(4)?.portal;
+                    if (typeof displayPortal?.close === "function") {
+                        displayPortal.close();
+                    } else if (typeof displayPortal?.hide === "function") {
+                        displayPortal.hide();
+                    }
+                    activeArticleRecord = {};
+                    activeArticleIconFile = null;
+                    activeArticleIconChanged = false;
+                    cacheArticleIconSource("", "");
+                    modular.success("Deleted article");
+                } catch (error) {
+                    modular.error("Failed to delete article");
+                }
+            }
+        });
     };
     const syncPortalWindowState = (portalIndex, context = {}, portal = null) => {
         portal = portal || findInternalsWindow(portalIndex)?.portal;
@@ -920,6 +1076,19 @@
         updateArticlePreview(portal);
         return true;
     };
+    const openModifyArticleFromView = (sourceNode = null) => {
+        const displayWindow = sourceNode?.closest?.(".draggable-window") || findInternalsWindow(4);
+        const articleId = activeArticleRecord?.id;
+        const carryoverSource = getArticleIconCarryoverSource(displayWindow);
+        if (articleId && carryoverSource) cacheArticleIconSource(articleId, carryoverSource);
+        const displayPortal = displayWindow?.portal || findInternalsWindow(4)?.portal;
+        if (typeof displayPortal?.close === "function") {
+            displayPortal.close();
+        } else if (typeof displayPortal?.hide === "function") {
+            displayPortal.hide();
+        }
+        modular.show("com.standard.internals", 5, {newInstance: true});
+    };
     window.StandardInternals = window.StandardInternals || {};
     window.StandardInternals.openTextFilePath = (rawPath = "", sourceNode = null) => openTextFilePath(rawPath, sourceNode);
     window.StandardInternals.openTextContent = (title = "", content = "", options = {}) => openTextContent(title, content, options);
@@ -995,9 +1164,9 @@
             dimensions: [680, 560],
             navigation: false,
             tools: [{
-                title: "Modify",
+                title: "Edit",
                 icon: EDIT_ICON,
-                onclick: () => modular.show("com.standard.internals", 5, {newInstance: true})
+                onclick: (event) => openModifyArticleFromView(event?.target)
             }],
             route: () => div({style: "large-padding-top small-padding", content: div({id: "internals-article-preview", style: "internals-article-preview"})}),
             afterRender: function () {
@@ -1008,27 +1177,29 @@
         new Portal({
             title: "Modify Article",
             internal: true,
-            dimensions: [520, 680],
+            dimensions: [520, 620],
             navigation: false,
             tools: [{
                 title: "Save",
                 icon: modular.icons.save,
                 onclick: saveModifiedArticle
+            }, {
+                title: "Delete",
+                icon: modular.icons.delete,
+                onclick: deleteModifiedArticle
             }],
             route: () => div({style: "large-padding-top small-padding", content: children([
                 div({style: "internals-article-modify-header", content: children([
-                    img({id: "modify-article-icon", style: "article-icon internals-article-modify-icon round inline cover", src: articleIconSrc(activeArticleRecord)}),
+                    img({id: "modify-article-icon", style: "article-icon internals-article-modify-icon inline", src: articleIconSrc(activeArticleRecord, {preferPreview: true})}),
                     div({style: "internals-article-modify-title-fields", content: children([
                         articleTextField("modify-article-title", "Title", activeArticleRecord?.title),
-                        articleTextField("modify-article-link", "Link", activeArticleRecord?.link)
                     ])})
                 ])}),
+                articleTextField("modify-article-link", "Link", activeArticleRecord?.link),
                 articleTextField("modify-article-description", "Description", activeArticleRecord?.description),
                 div({style: "internals-article-edit-full", content: articleTextField("modify-article-content", "Content", activeArticleRecord?.content, {textareaField: true})}),
                 articleTextField("modify-article-source", "Source", activeArticleRecord?.source),
-                articleTextField("modify-article-priority", "Priority", activeArticleRecord?.priority),
-                div({style: "spacer"}),
-                div({style: "spacer"})
+                articleTextField("modify-article-priority", "Priority", activeArticleRecord?.priority)
             ])}),
             afterRender: bindArticleModifyPortal
         })

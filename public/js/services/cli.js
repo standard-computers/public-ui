@@ -3,6 +3,7 @@
     let historyIndex = -1;
     let pendingCommand = "";
     let historyLoaded = false;
+    let pendingResponses = 0;
     const escapeHtml = (value = "") => `${value}`.replace(/[&<>"']/g, character => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[character] || character));
     const CLI_BACKGROUND = "#1f1b1b";
     const CLI_GREEN = "#08ac05";
@@ -35,6 +36,18 @@
     };
     const appendCliBlock = (value = "", variant = "result") => {
         document.getElementById("append-cli-reciprocate").append(div({style: "brick", content: renderCliBlock(value, variant)}));
+    };
+    const setCliLoading = isLoading => {
+        const status = document.getElementById("cli-status");
+        if (!status || typeof status.isLoading !== "function") return;
+        if (isLoading) {
+            pendingResponses += 1;
+            status.isLoading();
+            status.textContent = String.fromCodePoint(0x28F7);
+            return;
+        }
+        pendingResponses = Math.max(0, pendingResponses - 1);
+        if (pendingResponses === 0) status.isLoading(false);
     };
     const loadHistory = async cache => {
         if (historyLoaded) return;
@@ -70,12 +83,15 @@
         }
         appendCliBlock(`$ ${cli_value}`, "command");
         scrollCliToBottom();
+        setCliLoading(true);
         CLI.send(cli_value, false).then(d => {
             appendCliBlock(`${d ?? ""}`, "result");
             scrollCliToBottom();
         }).catch(error => {
             appendCliBlock(error?.message || "Unable to run command.", "result");
             scrollCliToBottom();
+        }).finally(() => {
+            setCliLoading(false);
         });
     };
     modular.register(new Service("com.standard.cli", [new Portal({
@@ -89,9 +105,10 @@
         icon: "/icons/interfaces/cli.png",
         route: div({style: "cli-holder padded brick margin-top", content: div({content: children([
                 div({id: "append-cli-reciprocate", style: "brick large-padding-bottom"}),
-                div({id: "commander", style: "fixed bottomed fill cli-holder padded brick", content: children([
-                        div({style: "inline text-green", content: "$ <> "}),
-                        input({id: "cli-commander", style: "inline undecorated text-green monospaced partial-fill", attributes: {autocomplete: "off"}})
+                div({id: "commander", style: "fixed bottomed fill cli-holder padded brick cli-command-row", content: children([
+                        div({style: "inline text-green cli-command-prompt", content: "$ <> "}),
+                        input({id: "cli-commander", style: "inline undecorated text-green monospaced cli-command-input", attributes: {autocomplete: "off"}}),
+                        div({id: "cli-status", style: "block-loader text-green cli-command-loader"})
                     ])
                 })
             ])})}),

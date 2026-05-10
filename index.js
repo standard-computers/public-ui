@@ -2285,29 +2285,6 @@ function sanitizeUploadFileName(name = "") {
     return normalized || "upload.bin";
 }
 
-function sanitizeCacheSegment(value = "", {allowDots = true} = {}) {
-    const pattern = allowDots ? /[^a-zA-Z0-9._-]/g : /[^a-zA-Z0-9_-]/g;
-    return `${value}`.trim().replace(pattern, "");
-}
-
-function resolveCachePath(interfaceName, key, format) {
-    const safeInterface = sanitizeCacheSegment(interfaceName);
-    const safeKey = sanitizeCacheSegment(key);
-    const safeFormat = format ? sanitizeCacheSegment(format, {allowDots: false}) : "";
-    if (!safeInterface || !safeKey) {
-        throw new Error("Invalid cache path");
-    }
-    const fileName = safeFormat ? `${safeKey}.${safeFormat}` : safeKey;
-    const cacheRoot = path.join(__dirname, "private", "cache");
-    const interfaceDir = path.join(cacheRoot, safeInterface);
-    const fullPath = path.normalize(path.join(interfaceDir, fileName));
-    const normalizedInterfaceDir = path.normalize(interfaceDir + path.sep);
-    if (!fullPath.startsWith(normalizedInterfaceDir)) {
-        throw new Error("Invalid cache path");
-    }
-    return {interfaceDir, fullPath, safeFormat};
-}
-
 function resolveUserLocalPath(userId, fileName) {
     const safeUserId = sanitizeUserId(userId);
     if (!safeUserId) {
@@ -2699,77 +2676,19 @@ app.post("/api/user-data/local", uploadSingleFile, async (req, res) => {
 });
 
 app.get("/api/cache/:interface", async (req, res) => {
-    try {
-        const safeInterface = sanitizeCacheSegment(req.params.interface);
-        if (!safeInterface) {
-            throw new Error("Invalid cache path");
-        }
-        const cacheRoot = path.join(__dirname, "private", "cache");
-        const interfaceDir = path.join(cacheRoot, safeInterface);
-        const normalizedInterfaceDir = path.normalize(interfaceDir + path.sep);
-        if (!normalizedInterfaceDir.startsWith(path.normalize(cacheRoot + path.sep))) throw new Error("Invalid cache path");
-        let entries = [];
-        try {
-            entries = await fs.readdir(interfaceDir, {withFileTypes: true});
-        } catch (err) {
-            if (err.code === "ENOENT") return res.json({files: []});
-            throw err;
-        }
-        const files = entries.filter((entry) => entry.isFile()).map((entry) => entry.name).sort((a, b) => a.localeCompare(b));
-        return res.json({files});
-    } catch (err) {
-        const status = err.message.startsWith("Invalid") ? 400 : 500;
-        console.error("Failed to list cache files:", err);
-        return res.status(status).json({error: "Failed to list cache files"});
-    }
+    return res.status(410).json({error: "Server file cache is obsolete. Cache entries are stored in the browser."});
 });
 
 app.get("/api/cache/:interface/:key", async (req, res) => {
-    try {
-        const {fullPath, safeFormat} = resolveCachePath(req.params.interface, req.params.key, req.query.format);
-        const content = await fs.readFile(fullPath);
-        if (safeFormat) res.type(safeFormat);
-        return res.send(content);
-    } catch (err) {
-        if (err.code === "ENOENT") return res.status(404).json({error: "Cache file not found"});
-        const status = err.message.startsWith("Invalid") ? 400 : 500;
-        console.error("Failed to read cache file:", err);
-        return res.status(status).json({error: "Failed to read cache file"});
-    }
+    return res.status(410).json({error: "Server file cache is obsolete. Cache entries are stored in the browser."});
 });
 
 app.post("/api/cache/:interface/:key", express.raw({type: ["application/octet-stream", "image/*"], limit: REQUEST_BODY_LIMIT}), async (req, res) => {
-    try {
-        const {interfaceDir, fullPath} = resolveCachePath(req.params.interface, req.params.key, req.query.format);
-        await fs.mkdir(interfaceDir, {recursive: true});
-        let content = "";
-        if (Buffer.isBuffer(req.body)) {
-            content = req.body;
-        } else if (typeof req.body === "string") {
-            content = req.body;
-        } else if (req.body !== undefined && req.body !== null && Object.keys(req.body).length > 0) {
-            content = JSON.stringify(req.body, null, 2);
-        }
-        await fs.writeFile(fullPath, content);
-        return res.status(201).json({message: "Cache file saved", path: fullPath});
-    } catch (err) {
-        const status = err.message.startsWith("Invalid") ? 400 : 500;
-        console.error("Failed to save cache file:", err);
-        return res.status(status).json({error: "Failed to save cache file"});
-    }
+    return res.status(410).json({error: "Server file cache is obsolete. Cache entries are stored in the browser."});
 });
 
 app.delete("/api/cache/:interface/:key", async (req, res) => {
-    try {
-        const {fullPath} = resolveCachePath(req.params.interface, req.params.key, req.query.format);
-        await fs.unlink(fullPath);
-        return res.json({message: "Cache file deleted"});
-    } catch (err) {
-        if (err.code === "ENOENT") return res.status(404).json({error: "Cache file not found"});
-        const status = err.message.startsWith("Invalid") ? 400 : 500;
-        console.error("Failed to delete cache file:", err);
-        return res.status(status).json({error: "Failed to delete cache file"});
-    }
+    return res.status(410).json({error: "Server file cache is obsolete. Cache entries are stored in the browser."});
 });
 
 const server = createServer();

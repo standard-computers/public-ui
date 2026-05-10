@@ -1029,17 +1029,11 @@ async function resolveThemeBackgroundSource(backgroundSetting) {
         return `/api/user-data/${encodeURIComponent(trimmed)}`;
     }
     if (backgroundSetting !== true) return "";
-    const metaEndpoint = `/api/cache/${encodeURIComponent(THEME_BACKGROUND_CACHE_INTERFACE)}/${encodeURIComponent(THEME_BACKGROUND_META_KEY)}?format=json&_=${Date.now()}`;
     try {
-        const metaResponse = await fetch(metaEndpoint, {cache: "no-store", credentials: "same-origin"});
-        if (!metaResponse.ok) return "";
-        const metadata = await metaResponse.json().catch(() => null);
+        const metadata = await window.StandardBrowserCache?.get?.(THEME_BACKGROUND_CACHE_INTERFACE, THEME_BACKGROUND_META_KEY, {format: "json"});
         const format = `${metadata?.format || ""}`.trim().replace(/[^a-z0-9]/gi, "").toLowerCase();
         if (!format) return "";
-        const imageEndpoint = `/api/cache/${encodeURIComponent(THEME_BACKGROUND_CACHE_INTERFACE)}/${encodeURIComponent(THEME_BACKGROUND_CACHE_KEY)}?format=${encodeURIComponent(format)}&_=${Date.now()}`;
-        const imageResponse = await fetch(imageEndpoint, {cache: "no-store", credentials: "same-origin"});
-        if (!imageResponse.ok) return "";
-        const imageBlob = await imageResponse.blob();
+        const imageBlob = await window.StandardBrowserCache?.get?.(THEME_BACKGROUND_CACHE_INTERFACE, THEME_BACKGROUND_CACHE_KEY, {format, responseType: "blob"});
         if (!imageBlob || !imageBlob.size) return "";
         if (currentThemeBackgroundObjectUrl) {
             URL.revokeObjectURL(currentThemeBackgroundObjectUrl);

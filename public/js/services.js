@@ -558,38 +558,12 @@ class Portal {
 
     #createRouteContext() {
         const serviceId = this.#serviceId;
-        const cache = {
-            get: async (key, options = {}) => {
-                if (!serviceId) throw new Error("Missing service context");
-                if (!key) throw new Error("Cache key is required");
-                const {format} = options;
-                const params = new URLSearchParams();
-                if (format) params.set("format", format);
-                const endpoint = `/api/cache/${encodeURIComponent(serviceId)}/${encodeURIComponent(key)}${params.toString() ? `?${params}` : ""}`;
-                const res = await fetch(endpoint);
-                if (res.status === 404) return null;
-                if (!res.ok) throw new Error(`Failed to read cache (${res.status})`);
-                const contentType = `${res.headers.get("content-type") || ""}`.toLowerCase();
-                if (contentType.includes("application/json")) {
-                    return res.json();
-                }
-                return res.text();
-            }, create: async (key, value, options = {}) => {
-                if (!serviceId) throw new Error("Missing service context");
-                if (!key) throw new Error("Cache key is required");
-                const {format, contentType} = options;
-                const params = new URLSearchParams();
-                if (format) params.set("format", format);
-                const endpoint = `/api/cache/${encodeURIComponent(serviceId)}/${encodeURIComponent(key)}${params.toString() ? `?${params}` : ""}`;
-                const payload = typeof value === "string" ? value : JSON.stringify(value ?? {}, null, 2);
-                const res = await fetch(endpoint, {
-                    method: "POST", headers: {
-                        "Content-Type": contentType || (typeof value === "string" ? "text/plain" : "application/json")
-                    }, body: payload
-                });
-                if (!res.ok) throw new Error(`Failed to write cache (${res.status})`);
-                return res.json();
-            }
+        const cache = window.StandardBrowserCache?.createAdapter?.(serviceId) || {
+            get: async () => null,
+            create: async () => null,
+            set: async () => null,
+            delete: async () => false,
+            list: async () => []
         };
         return {
             portal: this,

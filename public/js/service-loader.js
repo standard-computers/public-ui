@@ -1,6 +1,7 @@
 (() => {
     const platformInterfaces = [
         {serviceId: "com.standard.internals", title: "Internals", script: "/js/services/internals.js", icon: "/icons/interfaces/cli.png", internal: true},
+        {serviceId: "com.standard.stopwatch", title: "Stopwatch", script: "/js/services/stopwatch.js", icon: "/icons/interfaces/alarms.png", internal: true},
         {serviceId: "com.standard.files", title: "Files", script: "/js/services/files.js", icon: "/icons/interfaces/files.png"},
         {serviceId: "com.standard.calendar", title: "Calendar", script: "/js/services/calendar.js", icon: "/icons/interfaces/calendar.png"},
         {serviceId: "com.standard.contacts", title: "Contacts", script: "/js/services/contacts.js", icon: "/icons/interfaces/contacts.png"},
