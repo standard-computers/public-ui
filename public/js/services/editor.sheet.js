@@ -54,6 +54,8 @@
     const SHEET_IMAGE_DEFAULT_HEIGHT = 160;
     const SHEET_IMAGE_MIN_WIDTH = 80;
     const SHEET_IMAGE_MIN_HEIGHT = 60;
+    const SHEET_CLIPBOARD_MIME = "application/x-standard-sheet-cells";
+    let sheetClipboardPayload = null;
     const SHEET_IMAGE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`;
     const SHEET_CHART_TYPES = [
         {label: "Column", value: "bar"},
@@ -705,6 +707,7 @@
             isEditingInput: !!(activeElement && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable))
         };
     };
+    const isSheetShortcutBlockedByDialogue = () => !!document.querySelector(".dialogue");
     const isSheetRangeSelectionActive = () => !!(activeSheetRangeStart && activeSheetRangeEnd);
     const clearActiveSheetRange = () => {
         activeSheetRangeStart = null;
@@ -950,20 +953,275 @@
         }
         return activeSheetCell ? [activeSheetCell] : [];
     };
+    const getSheetReferenceBounds = (cellReferences = []) => {
+        const positions = cellReferences
+            .map((cellReference) => parseSheetCellReference(cellReference))
+            .filter((position) => position.rowIndex >= 0 && position.columnIndex >= 0);
+        if (!positions.length) return null;
+        return positions.reduce((bounds, position) => ({
+            minRow: Math.min(bounds.minRow, position.rowIndex),
+            maxRow: Math.max(bounds.maxRow, position.rowIndex),
+            minColumn: Math.min(bounds.minColumn, position.columnIndex),
+            maxColumn: Math.max(bounds.maxColumn, position.columnIndex)
+        }), {
+            minRow: positions[0].rowIndex,
+            maxRow: positions[0].rowIndex,
+            minColumn: positions[0].columnIndex,
+            maxColumn: positions[0].columnIndex
+        });
+    };
+    const buildSheetClipboardPayload = ({cut = false} = {}) => {
+        const selectedReferences = getActiveSheetCellReferences();
+        const bounds = getSheetReferenceBounds(selectedReferences);
+        if (!bounds) return null;
+        const selectedSet = new Set(selectedReferences);
+        const cells = [];
+        for (let rowIndex = bounds.minRow; rowIndex <= bounds.maxRow; rowIndex += 1) {
+            for (let columnIndex = bounds.minColumn; columnIndex <= bounds.maxColumn; columnIndex += 1) {
+                const cellReference = getSheetCellReference(rowIndex, columnIndex);
+                if (!selectedSet.has(cellReference)) continue;
+                cells.push({
+                    rowOffset: rowIndex - bounds.minRow,
+                    columnOffset: columnIndex - bounds.minColumn,
+                    sourceReference: cut === true ? cellReference : "",
+                    value: sheetCellValues[cellReference] ?? "",
+                    style: encodeSheetCellStyle(sheetCellStyles[cellReference]),
+                    type: normalizeSheetCellType(sheetCellTypes[cellReference]),
+                    link: normalizeSheetHyperlinkUrl(sheetCellLinks[cellReference]),
+                    locked: isSheetCellLocked(cellReference) ? 1 : 0
+                });
+            }
+        }
+        return {
+            format: "standard-sheet-cells",
+            version: 1,
+            rows: bounds.maxRow - bounds.minRow + 1,
+            columns: bounds.maxColumn - bounds.minColumn + 1,
+            cut: cut === true,
+            cutReferences: cut === true ? [...selectedSet] : [],
+            cells
+        };
+    };
+    const escapeSheetClipboardTsvCell = (value = "") => {
+        const text = String(value ?? "");
+        return /["\t\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const buildSheetClipboardTsv = (payload = null) => {
+        if (!payload?.rows || !payload?.columns) return "";
+        const values = Array.from({length: payload.rows}, () => Array.from({length: payload.columns}, () => ""));
+        (payload.cells || []).forEach((cell) => {
+            const rowIndex = Math.trunc(Number(cell?.rowOffset));
+            const columnIndex = Math.trunc(Number(cell?.columnOffset));
+            if (rowIndex < 0 || rowIndex >= payload.rows || columnIndex < 0 || columnIndex >= payload.columns) return;
+            values[rowIndex][columnIndex] = cell?.value ?? "";
+        });
+        return values.map((row) => row.map(escapeSheetClipboardTsvCell).join("\t")).join("\n");
+    };
+    const normalizeSheetClipboardPayload = (payload = null) => {
+        if (!payload || typeof payload !== "object" || payload.format !== "standard-sheet-cells") return null;
+        const rows = Math.max(1, Math.trunc(Number(payload.rows)) || 1);
+        const columns = Math.max(1, Math.trunc(Number(payload.columns)) || 1);
+        const cutReferences = Array.isArray(payload.cutReferences)
+            ? payload.cutReferences.map((cellReference) => String(cellReference || "").toUpperCase()).filter((cellReference) => /^[A-Z]+\d+$/.test(cellReference))
+            : [];
+        const cells = (Array.isArray(payload.cells) ? payload.cells : []).flatMap((cell) => {
+            const rowOffset = Math.trunc(Number(cell?.rowOffset));
+            const columnOffset = Math.trunc(Number(cell?.columnOffset));
+            if (!Number.isInteger(rowOffset) || !Number.isInteger(columnOffset) || rowOffset < 0 || columnOffset < 0 || rowOffset >= rows || columnOffset >= columns) return [];
+            return [{
+                rowOffset,
+                columnOffset,
+                sourceReference: /^[A-Z]+\d+$/.test(String(cell?.sourceReference || "").toUpperCase()) ? String(cell.sourceReference).toUpperCase() : "",
+                value: String(cell?.value ?? ""),
+                style: encodeSheetCellStyle(cell?.style),
+                type: normalizeSheetCellType(cell?.type),
+                link: normalizeSheetHyperlinkUrl(cell?.link),
+                locked: cell?.locked === 1 || cell?.locked === true ? 1 : 0
+            }];
+        });
+        return {format: "standard-sheet-cells", version: 1, rows, columns, cut: payload.cut === true, cutReferences, cells};
+    };
+    const parseSheetClipboardTsv = (text = "") => {
+        const source = String(text ?? "");
+        if (!source) return null;
+        const rows = [];
+        let row = [];
+        let value = "";
+        let quoted = false;
+        for (let index = 0; index < source.length; index += 1) {
+            const char = source[index];
+            if (quoted) {
+                if (char === '"' && source[index + 1] === '"') {
+                    value += '"';
+                    index += 1;
+                } else if (char === '"') {
+                    quoted = false;
+                } else {
+                    value += char;
+                }
+                continue;
+            }
+            if (char === '"' && value === "") {
+                quoted = true;
+                continue;
+            }
+            if (char === "\t") {
+                row.push(value);
+                value = "";
+                continue;
+            }
+            if (char === "\n") {
+                row.push(value);
+                rows.push(row);
+                row = [];
+                value = "";
+                continue;
+            }
+            if (char !== "\r") value += char;
+        }
+        row.push(value);
+        rows.push(row);
+        while (rows.length > 1 && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === "") rows.pop();
+        const columnCount = Math.max(1, ...rows.map((nextRow) => nextRow.length));
+        return {
+            format: "standard-sheet-cells",
+            version: 1,
+            rows: Math.max(1, rows.length),
+            columns: columnCount,
+            cut: false,
+            cutReferences: [],
+            cells: rows.flatMap((nextRow, rowIndex) => nextRow.map((nextValue, columnIndex) => ({
+                rowOffset: rowIndex,
+                columnOffset: columnIndex,
+                value: nextValue,
+                style: {},
+                type: "",
+                link: "",
+                locked: 0
+            })))
+        };
+    };
+    const writeSheetClipboardPayload = async (payload = null) => {
+        sheetClipboardPayload = normalizeSheetClipboardPayload(payload);
+        if (!sheetClipboardPayload) return false;
+        const json = JSON.stringify(sheetClipboardPayload);
+        const tsv = buildSheetClipboardTsv(sheetClipboardPayload);
+        try {
+            if (navigator.clipboard?.write && typeof ClipboardItem === "function") {
+                await navigator.clipboard.write([new ClipboardItem({
+                    [SHEET_CLIPBOARD_MIME]: new Blob([json], {type: SHEET_CLIPBOARD_MIME}),
+                    "text/plain": new Blob([tsv], {type: "text/plain"})
+                })]);
+                return true;
+            }
+        } catch (_) {}
+        try {
+            await navigator.clipboard?.writeText?.(tsv);
+        } catch (_) {}
+        return true;
+    };
+    const readSheetClipboardPayload = async () => {
+        try {
+            if (navigator.clipboard?.read) {
+                const items = await navigator.clipboard.read();
+                for (const item of items) {
+                    if (!item.types?.includes?.(SHEET_CLIPBOARD_MIME)) continue;
+                    const blob = await item.getType(SHEET_CLIPBOARD_MIME);
+                    const payload = normalizeSheetClipboardPayload(JSON.parse(await blob.text()));
+                    if (payload) return payload;
+                }
+            }
+        } catch (_) {}
+        if (sheetClipboardPayload) return normalizeSheetClipboardPayload(sheetClipboardPayload);
+        try {
+            const text = await navigator.clipboard?.readText?.();
+            if (!text) return null;
+            return parseSheetClipboardTsv(text);
+        } catch (_) {
+            return null;
+        }
+    };
+    const copyActiveSheetSelection = async () => {
+        captureActiveSheetInput();
+        const payload = buildSheetClipboardPayload();
+        if (!payload) return false;
+        await writeSheetClipboardPayload(payload);
+        modular.success("Copied selection");
+        return true;
+    };
+    const cutActiveSheetSelection = async () => {
+        captureActiveSheetInput();
+        const payload = buildSheetClipboardPayload({cut: true});
+        if (!payload) return false;
+        await writeSheetClipboardPayload(payload);
+        modular.success("Cut selection");
+        return true;
+    };
+    const pasteSheetClipboardPayload = async () => {
+        const payload = normalizeSheetClipboardPayload(await readSheetClipboardPayload());
+        if (!payload) return false;
+        captureActiveSheetInput();
+        const anchor = parseSheetCellReference(activeSheetCell);
+        let didPasteCell = false;
+        const movedSourceReferences = new Set();
+        const pastedTargetReferences = new Set();
+        payload.cells.forEach((cell) => {
+            const rowIndex = anchor.rowIndex + cell.rowOffset;
+            const columnIndex = anchor.columnIndex + cell.columnOffset;
+            if (rowIndex < 0 || rowIndex >= sheetRows || columnIndex < 0 || columnIndex >= sheetColumns) return;
+            const cellReference = getSheetCellReference(rowIndex, columnIndex);
+            if (isSheetCellLocked(cellReference)) return;
+            sheetCellValues[cellReference] = String(cell.value ?? "");
+            setSheetCellStyle(cellReference, cell.style || {});
+            setSheetCellType(cellReference, cell.type || "");
+            setSheetCellLink(cellReference, cell.link || "");
+            setSheetCellLocked(cellReference, cell.locked === 1 || cell.locked === true);
+            didPasteCell = true;
+            pastedTargetReferences.add(cellReference);
+            if (cell.sourceReference) movedSourceReferences.add(cell.sourceReference);
+        });
+        if (!didPasteCell) return false;
+        if (payload.cut) {
+            const sourceReferences = (movedSourceReferences.size ? [...movedSourceReferences] : payload.cutReferences)
+                .filter((cellReference) => !pastedTargetReferences.has(cellReference));
+            clearSheetCellsByReference(sourceReferences, {refresh: false});
+            await writeSheetClipboardPayload({...payload, cut: false, cutReferences: []});
+        }
+        const maxRow = Math.min(sheetRows - 1, anchor.rowIndex + payload.rows - 1);
+        const maxColumn = Math.min(sheetColumns - 1, anchor.columnIndex + payload.columns - 1);
+        setActiveSheetRange(activeSheetCell, getSheetCellReference(maxRow, maxColumn));
+        refreshSheetCells();
+        saveSheetPortalState();
+        modular.success("Pasted selection");
+        return true;
+    };
+    const clearSheetCell = (cellReference = "") => {
+        if (isSheetCellLocked(cellReference)) return false;
+        delete sheetCellValues[cellReference];
+        delete sheetCellStyles[cellReference];
+        delete sheetCellTypes[cellReference];
+        delete sheetCellLinks[cellReference];
+        delete sheetCellLocks[cellReference];
+        return true;
+    };
+    const clearSheetCellsByReference = (cellReferences = [], {refresh = true} = {}) => {
+        const uniqueReferences = [...new Set(cellReferences)];
+        let didClearCell = false;
+        uniqueReferences.forEach((cellReference) => {
+            if (clearSheetCell(cellReference)) didClearCell = true;
+        });
+        if (!didClearCell) return false;
+        if (refresh) {
+            refreshSheetCells();
+            saveSheetPortalState();
+        }
+        return true;
+    };
     const clearActiveSheetSelectedCells = () => {
         const selectedReferences = getActiveSheetCellReferences();
         if (!selectedReferences.length) return false;
         captureActiveSheetInput();
-        let didClearCell = false;
-        selectedReferences.forEach((cellReference) => {
-            if (isSheetCellLocked(cellReference)) return;
-            sheetCellValues[cellReference] = "";
-            didClearCell = true;
-        });
-        if (!didClearCell) return false;
-        refreshSheetCells();
-        saveSheetPortalState();
-        return true;
+        return clearSheetCellsByReference(selectedReferences);
     };
     const readSheetInputValue = (cellReference = "") => {
         const input = getSheetCellInput(cellReference);
@@ -2484,10 +2742,10 @@
         window.addEventListener("keydown", (event) => {
             if (!document.getElementById("editor-sheet-grid-wrap")) return;
             if (!isSheetWindowShown()) return;
-            const activeElement = document.activeElement;
-            const activeElementId = String(activeElement?.id || "");
-            const isSheetCellInput = activeElementId.startsWith("sheet-cell-");
-            const isSheetFormulaInput = activeElementId === "editor-sheet-formula";
+            if (isSheetShortcutBlockedByDialogue()) return;
+            const {activeElement, isSheetCellInput, isSheetFormulaInput, isEditingInput} = getSheetFocusedInputState();
+            const isEditingOutsideSheetCell = isEditingInput && !isSheetCellInput && !isSheetFormulaInput;
+            if (isEditingOutsideSheetCell) return;
             const isPrintableTyping = event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey;
             if (isPrintableTyping && !isSheetCellInput && !isSheetFormulaInput) {
                 if (Number.isInteger(activeSheetRow) || Number.isInteger(activeSheetColumn)) return;
@@ -2505,7 +2763,6 @@
                 return;
             }
             if (isSheetCellInput || isSheetFormulaInput) return;
-            if (activeElement && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable)) return;
             if (event.key === "Delete") {
                 if (deleteActiveSheetImage()) {
                     event.preventDefault();
@@ -2543,6 +2800,7 @@
         window.addEventListener("keydown", (event) => {
             if (!document.getElementById("editor-sheet-grid-wrap")) return;
             if (!isSheetWindowShown()) return;
+            if (isSheetShortcutBlockedByDialogue()) return;
             if ((!event.ctrlKey && !event.metaKey) || event.altKey || event.repeat) return;
             const buttonIdByKey = {
                 b: "editor-sheet-style-bold",
@@ -2574,11 +2832,31 @@
         window.addEventListener("keydown", (event) => {
             if (!document.getElementById("editor-sheet-grid-wrap")) return;
             if (!isSheetWindowShown()) return;
+            if (isSheetShortcutBlockedByDialogue()) return;
             if (event.altKey || event.metaKey || event.repeat) return;
             const {activeElement, isSheetCellInput, isSheetFormulaInput, isEditingInput} = getSheetFocusedInputState();
             const isEditingOutsideSheetCell = isEditingInput && !isSheetCellInput && !isSheetFormulaInput;
             if (isEditingOutsideSheetCell || isSheetFormulaInput) return;
             const key = String(event.key || "");
+            const shortcutKey = key.toLowerCase();
+            if (event.ctrlKey && !event.shiftKey && shortcutKey === "c") {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                copyActiveSheetSelection();
+                return;
+            }
+            if (event.ctrlKey && !event.shiftKey && shortcutKey === "x") {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                cutActiveSheetSelection();
+                return;
+            }
+            if (event.ctrlKey && !event.shiftKey && shortcutKey === "v") {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                pasteSheetClipboardPayload();
+                return;
+            }
             if (event.shiftKey && !event.ctrlKey && key === " ") {
                 event.preventDefault();
                 event.stopImmediatePropagation();
@@ -2715,7 +2993,7 @@
                         event.preventDefault();
                         return;
                     }
-                    if (event.key === "Delete" && isSheetRangeSelectionActive()) {
+                    if (event.key === "Delete") {
                         if (!clearActiveSheetSelectedCells()) return;
                         event.preventDefault();
                         event.stopPropagation();

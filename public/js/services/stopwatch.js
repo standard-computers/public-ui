@@ -40,13 +40,7 @@
             lapBody.innerHTML = div({style: "table-row", content: div({style: "cell faded", content: "No laps yet"})});
             return;
         }
-        lapBody.innerHTML = laps.map((lapTime, index) => div({
-            style: "table-row",
-            content: children([
-                div({style: "cell", content: `${index + 1}`}),
-                div({style: "cell", content: formatElapsed(lapTime)})
-            ])
-        })).join("");
+        lapBody.innerHTML = laps.map((lapTime, index) => div({style: "table-row", content: children([div({style: "cell", content: `${index + 1}`}), div({style: "cell", content: formatElapsed(lapTime)})])})).join("");
     };
     const updateDisplay = (root = getStopwatchWindow()) => {
         const display = root?.querySelector?.("#stopwatch-display");
@@ -110,11 +104,7 @@
         if (clearButton) clearButton.onclick = clear;
         render();
     };
-    window.StandardStopwatch = window.StandardStopwatch || {
-        startStop,
-        lap,
-        clear
-    };
+    window.StandardStopwatch = window.StandardStopwatch || {startStop, lap, clear};
     modular.register(new Service(SERVICE_ID, [new Portal({
         title: "Stopwatch",
         hints: ["stopwatch", "timer"],

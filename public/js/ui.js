@@ -329,6 +329,119 @@ function pushMessage(type, t) {
     setTimeout(() => message.classList.remove("show"), 1400);
     setTimeout(() => message.remove(), 1800);
 }
+
+(function () {
+    let activeOpenProgressToken = 0;
+
+    const normalizeDownloadPath = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
+
+    function ensureOpenProgress() {
+        let root = document.getElementById("file-open-progress");
+        if (root) return root;
+        root = document.createElement("div");
+        root.id = "file-open-progress";
+        root.className = "file-open-progress";
+        root.innerHTML = `
+            <div class="file-open-progress-header">
+                <div class="file-open-progress-label">Opening file</div>
+                <div class="file-open-progress-value">0%</div>
+            </div>
+            <div class="file-open-progress-track" aria-hidden="true">
+                <div class="file-open-progress-bar"></div>
+            </div>
+        `;
+        document.body.appendChild(root);
+        return root;
+    }
+
+    function updateOpenProgress({label = "Opening file", loaded = 0, total = 0, indeterminate = false, token = 0} = {}) {
+        if (token && token !== activeOpenProgressToken) return;
+        const root = ensureOpenProgress();
+        const labelNode = root.querySelector(".file-open-progress-label");
+        const valueNode = root.querySelector(".file-open-progress-value");
+        const barNode = root.querySelector(".file-open-progress-bar");
+        const percent = total > 0 ? Math.max(0, Math.min(100, Math.round((loaded / total) * 100))) : 0;
+        if (labelNode) labelNode.textContent = label;
+        if (valueNode) valueNode.textContent = indeterminate ? "Loading" : `${percent}%`;
+        root.classList.toggle("indeterminate", !!indeterminate);
+        if (barNode && !indeterminate) barNode.style.width = `${percent}%`;
+        root.classList.add("show");
+    }
+
+    function hideOpenProgress(token = 0) {
+        if (token && token !== activeOpenProgressToken) return;
+        const root = document.getElementById("file-open-progress");
+        if (!root) return;
+        root.classList.remove("show");
+    }
+
+    function beginOpenProgress(label = "Opening file", options = {}) {
+        const token = ++activeOpenProgressToken;
+        updateOpenProgress({
+            label,
+            loaded: Number(options.loaded) || 0,
+            total: Number(options.total) || 0,
+            indeterminate: options.indeterminate !== false,
+            token
+        });
+        return token;
+    }
+
+    async function downloadForOpen(rawPath = "", options = {}) {
+        const pathNormalizer = typeof options.pathNormalizer === "function" ? options.pathNormalizer : normalizeDownloadPath;
+        const filePath = pathNormalizer(rawPath);
+        if (!filePath) throw new Error(options.emptyPathMessage || "File path is required");
+        const token = ++activeOpenProgressToken;
+        const fileName = filePath.split("/").pop() || options.fallbackFileName || "file";
+        const label = options.label || `Opening ${fileName}`;
+        updateOpenProgress({label, loaded: 0, total: 0, indeterminate: true, token});
+        try {
+            const url = options.url || `/api/files/download?path=${encodeURIComponent(filePath)}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(options.errorMessage || `Download failed (${response.status})`);
+            const total = Number(response.headers.get("content-length")) || 0;
+            let blob;
+            if (!response.body || typeof response.body.getReader !== "function") {
+                blob = await response.blob();
+            } else {
+                const reader = response.body.getReader();
+                const chunks = [];
+                let loaded = 0;
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    if (!value) continue;
+                    chunks.push(value);
+                    loaded += value.byteLength || value.length || 0;
+                    updateOpenProgress({label, loaded, total, indeterminate: !(total > 0), token});
+                }
+                blob = new Blob(chunks, {type: response.headers.get("content-type") || "application/octet-stream"});
+            }
+            updateOpenProgress({
+                label,
+                loaded: total || blob.size,
+                total: total || blob.size || 1,
+                indeterminate: false,
+                token
+            });
+            if (options.autoHide !== false) window.setTimeout(() => hideOpenProgress(token), options.hideDelay ?? 220);
+            return {path: filePath, fileName, blob, contentType: response.headers.get("content-type") || "application/octet-stream", token};
+        } catch (error) {
+            hideOpenProgress(token);
+            throw error;
+        }
+    }
+
+    window.StandardDownloads = {
+        ...(window.StandardDownloads || {}),
+        normalizeDownloadPath,
+        beginOpenProgress,
+        updateOpenProgress,
+        hideOpenProgress,
+        downloadForOpen
+    };
+})();
+
 window.StandardUI = window.StandardUI || {};
 window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
     "Inter",

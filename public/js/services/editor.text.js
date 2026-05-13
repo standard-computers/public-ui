@@ -510,6 +510,53 @@
         savedTextSelectionRange = range.cloneRange();
         return true;
     };
+    const getTextCaretRect = (range) => {
+        if (!range) return null;
+        const rect = range.getBoundingClientRect();
+        if (rect && (rect.width || rect.height)) return rect;
+        const markerNode = document.createElement("span");
+        markerNode.style.display = "inline-block";
+        markerNode.style.width = "1px";
+        markerNode.style.height = "1em";
+        markerNode.style.lineHeight = "1em";
+        markerNode.style.pointerEvents = "none";
+        markerNode.style.opacity = "0";
+        const markerRange = range.cloneRange();
+        markerRange.insertNode(markerNode);
+        const markerRect = markerNode.getBoundingClientRect();
+        markerNode.remove();
+        markerRange.detach?.();
+        return markerRect;
+    };
+    const scrollTextEditorCaretIntoView = (portal = findTextPortal(), range = savedTextSelectionRange) => {
+        const editorNode = findTextEditorNode(portal);
+        const scrollContainer = portal?.body?.() || editorNode?.closest?.(".window-body");
+        if (!editorNode || !scrollContainer || typeof scrollContainer.scrollTo !== "function") return false;
+        const caretRect = getTextCaretRect(range);
+        if (!caretRect) return false;
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const verticalPadding = 28;
+        const horizontalPadding = 28;
+        let nextTop = scrollContainer.scrollTop;
+        let nextLeft = scrollContainer.scrollLeft;
+        if (caretRect.bottom > containerRect.bottom - verticalPadding) {
+            nextTop += caretRect.bottom - containerRect.bottom + verticalPadding;
+        } else if (caretRect.top < containerRect.top + verticalPadding) {
+            nextTop -= containerRect.top + verticalPadding - caretRect.top;
+        }
+        if (caretRect.right > containerRect.right - horizontalPadding) {
+            nextLeft += caretRect.right - containerRect.right + horizontalPadding;
+        } else if (caretRect.left < containerRect.left + horizontalPadding) {
+            nextLeft -= containerRect.left + horizontalPadding - caretRect.left;
+        }
+        const maxTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+        const maxLeft = Math.max(0, scrollContainer.scrollWidth - scrollContainer.clientWidth);
+        nextTop = Math.max(0, Math.min(nextTop, maxTop));
+        nextLeft = Math.max(0, Math.min(nextLeft, maxLeft));
+        if (nextTop === scrollContainer.scrollTop && nextLeft === scrollContainer.scrollLeft) return true;
+        scrollContainer.scrollTo({top: nextTop, left: nextLeft, behavior: "smooth"});
+        return true;
+    };
     const focusTextEditorAtEnd = (portal = findTextPortal()) => {
         const editorNode = findTextEditorNode(portal);
         if (!editorNode) return false;
@@ -522,6 +569,7 @@
         selection.addRange(range);
         savedTextSelectionRange = range.cloneRange();
         updateTextToolbarState();
+        requestAnimationFrame(() => scrollTextEditorCaretIntoView(portal, savedTextSelectionRange));
         return true;
     };
     const getActiveTextSelectionRange = () => {

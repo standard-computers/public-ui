@@ -4,78 +4,18 @@
     let boardViewport = {scale: 1, translate: {x: 0, y: 0}};
     let refreshBoardsList = null;
     let syncEditorState = null;
-    let activeOpenProgressToken = 0;
     const getBoardPathForDownload = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
-    const ensureFileOpenProgress = () => {
-        let root = document.getElementById("file-open-progress");
-        if (root) return root;
-        root = document.createElement("div");
-        root.id = "file-open-progress";
-        root.className = "file-open-progress";
-        root.innerHTML = `
-            <div class="file-open-progress-header">
-                <div class="file-open-progress-label">Opening file</div>
-                <div class="file-open-progress-value">0%</div>
-            </div>
-            <div class="file-open-progress-track" aria-hidden="true">
-                <div class="file-open-progress-bar"></div>
-            </div>
-        `;
-        document.body.appendChild(root);
-        return root;
-    };
-    const updateFileOpenProgress = ({label = "Opening file", loaded = 0, total = 0, indeterminate = false, token = 0} = {}) => {
-        if (token && token !== activeOpenProgressToken) return;
-        const root = ensureFileOpenProgress();
-        const labelNode = root.querySelector(".file-open-progress-label");
-        const valueNode = root.querySelector(".file-open-progress-value");
-        const barNode = root.querySelector(".file-open-progress-bar");
-        const percent = total > 0 ? Math.max(0, Math.min(100, Math.round((loaded / total) * 100))) : 0;
-        if (labelNode) labelNode.textContent = label;
-        if (valueNode) valueNode.textContent = indeterminate ? "Loading" : `${percent}%`;
-        root.classList.toggle("indeterminate", !!indeterminate);
-        if (barNode && !indeterminate) barNode.style.width = `${percent}%`;
-        root.classList.add("show");
-    };
-    const hideFileOpenProgress = token => {
-        if (token && token !== activeOpenProgressToken) return;
-        const root = document.getElementById("file-open-progress");
-        if (!root) return;
-        root.classList.remove("show");
-    };
+    const updateFileOpenProgress = (state = {}) => window.StandardDownloads?.updateOpenProgress?.(state);
+    const hideFileOpenProgress = token => window.StandardDownloads?.hideOpenProgress?.(token);
     const downloadBoardForOpen = async (rawPath = "") => {
-        const boardPath = getBoardPathForDownload(rawPath);
-        if (!boardPath) throw new Error("Board path is required");
-        const token = ++activeOpenProgressToken;
-        const fileName = boardPath.split("/").pop() || "board";
-        updateFileOpenProgress({label: `Opening ${fileName}`, loaded: 0, total: 0, indeterminate: true, token});
-        try {
-            const response = await fetch(`/api/files/download?path=${encodeURIComponent(boardPath)}`);
-            if (!response.ok) throw new Error("Unable to read board file");
-            const total = Number(response.headers.get("content-length")) || 0;
-            if (!response.body || typeof response.body.getReader !== "function") {
-                const blob = await response.blob();
-                updateFileOpenProgress({label: `Opening ${fileName}`, loaded: total || blob.size, total: total || blob.size || 1, indeterminate: false, token});
-                return {boardPath, fileName, blob, token};
-            }
-            const reader = response.body.getReader();
-            const chunks = [];
-            let loaded = 0;
-            while (true) {
-                const {done, value} = await reader.read();
-                if (done) break;
-                if (!value) continue;
-                chunks.push(value);
-                loaded += value.byteLength || value.length || 0;
-                updateFileOpenProgress({label: `Opening ${fileName}`, loaded, total, indeterminate: !(total > 0), token});
-            }
-            const blob = new Blob(chunks, {type: response.headers.get("content-type") || "application/octet-stream"});
-            updateFileOpenProgress({label: `Opening ${fileName}`, loaded: total || blob.size, total: total || blob.size || 1, indeterminate: false, token});
-            return {boardPath, fileName, blob, token};
-        } catch (error) {
-            hideFileOpenProgress(token);
-            throw error;
-        }
+        const download = await window.StandardDownloads.downloadForOpen(rawPath, {
+            pathNormalizer: getBoardPathForDownload,
+            emptyPathMessage: "Board path is required",
+            errorMessage: "Unable to read board file",
+            fallbackFileName: "board",
+            autoHide: false
+        });
+        return {...download, boardPath: download.path};
     };
     const isBoardsWindow = node => {
         if (!(node instanceof HTMLElement) || !node.classList.contains("draggable-window")) return false;

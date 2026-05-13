@@ -34,9 +34,27 @@
     let activeArticleIconFile = null;
     let activeArticleIconChanged = false;
     let activeArticleIconPreview = {articleId: "", source: ""};
+    let activeArticleEditProgressToken = 0;
     const articleIconCacheKeys = {};
     const getPathForDownload = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
     const getFileName = (rawPath = "") => String(rawPath || "").split("/").pop() || "Internals";
+    const beginInternalsProgress = (label = "Opening file") => {
+        if (typeof window.StandardDownloads?.beginOpenProgress === "function") return window.StandardDownloads.beginOpenProgress(label);
+        window.StandardDownloads?.updateOpenProgress?.({label, loaded: 0, total: 0, indeterminate: true});
+        return 0;
+    };
+    const updateInternalsProgress = (token, label = "Opening file", percent = 100) => {
+        window.StandardDownloads?.updateOpenProgress?.({
+            label,
+            loaded: percent,
+            total: 100,
+            indeterminate: false,
+            token
+        });
+    };
+    const hideInternalsProgress = (token, delay = 220) => {
+        window.setTimeout(() => window.StandardDownloads?.hideOpenProgress?.(token), delay);
+    };
     const findInternalsWindow = (portalIndex = 0) => [...Array.from(document.querySelectorAll(".draggable-window"))].reverse().find((windowNode) => typeof windowNode?.portal?.serviceId === "function" && windowNode.portal.serviceId() === "com.standard.internals" && windowNode.portal.portalIndex() === portalIndex);
     const getPortalFromSource = (sourceNode = null, portalIndex = 0) => {
         const sourcePortal = sourceNode?.closest?.(".draggable-window")?.portal;
@@ -695,6 +713,12 @@
         requestAnimationFrame(() => autoSizeArticleTextarea(contentField));
     };
     const getArticleEditFieldValue = (id = "") => document.getElementById(id)?.value?.trim?.() || "";
+    const completeArticleEditProgress = () => {
+        if (!activeArticleEditProgressToken) return;
+        updateInternalsProgress(activeArticleEditProgressToken, "Article editor ready", 100);
+        hideInternalsProgress(activeArticleEditProgressToken);
+        activeArticleEditProgressToken = 0;
+    };
     const updateArticlePreview = (portal = findInternalsWindow(4)?.portal) => {
         const root = portal?.window?.() || document;
         const articlePreview = root.querySelector("#internals-article-preview");
@@ -721,7 +745,10 @@
         const article = normalizeArticleRecord(activeArticleRecord);
         const portalWindow = findInternalsWindow(5);
         const bindingKey = `${article.id || "new"}`;
-        if (portalWindow?.dataset?.articleModifyBound === bindingKey) return;
+        if (portalWindow?.dataset?.articleModifyBound === bindingKey) {
+            completeArticleEditProgress();
+            return;
+        }
         if (portalWindow?.dataset) portalWindow.dataset.articleModifyBound = bindingKey;
         const setValue = (id, value) => {
             const field = document.getElementById(id);
@@ -735,14 +762,20 @@
         setValue("modify-article-source", article.source);
         setValue("modify-article-priority", article.priority);
         const iconEl = document.getElementById("modify-article-icon");
-        if (!iconEl) return;
+        if (!iconEl) {
+            completeArticleEditProgress();
+            return;
+        }
         iconEl.src = articleIconSrc(article, {preferPreview: true});
         iconEl.style.cursor = "pointer";
         activeArticleIconFile = null;
         activeArticleIconChanged = false;
         const binding = resetArticleIconPickerBinding(iconEl, "__modifyArticleIconPicker");
         const fileInput = binding?.input;
-        if (!fileInput) return;
+        if (!fileInput) {
+            completeArticleEditProgress();
+            return;
+        }
         iconEl.onclick = () => fileInput.click();
         fileInput.onchange = () => {
             const file = fileInput.files && fileInput.files[0];
@@ -761,6 +794,7 @@
             cacheArticleIconSource(article.id, binding.objectUrl);
             fileInput.value = "";
         };
+        completeArticleEditProgress();
     };
     const closeModifyArticlePortal = () => {
         const portal = findInternalsWindow(5)?.portal;
@@ -790,7 +824,9 @@
             priority: getArticleEditFieldValue("modify-article-priority"),
             created: activeArticleRecord?.created ?? ""
         });
+        const progressToken = beginInternalsProgress("Saving article");
         try {
+            updateInternalsProgress(progressToken, "Saving article fields", 20);
             const updates = [
                 CLI.send(`[articles] title "${escapeCliQuotedValue(nextArticle.title)}" <id ${articleId}>`),
                 CLI.send(`[articles] description "${escapeCliQuotedValue(nextArticle.description)}" <id ${articleId}>`),
@@ -802,9 +838,12 @@
             const updateResponses = await Promise.all(updates);
             if (updateResponses.some(response => response === 0)) {
                 modular.error("Failed to update one or more article fields");
+                hideInternalsProgress(progressToken, 0);
                 return;
             }
+            updateInternalsProgress(progressToken, "Article fields saved", 70);
             if (activeArticleIconChanged && activeArticleIconFile) {
+                updateInternalsProgress(progressToken, "Uploading article icon", 78);
                 const formData = new FormData();
                 formData.append("file", activeArticleIconFile);
                 const uploadResponse = typeof window.StandardUploads?.uploadFile === "function"
@@ -812,6 +851,7 @@
                     : await fetch(`/api/upload/temp/${encodeURIComponent(articleId)}`, {method: "POST", body: formData}).then(response => ({ok: response.ok, status: response.status}));
                 if (!uploadResponse.ok) {
                     modular.error(`Icon upload failed (${uploadResponse.status})`);
+                    hideInternalsProgress(progressToken, 0);
                     return;
                 }
                 bumpArticleIconCacheKey(articleId);
@@ -819,8 +859,10 @@
             }
         } catch (error) {
             modular.error("Failed to save article");
+            hideInternalsProgress(progressToken, 0);
             return;
         }
+        updateInternalsProgress(progressToken, "Article saved", 95);
         activeArticleRecord = nextArticle;
         activeArticleIconFile = null;
         activeArticleIconChanged = false;
@@ -832,6 +874,8 @@
         } else {
             openArticle(activeArticleRecord);
         }
+        updateInternalsProgress(progressToken, "Article saved", 100);
+        hideInternalsProgress(progressToken);
         modular.success("Saved article");
     };
     const deleteModifiedArticle = () => {
@@ -1069,14 +1113,19 @@
         return true;
     };
     const openArticle = (article = {}, sourceNode = null) => {
+        const progressToken = beginInternalsProgress("Opening article");
         activeArticleRecord = normalizeArticleRecord(article);
         const title = String(activeArticleRecord.title || "Untitled Article").trim();
+        updateInternalsProgress(progressToken, `Opening ${title}`, 45);
         const portal = modular.show("com.standard.internals", 4, {newInstance: true});
         syncPortalWindowState(4, {directive: title, cachedContent: activeArticleRecord}, portal);
         updateArticlePreview(portal);
+        updateInternalsProgress(progressToken, "Article ready", 100);
+        hideInternalsProgress(progressToken);
         return true;
     };
     const openModifyArticleFromView = (sourceNode = null) => {
+        activeArticleEditProgressToken = beginInternalsProgress("Loading article editor");
         const displayWindow = sourceNode?.closest?.(".draggable-window") || findInternalsWindow(4);
         const articleId = activeArticleRecord?.id;
         const carryoverSource = getArticleIconCarryoverSource(displayWindow);
@@ -1087,6 +1136,7 @@
         } else if (typeof displayPortal?.hide === "function") {
             displayPortal.hide();
         }
+        updateInternalsProgress(activeArticleEditProgressToken, "Preparing article editor", 65);
         modular.show("com.standard.internals", 5, {newInstance: true});
     };
     window.StandardInternals = window.StandardInternals || {};

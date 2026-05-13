@@ -192,44 +192,6 @@
         anchor.click();
         anchor.remove();
     };
-    let activeOpenProgressToken = 0;
-    const ensureFileOpenProgress = () => {
-        let root = document.getElementById("file-open-progress");
-        if (root) return root;
-        root = document.createElement("div");
-        root.id = "file-open-progress";
-        root.className = "file-open-progress";
-        root.innerHTML = `
-            <div class="file-open-progress-header">
-                <div class="file-open-progress-label">Opening file</div>
-                <div class="file-open-progress-value">0%</div>
-            </div>
-            <div class="file-open-progress-track" aria-hidden="true">
-                <div class="file-open-progress-bar"></div>
-            </div>
-        `;
-        document.body.appendChild(root);
-        return root;
-    };
-    const updateFileOpenProgress = ({label = "Opening file", loaded = 0, total = 0, indeterminate = false, token = 0} = {}) => {
-        if (token && token !== activeOpenProgressToken) return;
-        const root = ensureFileOpenProgress();
-        const labelNode = root.querySelector(".file-open-progress-label");
-        const valueNode = root.querySelector(".file-open-progress-value");
-        const barNode = root.querySelector(".file-open-progress-bar");
-        const percent = total > 0 ? Math.max(0, Math.min(100, Math.round((loaded / total) * 100))) : 0;
-        if (labelNode) labelNode.textContent = label;
-        if (valueNode) valueNode.textContent = indeterminate ? "Loading" : `${percent}%`;
-        root.classList.toggle("indeterminate", !!indeterminate);
-        if (barNode && !indeterminate) barNode.style.width = `${percent}%`;
-        root.classList.add("show");
-    };
-    const hideFileOpenProgress = token => {
-        if (token && token !== activeOpenProgressToken) return;
-        const root = document.getElementById("file-open-progress");
-        if (!root) return;
-        root.classList.remove("show");
-    };
     const waitForServiceMethod = async (lookup, serviceId = "") => {
         if (typeof lookup !== "function") return null;
         let resolved = lookup();
@@ -242,54 +204,9 @@
         }
         return null;
     };
-    const downloadFileForOpen = async (rawPath = "") => {
-        const filePath = String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
-        if (!filePath) throw new Error("File path is required");
-        const token = ++activeOpenProgressToken;
-        const fileName = filePath.split("/").pop() || "file";
-        updateFileOpenProgress({label: `Opening ${fileName}`, loaded: 0, total: 0, indeterminate: true, token});
-        try {
-            const response = await fetch(`/api/files/download?path=${encodeURIComponent(filePath)}`);
-            if (!response.ok) throw new Error(`Download failed (${response.status})`);
-            const total = Number(response.headers.get("content-length")) || 0;
-            if (!response.body || typeof response.body.getReader !== "function") {
-                const blob = await response.blob();
-                updateFileOpenProgress({label: `Opening ${fileName}`, loaded: total || blob.size, total: total || blob.size || 1, indeterminate: false, token});
-                window.setTimeout(() => hideFileOpenProgress(token), 220);
-                return {path: filePath, fileName, blob, contentType: response.headers.get("content-type") || "application/octet-stream"};
-            }
-            const reader = response.body.getReader();
-            const chunks = [];
-            let loaded = 0;
-            while (true) {
-                const {done, value} = await reader.read();
-                if (done) break;
-                if (!value) continue;
-                chunks.push(value);
-                loaded += value.byteLength || value.length || 0;
-                updateFileOpenProgress({
-                    label: `Opening ${fileName}`,
-                    loaded,
-                    total,
-                    indeterminate: !(total > 0),
-                    token
-                });
-            }
-            const blob = new Blob(chunks, {type: response.headers.get("content-type") || "application/octet-stream"});
-            updateFileOpenProgress({
-                label: `Opening ${fileName}`,
-                loaded: total || blob.size,
-                total: total || blob.size || 1,
-                indeterminate: false,
-                token
-            });
-            window.setTimeout(() => hideFileOpenProgress(token), 220);
-            return {path: filePath, fileName, blob, contentType: response.headers.get("content-type") || "application/octet-stream"};
-        } catch (error) {
-            hideFileOpenProgress(token);
-            throw error;
-        }
-    };
+    const downloadFileForOpen = (rawPath = "") => window.StandardDownloads.downloadForOpen(rawPath, {
+        emptyPathMessage: "File path is required"
+    });
     const openNoteInNotesApp = (note = {}) => {
         if (window.StandardNotes?.openNote) window.StandardNotes.openNote(note);
     };
