@@ -109,6 +109,8 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .search-dialogue-actions {min-height:32px}
 .editor-text-search-marker {display:inline-block;width:0;height:1.2em;vertical-align:middle;box-shadow:0 0 0 4px rgba(59, 130, 246, 0.18);animation:editorTextSearchPulse 700ms ease-out}
 @keyframes editorTextSearchPulse {0% {box-shadow:0 0 0 8px rgba(59, 130, 246, 0.32)}100% {box-shadow:0 0 0 4px rgba(59, 130, 246, 0.02)}}
+.files-search-hit {animation:filesSearchPulse 800ms ease-out}
+@keyframes filesSearchPulse {0% {box-shadow:0 0 0 8px rgba(59, 130, 246, 0.32)}100% {box-shadow:0 0 0 2px rgba(59, 130, 246, 0)}}
 .status-indicator {z-index:25;font-size:calc(var(--fs) - 4px);cursor:pointer;position:fixed;opacity:0.8;left:50%;top:5px;display:inline-flex;align-items:center;gap:8px;padding:8px 12px 8px 12px;backdrop-filter:blur(var(--blur));margin:5px 0 0 -61px;border:1px solid var(--border);transition:border-color 0.3s ease}
 .status-indicator:hover {box-shadow:var(--shadow)}
 .status-indicator .status-dot {width:10px;height:10px;border-radius:50%;background-color:var(--green);transition:background-color 0.3s ease, transform 0.3s ease}

@@ -1472,6 +1472,34 @@
         if (pageViewEnabled) requestAnimationFrame(() => ensureTextEditorPageWindowFits(portal));
         return true;
     };
+    const formatTextEditorStatNumber = (value = 0) => Math.max(0, Number(value) || 0).toLocaleString();
+    const getTextEditorStatsText = (textArea = findTextEditorNode()) => {
+        if (!textArea) return "";
+        const clone = textArea.cloneNode(true);
+        clone.querySelectorAll(".editor-text-page-break-spacer, .editor-text-search-marker, .editor-text-image-handle, .editor-text-table-resize-handle").forEach((node) => node.remove());
+        return clone.innerText || clone.textContent || "";
+    };
+    const getTextEditorPageCount = (portal = findTextPortal()) => {
+        const backdropNode = findTextEditorPageBackdrop(portal);
+        const renderedPages = Number(backdropNode?.dataset?.renderedPageCount || 0);
+        if (renderedPages > 0) return renderedPages;
+        return Math.max(1, backdropNode?.querySelectorAll?.(".editor-text-page-card")?.length || 1);
+    };
+    const renderTextEditorStatsMenuContent = (portal = findTextPortal()) => {
+        const statsText = getTextEditorStatsText(findTextEditorNode(portal));
+        const trimmedText = statsText.trim();
+        const wordCount = trimmedText ? trimmedText.split(/\s+/).filter(Boolean).length : 0;
+        const characterCount = statsText.length;
+        const pageCount = getTextEditorPageCount(portal);
+        return children([
+            div({style: "editor-text-menu-stats-label", content: "Document stats"}),
+            div({style: "editor-text-menu-stats-grid", content: children([
+                div({content: children([`<strong>${formatTextEditorStatNumber(wordCount)}</strong>`, `<span>Words</span>`])}),
+                div({content: children([`<strong>${formatTextEditorStatNumber(characterCount)}</strong>`, `<span>Characters</span>`])}),
+                div({content: children([`<strong>${formatTextEditorStatNumber(pageCount)}</strong>`, `<span>Pages</span>`])})
+            ])})
+        ]);
+    };
     const toggleTextEditorPageView = (enabled = !activeTextPageViewEnabled, portal = findTextPortal()) => {
         activeTextPageViewEnabled = isPlainTextFilePath(activeTextEditorFilePath) ? false : !!enabled;
         if (activeTextEditorFilePath) persistTextDocumentPageViewPreference(activeTextEditorFilePath, activeTextPageViewEnabled);
@@ -2081,14 +2109,21 @@
             otherButton.dataset.bound = "1";
             otherButton.popoutmenu([{
                 className: "context-menu-item-switch",
-                content: children([
-                    div({content: children([
-                        switcher({id: "editor-text-page-view-toggle", style: "menu-switcher float-right", checked: activeTextPageViewEnabled}),
-                        `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon space-right" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3.75h10.5A2.25 2.25 0 0 1 19.5 6v12a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 18V6a2.25 2.25 0 0 1 2.25-2.25Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5h7.5M8.25 10.5h7.5M8.25 13.5h7.5M8.25 16.5h4.5" /></svg>`,
-                        `<span>Pages</span>`
-                    ])}),
-                ]),
+                get content() {
+                    return children([
+                        div({content: children([
+                            switcher({id: "editor-text-page-view-toggle", style: "menu-switcher float-right", checked: activeTextPageViewEnabled}),
+                            `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon space-right" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3.75h10.5A2.25 2.25 0 0 1 19.5 6v12a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 18V6a2.25 2.25 0 0 1 2.25-2.25Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5h7.5M8.25 10.5h7.5M8.25 13.5h7.5M8.25 16.5h4.5" /></svg>`,
+                            `<span>Pages</span>`
+                        ])}),
+                    ]);
+                },
                 action: () => toggleTextEditorPageView(undefined, portal)
+            }, {
+                className: "editor-text-menu-stats",
+                get content() {
+                    return renderTextEditorStatsMenuContent(portal);
+                }
             }]);
         }
         updateTextToolbarState();
