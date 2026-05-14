@@ -1,5 +1,15 @@
 (async () => {
+    const ALARMS_SERVICE_ID = "com.standard.alarms";
+    const DEFAULT_ALARM_NAME = "Untitled";
+    const ALARM_SETTINGS = {
+        default_name: {
+            label: "Default Name",
+            type: "text",
+            default: DEFAULT_ALARM_NAME
+        }
+    };
     const padTimeUnit = value => `${Number.isFinite(value) ? value : 0}`.padStart(2, "0");
+    const escapeCliQuotedValue = (value = "") => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     const to12HourTimestamp = (h, m) => {
         const safeHour = Number.isFinite(h) ? h : 0;
         const safeMinute = Number.isFinite(m) ? m : 0;
@@ -75,6 +85,17 @@
         if (hour === null) return null;
         return {hour, minute};
     };
+    const getDefaultAlarmName = async (view = null) => {
+        try {
+            const values = typeof view?.settings?.values === "function"
+                ? await view.settings.values()
+                : await window.StandardAppSettings?.values?.(ALARMS_SERVICE_ID);
+            const defaultName = String(values?.default_name || DEFAULT_ALARM_NAME).trim();
+            return defaultName || DEFAULT_ALARM_NAME;
+        } catch (_) {
+            return DEFAULT_ALARM_NAME;
+        }
+    };
     const openAlarmPortal = alarm => {
         const parsedTime = parseTimestamp(alarm.timestamp);
         const handleAlarmMutation = (promise, successMessage, errorMessage) => {
@@ -123,7 +144,7 @@
     };
     window.StandardAlarms = window.StandardAlarms || {};
     window.StandardAlarms.openAlarm = alarm => openAlarmPortal(alarm);
-    modular.register(new Service("com.standard.alarms", [new Portal({
+    modular.register(new Service(ALARMS_SERVICE_ID, [new Portal({
         title: "Alarms",
         hints: ["alarms"],
         dimensions: [380, 500],
@@ -132,10 +153,11 @@
         tools: [{
             title: "New Alarm",
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
-            onclick: () => {
+            onclick: async (_event, view) => {
+                const defaultAlarmName = await getDefaultAlarmName(view);
                 inputDialogue({
                     title: "What Time?",
-                    titleholder: "Alarm Name",
+                    titleholder: defaultAlarmName,
                     title_entry: true,
                     placeholder: "9 AM, 10 tonight, etc.",
                     confirmation: (title, t) => {
@@ -145,9 +167,10 @@
                         const tdsm = (tdsv.minute <= 9 ? `0${tdsv.minute}` : tdsv.minute);
                         const tds = `${thrs}:${tdsm} ${ttod}`;
                         const userId = modular.user.id();
-                        CLI.send(`[alarms] + (@${userId}, "${(title.trim() === "" ? "Untitled" : title)}", "${tds}", 1, true, true, [0,1,2,3,4,5,6])`, false).then(d => {
+                        const alarmName = String(title || "").trim() === "" ? defaultAlarmName : title;
+                        CLI.send(`[alarms] + (@${userId}, "${escapeCliQuotedValue(alarmName)}", "${tds}", 1, true, true, [0,1,2,3,4,5,6])`, false).then(d => {
                             if (d !== 0) {
-                                modular.refresh("com.standard.alarms", 0);
+                                modular.refresh(ALARMS_SERVICE_ID, 0);
                                 modular.success("Created alarm");
                             } else {
                                 modular.error("Couldn't create alarm");
@@ -192,5 +215,5 @@
                 }
             })])
         })
-    })]));
+    })], ALARM_SETTINGS));
 })();

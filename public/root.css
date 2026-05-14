@@ -159,6 +159,8 @@
 .medium-padding {padding:15px}
 .large-padding {padding:30px}
 .very-small-padding-top {padding-top:3px}
+.very-small-padding {padding-top:1px}
+.very-small-padding svg {width:20px;height:20px}
 .small-padding-top {padding-top:5px}
 .padding-top {padding-top:10px}
 .padding-bottom {padding-bottom:10px}

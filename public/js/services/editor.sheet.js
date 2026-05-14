@@ -88,6 +88,7 @@
     const SHEET_DECIMAL_DECREASE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.75h8.5M5.25 10.25h5.25M4.5 15.75h.008v.008H4.5v-.008Zm3 0h.008v.008H7.5v-.008Zm3 0h.008v.008H10.5v-.008Zm3 0h.008v.008H13.5v-.008Zm5.25-6.25-3 3m0 0 3 3m-3-3h4.5" /></svg>`;
     const SHEET_DECIMAL_INCREASE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.75h8.5M5.25 10.25h5.25M4.5 15.75h.008v.008H4.5v-.008Zm3 0h.008v.008H7.5v-.008Zm3 0h.008v.008H10.5v-.008Zm6.75-3.25 3 3m0 0-3 3m3-3h-4.5" /></svg>`;
     const SHEET_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" style="fill:none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path fill="none" style="fill:none" stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>`;
+    const SHEET_SEARCH_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /> </svg>`;
     const SHEET_LOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`;
     const SHEET_UNLOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`;
     const SHEET_CELL_TYPES = [
@@ -707,7 +708,7 @@
             isEditingInput: !!(activeElement && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable))
         };
     };
-    const isSheetShortcutBlockedByDialogue = () => !!document.querySelector(".dialogue");
+    const isSheetShortcutBlockedByDialogue = () => !!document.querySelector(".dialogue, .search-dialogue-popout");
     const isSheetRangeSelectionActive = () => !!(activeSheetRangeStart && activeSheetRangeEnd);
     const clearActiveSheetRange = () => {
         activeSheetRangeStart = null;
@@ -1155,6 +1156,53 @@
         if (!payload) return false;
         await writeSheetClipboardPayload(payload);
         modular.success("Cut selection");
+        return true;
+    };
+    const adjustSheetFormulaReferencesForCopyDown = (rawValue = "", rowDelta = 0) => {
+        const textValue = String(rawValue ?? "");
+        if (!textValue.startsWith("=") || !rowDelta) return textValue;
+        return textValue.replace(/\b([A-Z]+)(\d+)\b/gi, (match, columnLabel, rowNumber) => {
+            const nextRowNumber = Number(rowNumber) + rowDelta;
+            return nextRowNumber > 0 ? `${String(columnLabel).toUpperCase()}${nextRowNumber}` : match;
+        });
+    };
+    const copySheetCellDown = (sourceReference = "", targetReference = "", rowDelta = 0) => {
+        if (!sourceReference || !targetReference || sourceReference === targetReference) return false;
+        if (isSheetCellLocked(targetReference)) return false;
+        if (Object.prototype.hasOwnProperty.call(sheetCellValues, sourceReference)) {
+            sheetCellValues[targetReference] = adjustSheetFormulaReferencesForCopyDown(sheetCellValues[sourceReference], rowDelta);
+        } else {
+            delete sheetCellValues[targetReference];
+        }
+        setSheetCellStyle(targetReference, getSheetCellStyle(sourceReference));
+        setSheetCellType(targetReference, getSheetCellType(sourceReference));
+        setSheetCellLink(targetReference, getSheetCellLink(sourceReference));
+        setSheetCellLocked(targetReference, isSheetCellLocked(sourceReference));
+        return true;
+    };
+    const fillActiveSheetSelectionDown = () => {
+        captureActiveSheetInput();
+        const selectedReferences = getActiveSheetCellReferences();
+        const bounds = getSheetReferenceBounds(selectedReferences);
+        if (!bounds) return false;
+        const selectedSet = new Set(selectedReferences);
+        const usesTopSelectedRowAsSource = bounds.maxRow > bounds.minRow;
+        const sourceRowIndex = usesTopSelectedRowAsSource ? bounds.minRow : bounds.minRow - 1;
+        if (sourceRowIndex < 0) return false;
+        const firstTargetRowIndex = usesTopSelectedRowAsSource ? bounds.minRow + 1 : bounds.minRow;
+        let didFillCell = false;
+        for (let rowIndex = firstTargetRowIndex; rowIndex <= bounds.maxRow; rowIndex += 1) {
+            for (let columnIndex = bounds.minColumn; columnIndex <= bounds.maxColumn; columnIndex += 1) {
+                const targetReference = getSheetCellReference(rowIndex, columnIndex);
+                if (!selectedSet.has(targetReference)) continue;
+                const sourceReference = getSheetCellReference(sourceRowIndex, columnIndex);
+                if (copySheetCellDown(sourceReference, targetReference, rowIndex - sourceRowIndex)) didFillCell = true;
+            }
+        }
+        if (!didFillCell) return false;
+        refreshSheetCells();
+        saveSheetPortalState();
+        modular.success("Filled down");
         return true;
     };
     const pasteSheetClipboardPayload = async () => {
@@ -1780,6 +1828,82 @@
         }
         if (cellType === "date") return formatSheetDateValue(rawValue.startsWith("=") ? evaluatedValue : rawValue);
         return String(evaluatedValue);
+    };
+    const createSheetSearchMatches = (query = "") => {
+        captureActiveSheetInput();
+        const needle = String(query || "").trim().toLowerCase();
+        if (!needle) return [];
+        return collectSheetCells()
+            .filter(({cellReference, value}) => {
+                const rawValue = String(value ?? "");
+                const displayValue = getSheetCellDisplayValue(cellReference);
+                return rawValue.toLowerCase().includes(needle)
+                    || String(displayValue ?? "").toLowerCase().includes(needle);
+            })
+            .sort((first, second) => {
+                const firstPosition = parseSheetCellReference(first.cellReference);
+                const secondPosition = parseSheetCellReference(second.cellReference);
+                return (firstPosition.rowIndex - secondPosition.rowIndex)
+                    || (firstPosition.columnIndex - secondPosition.columnIndex);
+            })
+            .slice(0, 50)
+            .map(({cellReference, value}) => {
+                const displayValue = getSheetCellDisplayValue(cellReference);
+                const rawValue = String(value ?? "");
+                const visibleValue = String(displayValue || rawValue || "");
+                const detail = rawValue && rawValue !== visibleValue
+                    ? `${visibleValue} (${rawValue})`
+                    : visibleValue;
+                return {
+                    cellReference,
+                    label: cellReference,
+                    detail
+                };
+            });
+    };
+    const scrollToSheetSearchMatch = (match = null) => {
+        const cellReference = String(match?.cellReference || "").toUpperCase();
+        if (!cellReference) return false;
+        const position = parseSheetCellReference(cellReference);
+        if (position.rowIndex >= sheetRows || position.columnIndex >= sheetColumns) return false;
+        setActiveSheetCell(cellReference);
+        const cellInput = getSheetCellInput(cellReference);
+        const cellWrap = getSheetCellWrap(cellReference);
+        if (!cellInput) return false;
+        cellInput.scrollIntoView({behavior: "smooth", block: "center", inline: "center"});
+        window.setTimeout(() => {
+            cellInput.focus();
+            cellInput.select?.();
+            cellWrap?.classList.add("editor-sheet-search-hit");
+            window.setTimeout(() => cellWrap?.classList.remove("editor-sheet-search-hit"), 800);
+        }, 180);
+        return true;
+    };
+    const showSheetSearchDialogue = (anchorNode = null) => {
+        if (typeof searchDialogue === "function") {
+            searchDialogue({
+                title: "Search",
+                placeholder: "Find cell value",
+                confirmText: "Search",
+                anchor: anchorNode,
+                matches: createSheetSearchMatches,
+                preview: (_, match) => scrollToSheetSearchMatch(match),
+                confirmation: (query, match, matches) => {
+                    const selectedMatch = match || matches?.[0] || createSheetSearchMatches(query)[0];
+                    if (!scrollToSheetSearchMatch(selectedMatch)) modular.error("No matches found");
+                }
+            });
+            return true;
+        }
+        inputDialogue({
+            title: "Search",
+            placeholder: "Find cell value",
+            confirmation: (_, query) => {
+                const match = createSheetSearchMatches(query)[0];
+                if (!scrollToSheetSearchMatch(match)) modular.error("No matches found");
+            }
+        });
+        return true;
     };
     const getSheetCellPosition = (cellReference = "A1") => {
         const position = parseSheetCellReference(cellReference);
@@ -2857,6 +2981,12 @@
                 pasteSheetClipboardPayload();
                 return;
             }
+            if (event.ctrlKey && !event.shiftKey && shortcutKey === "d") {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                fillActiveSheetSelectionDown();
+                return;
+            }
             if (event.shiftKey && !event.ctrlKey && key === " ") {
                 event.preventDefault();
                 event.stopImmediatePropagation();
@@ -3150,6 +3280,10 @@
                 onclick: () => {
                     saveLoadedSheet();
                 }
+            }, {
+                title: "Search",
+                icon: SHEET_SEARCH_ICON,
+                onclick: (event) => showSheetSearchDialogue(event?.currentTarget)
             }],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5" /></svg>`,
             icon: "/icons/sprdshts.png",

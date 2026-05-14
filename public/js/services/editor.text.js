@@ -34,6 +34,7 @@
     const TEXT_INPUT_SYNC_DEBOUNCE_MS = 120;
     const TEXT_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" style="fill:none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path fill="none" style="fill:none" stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>`;
     const TEXT_TABLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75V5.25Zm0 4.5h16.5M3.75 14.25h16.5M9.25 5.25v13.5M14.75 5.25v13.5" /></svg>`;
+    const TEXT_SEARCH_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon very-small-padding" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /> </svg>`;
     const TEXT_ALIGN_ICONS = {
         left: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M4 10.5h10M4 14.5h16M4 18.5h10" /></svg>`,
         center: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M7 10.5h10M4 14.5h16M7 18.5h10" /></svg>`,
@@ -224,6 +225,7 @@
         unwrapTextEditorImageFrames(clone);
         clone.querySelectorAll(".editor-text-image-handle").forEach((handleNode) => handleNode.remove());
         clone.querySelectorAll(".editor-text-table-resize-handle").forEach((handleNode) => handleNode.remove());
+        clone.querySelectorAll(".editor-text-search-marker").forEach((markerNode) => markerNode.remove());
         clone.querySelectorAll("[data-editor-image-selected=\"1\"]").forEach((node) => node.removeAttribute("data-editor-image-selected"));
         return clone.innerHTML;
     };
@@ -711,6 +713,111 @@
         selection.removeAllRanges();
         selection.addRange(range);
         savedTextSelectionRange = range.cloneRange();
+        return true;
+    };
+    const buildTextEditorSearchIndex = (rootNode = findTextEditorNode()) => {
+        if (!(rootNode instanceof HTMLElement)) return "";
+        const walker = document.createTreeWalker(rootNode, NodeFilter.SHOW_ALL, {
+            acceptNode: (node) => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.classList?.contains("editor-text-page-break-spacer")
+                        || node.classList?.contains("editor-text-search-marker")
+                        || node.classList?.contains("editor-text-image-handle")
+                        || node.classList?.contains("editor-text-table-resize-handle")) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return String(node.tagName || "").toUpperCase() === "BR"
+                        ? NodeFilter.FILTER_ACCEPT
+                        : NodeFilter.FILTER_SKIP;
+                }
+                if (node.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
+                return NodeFilter.FILTER_SKIP;
+            }
+        });
+        let indexedText = "";
+        let currentNode = walker.nextNode();
+        while (currentNode) {
+            indexedText += currentNode.nodeType === Node.TEXT_NODE ? (currentNode.textContent || "") : "\n";
+            currentNode = walker.nextNode();
+        }
+        return indexedText;
+    };
+    const createTextEditorSearchMatches = (query = "", portal = findTextPortal()) => {
+        const textArea = findTextEditorNode(portal);
+        const needle = String(query || "").trim();
+        if (!textArea || !needle) return [];
+        const documentText = buildTextEditorSearchIndex(textArea);
+        const haystack = documentText.toLowerCase();
+        const lowerNeedle = needle.toLowerCase();
+        const matches = [];
+        let index = haystack.indexOf(lowerNeedle);
+        while (index >= 0 && matches.length < 50) {
+            const before = documentText.slice(Math.max(0, index - 28), index).replace(/\s+/g, " ").trim();
+            const matchText = documentText.slice(index, index + needle.length).replace(/\s+/g, " ");
+            const after = documentText.slice(index + needle.length, index + needle.length + 36).replace(/\s+/g, " ").trim();
+            matches.push({
+                index,
+                length: needle.length,
+                label: `${matches.length + 1}. ${matchText}`,
+                detail: `${before ? `${before} ` : ""}${matchText}${after ? ` ${after}` : ""}`.trim()
+            });
+            index = haystack.indexOf(lowerNeedle, index + Math.max(needle.length, 1));
+        }
+        return matches;
+    };
+    const scrollToTextEditorSearchMatch = (match = null, portal = findTextPortal()) => {
+        const textArea = findTextEditorNode(portal);
+        if (!textArea || !match || !Number.isFinite(match.index)) return false;
+        const start = match.index;
+        const end = start + (match.length || 0);
+        textArea.focus();
+        if (!restoreTextEditorSelectionOffsets(textArea, start, end)) return false;
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return false;
+        const markerRange = selection.getRangeAt(0).cloneRange();
+        markerRange.collapse(true);
+        const markerNode = document.createElement("span");
+        markerNode.className = "editor-text-search-marker";
+        markerNode.contentEditable = "false";
+        markerNode.setAttribute("aria-hidden", "true");
+        markerRange.insertNode(markerNode);
+        markerNode.scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"});
+        window.setTimeout(() => {
+            markerNode.remove();
+            restoreTextEditorSelectionOffsets(textArea, start, end);
+        }, 700);
+        return true;
+    };
+    const showTextEditorSearchDialogue = (portal = findTextPortal(), anchorNode = null) => {
+        const textArea = findTextEditorNode(portal);
+        if (!textArea) return false;
+        const selectedText = getTextSelectionPlainText().trim();
+        const initialValue = selectedText && !selectedText.includes("\n") ? selectedText : "";
+        if (typeof searchDialogue === "function") {
+            searchDialogue({
+                title: "Search",
+                placeholder: "Find text",
+                value: initialValue,
+                confirmText: "Search",
+                anchor: anchorNode,
+                matches: (query) => createTextEditorSearchMatches(query, portal),
+                preview: (_, match) => scrollToTextEditorSearchMatch(match, portal),
+                confirmation: (query, match, matches) => {
+                    const selectedMatch = match || matches?.[0] || createTextEditorSearchMatches(query, portal)[0];
+                    if (!scrollToTextEditorSearchMatch(selectedMatch, portal)) modular.error("No matches found");
+                }
+            });
+            return true;
+        }
+        inputDialogue({
+            title: "Search",
+            placeholder: "Find text",
+            value: initialValue,
+            confirmation: (_, query) => {
+                const match = createTextEditorSearchMatches(query, portal)[0];
+                if (!scrollToTextEditorSearchMatch(match, portal)) modular.error("No matches found");
+            }
+        });
         return true;
     };
     const findTextLineNode = (node, rootNode = findTextEditorNode()) => {
@@ -2132,6 +2239,10 @@
                 title: "Save",
                 icon: modular.icons.save,
                 onclick: (_, context) => saveLoadedTextFile(context?.portal)
+            }, {
+                title: "Search",
+                icon: TEXT_SEARCH_ICON,
+                onclick: (event, context) => showTextEditorSearchDialogue(context?.portal, event?.currentTarget)
             }],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>`,
             icon: "/icons/interfaces/editor.png",

@@ -1088,6 +1088,9 @@ function getFocusedPortalSaveTool() {
 function getFocusedPortalEditTool() {
     return getFocusedPortalToolByTitle("Edit");
 }
+function getFocusedPortalSearchTool() {
+    return getFocusedPortalToolByTitle("Search");
+}
 function getFocusedPortalWindow() {
     return document.querySelector(".draggable-window.window-focused:not(.widget-window)");
 }
@@ -1144,6 +1147,17 @@ document.addEventListener("keydown", function (e) {
             editTool.click();
         } else {
             modular.error("No edit in this app");
+        }
+        return;
+    }
+
+    if (e.ctrlKey && !e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "g") {
+        const searchTool = getFocusedPortalSearchTool();
+        e.preventDefault();
+        if (searchTool) {
+            searchTool.click();
+        } else {
+            modular.error("No search in this app");
         }
         return;
     }

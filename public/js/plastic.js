@@ -437,6 +437,149 @@ function inputDialogue(n) {
     document.addEventListener("keydown", dialogueKeydownHandler, true);
     dialogue.querySelector("input")?.focus();
 }
+function searchDialogue(n = {}) {
+    document.querySelectorAll(".dialogue, .search-dialogue-popout").forEach(d => d.remove());
+    const anchorNode = n.anchor instanceof Element ? n.anchor : null;
+    const isPopout = !!anchorNode;
+    if (!isPopout) document.getElementById("cover").in();
+    let matches = [];
+    let activeIndex = -1;
+    const dialogue = createMarkupNode(div({
+        style: `${isPopout ? "custom-context-menu search-dialogue-popout" : "dialogue"} padded search-dialogue`,
+        content: children([
+            label({content: n.title || "Search"}),
+            input({style: "undecorated search-dialogue-input", placeholder: n.placeholder || "Search", value: n.value || "", autofocus: true}),
+            div({style: "search-dialogue-results", content: ""}),
+            div({style: "float-right search-dialogue-actions", content: children([
+                button({style: "undecorated space-right", content: "Cancel"}),
+                button({style: "primary", content: n.confirmText || "Confirm"})
+            ])})
+        ])
+    }));
+    const inputNode = dialogue.querySelector("input");
+    const resultsNode = dialogue.querySelector(".search-dialogue-results");
+    const buttons = dialogue.querySelectorAll("button");
+    const cancelButton = buttons[0] || null;
+    const confirmButton = buttons[1] || null;
+    const closeDialogue = () => {
+        document.removeEventListener("keydown", dialogueKeydownHandler, true);
+        document.removeEventListener("mousedown", outsideClickHandler, true);
+        window.removeEventListener("resize", positionPopout);
+        if (!isPopout) document.getElementById("cover").out();
+        dialogue.remove();
+    };
+    const positionPopout = () => {
+        if (!isPopout || !dialogue.isConnected) return;
+        const rect = anchorNode.getBoundingClientRect();
+        dialogue.style.left = `${rect.left}px`;
+        dialogue.style.top = `${rect.bottom + 6}px`;
+        requestAnimationFrame(() => {
+            const dialogueRect = dialogue.getBoundingClientRect();
+            if (dialogueRect.right > window.innerWidth) {
+                dialogue.style.left = `${Math.max(8, window.innerWidth - dialogueRect.width - 8)}px`;
+            }
+            if (dialogueRect.bottom > window.innerHeight) {
+                dialogue.style.top = `${Math.max(8, rect.top - dialogueRect.height - 6)}px`;
+            }
+        });
+    };
+    const outsideClickHandler = (event) => {
+        if (!isPopout || dialogue.contains(event.target) || anchorNode.contains(event.target)) return;
+        closeDialogue();
+    };
+    const setActiveIndex = (nextIndex = -1) => {
+        const visibleMatchCount = Math.min(matches.length, n.maxVisible || 8);
+        activeIndex = visibleMatchCount ? Math.max(0, Math.min(nextIndex, visibleMatchCount - 1)) : -1;
+        resultsNode.querySelectorAll(".search-dialogue-result").forEach((row, index) => {
+            row.classList.toggle("active", index === activeIndex);
+        });
+    };
+    const renderMatches = () => {
+        resultsNode.innerHTML = "";
+        const query = inputNode?.value || "";
+        matches = typeof n.matches === "function" ? (n.matches(query) || []) : [];
+        if (!query.trim()) {
+            const emptyNode = document.createElement("div");
+            emptyNode.className = "search-dialogue-empty";
+            emptyNode.textContent = n.emptyText || "Start typing to search.";
+            resultsNode.appendChild(emptyNode);
+            setActiveIndex(-1);
+            return;
+        }
+        if (!matches.length) {
+            const emptyNode = document.createElement("div");
+            emptyNode.className = "search-dialogue-empty";
+            emptyNode.textContent = n.noResultsText || "No matches found.";
+            resultsNode.appendChild(emptyNode);
+            setActiveIndex(-1);
+            return;
+        }
+        matches.slice(0, n.maxVisible || 8).forEach((match, index) => {
+            const row = document.createElement("button");
+            row.type = "button";
+            row.className = "search-dialogue-result";
+            const titleNode = document.createElement("span");
+            titleNode.className = "search-dialogue-result-title";
+            titleNode.textContent = match?.label || String(match || "");
+            row.appendChild(titleNode);
+            if (match?.detail) {
+                const detailNode = document.createElement("span");
+                detailNode.className = "search-dialogue-result-detail";
+                detailNode.textContent = match.detail;
+                row.appendChild(detailNode);
+            }
+            row.addEventListener("click", () => {
+                setActiveIndex(index);
+                if (typeof n.preview === "function") n.preview(inputNode.value, matches[activeIndex], matches);
+            });
+            row.addEventListener("dblclick", () => confirmButton?.click());
+            resultsNode.appendChild(row);
+        });
+        setActiveIndex(activeIndex >= 0 ? activeIndex : 0);
+    };
+    const dialogueKeydownHandler = (event) => {
+        if (!dialogue.isConnected) return;
+        if (event.key === "Escape") {
+            event.preventDefault();
+            cancelButton?.click();
+            return;
+        }
+        if (event.key === "ArrowDown" && dialogue.contains(document.activeElement)) {
+            event.preventDefault();
+            setActiveIndex(activeIndex + 1);
+            return;
+        }
+        if (event.key === "ArrowUp" && dialogue.contains(document.activeElement)) {
+            event.preventDefault();
+            setActiveIndex(activeIndex - 1);
+            return;
+        }
+        if (event.key === "Enter" && dialogue.contains(document.activeElement)) {
+            event.preventDefault();
+            confirmButton?.click();
+        }
+    };
+    cancelButton?.addEventListener("click", closeDialogue);
+    confirmButton?.addEventListener("click", () => {
+        const query = inputNode?.value || "";
+        const selectedMatch = activeIndex >= 0 ? matches[activeIndex] : null;
+        closeDialogue();
+        if (typeof n.confirmation === "function") n.confirmation(query, selectedMatch, matches);
+    });
+    inputNode?.addEventListener("input", () => {
+        activeIndex = -1;
+        renderMatches();
+        if (typeof n.input === "function") n.input(inputNode.value, matches);
+    });
+    document.querySelector("body").append(dialogue);
+    positionPopout();
+    document.addEventListener("keydown", dialogueKeydownHandler, true);
+    document.addEventListener("mousedown", outsideClickHandler, true);
+    window.addEventListener("resize", positionPopout);
+    renderMatches();
+    inputNode?.focus();
+    inputNode?.select?.();
+}
 function confirmationDialogue(n) {
     document.getElementById("cover").in()
     document.querySelector("body").append(div({style: "dialogue padded center medium-padding", content: children([label({content: n.title}), blockquote({content: n.content}), button({style: "secondary space-right hover-zoom", content: "Cancel", onclick: () => {

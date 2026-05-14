@@ -352,15 +352,244 @@ if (document.readyState === 'loading') {
 } else {
     kickOffWindowRestore();
 }
+window.StandardAppSettings = window.StandardAppSettings || (() => {
+    const schemas = {};
+    const loadedValues = {};
+    const loadPromises = {};
+    const saveQueues = {};
+    const sanitizeRecordId = (value = "") => `${value || ""}`.trim().replace(/[^a-zA-Z0-9_-]/g, "");
+    const cacheKeyFor = (serviceId = "") => `settings:${serviceId}`;
+    const normalizeSchema = (settings = {}) => {
+        if (!settings || typeof settings !== "object" || Array.isArray(settings)) return {};
+        return Object.fromEntries(Object.entries(settings).filter(([, setting]) => {
+            return setting && typeof setting === "object" && !Array.isArray(setting);
+        }).map(([name, setting]) => {
+            const type = `${setting.type || "text"}`.trim().toLowerCase() || "text";
+            return [name, {
+                label: `${setting.label || name}`,
+                type,
+                default: setting.default,
+                restrictions: setting.restrictions
+            }];
+        }));
+    };
+    const restrictionValues = (setting = {}) => {
+        if (`${setting?.type || ""}`.toLowerCase() === "boolean") return [];
+        if (Array.isArray(setting?.restrictions)) return setting.restrictions.map(value => `${value}`).filter(value => value !== "");
+        return `${setting?.restrictions || ""}`.split(",").map(value => value.trim()).filter(Boolean);
+    };
+    const normalizeValue = (setting = {}, value) => {
+        const type = `${setting?.type || "text"}`.toLowerCase();
+        if (type === "boolean") {
+            if (value === true || value === "true" || value === 1 || value === "1") return true;
+            return false;
+        }
+        const restrictions = restrictionValues(setting);
+        let normalized = value ?? setting?.default ?? "";
+        if (type === "number") {
+            const parsed = Number.parseFloat(normalized);
+            normalized = Number.isFinite(parsed) ? parsed : 0;
+        } else {
+            normalized = `${normalized ?? ""}`;
+        }
+        if (restrictions.length) {
+            const match = restrictions.find(option => `${option}` === `${normalized}`);
+            return match ?? restrictions[0];
+        }
+        return normalized;
+    };
+    const defaultValuesFor = (serviceId = "") => {
+        const schema = schemas[serviceId] || {};
+        return Object.fromEntries(Object.entries(schema).map(([name, setting]) => [name, normalizeValue(setting, setting.default)]));
+    };
+    const extractCacheRecord = (payload) => {
+        if (!payload) return null;
+        if (Array.isArray(payload)) return payload[0] || null;
+        if (Array.isArray(payload.cache)) return payload.cache[0] || null;
+        if (payload.cache && typeof payload.cache === "object") return payload.cache;
+        if (typeof payload === "object" && !Array.isArray(payload)) return payload;
+        return null;
+    };
+    const parseLookupResponse = (payload) => {
+        if (payload === 0 || payload === "0" || payload === "" || payload === null || payload === undefined) {
+            return {exists: false, value: null, recordId: ""};
+        }
+        if (typeof payload === "string") {
+            const trimmed = payload.trim();
+            if (!trimmed || trimmed === "0") return {exists: false, value: null, recordId: ""};
+            try {
+                return parseLookupResponse(JSON.parse(trimmed));
+            } catch (_) {
+                return {exists: true, value: trimmed, recordId: ""};
+            }
+        }
+        const record = extractCacheRecord(payload);
+        if (!record) return {exists: false, value: null, recordId: ""};
+        return {
+            exists: true,
+            value: record.value ?? record.VL ?? record.vl ?? null,
+            recordId: sanitizeRecordId(record.id || record.ID || "")
+        };
+    };
+    const parseSettingsValue = (value) => {
+        let candidate = value;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            if (!candidate) return null;
+            if (typeof candidate === "object" && !Array.isArray(candidate)) return candidate;
+            if (typeof candidate !== "string") return null;
+            const trimmed = candidate.trim();
+            if (!trimmed) return null;
+            try {
+                candidate = JSON.parse(trimmed);
+                continue;
+            } catch (_) {
+            }
+            try {
+                candidate = JSON.parse(trimmed.replace(/\\"/g, "\"").replace(/\\\\/g, "\\"));
+                continue;
+            } catch (_) {
+            }
+            return null;
+        }
+        return (candidate && typeof candidate === "object" && !Array.isArray(candidate)) ? candidate : null;
+    };
+    const normalizeValuesFor = (serviceId = "", values = {}) => {
+        const schema = schemas[serviceId] || {};
+        const defaults = defaultValuesFor(serviceId);
+        return Object.fromEntries(Object.entries(schema).map(([name, setting]) => {
+            const source = values && Object.prototype.hasOwnProperty.call(values, name) ? values[name] : defaults[name];
+            return [name, normalizeValue(setting, source)];
+        }));
+    };
+    const serializeSettingsValues = (value) => JSON.stringify(JSON.stringify(value && typeof value === "object" && !Array.isArray(value) ? value : {}));
+    const resolveUserRecordId = async () => {
+        const cachedUserRecord = typeof modular?.user?.readCachedUserRecord === "function"
+            ? modular.user.readCachedUserRecord()
+            : null;
+        const cachedRecordId = sanitizeRecordId(cachedUserRecord?.id);
+        if (cachedRecordId) return cachedRecordId;
+        const userRecord = typeof modular?.user?.data === "function" ? await modular.user.data() : null;
+        return sanitizeRecordId(userRecord?.id);
+    };
+    const sendCommand = async (query, parseJson = true) => {
+        if (typeof window.CLI?.send === "function") return window.CLI.send(query, parseJson);
+        const response = await fetch(`/api/cli?_=${Date.now()}`, {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: {"Content-Type": "application/json", "Cache-Control": "no-cache, no-store, must-revalidate"},
+            body: JSON.stringify({query})
+        });
+        const text = await response.text().catch(() => "");
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${text.slice(0, 200)}`);
+        if (!parseJson) return text;
+        try {
+            return JSON.parse(text.replace(/^\uFEFF/, "").trim());
+        } catch (_) {
+            return text;
+        }
+    };
+    const fetchCommandFor = (userRecordId, serviceId) => `[cache] <user "${userRecordId}", key "${cacheKeyFor(serviceId)}">`;
+    const createCommandFor = (userRecordId, serviceId, values) => `[cache] + (@${userRecordId}, "${cacheKeyFor(serviceId)}", ${serializeSettingsValues(values)})`;
+    const updateCommandFor = (userRecordId, serviceId, values, recordId = "") => {
+        const filter = recordId ? `id "${recordId}"` : `user @${userRecordId}, key "${cacheKeyFor(serviceId)}"`;
+        return `[cache] value ${serializeSettingsValues(values)} <${filter}>`;
+    };
+    const load = async (serviceId = "", {force = false} = {}) => {
+        if (!serviceId) return {};
+        if (loadedValues[serviceId] && !force) return {...loadedValues[serviceId]};
+        if (!loadPromises[serviceId] || force) {
+            loadPromises[serviceId] = (async () => {
+                const defaults = defaultValuesFor(serviceId);
+                try {
+                    const userRecordId = await resolveUserRecordId();
+                    if (!userRecordId) {
+                        loadedValues[serviceId] = defaults;
+                        return loadedValues[serviceId];
+                    }
+                    const payload = await sendCommand(fetchCommandFor(userRecordId, serviceId), true);
+                    const lookup = parseLookupResponse(payload);
+                    loadedValues[serviceId] = normalizeValuesFor(serviceId, lookup.exists ? parseSettingsValue(lookup.value) : defaults);
+                } catch (error) {
+                    console.error(`Failed to load settings for ${serviceId}`, error);
+                    loadedValues[serviceId] = defaults;
+                }
+                return loadedValues[serviceId];
+            })();
+        }
+        return {...(await loadPromises[serviceId])};
+    };
+    const save = async (serviceId = "", nextValues = {}) => {
+        if (!serviceId) return false;
+        const values = normalizeValuesFor(serviceId, nextValues);
+        saveQueues[serviceId] = (saveQueues[serviceId] || Promise.resolve()).catch(() => null).then(async () => {
+            const userRecordId = await resolveUserRecordId();
+            if (!userRecordId) return false;
+            const payload = await sendCommand(fetchCommandFor(userRecordId, serviceId), true);
+            const lookup = parseLookupResponse(payload);
+            const command = lookup.exists
+                ? updateCommandFor(userRecordId, serviceId, values, lookup.recordId)
+                : createCommandFor(userRecordId, serviceId, values);
+            await sendCommand(command, false);
+            loadedValues[serviceId] = values;
+            loadPromises[serviceId] = Promise.resolve(values);
+            document.dispatchEvent(new CustomEvent("standard-app-settings-saved", {detail: {serviceId, values}}));
+            return true;
+        }).catch((error) => {
+            console.error(`Failed to save settings for ${serviceId}`, error);
+            return false;
+        });
+        return saveQueues[serviceId];
+    };
+    const reset = async (serviceId = "") => {
+        if (!serviceId) return false;
+        try {
+            const userRecordId = await resolveUserRecordId();
+            if (!userRecordId) return false;
+            const payload = await sendCommand(fetchCommandFor(userRecordId, serviceId), true);
+            const lookup = parseLookupResponse(payload);
+            if (lookup.exists && lookup.recordId) {
+                await sendCommand(`[cache] - <id "${lookup.recordId}">`, false);
+            }
+            const defaults = defaultValuesFor(serviceId);
+            loadedValues[serviceId] = defaults;
+            loadPromises[serviceId] = Promise.resolve(defaults);
+            document.dispatchEvent(new CustomEvent("standard-app-settings-reset", {detail: {serviceId, values: defaults}}));
+            return true;
+        } catch (error) {
+            console.error(`Failed to reset settings for ${serviceId}`, error);
+            return false;
+        }
+    };
+    return {
+        register(serviceId = "", settings = {}) {
+            if (!serviceId) return {};
+            schemas[serviceId] = normalizeSchema(settings);
+            delete loadedValues[serviceId];
+            delete loadPromises[serviceId];
+            return {...schemas[serviceId]};
+        },
+        schema: (serviceId = "") => ({...(schemas[serviceId] || {})}),
+        hasSettings: (serviceId = "") => Object.keys(schemas[serviceId] || {}).length > 0,
+        defaults: (serviceId = "") => defaultValuesFor(serviceId),
+        values: load,
+        save,
+        reset,
+        cacheKeyFor,
+        restrictionValues
+    };
+})();
 class Service {
     #service;
     #portals = [];
     #memory = [];
     #portalStructs = [];
+    #settings = {};
     #instanceCounter = 0;
-    constructor(service, portals) {
+    constructor(service, portals, settings = {}) {
         this.#service = service;
         this.#portals = [];
+        this.#settings = window.StandardAppSettings?.register?.(service, settings) || {};
         this.#portalStructs = portals.map((p, index) => {
             if (typeof p.setContext === "function") {
                 p.setContext(service, index);
@@ -415,6 +644,9 @@ class Service {
     }
     refresh() {
         this.#portals.forEach(p => p.refresh());
+    }
+    settings() {
+        return {...this.#settings};
     }
     hide() {
         this.#portals.forEach(p => p.hide());
@@ -502,11 +734,20 @@ class Portal {
         return [{
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>`,
             label: "Refresh",
-            action: () => location.reload()
+            action: () => this.refresh()
         }, {
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>`,
             label: "Settings",
             action: () => {
+                if (typeof window.StandardInternals?.openAppSettings === "function") {
+                    window.StandardInternals.openAppSettings(this.#serviceId, {
+                        title: this.title(),
+                        sourcePortalIndex: this.#portalIndex,
+                        sourceInstanceId: this.#instanceId
+                    });
+                } else {
+                    modular?.error?.("Settings viewer is not ready yet");
+                }
             }
         }];
     }
@@ -572,6 +813,13 @@ class Portal {
             struct: this.#struct,
             serviceId,
             cache,
+            settings: {
+                schema: () => window.StandardAppSettings?.schema?.(serviceId) || {},
+                defaults: () => window.StandardAppSettings?.defaults?.(serviceId) || {},
+                values: (options = {}) => window.StandardAppSettings?.values?.(serviceId, options) || Promise.resolve({}),
+                save: (values = {}) => window.StandardAppSettings?.save?.(serviceId, values) || Promise.resolve(false),
+                reset: () => window.StandardAppSettings?.reset?.(serviceId) || Promise.resolve(false)
+            },
             windowState: {
                 get: () => this.windowState(),
                 set: (nextState = {}, options = {}) => this.setWindowState(nextState, options),

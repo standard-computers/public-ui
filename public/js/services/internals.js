@@ -700,6 +700,98 @@
             })
         ])});
     };
+    const getSettingsPortalState = (portal = findInternalsWindow(6)?.portal) => {
+        const state = portal?.windowState?.() || {};
+        return {
+            serviceId: String(state.serviceId || ""),
+            title: String(state.title || state.serviceId || "App Settings")
+        };
+    };
+    const getSettingsFieldId = (name = "") => `internals-app-setting-${String(name || "").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+    const renderSettingControl = (name = "", setting = {}, value) => {
+        const fieldId = getSettingsFieldId(name);
+        const type = String(setting?.type || "text").toLowerCase();
+        const restrictions = window.StandardAppSettings?.restrictionValues?.(setting) || [];
+        const normalizedValue = value ?? setting?.default ?? "";
+        if (type === "boolean") {
+            const checked = normalizedValue === true || normalizedValue === "true" || normalizedValue === 1 || normalizedValue === "1";
+            return `<input id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="boolean" type="checkbox" ${checked ? "checked" : ""}>`;
+        }
+        if (restrictions.length) {
+            return `<select id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="${escapeHtml(type)}" class="undecorated no-padding fill">${restrictions.map(option => `<option value="${escapeHtml(option)}" ${String(option) === String(normalizedValue) ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>`;
+        }
+        const inputType = type === "number" ? "number" : "text";
+        return `<input id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="${escapeHtml(type)}" type="${inputType}" class="undecorated no-padding fill" value="${escapeHtml(normalizedValue)}">`;
+    };
+    const renderAppSettingsPortal = async (portal = findInternalsWindow(6)?.portal) => {
+        const root = portal?.window?.() || document;
+        const host = root.querySelector("#internals-app-settings-host");
+        if (!host) return;
+        const {serviceId, title} = getSettingsPortalState(portal);
+        updatePortalTitle(6, title ? `${title} Settings` : "App Settings", portal);
+        const schema = window.StandardAppSettings?.schema?.(serviceId) || {};
+        const settingEntries = Object.entries(schema);
+        if (!serviceId || !settingEntries.length) {
+            host.innerHTML = div({style: "faded small-padding", content: "No app settings are defined for this interface."});
+            return;
+        }
+        host.innerHTML = div({style: "faded small-padding", content: "Loading settings..."});
+        const values = await window.StandardAppSettings.values(serviceId);
+        const rows = settingEntries.map(([name, setting]) => {
+            const type = escapeHtml(setting?.type || "text");
+            const restrictions = window.StandardAppSettings?.restrictionValues?.(setting) || [];
+            const meta = restrictions.length && String(setting?.type || "").toLowerCase() !== "boolean"
+                ? `${type} - ${restrictions.map(escapeHtml).join(", ")}`
+                : type;
+            return `<label class="internals-app-setting-row bordered inner-radius small-padding" data-setting-row="${escapeHtml(name)}">
+                <span class="internals-app-setting-label">${escapeHtml(setting?.label || name)}</span>
+                <span class="internals-app-setting-meta faded">${escapeHtml(meta)}</span>
+                <span class="internals-app-setting-control padded">${renderSettingControl(name, setting, values?.[name])}</span>
+            </label>`;
+        }).join("");
+        host.innerHTML = `<div class="internals-app-settings" data-settings-service="${escapeHtml(serviceId)}">${rows}</div>`;
+    };
+    const collectAppSettingsValues = (portal = findInternalsWindow(6)?.portal) => {
+        const root = portal?.window?.() || document;
+        const values = {};
+        root.querySelectorAll("[data-setting-name]").forEach((field) => {
+            const name = field.getAttribute("data-setting-name") || "";
+            if (!name) return;
+            const type = field.getAttribute("data-setting-type") || "text";
+            values[name] = type === "boolean" ? field.checked === true : field.value;
+        });
+        return values;
+    };
+    const saveAppSettingsFromPortal = async (_event, context = {}) => {
+        const portal = context?.portal || findInternalsWindow(6)?.portal;
+        const {serviceId, title} = getSettingsPortalState(portal);
+        if (!serviceId) return;
+        const saved = await window.StandardAppSettings?.save?.(serviceId, collectAppSettingsValues(portal));
+        if (saved) {
+            modular.success(`Saved ${title || serviceId} settings`);
+            await renderAppSettingsPortal(portal);
+        } else {
+            modular.error("Unable to save app settings");
+        }
+    };
+    const deleteAppSettingsFromPortal = (_event, context = {}) => {
+        const portal = context?.portal || findInternalsWindow(6)?.portal;
+        const {serviceId, title} = getSettingsPortalState(portal);
+        if (!serviceId) return;
+        confirmationDialogue({
+            title: "Reset Settings",
+            content: `Delete saved settings for ${title || serviceId} and restore defaults?`,
+            confirmation: async () => {
+                const reset = await window.StandardAppSettings?.reset?.(serviceId);
+                if (reset) {
+                    modular.success(`Reset ${title || serviceId} settings`);
+                    await renderAppSettingsPortal(portal);
+                } else {
+                    modular.error("Unable to reset app settings");
+                }
+            }
+        });
+    };
     const autoSizeArticleTextarea = (field) => {
         if (!(field instanceof HTMLTextAreaElement)) return;
         field.style.height = "auto";
@@ -1124,6 +1216,20 @@
         hideInternalsProgress(progressToken);
         return true;
     };
+    const openAppSettings = (serviceId = "", options = {}) => {
+        const normalizedServiceId = String(serviceId || "").trim();
+        if (!normalizedServiceId) return false;
+        const title = String(options?.title || normalizedServiceId).trim();
+        const portal = modular.show("com.standard.internals", 6, {newInstance: true});
+        syncPortalWindowState(6, {
+            serviceId: normalizedServiceId,
+            title,
+            sourcePortalIndex: options?.sourcePortalIndex ?? 0,
+            sourceInstanceId: options?.sourceInstanceId || "default"
+        }, portal);
+        void renderAppSettingsPortal(portal);
+        return true;
+    };
     const openModifyArticleFromView = (sourceNode = null) => {
         activeArticleEditProgressToken = beginInternalsProgress("Loading article editor");
         const displayWindow = sourceNode?.closest?.(".draggable-window") || findInternalsWindow(4);
@@ -1153,6 +1259,7 @@
     });
     window.StandardInternals.openStandardData = (standardReference = "", payload = {}, options = {}) => openStandardData(standardReference, payload, options?.sourceNode || null);
     window.StandardInternals.openArticle = (article = {}, options = {}) => openArticle(article, options?.sourceNode || null);
+    window.StandardInternals.openAppSettings = openAppSettings;
     window.StandardInternals.openFilePath = (rawPath = "", sourceNode = null) => {
         if (IMAGE_FILE_PATTERN.test(String(rawPath || ""))) return openImageFilePath(rawPath, sourceNode);
         if (VIDEO_FILE_PATTERN.test(String(rawPath || ""))) return openVideoFilePath(rawPath, sourceNode);
@@ -1252,6 +1359,25 @@
                 articleTextField("modify-article-priority", "Priority", activeArticleRecord?.priority)
             ])}),
             afterRender: bindArticleModifyPortal
+        }),
+        new Portal({
+            title: "App Settings",
+            internal: true,
+            dimensions: [520, 500],
+            navigation: false,
+            tools: [{
+                title: "Save",
+                icon: modular.icons.save,
+                onclick: saveAppSettingsFromPortal
+            }, {
+                title: "Delete",
+                icon: modular.icons.delete,
+                onclick: deleteAppSettingsFromPortal
+            }],
+            route: () => div({style: "large-padding-top small-padding fill", content: div({id: "internals-app-settings-host", style: "internals-app-settings-host padded"})}),
+            afterRender: function () {
+                void renderAppSettingsPortal(this.portal);
+            }
         })
     ]));
 })();

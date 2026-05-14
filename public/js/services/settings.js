@@ -109,6 +109,22 @@
         }
         return true;
     };
+    const openInterfaceSettings = async (app = {}) => {
+        const serviceId = String(app?.serviceId || "").trim();
+        if (!serviceId) return;
+        if (typeof window.StandardInternals?.openAppSettings !== "function") {
+            modular.start("com.standard.internals");
+            for (let attempt = 0; attempt < 20; attempt += 1) {
+                if (typeof window.StandardInternals?.openAppSettings === "function") break;
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+        }
+        if (typeof window.StandardInternals?.openAppSettings === "function") {
+            window.StandardInternals.openAppSettings(serviceId, {title: app?.title || serviceId});
+        } else {
+            modular.error("Settings viewer is not ready yet");
+        }
+    };
     const renderInterfaceIcon = (app) => {
         const icon = `${app?.icon || ""}`.trim();
         if (!icon) return INTERFACES_ICON;
@@ -134,7 +150,7 @@
                         div({style: "settings-interface-toggle float-right", content: children([
                             switcher({id: `settings-interface-enabled-${serviceId}`, checked: enabled})
                         ])}),
-                        button({style: "tiny inner-radius", content: "Settings"}),
+                        button({style: "tiny inner-radius", data: serviceId, content: "Settings"}),
                     ])})
                 ])})
             ])});
@@ -147,6 +163,14 @@
                     if (openItem !== item) openItem.classList.remove("open");
                 });
                 item.classList.toggle("open");
+            };
+        });
+        root.querySelectorAll(".settings-interface-drawer button[data]").forEach((settingsButton) => {
+            settingsButton.onclick = (event) => {
+                event.stopPropagation();
+                const serviceId = settingsButton.getAttribute("data") || "";
+                const app = getPlatformInterfaces().find(item => item.serviceId === serviceId) || {serviceId};
+                void openInterfaceSettings(app);
             };
         });
         getPlatformInterfaces().forEach((app) => {
