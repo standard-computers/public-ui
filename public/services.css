@@ -236,6 +236,23 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .shortcut-overlay {position:absolute;background-color:#ffa500;border:1px solid #FF8B00;color:#1f1b1b;font-size:14px;border-radius:calc(var(--radius) - 2px);padding:4px 6px;pointer-events:none;font-weight:bold;z-index:1000;transform:scale(0.9);animation:fadeIn 0.2s ease-out forwards}
 body.drag-active #app {filter:blur(3px)}
 body.drag-active::before {content:"";position:fixed;inset:0;pointer-events:none;box-sizing:border-box;border:12px solid var(--border);box-shadow:0 0 0 9999px rgba(0,0,0,0.0) inset}
+.calendar-recurrence-shell {border-top:1px solid var(--border);margin-top:10px;padding-top:4px}
+.calendar-recurrence-switch-row {display:flex;align-items:center;justify-content:space-between;gap:10px}
+.calendar-recurrence-switch-row .switcher {flex:0 0 auto}
+.calendar-recurrence-panel {max-height:0;opacity:0;overflow:hidden;transition:max-height .28s ease, opacity .22s ease, padding-top .28s ease}
+.calendar-recurrence-panel.open {max-height:420px;opacity:1;padding-top:4px}
+.calendar-recurrence-row {display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.calendar-recurrence-inline-label {font-weight:600;white-space:nowrap}
+input.calendar-recurrence-number {width:46px;padding:5px 6px;text-align:center}
+.calendar-recurrence-unit {color:var(--faded);white-space:nowrap}
+.calendar-recurrence-weekdays {display:grid;grid-template-columns:repeat(7, minmax(0, 1fr));gap:4px;padding:4px 8px 8px}
+.calendar-recurrence-day {display:block;margin:0;cursor:pointer}
+.calendar-recurrence-day-label {border:1px solid var(--border);border-radius:var(--radius);padding:5px 0;text-align:center;font-size:calc(var(--fs) - 2px);background:var(--secondary-bg);transition:all .12s ease}
+.calendar-recurrence-day-input:checked + .calendar-recurrence-day-label {background:var(--fg);border-color:var(--fg);color:var(--bg)}
+.calendar-recurrence-radio-row {display:flex;align-items:center;gap:8px;padding:4px 8px;min-width:0;flex-wrap:wrap}
+.calendar-recurrence-radio-label {display:inline-flex;align-items:center;gap:5px;margin:0;min-width:46px}
+.calendar-recurrence-radio-label input[type="radio"] {width:auto;margin:0}
+.calendar-recurrence-monthly-section,.calendar-recurrence-yearly-section {display:none}
 .service-window-parked {transition:left 200ms ease, top 200ms ease, transform 200ms ease, opacity 200ms ease;transform:scale(0.96);opacity:0.93}
 .monospaced {font-family:Consolas, serif !important}
 .cli-holder {width:100%;overflow:hidden}

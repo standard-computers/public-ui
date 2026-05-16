@@ -175,6 +175,67 @@
         if (eventEntry.endKey === dateKey) return `Until ${toTimeLabel(eventEntry.endDate)}`;
         return "All day";
     };
+    const WEEKDAY_OPTIONS = [
+        {value: "0", label: "Sun"},
+        {value: "1", label: "Mon"},
+        {value: "2", label: "Tue"},
+        {value: "3", label: "Wed"},
+        {value: "4", label: "Thu"},
+        {value: "5", label: "Fri"},
+        {value: "6", label: "Sat"}
+    ];
+    const MONTH_OPTIONS = [
+        {value: "1", label: "Jan"},
+        {value: "2", label: "Feb"},
+        {value: "3", label: "Mar"},
+        {value: "4", label: "Apr"},
+        {value: "5", label: "May"},
+        {value: "6", label: "Jun"},
+        {value: "7", label: "Jul"},
+        {value: "8", label: "Aug"},
+        {value: "9", label: "Sep"},
+        {value: "10", label: "Oct"},
+        {value: "11", label: "Nov"},
+        {value: "12", label: "Dec"}
+    ];
+    const ORDINAL_OPTIONS = [
+        {value: "1", label: "first"},
+        {value: "2", label: "second"},
+        {value: "3", label: "third"},
+        {value: "4", label: "fourth"},
+        {value: "-1", label: "last"}
+    ];
+    const PATTERN_LABELS = {daily: "day", weekly: "week", monthly: "month", yearly: "year"};
+    const clampNumber = (value, fallback, min, max) => {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.min(max, Math.max(min, Math.trunc(parsed)));
+    };
+    const getLastDayOfMonth = (year, monthIndex) => new Date(year, monthIndex + 1, 0).getDate();
+    const sameLocalDateTime = (left, right) => left && right && left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate() && left.getHours() === right.getHours() && left.getMinutes() === right.getMinutes();
+    const copyTimeToDate = (date, source) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), source.getHours(), source.getMinutes(), source.getSeconds(), source.getMilliseconds());
+    const addMonthsClamped = (date, months) => {
+        const next = new Date(date.getFullYear(), date.getMonth() + months, 1, date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
+        next.setDate(Math.min(date.getDate(), getLastDayOfMonth(next.getFullYear(), next.getMonth())));
+        return next;
+    };
+    const addYearsClamped = (date, years) => {
+        const next = new Date(date.getFullYear() + years, date.getMonth(), 1, date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
+        next.setDate(Math.min(date.getDate(), getLastDayOfMonth(next.getFullYear(), next.getMonth())));
+        return next;
+    };
+    const getNthWeekdayOfMonth = (year, monthIndex, ordinal, weekday) => {
+        if (ordinal === -1) {
+            const last = new Date(year, monthIndex + 1, 0);
+            const offset = (last.getDay() - weekday + 7) % 7;
+            return new Date(year, monthIndex, last.getDate() - offset);
+        }
+        const first = new Date(year, monthIndex, 1);
+        const offset = (weekday - first.getDay() + 7) % 7;
+        const day = 1 + offset + ((ordinal - 1) * 7);
+        if (day > getLastDayOfMonth(year, monthIndex)) return null;
+        return new Date(year, monthIndex, day);
+    };
     const getWeekRouteTitle = value => {
         const weekDates = getWeekDates(value);
         if (weekDates.length === 0) return "Week";
@@ -544,20 +605,227 @@
             }
         });
     };
+    const recurrencePrefix = portalIndex => portalIndex === 6 ? "edit" : "create";
+    const getRecurrenceField = (prefix, id) => document.getElementById(`${prefix}-recurrence-${id}`);
+    const getSelectedRecurrenceWeekdays = (prefix, fallbackDay = new Date().getDay()) => {
+        const selected = Array.from(document.querySelectorAll(`[data-recurrence-prefix="${prefix}"][data-recurrence-weekday]:checked`)).map(input => Number(input.value)).filter(value => Number.isFinite(value));
+        return selected.length > 0 ? selected : [fallbackDay];
+    };
+    const getRecurrenceSettingsFromPortal = (portalIndex, baseStart) => {
+        const prefix = recurrencePrefix(portalIndex);
+        if (getRecurrenceField(prefix, "enabled")?.checked !== true) return {enabled: false};
+        const pattern = getRecurrenceField(prefix, "pattern")?.value || "weekly";
+        const interval = clampNumber(getRecurrenceField(prefix, "interval")?.value, 1, 1, 999);
+        const occurrences = clampNumber(getRecurrenceField(prefix, "occurrences")?.value, 10, 1, 365);
+        const dayOfMonth = clampNumber(getRecurrenceField(prefix, "month-day")?.value, baseStart.getDate(), 1, 31);
+        const monthOrdinal = clampNumber(getRecurrenceField(prefix, "month-ordinal")?.value, 1, -1, 4);
+        const monthWeekday = clampNumber(getRecurrenceField(prefix, "month-weekday")?.value, baseStart.getDay(), 0, 6);
+        const yearlyMonth = clampNumber(getRecurrenceField(prefix, "year-month")?.value, baseStart.getMonth() + 1, 1, 12);
+        const yearlyDay = clampNumber(getRecurrenceField(prefix, "year-day")?.value, baseStart.getDate(), 1, 31);
+        return {
+            enabled: true,
+            pattern,
+            interval,
+            occurrences,
+            weekdays: getSelectedRecurrenceWeekdays(prefix, baseStart.getDay()),
+            monthlyMode: getRecurrenceField(prefix, "month-mode")?.value || "day",
+            dayOfMonth,
+            monthOrdinal,
+            monthWeekday,
+            yearlyMonth,
+            yearlyDay
+        };
+    };
+    const buildEventOccurrence = (startDate, durationMs) => {
+        const endDate = new Date(startDate.getTime() + durationMs);
+        return {
+            start: toTimestampString(toDateTimeLocalValue(startDate, startDate.getHours(), startDate.getMinutes())),
+            end: toTimestampString(toDateTimeLocalValue(endDate, endDate.getHours(), endDate.getMinutes()))
+        };
+    };
+    const calculateRecurringEventOccurrences = (baseStart, baseEnd, recurrence, options = {}) => {
+        if (!recurrence?.enabled) return [buildEventOccurrence(baseStart, baseEnd.getTime() - baseStart.getTime())];
+        const durationMs = Math.max(0, baseEnd.getTime() - baseStart.getTime());
+        const occurrences = [];
+        const addCandidate = candidate => {
+            if (!candidate || candidate < baseStart) return;
+            if (options.skipBase && sameLocalDateTime(candidate, baseStart)) return;
+            if (occurrences.some(existing => sameLocalDateTime(existing, candidate))) return;
+            occurrences.push(candidate);
+        };
+        if (recurrence.pattern === "daily") {
+            const selectedWeekdays = new Set(recurrence.weekdays);
+            for (let offset = 0; occurrences.length < recurrence.occurrences && offset < recurrence.occurrences * recurrence.interval * 14; offset += 1) {
+                if (offset % recurrence.interval !== 0) continue;
+                const candidate = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate() + offset, baseStart.getHours(), baseStart.getMinutes(), 0, 0);
+                if (selectedWeekdays.has(candidate.getDay())) addCandidate(candidate);
+            }
+        } else if (recurrence.pattern === "weekly") {
+            const selectedWeekdays = [...new Set(recurrence.weekdays)].sort((left, right) => left - right);
+            const baseWeek = getStartOfWeek(baseStart) || baseStart;
+            for (let weekOffset = 0; occurrences.length < recurrence.occurrences && weekOffset < recurrence.occurrences * recurrence.interval * 8; weekOffset += recurrence.interval) {
+                selectedWeekdays.forEach(weekday => {
+                    const candidateDate = new Date(baseWeek.getFullYear(), baseWeek.getMonth(), baseWeek.getDate() + weekOffset * 7 + weekday);
+                    addCandidate(copyTimeToDate(candidateDate, baseStart));
+                });
+            }
+        } else if (recurrence.pattern === "monthly") {
+            for (let monthOffset = 0; occurrences.length < recurrence.occurrences && monthOffset < recurrence.occurrences * recurrence.interval * 3; monthOffset += recurrence.interval) {
+                const monthSeed = addMonthsClamped(baseStart, monthOffset);
+                let candidateDate = null;
+                if (recurrence.monthlyMode === "weekday") {
+                    candidateDate = getNthWeekdayOfMonth(monthSeed.getFullYear(), monthSeed.getMonth(), recurrence.monthOrdinal, recurrence.monthWeekday);
+                } else {
+                    candidateDate = new Date(monthSeed.getFullYear(), monthSeed.getMonth(), Math.min(recurrence.dayOfMonth, getLastDayOfMonth(monthSeed.getFullYear(), monthSeed.getMonth())));
+                }
+                addCandidate(candidateDate ? copyTimeToDate(candidateDate, baseStart) : null);
+            }
+        } else if (recurrence.pattern === "yearly") {
+            for (let yearOffset = 0; occurrences.length < recurrence.occurrences && yearOffset < recurrence.occurrences * recurrence.interval * 2; yearOffset += recurrence.interval) {
+                const yearSeed = addYearsClamped(baseStart, yearOffset);
+                const monthIndex = recurrence.yearlyMonth - 1;
+                const candidateDate = new Date(yearSeed.getFullYear(), monthIndex, Math.min(recurrence.yearlyDay, getLastDayOfMonth(yearSeed.getFullYear(), monthIndex)));
+                addCandidate(copyTimeToDate(candidateDate, baseStart));
+            }
+        }
+        return occurrences.slice(0, recurrence.occurrences).map(startDate => buildEventOccurrence(startDate, durationMs));
+    };
+    const createEventRecord = ({owner, category, name, start, end}) => {
+        const escapedName = escapeQuotedValue(name);
+        const escapedStart = escapeQuotedValue(start);
+        const escapedEnd = escapeQuotedValue(end);
+        return CLI.send(`[events] + (@${owner}, @${category}, "${escapedName}", "${escapedStart}", "${escapedEnd}", [], [])`, false);
+    };
+    const isSuccessfulCalendarWrite = response => {
+        const normalizedResponse = `${response ?? ""}`.trim();
+        return normalizedResponse !== "" && normalizedResponse !== "0";
+    };
+    const buildWeekdaySelector = (prefix, selectedDays) => div({
+        style: "calendar-recurrence-weekdays",
+        content: children(WEEKDAY_OPTIONS.map(day => label({
+            style: "calendar-recurrence-day",
+            content: children([
+                input({
+                    type: "checkbox",
+                    style: "calendar-recurrence-day-input",
+                    value: day.value,
+                    checked: selectedDays.includes(Number(day.value))
+                }).replace("<input ", `<input data-recurrence-prefix="${prefix}" data-recurrence-weekday `),
+                div({style: "calendar-recurrence-day-label", content: day.label})
+            ])
+        })))
+    });
+    const buildRecurrenceControls = (prefix, baseStart) => {
+        const startDate = toDateObject(baseStart) || new Date();
+        const selectedWeekday = startDate.getDay();
+        const dayOfMonth = startDate.getDate();
+        return div({style: "calendar-recurrence-shell", content: children([
+            div({style: "calendar-recurrence-switch-row padded", content: children([
+                div({style: "bold small-padding-top", content: "Reoccurring"}),
+                switcher({id: `${prefix}-recurrence-enabled`, checked: false})
+            ])}),
+            div({style: "calendar-recurrence-panel", id: `${prefix}-recurrence-panel`, content: children([
+                div({style: "faded small-padding bold", content: "Reoccurrence pattern"}),
+                div({style: "padded", content: select({
+                    id: `${prefix}-recurrence-pattern`,
+                    value: "weekly",
+                    options: [
+                        {value: "daily", label: "Daily"},
+                        {value: "weekly", label: "Weekly"},
+                        {value: "monthly", label: "Monthly"},
+                        {value: "yearly", label: "Yearly"}
+                    ]
+                })}),
+                div({style: "calendar-recurrence-row padded", content: children([
+                    label({style: "calendar-recurrence-inline-label", input: `${prefix}-recurrence-interval`, content: "Recur every"}),
+                    input({id: `${prefix}-recurrence-interval`, type: "number", value: "1", style: "calendar-recurrence-number", placeholder: "1"}),
+                    div({style: "calendar-recurrence-unit", id: `${prefix}-recurrence-unit`, content: "week(s) on:"})
+                ])}),
+                div({style: "calendar-recurrence-weekday-section", id: `${prefix}-recurrence-weekday-section`, content: buildWeekdaySelector(prefix, [selectedWeekday])}),
+                div({style: "calendar-recurrence-monthly-section", id: `${prefix}-recurrence-monthly-section`, content: children([
+                    div({style: "calendar-recurrence-radio-row", content: children([
+                        label({style: "calendar-recurrence-radio-label", content: children([
+                            input({type: "radio", name: `${prefix}-recurrence-month-mode`, id: `${prefix}-recurrence-month-mode-day`, value: "day", checked: true}).replace("<input ", `<input data-recurrence-month-mode="${prefix}" `),
+                            "Day"
+                        ])}),
+                        input({id: `${prefix}-recurrence-month-day`, type: "number", value: `${dayOfMonth}`, style: "calendar-recurrence-number", placeholder: `${dayOfMonth}`})
+                    ])}),
+                    div({style: "calendar-recurrence-radio-row", content: children([
+                        label({style: "calendar-recurrence-radio-label", content: children([
+                            input({type: "radio", name: `${prefix}-recurrence-month-mode`, id: `${prefix}-recurrence-month-mode-weekday`, value: "weekday"}).replace("<input ", `<input data-recurrence-month-mode="${prefix}" `),
+                            "The"
+                        ])}),
+                        select({id: `${prefix}-recurrence-month-ordinal`, value: "1", options: ORDINAL_OPTIONS}),
+                        select({id: `${prefix}-recurrence-month-weekday`, value: `${selectedWeekday}`, options: WEEKDAY_OPTIONS.map(option => ({value: option.value, label: option.label}))})
+                    ])}),
+                    input({type: "hidden", id: `${prefix}-recurrence-month-mode`, value: "day"})
+                ])}),
+                div({style: "calendar-recurrence-yearly-section", id: `${prefix}-recurrence-yearly-section`, content: children([
+                    div({style: "calendar-recurrence-row", content: children([
+                        select({id: `${prefix}-recurrence-year-month`, value: `${startDate.getMonth() + 1}`, options: MONTH_OPTIONS}),
+                        input({id: `${prefix}-recurrence-year-day`, type: "number", value: `${dayOfMonth}`, style: "calendar-recurrence-number", placeholder: `${dayOfMonth}`})
+                    ])})
+                ])}),
+                div({style: "calendar-recurrence-row padded", content: children([
+                    label({style: "calendar-recurrence-inline-label", input: `${prefix}-recurrence-occurrences`, content: "Occurrences"}),
+                    input({id: `${prefix}-recurrence-occurrences`, type: "number", value: "10", style: "calendar-recurrence-number", placeholder: "10"})
+                ])})
+            ])})
+        ])});
+    };
+    const bindRecurrenceControls = (prefix, startInput = null) => {
+        const enabledInput = getRecurrenceField(prefix, "enabled");
+        const panel = getRecurrenceField(prefix, "panel");
+        const patternSelect = getRecurrenceField(prefix, "pattern");
+        const unit = getRecurrenceField(prefix, "unit");
+        const weekdaySection = getRecurrenceField(prefix, "weekday-section");
+        const monthlySection = getRecurrenceField(prefix, "monthly-section");
+        const yearlySection = getRecurrenceField(prefix, "yearly-section");
+        if (!enabledInput || !panel || !patternSelect) return;
+        const updatePattern = () => {
+            const pattern = patternSelect.value || "weekly";
+            if (unit) unit.textContent = `${PATTERN_LABELS[pattern] || "week"}(s) on:`;
+            if (weekdaySection) weekdaySection.style.display = pattern === "daily" || pattern === "weekly" ? "block" : "none";
+            if (monthlySection) monthlySection.style.display = pattern === "monthly" ? "block" : "none";
+            if (yearlySection) yearlySection.style.display = pattern === "yearly" ? "block" : "none";
+        };
+        const updateEnabled = () => {
+            const expanded = enabledInput.checked === true;
+            panel.classList.toggle("open", expanded);
+        };
+        enabledInput.addEventListener("change", updateEnabled);
+        patternSelect.addEventListener("change", updatePattern);
+        document.querySelectorAll(`[data-recurrence-month-mode="${prefix}"]`).forEach(inputNode => {
+            inputNode.addEventListener("change", () => {
+                if (inputNode.checked) getRecurrenceField(prefix, "month-mode").value = inputNode.value;
+            });
+        });
+        startInput?.addEventListener("change", () => {
+            const startDate = toDateObject(startInput.value);
+            if (!startDate) return;
+            const dayInput = getRecurrenceField(prefix, "month-day");
+            const yearDayInput = getRecurrenceField(prefix, "year-day");
+            if (dayInput) dayInput.value = `${startDate.getDate()}`;
+            if (yearDayInput) yearDayInput.value = `${startDate.getDate()}`;
+        });
+        updatePattern();
+        updateEnabled();
+    };
     const createEventFromPortal = portalIndex => {
         const owner = `${modular.user.id()}`.trim();
         const categoryInput = document.getElementById("event-category");
         const category = normalizeRecordId((document.getElementById("event-category-id")?.value || "") || (categoryInput?.getAttribute("data-searchbox-selected-value") || ""));
         const name = (document.getElementById("event-name")?.value || "").trim();
-        const start = toTimestampString((document.getElementById("start-timestamp")?.value || "").trim());
-        const end = toTimestampString((document.getElementById("end-timestamp")?.value || "").trim());
-        if (owner === "" || category === "" || name === "" || start === "" || end === "") return;
-        const escapedName = escapeQuotedValue(name);
-        const escapedStart = escapeQuotedValue(start);
-        const escapedEnd = escapeQuotedValue(end);
-        CLI.send(`[events] + (@${owner}, @${category}, "${escapedName}", "${escapedStart}", "${escapedEnd}", [], [])`, false).then(createResponse => {
-            const normalizedResponse = `${createResponse ?? ""}`.trim();
-            if (normalizedResponse !== "" && normalizedResponse !== "0") {
+        const startValue = (document.getElementById("start-timestamp")?.value || "").trim();
+        const endValue = (document.getElementById("end-timestamp")?.value || "").trim();
+        const startDate = toDateObject(startValue);
+        const endDate = toDateObject(endValue);
+        if (owner === "" || category === "" || name === "" || !startDate || !endDate) return;
+        const recurrence = getRecurrenceSettingsFromPortal(portalIndex, startDate);
+        const occurrences = calculateRecurringEventOccurrences(startDate, endDate, recurrence);
+        Promise.all(occurrences.map(occurrence => createEventRecord({owner, category, name, start: occurrence.start, end: occurrence.end}))).then(createResponses => {
+            const createdAll = createResponses.every(isSuccessfulCalendarWrite);
+            if (createdAll) {
                 refreshCalendarPortals();
                 hideCalendarPortal(portalIndex);
                 return;
@@ -572,19 +840,28 @@
         const name = (document.getElementById("edit-event-name")?.value || "").trim();
         const categoryInput = document.getElementById("edit-event-category");
         const category = normalizeRecordId((document.getElementById("edit-event-category-id")?.value || "") || (categoryInput?.getAttribute("data-searchbox-selected-value") || ""));
-        const start = toTimestampString((document.getElementById("edit-start-timestamp")?.value || "").trim());
-        const end = toTimestampString((document.getElementById("edit-end-timestamp")?.value || "").trim());
-        if (eventId === "" || name === "" || category === "" || start === "" || end === "") return;
+        const startValue = (document.getElementById("edit-start-timestamp")?.value || "").trim();
+        const endValue = (document.getElementById("edit-end-timestamp")?.value || "").trim();
+        const startDate = toDateObject(startValue);
+        const endDate = toDateObject(endValue);
+        const start = toTimestampString(startValue);
+        const end = toTimestampString(endValue);
+        if (eventId === "" || name === "" || category === "" || start === "" || end === "" || !startDate || !endDate) return;
         const escapedName = escapeQuotedValue(name);
         const escapedStart = escapeQuotedValue(start);
         const escapedEnd = escapeQuotedValue(end);
+        const owner = `${modular.user.id()}`.trim();
+        const recurrence = getRecurrenceSettingsFromPortal(portalIndex, startDate);
+        const extraOccurrences = calculateRecurringEventOccurrences(startDate, endDate, recurrence, {skipBase: true});
+        if (extraOccurrences.length > 0 && owner === "") return;
         Promise.all([
             CLI.send(`[events] name "${escapedName}" <id ${eventId}>`),
             CLI.send(`[events] category ${category} <id ${eventId}>`),
             CLI.send(`[events] start "${escapedStart}" <id ${eventId}>`),
-            CLI.send(`[events] end "${escapedEnd}" <id ${eventId}>`)
+            CLI.send(`[events] end "${escapedEnd}" <id ${eventId}>`),
+            ...extraOccurrences.map(occurrence => createEventRecord({owner, category, name, start: occurrence.start, end: occurrence.end}))
         ]).then(responses => {
-            if (responses.every(response => response !== 0)) {
+            if (responses.every(isSuccessfulCalendarWrite)) {
                 selectedEvent = {
                     ...selectedEvent,
                     name,
@@ -1076,7 +1353,7 @@
         }),
         new Portal({
             title: getCreateEventPortalTitle(),
-            dimensions: [340, 305],
+            dimensions: [380, 305],
             navigation: false,
             tools: [{
                 title: "Save",
@@ -1121,7 +1398,8 @@
                                             return createEnd ? toDateTimeLocalValue(createEnd, createEnd.getHours(), createEnd.getMinutes()) : "";
                                         })()})})
                             ]),
-                        })
+                        }),
+                        buildRecurrenceControls("create", getCreateEventDateTimeRange().start)
                     ]);
                 })
             }),
@@ -1139,6 +1417,7 @@
                     const {start, end} = getCreateEventDateTimeRange();
                     startInput.value = start ? toDateTimeLocalValue(start, start.getHours(), start.getMinutes()) : "";
                     endInput.value = end ? toDateTimeLocalValue(end, end.getHours(), end.getMinutes()) : "";
+                    bindRecurrenceControls("create", startInput);
                     const applySelectedCategory = categoryId => {
                         const normalizedCategoryId = normalizeRecordId(categoryId);
                         const selectedCategory = eventCategoryLookup[normalizedCategoryId];
@@ -1217,7 +1496,7 @@
         }),
         new Portal({
             title: "Edit Event",
-            dimensions: [350, 360],
+            dimensions: [380, 360],
             navigation: false,
             tools: [{
                 title: "Delete",
@@ -1286,6 +1565,7 @@
                                     })
                                 ])
                             }),
+                            buildRecurrenceControls("edit", startDate || new Date()),
                             div({style: "spaced"})
                         ]);
                     });
@@ -1308,6 +1588,7 @@
                     const endDate = toDateObject(getEventBoundary(selectedEvent, "end"));
                     endInput.value = endDate ? toDateTimeLocalValue(endDate, endDate.getHours(), endDate.getMinutes()) : "";
                 }
+                bindRecurrenceControls("edit", startInput);
                 if (!categoryInput || !categoryIdInput) return;
                 const applySelectedCategory = categoryId => {
                     const normalizedCategoryId = normalizeRecordId(categoryId);
