@@ -54,7 +54,10 @@
         <main>
             <div class="center-center float" id="search-box-container">
                 <div class="float-left block-loader" id="search-status"></div>
-                <input class="undecorated center large" type="text" placeholder="Start Typing" id="search-box" autofocus/>
+                <div class="search-box-field">
+                    <div id="search-filter-prefix" class="search-filter-prefix faded hidden" aria-hidden="true">description:</div>
+                    <input class="undecorated center large" type="text" placeholder="Start Typing" id="search-box" autofocus/>
+                </div>
                 <div id="interface-shortcuts" class="center"></div>
                 <div id="search-results" class="small-margin-top large-padding padding-top"></div>
             </div>

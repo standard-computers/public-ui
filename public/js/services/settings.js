@@ -87,6 +87,7 @@
         {serviceId: "com.standard.files", title: "Files", icon: "/icons/interfaces/files.png"},
         {serviceId: "com.standard.calendar", title: "Calendar", icon: "/icons/interfaces/calendar.png"},
         {serviceId: "com.standard.contacts", title: "Contacts", icon: "/icons/interfaces/contacts.png"},
+        {serviceId: "com.standard.email", title: "Email", icon: "/icons/interfaces/email.png"},
         {serviceId: "com.standard.alarms", title: "Alarms", icon: "/icons/interfaces/alarms.png"},
         {serviceId: "com.standard.maps", title: "Maps", icon: "/icons/interfaces/maps.png"},
         {serviceId: "com.standard.notes", title: "Notes", icon: "/icons/interfaces/notes.png"},

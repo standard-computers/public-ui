@@ -5,6 +5,7 @@
         {serviceId: "com.standard.files", title: "Files", script: "/js/services/files.js", icon: "/icons/interfaces/files.png"},
         {serviceId: "com.standard.calendar", title: "Calendar", script: "/js/services/calendar.js", icon: "/icons/interfaces/calendar.png"},
         {serviceId: "com.standard.contacts", title: "Contacts", script: "/js/services/contacts.js", icon: "/icons/interfaces/contacts.png"},
+        {serviceId: "com.standard.email", title: "Email", script: "/js/services/email.js", icon: "/icons/interfaces/email.png"},
         {serviceId: "com.standard.alarms", title: "Alarms", script: "/js/services/alarms.js", icon: "/icons/interfaces/alarms.png"},
         {serviceId: "com.standard.maps", title: "Maps", script: "/js/services/maps.js", icon: "/icons/interfaces/maps.png"},
         {serviceId: "com.standard.notes", title: "Notes", script: "/js/services/notes.js", icon: "/icons/interfaces/notes.png"},

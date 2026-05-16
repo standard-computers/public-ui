@@ -136,7 +136,13 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .service-loader-bar {border:1px solid var(--light-border);border-radius:var(--radius);height:8px;overflow:hidden;background:var(--secondary-bg)}
 .service-loader-bar-progress {height:100%;width:0%;background:var(--primary);transition:width 200ms ease}
 .service-loader-status {margin:8px 0 0 0;font-size:14px;opacity:0.8}
-#search-box {padding:8px 4px 8px 4px;min-width:350px;width:100%;display:inline-block;text-overflow:clip}
+.search-box-field {display:flex;align-items:center;justify-content:center;min-width:350px;width:100%;gap:6px}
+.search-filter-prefix {display:inline-flex;align-items:center;align-self:center;flex:0 0 auto;padding:5px 8px 6px;border:1px solid var(--border);border-radius:calc(var(--radius) - 4px);background-color:var(--secondary-bg);color:var(--primary);box-shadow:var(--small-shadow);font-weight:700;line-height:1;opacity:1;transform:translateX(0) scale(1);transition:opacity 140ms ease, transform 140ms ease, max-width 140ms ease, padding 140ms ease, margin 140ms ease;max-width:140px;overflow:hidden;white-space:nowrap}
+.search-filter-prefix.hidden {opacity:0;transform:translateX(-8px) scale(0.96);max-width:0;padding-left:0;padding-right:0;margin-right:-6px;border-width:0}
+.search-filter-prefix.removing {opacity:0;transform:translateX(8px) scale(0.96)}
+#search-box {padding:8px 4px 8px 4px;min-width:0;width:100%;display:inline-block;text-overflow:clip}
+#search-box.search-filter-backspace {animation:searchFilterBackspace 170ms ease-out}
+@keyframes searchFilterBackspace {0% {transform:translateX(6px)}60% {transform:translateX(-2px)}100% {transform:translateX(0)}}
 #search-status {margin-top:9px}
 .block-loader {font-family:"Fira Code", "JetBrains Mono", Consolas, monospace;font-size:26px;line-height:1}
 .draggable-window {position:fixed;top:50px;left:50px;width:600px;border:1px solid var(--border);box-shadow:var(--shadow);border-radius:var(--radius);z-index:1000;overflow:hidden;background-color:rgba(255, 255, 255, 0.4);backdrop-filter:blur(var(--blur))}
@@ -239,8 +245,10 @@ body.drag-active::before {content:"";position:fixed;inset:0;pointer-events:none;
 .calendar-recurrence-shell {border-top:1px solid var(--border);margin-top:10px;padding-top:4px}
 .calendar-recurrence-switch-row {display:flex;align-items:center;justify-content:space-between;gap:10px}
 .calendar-recurrence-switch-row .switcher {flex:0 0 auto}
-.calendar-recurrence-panel {max-height:0;opacity:0;overflow:hidden;transition:max-height .28s ease, opacity .22s ease, padding-top .28s ease}
-.calendar-recurrence-panel.open {max-height:420px;opacity:1;padding-top:4px}
+.calendar-recurrence-panel {display:none;opacity:0;overflow:hidden}
+.calendar-recurrence-panel-closed {display:none}
+.calendar-recurrence-panel.open {display:block;opacity:1;padding-top:4px;animation:calendar-recurrence-reveal .22s ease}
+@keyframes calendar-recurrence-reveal {from {opacity:0;transform:translateY(-6px)} to {opacity:1;transform:translateY(0)}}
 .calendar-recurrence-row {display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
 .calendar-recurrence-inline-label {font-weight:600;white-space:nowrap}
 input.calendar-recurrence-number {width:46px;padding:5px 6px;text-align:center}

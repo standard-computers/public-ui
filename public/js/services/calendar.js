@@ -724,7 +724,7 @@
                 div({style: "bold small-padding-top", content: "Reoccurring"}),
                 switcher({id: `${prefix}-recurrence-enabled`, checked: false})
             ])}),
-            div({style: "calendar-recurrence-panel", id: `${prefix}-recurrence-panel`, content: children([
+            div({style: "calendar-recurrence-panel calendar-recurrence-panel-closed", id: `${prefix}-recurrence-panel`, content: children([
                 div({style: "faded small-padding bold", content: "Reoccurrence pattern"}),
                 div({style: "padded", content: select({
                     id: `${prefix}-recurrence-pattern`,
@@ -782,6 +782,12 @@
         const monthlySection = getRecurrenceField(prefix, "monthly-section");
         const yearlySection = getRecurrenceField(prefix, "yearly-section");
         if (!enabledInput || !panel || !patternSelect) return;
+        if (panel.dataset.recurrenceBound === "true") return;
+        panel.dataset.recurrenceBound = "true";
+        const windowNode = panel.closest(".draggable-window");
+        if (windowNode && !windowNode.dataset.calendarRecurrenceBaseHeight) {
+            windowNode.dataset.calendarRecurrenceBaseHeight = `${Math.ceil(windowNode.getBoundingClientRect().height || windowNode.offsetHeight || 0)}`;
+        }
         const updatePattern = () => {
             const pattern = patternSelect.value || "weekly";
             if (unit) unit.textContent = `${PATTERN_LABELS[pattern] || "week"}(s) on:`;
@@ -789,12 +795,44 @@
             if (monthlySection) monthlySection.style.display = pattern === "monthly" ? "block" : "none";
             if (yearlySection) yearlySection.style.display = pattern === "yearly" ? "block" : "none";
         };
+        let closeTimer = null;
+        const setWindowExpanded = expanded => {
+            const targetWindow = panel.closest(".draggable-window");
+            if (!targetWindow) return;
+            const baseHeight = Number.parseFloat(targetWindow.dataset.calendarRecurrenceBaseHeight || "");
+            if (!Number.isFinite(baseHeight) || baseHeight <= 0) return;
+            targetWindow.style.transition = "height .28s ease";
+            if (expanded) {
+                targetWindow.style.height = `${baseHeight + panel.scrollHeight + 12}px`;
+                return;
+            }
+            targetWindow.style.height = `${baseHeight}px`;
+        };
         const updateEnabled = () => {
             const expanded = enabledInput.checked === true;
-            panel.classList.toggle("open", expanded);
+            if (closeTimer) {
+                clearTimeout(closeTimer);
+                closeTimer = null;
+            }
+            if (expanded) {
+                panel.classList.remove("calendar-recurrence-panel-closed");
+                panel.classList.add("open");
+                requestAnimationFrame(() => setWindowExpanded(true));
+                return;
+            }
+            setWindowExpanded(false);
+            panel.classList.remove("open");
+            closeTimer = setTimeout(() => {
+                if (enabledInput.checked === true) return;
+                panel.classList.add("calendar-recurrence-panel-closed");
+                closeTimer = null;
+            }, 280);
         };
         enabledInput.addEventListener("change", updateEnabled);
-        patternSelect.addEventListener("change", updatePattern);
+        patternSelect.addEventListener("change", () => {
+            updatePattern();
+            if (enabledInput.checked === true) requestAnimationFrame(() => setWindowExpanded(true));
+        });
         document.querySelectorAll(`[data-recurrence-month-mode="${prefix}"]`).forEach(inputNode => {
             inputNode.addEventListener("change", () => {
                 if (inputNode.checked) getRecurrenceField(prefix, "month-mode").value = inputNode.value;
@@ -1353,6 +1391,7 @@
         }),
         new Portal({
             title: getCreateEventPortalTitle(),
+            instanceId: "create-event-recurrence-v3",
             dimensions: [380, 305],
             navigation: false,
             tools: [{
@@ -1496,6 +1535,7 @@
         }),
         new Portal({
             title: "Edit Event",
+            instanceId: "edit-event-recurrence-v3",
             dimensions: [380, 360],
             navigation: false,
             tools: [{

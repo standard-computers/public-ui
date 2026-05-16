@@ -337,6 +337,9 @@ function searchablePortals() {
 let activeSearchResultIndex = -1;
 let articleSearchRequestVersion = 0;
 let clientContextPromise = null;
+let searchFilterMode = "";
+let searchFilterAnimating = false;
+const SEARCH_DESCRIPTION_PREFIX = "description:";
 
 function getClientContext() {
     if (!clientContextPromise) {
@@ -550,13 +553,25 @@ function getArticleSearchTerms(rawQuery = "") {
     return [...new Set(terms)];
 }
 
-function buildArticleSearchCommand(rawQuery = "") {
+function getSearchInputState(rawValue = "") {
+    const value = String(rawValue || "");
+    if (searchFilterMode === "description") {
+        return {query: value, articleField: "description", filtered: true};
+    }
+    if (value.toLowerCase().startsWith(SEARCH_DESCRIPTION_PREFIX)) {
+        return {query: value.slice(SEARCH_DESCRIPTION_PREFIX.length), articleField: "description", filtered: true};
+    }
+    return {query: value, articleField: "title", filtered: false};
+}
+
+function buildArticleSearchCommand(rawQuery = "", field = "title") {
     const terms = getArticleSearchTerms(rawQuery);
     if (!terms.length) return "";
-    const titleCondition = terms
-        .map((term, index) => `${index === 0 ? "title " : ""}CONTAINS "${escapeArticleSearchValue(term)}" IGNORE CASE`)
+    const articleField = field === "description" ? "description" : "title";
+    const articleCondition = terms
+        .map((term, index) => `${index === 0 ? `${articleField} ` : ""}CONTAINS "${escapeArticleSearchValue(term)}" IGNORE CASE`)
         .join(" OR ");
-    return `[articles] <${titleCondition}, LIMIT 10>`;
+    return `[articles] <${articleCondition}, LIMIT 10>`;
 }
 
 function levenshteinDistance(left = "", right = "") {
@@ -663,18 +678,19 @@ function enhanceArticleSearchResultIcon(result, article = {}, requestVersion = 0
     });
 }
 
-async function appendArticleSearchResults(rawQuery = "", requestVersion = 0) {
-    const command = buildArticleSearchCommand(rawQuery);
+async function appendArticleSearchResults(rawQuery = "", requestVersion = 0, articleField = "title") {
+    const command = buildArticleSearchCommand(rawQuery, articleField);
     if (!command) return [];
     try {
         const response = await sendArticleCliCommand(command);
         if (requestVersion !== articleSearchRequestVersion) return [];
         const normalizedQuery = String(rawQuery || "").replace(/\s+/g, " ").trim();
+        const sortField = articleField === "description" ? "description" : "title";
         const articles = resolveArticleRecords(response)
             .filter(article => article && typeof article === "object")
             .sort((left, right) => {
-                const leftDistance = levenshteinDistance(left?.title || "", normalizedQuery);
-                const rightDistance = levenshteinDistance(right?.title || "", normalizedQuery);
+                const leftDistance = levenshteinDistance(left?.[sortField] || "", normalizedQuery);
+                const rightDistance = levenshteinDistance(right?.[sortField] || "", normalizedQuery);
                 if (leftDistance !== rightDistance) return leftDistance - rightDistance;
                 return `${left?.title || ""}`.localeCompare(`${right?.title || ""}`);
             });
@@ -718,8 +734,8 @@ function renderCachedSearchResults(rawQuery = "") {
     return {calculation, matchingPortals};
 }
 
-function renderArticleSearchResults(rawQuery = "", requestVersion = 0, cachedSearch = {}) {
-    return appendArticleSearchResults(rawQuery, requestVersion).then((articles) => {
+function renderArticleSearchResults(rawQuery = "", requestVersion = 0, cachedSearch = {}, articleField = "title") {
+    return appendArticleSearchResults(rawQuery, requestVersion, articleField).then((articles) => {
         if (requestVersion !== articleSearchRequestVersion) return [];
         const hasCachedResults = Boolean(cachedSearch?.calculation) || Boolean(cachedSearch?.matchingPortals?.length);
         if (!hasCachedResults && articles.length) {
@@ -835,6 +851,7 @@ function renderSearchResult(portal, matchingHint) {
     result.onclick = () => {
         openPortal(portal);
         document.getElementById("search-box").value = "";
+        clearSearchFilterPrefix();
         document.getElementById("search-results").empty();
         resetActiveSearchResult();
         document.getElementById("search-box").blur();
@@ -844,6 +861,11 @@ function renderSearchResult(portal, matchingHint) {
 }
 
 document.getElementById("search-box").addEventListener("keydown", event => {
+    if (event.key === "Backspace" && searchFilterMode === "description" && event.target.value === "" && !searchFilterAnimating) {
+        event.preventDefault();
+        removeSearchFilterPrefix();
+        return;
+    }
     if (event.key === "ArrowDown") {
         event.preventDefault();
         moveActiveSearchResult(1);
@@ -866,13 +888,57 @@ document.getElementById("search-box").addEventListener("keydown", event => {
     }
 });
 
+function setSearchFilterPrefixVisible(visible) {
+    const prefix = document.getElementById("search-filter-prefix");
+    if (!prefix) return;
+    prefix.classList.toggle("hidden", !visible);
+    prefix.classList.remove("removing");
+}
+
+function activateSearchFilterPrefix() {
+    const searchBox = document.getElementById("search-box");
+    if (!searchBox || searchFilterMode === "description") return;
+    const value = String(searchBox.value || "");
+    if (!value.toLowerCase().startsWith(SEARCH_DESCRIPTION_PREFIX)) return;
+    searchFilterMode = "description";
+    searchBox.value = value.slice(SEARCH_DESCRIPTION_PREFIX.length);
+    setSearchFilterPrefixVisible(true);
+}
+
+function removeSearchFilterPrefix() {
+    const searchBox = document.getElementById("search-box");
+    const prefix = document.getElementById("search-filter-prefix");
+    if (!searchBox) return;
+    searchFilterAnimating = true;
+    if (prefix) prefix.classList.add("removing");
+    window.setTimeout(() => {
+        searchFilterMode = "";
+        searchFilterAnimating = false;
+        setSearchFilterPrefixVisible(false);
+        searchBox.value = "description";
+        searchBox.classList.remove("search-filter-backspace");
+        void searchBox.offsetWidth;
+        searchBox.classList.add("search-filter-backspace");
+        updateSearchResults();
+    }, 140);
+}
+
+function clearSearchFilterPrefix() {
+    searchFilterMode = "";
+    searchFilterAnimating = false;
+    setSearchFilterPrefixVisible(false);
+    document.getElementById("search-box")?.classList.remove("search-filter-backspace");
+}
+
 function updateSearchResults() {
     const searchStatus = document.getElementById("search-status");
     const searchBox = document.getElementById("search-box");
     const searchResults = document.getElementById("search-results");
     const currentArticleSearchVersion = ++articleSearchRequestVersion;
     searchStatus.isLoading();
-    const rawQuery = searchBox.value.trim();
+    activateSearchFilterPrefix();
+    const searchState = getSearchInputState(searchBox.value);
+    const rawQuery = searchState.query.trim();
     const query = rawQuery.toLowerCase();
     searchResults.empty();
     if (!query) {
@@ -883,13 +949,13 @@ function updateSearchResults() {
 
     let cachedSearch = {calculation: null, matchingPortals: []};
     try {
-        cachedSearch = renderCachedSearchResults(rawQuery);
+        cachedSearch = searchState.filtered ? {calculation: null, matchingPortals: []} : renderCachedSearchResults(rawQuery);
     } catch (error) {
         console.error("Failed to search cached records:", error);
         resetActiveSearchResult();
     }
 
-    renderArticleSearchResults(rawQuery, currentArticleSearchVersion, cachedSearch).finally(() => {
+    renderArticleSearchResults(rawQuery, currentArticleSearchVersion, cachedSearch, searchState.articleField).finally(() => {
         if (currentArticleSearchVersion === articleSearchRequestVersion) {
             searchStatus.isLoading(false);
         }
@@ -1222,13 +1288,5 @@ document.querySelector(".status-indicator").popoutmenu([{
     icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>`,
     label: "Disconnect",
     destructive: true,
-    action: () => {
-        confirmationDialogue({
-            title: "Disconnect",
-            content: "This will log you out of the standard user interface. Are you sure you want to disconnect?",
-            confirmation: () => {
-                window.location = "/logout";
-            }
-        });
-    }
+    action: () => window.location = "/logout"
 }]);
