@@ -8,6 +8,8 @@
             default: DEFAULT_ALARM_NAME
         }
     };
+    const FILES_EDIT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" /></svg>`;
+    const FILES_DELETE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`;
     const padTimeUnit = value => `${Number.isFinite(value) ? value : 0}`.padStart(2, "0");
     const escapeCliQuotedValue = (value = "") => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     const to12HourTimestamp = (h, m) => {
@@ -96,6 +98,13 @@
             return DEFAULT_ALARM_NAME;
         }
     };
+    const findAlarmById = async alarmId => {
+        const safeAlarmId = `${alarmId ?? ""}`.trim();
+        if (!safeAlarmId) return null;
+        const response = await CLI.send("[alarms]");
+        const alarms = Array.isArray(response?.alarms) ? response.alarms : [];
+        return alarms.find(alarm => `${alarm?.id ?? ""}` === safeAlarmId) || null;
+    };
     const openAlarmPortal = alarm => {
         const parsedTime = parseTimestamp(alarm.timestamp);
         const handleAlarmMutation = (promise, successMessage, errorMessage) => {
@@ -142,15 +151,50 @@
         });
         alarmPortal.show();
     };
+    const getAlarmTileId = tile => `${tile?.getAttribute?.("data") || ""}`.trim();
+    const openAlarmTileEditor = async tile => {
+        const alarmId = getAlarmTileId(tile);
+        const alarm = await findAlarmById(alarmId);
+        if (alarm) {
+            openAlarmPortal(alarm);
+        } else {
+            modular.error("Couldn't find alarm");
+        }
+    };
+    const deleteAlarmTile = tile => {
+        const alarmId = getAlarmTileId(tile);
+        if (!alarmId) return;
+        CLI.send(`[alarms] - <id ${alarmId}>`).then(response => {
+            if (response !== 0) {
+                tile?.remove?.();
+                modular.success("Deleted alarm");
+            } else {
+                modular.error("Couldn't delete alarm");
+            }
+        }).catch(() => {
+            modular.error("Couldn't delete alarm");
+        });
+    };
+    const bindAlarmListContextMenu = () => {
+        const alarmsList = document.getElementById("alarms-list");
+        if (!alarmsList || alarmsList.dataset.contextMenuBound === "1") return;
+        alarmsList.dataset.contextMenuBound = "1";
+        alarmsList.contextmenu([{
+            icon: FILES_EDIT_ICON,
+            label: "Edit",
+            visible: (_root, target) => !!target?.closest?.(".alarm-tile"),
+            action: (_root, _event, tile) => openAlarmTileEditor(tile)
+        }, {
+            icon: FILES_DELETE_ICON,
+            label: "Delete",
+            destructive: true,
+            visible: (_root, target) => !!target?.closest?.(".alarm-tile"),
+            action: (_root, _event, tile) => deleteAlarmTile(tile)
+        }], ".alarm-tile");
+    };
     window.StandardAlarms = window.StandardAlarms || {};
     window.StandardAlarms.openAlarm = alarm => openAlarmPortal(alarm);
-    window.StandardAlarms.findAlarmById = async alarmId => {
-        const safeAlarmId = `${alarmId ?? ""}`.trim();
-        if (!safeAlarmId) return null;
-        const response = await CLI.send("[alarms]");
-        const alarms = Array.isArray(response?.alarms) ? response.alarms : [];
-        return alarms.find(alarm => `${alarm?.id ?? ""}` === safeAlarmId) || null;
-    };
+    window.StandardAlarms.findAlarmById = findAlarmById;
     window.StandardAlarms.notifyAlarm = async ({data = []} = {}) => {
         const alarmId = `${data?.[0] ?? ""}`.trim();
         let alarm = null;
@@ -210,13 +254,13 @@
         svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>`,
         icon: "/icons/interfaces/alarms.png",
         route: () => div({style: "large-padding-top", content: children([
-                div({style: "list", content: () => {
+                div({id: "alarms-list", style: "list", content: () => {
                     return CLI.send("[alarms]").then(d => {
                         const sortedAlarms = [...d.alarms].sort((a, b) => getAlarmSortKey(a) - getAlarmSortKey(b));
                         let as = [];
                         for (let i = 0; i < sortedAlarms.length; i++) {
                             const alarm = sortedAlarms[i];
-                            as.push(div({style: "padded secondary-tile brick line", onclick: () => openAlarmPortal(alarm), content: children([
+                            as.push(div({style: "alarm-tile padded secondary-tile brick line", data: alarm.id, onclick: () => openAlarmPortal(alarm), content: children([
                                     div({onclick: event => event.stopPropagation(), content: switcher({style: "no-margin float-right large-adjust-top",
                                             id: `alarm-enabled-${alarm.id}`, checked: alarm.enabled, onchange: event => {
                                                 event.stopPropagation();
@@ -241,6 +285,7 @@
                     })
                 }
             })])
-        })
+        }),
+        afterRender: bindAlarmListContextMenu
     })], ALARM_SETTINGS));
 })();

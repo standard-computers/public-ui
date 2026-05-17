@@ -156,6 +156,13 @@
         return extension === "txt" || extension === "md";
     };
     const isRichTextDocument = (rawPath = activeTextEditorFilePath) => !shouldHideTextEditorBar(rawPath);
+    const escapeTextHtml = (value = "") => `${value ?? ""}`.replace(/[&<>"']/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+    }[character] || character));
     const isSelectionInsideTextEditor = (selection = window.getSelection()) => {
         const editorNode = findTextEditorNode();
         if (!editorNode || !selection?.rangeCount) return false;
@@ -261,6 +268,117 @@
     const readTextEditorContent = (textArea = findTextEditorNode()) => {
         if (!textArea) return activeTextEditorContent;
         return isRichTextDocument() ? serializeTextEditorRichContent(textArea) : textArea.innerText;
+    };
+    const cleanTextEditorPrintClone = (clone) => {
+        if (!clone?.querySelectorAll) return clone;
+        clone.querySelectorAll(".editor-text-page-break-spacer, .editor-text-image-handle, .editor-text-table-resize-handle, .editor-text-search-marker").forEach((node) => node.remove());
+        unwrapTextEditorImageFrames(clone);
+        clone.querySelectorAll("script, iframe, object, embed").forEach((node) => node.remove());
+        clone.querySelectorAll("*").forEach((node) => {
+            node.removeAttribute("contenteditable");
+            Array.from(node.attributes || []).forEach((attribute) => {
+                if (/^on/i.test(attribute.name)) node.removeAttribute(attribute.name);
+            });
+        });
+        clone.querySelectorAll("[data-editor-image-selected=\"1\"]").forEach((node) => node.removeAttribute("data-editor-image-selected"));
+        clone.querySelectorAll(".editor-text-shape-frame").forEach((node) => {
+            node.removeAttribute("data-editor-shape-selected");
+            node.style.outline = "";
+            node.style.boxShadow = "";
+            node.style.cursor = "";
+        });
+        return clone;
+    };
+    const buildTextEditorPrintDocument = (portal = findTextPortal()) => {
+        const textArea = findTextEditorNode(portal);
+        const state = portal?.windowState?.() || {};
+        const filePath = normalizeTextFilePath(state?.directive || activeTextEditorFilePath || "");
+        const title = getTextFileName(filePath || "Text");
+        const richDocument = isRichTextDocument(filePath);
+        let printBody = "";
+        if (textArea) {
+            const clone = cleanTextEditorPrintClone(textArea.cloneNode(true));
+            printBody = richDocument
+                ? clone.innerHTML
+                : `<pre class="plain-text-document">${escapeTextHtml(clone.innerText || clone.textContent || "")}</pre>`;
+        } else {
+            const fallbackContent = typeof state?.cachedContent === "string" ? state.cachedContent : activeTextEditorContent;
+            printBody = richDocument
+                ? fallbackContent
+                : `<pre class="plain-text-document">${escapeTextHtml(fallbackContent)}</pre>`;
+        }
+        return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title></title>
+<style>
+@page { size: letter; margin: 0; }
+html, body { margin: 0; padding: 0; background: #fff; color: #111827; }
+body { font-family: Inter, Arial, sans-serif; font-size: 12pt; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.print-document { box-sizing: border-box; width: 100%; min-height: 100vh; padding: 0.75in; overflow-wrap: anywhere; }
+.plain-text-document { margin: 0; white-space: pre-wrap; font: 10.5pt/1.45 "Courier New", monospace; overflow-wrap: anywhere; }
+p, div { break-inside: auto; }
+img, svg, table, blockquote, pre { max-width: 100%; break-inside: avoid; }
+img { height: auto; }
+table { border-collapse: collapse; width: auto; }
+td, th { border: 1px solid #d1d5db; padding: 6px; vertical-align: top; }
+a { color: #1d4ed8; text-decoration: underline; }
+.editor-text-shape-frame { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+</style>
+</head>
+<body><main class="print-document">${printBody || "<br>"}</main></body>
+</html>`;
+    };
+    const printTextEditorDocument = async (portal = findTextPortal()) => {
+        const textArea = findTextEditorNode(portal);
+        if (!textArea && !activeTextEditorContent) {
+            modular.error("Nothing to print");
+            return false;
+        }
+        restoreEditorWindowState(portal);
+        activeTextEditorContent = readTextEditorContent(textArea);
+        syncEditorWindowState(portal);
+        const printFrame = document.createElement("iframe");
+        printFrame.style.position = "fixed";
+        printFrame.style.right = "0";
+        printFrame.style.bottom = "0";
+        printFrame.style.width = "0";
+        printFrame.style.height = "0";
+        printFrame.style.border = "0";
+        printFrame.style.opacity = "0";
+        printFrame.setAttribute("aria-hidden", "true");
+        document.body.appendChild(printFrame);
+        const frameWindow = printFrame.contentWindow;
+        const frameDocument = frameWindow?.document;
+        if (!frameWindow || !frameDocument) {
+            printFrame.remove();
+            modular.error("Unable to prepare document for printing");
+            return false;
+        }
+        const cleanup = () => window.setTimeout(() => printFrame.remove(), 500);
+        frameWindow.addEventListener("afterprint", cleanup, {once: true});
+        frameDocument.open();
+        frameDocument.write(buildTextEditorPrintDocument(portal));
+        frameDocument.close();
+        await frameDocument.fonts?.ready?.catch?.(() => {});
+        await Promise.all(Array.from(frameDocument.images || []).map((imageNode) => {
+            if (imageNode.complete) return Promise.resolve();
+            return new Promise((resolve) => {
+                imageNode.onload = resolve;
+                imageNode.onerror = resolve;
+            });
+        }));
+        try {
+            frameWindow.focus();
+            frameWindow.print();
+            window.setTimeout(cleanup, 30000);
+            return true;
+        } catch (_) {
+            cleanup();
+            modular.error("Unable to print this document");
+            return false;
+        }
     };
     const createTextEditorImageHandle = (position = "se") => {
         const handleNode = document.createElement("span");
@@ -2565,6 +2683,10 @@
                 title: "Save",
                 icon: modular.icons.save,
                 onclick: (_, context) => saveLoadedTextFile(context?.portal)
+            }, {
+                title: "Print",
+                icon: modular.icons.print,
+                onclick: (_, context) => printTextEditorDocument(context?.portal)
             }, {
                 title: "Search",
                 icon: modular.icons.search,

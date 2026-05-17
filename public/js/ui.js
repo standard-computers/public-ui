@@ -100,12 +100,13 @@ Element.prototype.contextmenu = function (items, selector = null) {
             option.className = "context-menu-item";
             if (item.className) option.classList.add(...String(item.className).split(/\s+/).filter(Boolean));
             if (item.destructive) option.classList.add("text-red");
+            const label = typeof item.label === "function" ? item.label(ele, lastClickedTarget) : item.label;
             if (item.content) {
                 option.innerHTML = item.content;
             } else if (item.icon) {
-                option.innerHTML = `${item.icon}<span>${item.label}</span>`;
+                option.innerHTML = `${item.icon}<span>${label}</span>`;
             } else {
-                option.textContent = item.label;
+                option.textContent = label;
             }
             option.onclick = (e) => {
                 e.preventDefault();

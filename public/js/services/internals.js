@@ -648,6 +648,35 @@
         if (pathLabel) pathLabel.textContent = activePdfFilePath || "No file selected";
         updatePortalTitle(7, activePdfFilePath, portal);
     };
+    const printActivePdf = (portal = findInternalsWindow(7)?.portal) => {
+        const state = portal?.windowState?.() || {};
+        const pdfPath = String(state?.directive || activePdfFilePath || "");
+        if (!pdfPath) {
+            modular.error("Open a PDF first");
+            return;
+        }
+        const root = portal?.window?.() || document;
+        const pdfPreview = root.querySelector("#internals-pdf-preview");
+        if (!pdfPreview) {
+            modular.error("PDF preview is not ready");
+            return;
+        }
+        const printPreview = () => {
+            try {
+                pdfPreview.contentWindow?.focus?.();
+                pdfPreview.contentWindow?.print?.();
+            } catch (_) {
+                modular.error("Unable to print this PDF");
+            }
+        };
+        const pdfSource = String(state?.cachedContent?.source || activePdfFileSource || pdfPreviewUrl(pdfPath));
+        if (pdfPreview.src && pdfPreview.src !== "about:blank") {
+            printPreview();
+            return;
+        }
+        pdfPreview.addEventListener("load", printPreview, {once: true});
+        pdfPreview.src = pdfSource;
+    };
     const formatStandardDataPayload = () => {
         if (typeof activeStandardDataPayload === "string") {
             try {
@@ -1420,6 +1449,11 @@
             internal: true,
             dimensions: [820, 640],
             navigation: false,
+            tools: [{
+                title: "Print",
+                icon: modular.icons.print,
+                onclick: (event, context) => printActivePdf(context?.portal || getPortalFromSource(event?.target, 7))
+            }],
             route: () => div({style: "large-padding-top fill internals-pdf-viewer-shell", content: `<iframe id="internals-pdf-preview" class="internals-pdf-preview radius" src="${activePdfFileSource || "about:blank"}" title="${escapeHtml(activePdfFilePath || "PDF preview")}"></iframe>`}),
             afterRender: function () {
                 restorePdfStateFromPortal(this.portal);

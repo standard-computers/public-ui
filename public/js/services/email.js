@@ -1,10 +1,14 @@
 (() => {
     const EMAIL_SERVICE_ID = "com.standard.email";
-    const buildFolderCommand = folder => `[email] <folder "${String(folder || "inbox").replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}">`;
+    const escapeEmailCommandValue = value => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+    const buildFolderCommand = folder => folder === "everything" ? "[email]" : `[email] <folder "${escapeEmailCommandValue(folder || "inbox")}">`;
+    const buildReadStateCommand = (recordId, read) => `[email] read ${read ? "true" : "false"} <id "${escapeEmailCommandValue(recordId)}">`;
+    const buildMoveFolderCommand = (recordId, folder) => `[email] folder "${escapeEmailCommandValue(folder)}" <id "${escapeEmailCommandValue(recordId)}">`;
     const EMAIL_FOLDERS = [
         {folder: "inbox", title: "Inbox", icon: "inbox"},
         {folder: "sent", title: "Sent", icon: "sent"},
         {folder: "everything", title: "Everything", icon: "everything"},
+        {folder: "archived", title: "Archive", icon: "archive"},
         {folder: "spam", title: "Spam", icon: "spam"},
         {folder: "deleted", title: "Deleted", icon: "deleted"}
     ];
@@ -12,8 +16,11 @@
     const INBOX_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3" /></svg>`;
     const SENT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg>`;
     const EVERYTHING_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m7.875 14.25 1.214 1.942a2.25 2.25 0 0 0 1.908 1.058h2.006c.776 0 1.497-.4 1.908-1.058l1.214-1.942M2.41 9h4.636a2.25 2.25 0 0 1 1.872 1.002l.164.246a2.25 2.25 0 0 0 1.872 1.002h2.092a2.25 2.25 0 0 0 1.872-1.002l.164-.246A2.25 2.25 0 0 1 16.954 9h4.636M2.41 9a2.25 2.25 0 0 0-.16.832V12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 12V9.832c0-.287-.055-.57-.16-.832M2.41 9a2.25 2.25 0 0 1 .382-.632l3.285-3.832a2.25 2.25 0 0 1 1.708-.786h8.43c.657 0 1.281.287 1.709.786l3.284 3.832c.163.19.291.404.382.632M4.5 20.25h15A2.25 2.25 0 0 0 21.75 18v-2.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125V18a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`;
+    const ARCHIVE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>`;
     const SPAM_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>`;
     const DELETED_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`;
+    const READ_UNREAD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 9v8.25A2.25 2.25 0 0 1 19.5 19.5h-15a2.25 2.25 0 0 1-2.25-2.25V9m19.5 0A2.25 2.25 0 0 0 19.5 6.75h-15A2.25 2.25 0 0 0 2.25 9m19.5 0-8.25 5.25a2.25 2.25 0 0 1-3 0L2.25 9" /></svg>`;
+    const CATEGORY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l8.682 8.682a2.25 2.25 0 0 0 3.182 0l4.318-4.318a2.25 2.25 0 0 0 0-3.182L11.159 3.659A2.25 2.25 0 0 0 9.568 3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z" /></svg>`;
     const EMAIL_FONT_FAMILIES = window.StandardUI?.fontFamilies || ["Inter", "Georgia", "Times New Roman", "Courier New", "Verdana"];
     const EMAIL_FONT_SIZES = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72"];
     const EMAIL_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" style="fill:none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path fill="none" style="fill:none" stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>`;
@@ -66,6 +73,23 @@
             minute: "2-digit"
         });
     };
+    const parseBooleanValue = value => {
+        if (value === true || value === false) return value;
+        const normalized = String(value ?? "").trim().toLowerCase();
+        if (["true", "1", "yes", "y"].includes(normalized)) return true;
+        if (["false", "0", "no", "n"].includes(normalized)) return false;
+        return null;
+    };
+    const isMessageUnread = message => {
+        const raw = message?.raw || message || {};
+        const unreadValue = parseBooleanValue(raw?.unread);
+        if (unreadValue !== null) return unreadValue;
+        const readValue = parseBooleanValue(raw?.read);
+        if (readValue !== null) return !readValue;
+        const seenValue = parseBooleanValue(raw?.seen);
+        if (seenValue !== null) return !seenValue;
+        return message?.unread === true;
+    };
     const parseResponse = response => {
         if (!response || response === 0) return [];
         let payload = response;
@@ -87,23 +111,47 @@
         }
         return [];
     };
+    const resolveEmailRecordId = record => firstValue(record, [
+        "id",
+        "ID",
+        "_id",
+        "recordId",
+        "recordID",
+        "record_id",
+        "emailid",
+        "emailId",
+        "email_id"
+    ]);
+    const resolveEmailViewId = (record, index) => firstValue(record, [
+        "id",
+        "ID",
+        "_id",
+        "recordId",
+        "recordID",
+        "record_id",
+        "emailid",
+        "emailId",
+        "email_id",
+        "messageId",
+        "message_id"
+    ], `message-${index}`);
     const normalizeMessage = (record, index) => {
         const body = firstValue(record, ["body", "content", "text", "message", "html", "snippet", "preview"]);
         const subject = String(firstValue(record, ["subject", "title", "name"], "(No subject)")).trim() || "(No subject)";
         const from = formatAddress(firstValue(record, ["from", "sender", "author", "from_email", "fromEmail"]));
         const to = formatAddress(firstValue(record, ["to", "recipient", "recipients", "to_email", "toEmail"]));
         const date = firstValue(record, ["date", "timestamp", "created", "created_at", "received", "received_at", "sent", "sent_at"]);
-        const readValue = record?.read;
-        const seenValue = record?.seen;
+        const recordId = String(resolveEmailRecordId(record) || "");
         return {
-            id: String(firstValue(record, ["id", "emailid", "emailId", "messageId", "message_id"], `message-${index}`)),
+            id: String(resolveEmailViewId(record, index)),
+            recordId,
             subject,
             from,
             to,
             date,
             body: stripMarkup(body),
             snippet: stripMarkup(firstValue(record, ["snippet", "preview", "summary"], body)).replace(/\s+/g, " ").trim(),
-            unread: Boolean(record?.unread || readValue === false || `${readValue}`.toLowerCase() === "false" || seenValue === false || `${seenValue}`.toLowerCase() === "false"),
+            unread: isMessageUnread(record),
             raw: record
         };
     };
@@ -259,6 +307,170 @@
             updateEmailRouteUnreadCounts();
         });
     };
+    const findMailboxMessageContext = target => {
+        const item = target?.closest?.(".email-message-item");
+        const workspace = item?.closest?.(".email-workspace");
+        const folder = workspace?.getAttribute("data") || activeMailboxFolder;
+        const cache = mailboxCache.get(folder);
+        const messageId = item?.getAttribute("data") || "";
+        const message = (cache?.messages || mailboxMessages).find(entry => entry.id === messageId);
+        return {item, workspace, folder, cache, messageId, message};
+    };
+    const syncMailboxMessageCache = (folder, messages) => {
+        const currentCache = mailboxCache.get(folder);
+        const meta = getFolderMeta(folder);
+        mailboxCache.set(folder, {
+            folder,
+            title: currentCache?.title || meta.title,
+            messages,
+            error: currentCache?.error || null,
+            unreadCount: countUnreadMessages(messages)
+        });
+    };
+    const refreshMailboxContext = ({workspace, folder} = {}) => {
+        const cache = mailboxCache.get(folder);
+        if (cache) refreshRenderedMailboxFolder(folder, cache);
+        if (workspace) {
+            requestAnimationFrame(() => bindEmailMessageContextMenus(workspace));
+        }
+        updateEmailRouteUnreadCounts();
+    };
+    const updateMailboxMessageReadState = target => {
+        const context = findMailboxMessageContext(target);
+        if (!context.message || !context.cache) return;
+        const recordId = context.message.recordId || resolveEmailRecordId(context.message.raw);
+        if (!recordId) {
+            modular?.error?.("Couldn't update email: missing record id");
+            return;
+        }
+        const nextReadState = isMessageUnread(context.message);
+        context.message.unread = !nextReadState;
+        context.message.recordId = String(recordId);
+        if (context.message.raw && typeof context.message.raw === "object") {
+            context.message.raw.unread = context.message.unread;
+            context.message.raw.read = nextReadState;
+            context.message.raw.seen = nextReadState;
+        }
+        syncMailboxMessageCache(context.folder, context.cache.messages);
+        if (context.item) {
+            context.item.classList.toggle("unread", context.message.unread);
+            applyEmailMessageItemStyles(context.workspace || document);
+        }
+        updateEmailRouteUnreadCounts();
+        CLI.send(buildReadStateCommand(recordId, nextReadState))
+            .then(() => modular?.success?.(nextReadState ? "Marked email as read" : "Marked email as unread"))
+            .catch(error => {
+                console.error("Failed to update email read state:", error);
+                modular?.error?.(nextReadState ? "Couldn't mark email as read" : "Couldn't mark email as unread");
+            });
+    };
+    const moveMailboxMessageToFolder = (target, destinationFolder) => {
+        const context = findMailboxMessageContext(target);
+        if (!context.message || !context.cache || context.folder === destinationFolder) return;
+        const recordId = context.message.recordId || resolveEmailRecordId(context.message.raw);
+        if (!recordId) {
+            modular?.error?.("Couldn't move email: missing record id");
+            return;
+        }
+        const nextSourceMessages = context.cache.messages.filter(message => message.id !== context.messageId);
+        syncMailboxMessageCache(context.folder, nextSourceMessages);
+        const destinationCache = mailboxCache.get(destinationFolder);
+        if (destinationCache && !destinationCache.messages.some(message => message.id === context.messageId)) {
+            syncMailboxMessageCache(destinationFolder, [{...context.message, recordId: String(recordId)}, ...destinationCache.messages]);
+        }
+        if (selectedMailboxMessageId === context.messageId) selectedMailboxMessageId = nextSourceMessages[0]?.id || "";
+        refreshMailboxContext(context);
+        CLI.send(buildMoveFolderCommand(recordId, destinationFolder))
+            .then(() => modular?.success?.(`Moved email to ${getFolderMeta(destinationFolder).title}`))
+            .catch(error => {
+                console.error("Failed to move email:", error);
+                modular?.error?.(`Couldn't move email to ${getFolderMeta(destinationFolder).title}`);
+            });
+    };
+    const categorizeMailboxMessage = target => {
+        const context = findMailboxMessageContext(target);
+        if (!context.message || !context.cache) return;
+        const currentCategory = context.message.category || context.message.raw?.category || "";
+        const category = window.prompt("Category", currentCategory);
+        if (category === null) return;
+        context.message.category = category.trim();
+        if (context.message.raw && typeof context.message.raw === "object") {
+            context.message.raw.category = context.message.category;
+        }
+        syncMailboxMessageCache(context.folder, context.cache.messages);
+        modular?.success?.(context.message.category ? `Categorized as ${context.message.category}` : "Category cleared");
+        refreshMailboxContext(context);
+    };
+    const hasEmailMessageMenuTarget = (_list, target) => !!target?.closest?.(".email-message-item");
+    const getReadUnreadMailboxLabel = (_list, target) => {
+        const context = findMailboxMessageContext(target);
+        return isMessageUnread(context.message) ? "Mark Read" : "Mark Unread";
+    };
+    const createEmailMessageContextMenuItems = () => [{
+        icon: READ_UNREAD_ICON,
+        label: getReadUnreadMailboxLabel,
+        visible: hasEmailMessageMenuTarget,
+        action: (_list, _event, item) => updateMailboxMessageReadState(item)
+    }, {
+        icon: ARCHIVE_ICON,
+        label: "Archive",
+        visible: hasEmailMessageMenuTarget,
+        action: (_list, _event, item) => moveMailboxMessageToFolder(item, "archived")
+    }, {
+        icon: SPAM_ICON,
+        label: "Spam",
+        visible: hasEmailMessageMenuTarget,
+        action: (_list, _event, item) => moveMailboxMessageToFolder(item, "spam")
+    }, {
+        icon: CATEGORY_ICON,
+        label: "Categorize",
+        visible: hasEmailMessageMenuTarget,
+        action: (_list, _event, item) => categorizeMailboxMessage(item)
+    }, {
+        icon: DELETED_ICON,
+        label: "Deleted",
+        destructive: true,
+        visible: hasEmailMessageMenuTarget,
+        action: (_list, _event, item) => moveMailboxMessageToFolder(item, "deleted")
+    }];
+    const bindEmailMessageContextMenus = (root = document) => {
+        root.querySelectorAll?.(".email-message-list").forEach(list => {
+            if (list.dataset.emailContextMenuBound === "true") return;
+            list.dataset.emailContextMenuBound = "true";
+            list.contextmenu(createEmailMessageContextMenuItems(), ".email-message-item");
+        });
+    };
+    const isEmailReadShortcut = event => (
+        event.ctrlKey
+        && !event.altKey
+        && !event.metaKey
+        && !event.shiftKey
+        && event.key?.toLowerCase?.() === "u"
+    );
+    const isEditableShortcutTarget = target => !!target?.closest?.("input, textarea, select, [contenteditable='true'], [contenteditable='']");
+    const getFocusedEmailWindow = target => {
+        const targetWindow = target?.closest?.(".draggable-window");
+        if (targetWindow?.portal?.serviceId?.() === EMAIL_SERVICE_ID) return targetWindow;
+        const focusedWindow = document.querySelector(".draggable-window.window-focused");
+        if (focusedWindow?.portal?.serviceId?.() === EMAIL_SERVICE_ID) return focusedWindow;
+        return null;
+    };
+    const findSelectedMailboxItemForShortcut = target => {
+        const emailWindow = getFocusedEmailWindow(target);
+        const workspace = emailWindow?.querySelector?.(".email-workspace");
+        if (!workspace) return null;
+        const escapedSelectedId = typeof window.CSS?.escape === "function" ? window.CSS.escape(selectedMailboxMessageId) : selectedMailboxMessageId.replace(/"/g, "\\\"");
+        return workspace.querySelector(".email-message-item.active")
+            || (selectedMailboxMessageId ? workspace.querySelector(`.email-message-item[data="${escapedSelectedId}"]`) : null);
+    };
+    document.addEventListener("keydown", (event) => {
+        if (!isEmailReadShortcut(event) || event.defaultPrevented || isEditableShortcutTarget(event.target)) return;
+        const selectedItem = findSelectedMailboxItemForShortcut(event.target);
+        if (!selectedItem) return;
+        event.preventDefault();
+        event.stopPropagation();
+        updateMailboxMessageReadState(selectedItem);
+    }, true);
     document.addEventListener("mouseenter", (event) => {
         const handle = event.target?.closest?.(".email-resize-handle");
         if (!handle || handle.style.pointerEvents === "none") return;
@@ -384,6 +596,7 @@
         requestAnimationFrame(() => bindEmailPaneResizer(document));
         requestAnimationFrame(() => applyEmailMessageItemStyles(document));
         requestAnimationFrame(() => updateEmailRouteUnreadCounts());
+        requestAnimationFrame(() => bindEmailMessageContextMenus(document));
         return div({
             style: "email-workspace",
             data: folder,
@@ -438,6 +651,10 @@
             text: "Everything",
             icon: EVERYTHING_ICON,
             route: () => loadMailboxFolder("everything", "Everything")
+        }, {
+            text: "Archive",
+            icon: ARCHIVE_ICON,
+            route: () => loadMailboxFolder("archived", "Archive")
         }, {
             text: "Spam",
             icon: SPAM_ICON,
