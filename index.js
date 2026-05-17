@@ -39,6 +39,8 @@ const WS_URL = resolveWsUrl();
 const STANDARD_CHIT = (process.env.STANDARD_CHIT || "").trim();
 const SETUP_COOKIE_NAME = "setup";
 const SETUP_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 365;
+const REQUIRED_RELAY_COOKIES = ["relay_chit", "relay_device", "sid", "uid", "user"];
+const RELAY_CONNECTION_EXEMPT_PATHS = ["/bad-connection", "/api/login", "/api/status", "/api/device/status", "/api/keys/push"];
 const RELAY_COOKIE_DOMAIN = process.env.RELAY_COOKIE_DOMAIN || process.env.COOKIE_DOMAIN || "";
 const RELAY_COOKIE_SECRET = process.env.RELAY_COOKIE_SECRET || process.env.COOKIE_SECRET || process.env.SESSION_SECRET || "";
 const RELAY_COOKIE_SECRETS = process.env.RELAY_COOKIE_SECRETS || "";
@@ -105,6 +107,19 @@ function getRequestCookies(req) {
         return {...req.cookies, ...signedCookies};
     }
     return parseCookies(req?.headers?.cookie || "");
+}
+
+function pathStartsWithAny(pathname = "", prefixes = []) {
+    return prefixes.some(prefix => pathname.startsWith(prefix));
+}
+
+function isRelayConnectionExemptPath(req) {
+    return pathStartsWithAny(req?.path || "", RELAY_CONNECTION_EXEMPT_PATHS);
+}
+
+function hasRequiredRelayCookies(req) {
+    const cookies = getRequestCookies(req);
+    return REQUIRED_RELAY_COOKIES.every(cookieName => String(cookies[cookieName] || "").trim());
 }
 
 const relaySecrets = [
@@ -1039,6 +1054,9 @@ function requireLogin(req, res, next) {
     if (isDesktopSetupEnabled) {
         publicPaths.push("/setup");
     }
+    if (isRelayMode && !isRelayConnectionExemptPath(req) && !hasRequiredRelayCookies(req)) {
+        return res.redirect("/bad-connection");
+    }
     if (publicPaths.some(path => req.path.startsWith(path))) {
         return next();
     }
@@ -1072,6 +1090,8 @@ function parseInboundPushCommand(data, isBinary = false) {
         commandText = relayMatch[2].trim();
         if (!targetSerial || !commandText) return null;
     }
+    const notificationCommand = parseInboundNotificationCommand(commandText, targetSerial);
+    if (notificationCommand) return notificationCommand;
     const startMatch = commandText.match(/^start\s+([a-z0-9][a-z0-9_.-]*)(?:\s*)$/i);
     if (!startMatch) return null;
     const serviceId = startMatch[1].trim();
@@ -1084,13 +1104,36 @@ function parseInboundPushCommand(data, isBinary = false) {
     };
 }
 
+function parseInboundNotificationCommand(commandText = "", targetSerial = null) {
+    const normalizedText = String(commandText || "").trim().replace(/^start\s+/i, "");
+    const segments = normalizedText.split("|").map(segment => segment.trim());
+    if (segments.length < 2) return null;
+    const serviceId = segments[0].toLowerCase();
+    if (serviceId !== "com.standard.notifications" && serviceId !== "com.standard.noticiations") return null;
+    const notificationType = segments[1].toLowerCase();
+    if (!/^[a-z0-9_.-]+$/i.test(notificationType)) return null;
+    return {
+        command: "notify",
+        serviceId: "com.standard.notifications",
+        notificationType,
+        notificationData: segments.slice(2),
+        targetSerial,
+        receivedAt: Date.now()
+    };
+}
+
 function broadcastPushCommand(pushCommand) {
     if (!pushCommand) return false;
-    const payload = `data: ${JSON.stringify({
+    const payloadBody = {
         command: pushCommand.command,
         serviceId: pushCommand.serviceId,
         timestamp: pushCommand.receivedAt || Date.now()
-    })}\n\n`;
+    };
+    if (pushCommand.command === "notify") {
+        payloadBody.notificationType = pushCommand.notificationType;
+        payloadBody.notificationData = pushCommand.notificationData || [];
+    }
+    const payload = `data: ${JSON.stringify(payloadBody)}\n\n`;
     let delivered = false;
     for (const subscriber of pushSubscribers) {
         if (isRelayMode) {
@@ -1110,6 +1153,7 @@ function handleInboundPushCommand(data, isBinary = false) {
     console.log("[ws-push-command]", {
         command: pushCommand.command,
         serviceId: pushCommand.serviceId,
+        notificationType: pushCommand.notificationType || null,
         targetSerial: pushCommand.targetSerial || null,
         delivered
     });
@@ -1537,8 +1581,7 @@ function relayGuard(req, res, next) {
     if (!isRelayMode) {
         return next();
     }
-    const exemptPaths = ["/", "/api/status", "/api/login", "/api/device/status", "/api/keys/push", "/bad-connection"];
-    if (exemptPaths.some(path => req.path.startsWith(path))) {
+    if (isRelayConnectionExemptPath(req)) {
         return next();
     }
     const relayContext = resolveRelayContext(req);

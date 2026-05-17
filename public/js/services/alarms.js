@@ -144,6 +144,33 @@
     };
     window.StandardAlarms = window.StandardAlarms || {};
     window.StandardAlarms.openAlarm = alarm => openAlarmPortal(alarm);
+    window.StandardAlarms.findAlarmById = async alarmId => {
+        const safeAlarmId = `${alarmId ?? ""}`.trim();
+        if (!safeAlarmId) return null;
+        const response = await CLI.send("[alarms]");
+        const alarms = Array.isArray(response?.alarms) ? response.alarms : [];
+        return alarms.find(alarm => `${alarm?.id ?? ""}` === safeAlarmId) || null;
+    };
+    window.StandardAlarms.notifyAlarm = async ({data = []} = {}) => {
+        const alarmId = `${data?.[0] ?? ""}`.trim();
+        let alarm = null;
+        try {
+            alarm = await window.StandardAlarms.findAlarmById(alarmId);
+        } catch (error) {
+            console.error("Failed to load alarm notification", error);
+        }
+        const alarmName = `${alarm?.name || ""}`.trim() || DEFAULT_ALARM_NAME;
+        const alarmTime = `${alarm?.timestamp || ""}`.trim();
+        const fallbackLabel = alarmId ? `Alarm ${alarmId}` : "Alarm";
+        window.StandardNotifications?.show?.({
+            type: "alarms",
+            title: alarm ? alarmName : fallbackLabel,
+            message: alarmTime ? `Alarm set for ${alarmTime}` : "Alarm triggered",
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>`
+        });
+        modular.refresh(ALARMS_SERVICE_ID);
+    };
+    window.StandardNotifications?.register?.("alarms", window.StandardAlarms.notifyAlarm);
     modular.register(new Service(ALARMS_SERVICE_ID, [new Portal({
         title: "Alarms",
         hints: ["alarms"],

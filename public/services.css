@@ -371,8 +371,10 @@ input.calendar-recurrence-number {width:46px;padding:5px 6px;text-align:center}
 .editor-sheet-cell-header {position:relative;padding:8px 6px;font-size:calc(var(--fs) - 1px);font-weight:600;background:var(--secondary-bg);border-right:1px solid var(--border);border-bottom:1px solid var(--border);box-shadow:inset 0 -1px 0 var(--border);text-align:center;box-sizing:border-box;user-select:none}
 .editor-sheet-selectable-header {cursor:pointer}
 .editor-sheet-row-header {position:sticky;left:0;z-index:3}
-.editor-sheet-row:first-child .editor-sheet-cell-header {position:sticky;top:0;z-index:4}
-.editor-sheet-row:first-child .editor-sheet-row-header {z-index:5}
+#editor-sheet-header-row {position:sticky;top:0;z-index:7}
+#editor-sheet-header-row > .editor-sheet-row-header {z-index:8}
+#editor-sheet-grid.editor-sheet-freeze-first-row #editor-sheet-data-row-0 {position:sticky;top:var(--editor-sheet-header-height, 36px);z-index:5}
+#editor-sheet-grid.editor-sheet-freeze-first-row #editor-sheet-data-row-0 > .editor-sheet-row-header {z-index:6}
 .editor-sheet-cell {position:relative;border-right:1px solid var(--border);border-bottom:1px solid var(--border);box-shadow:inset 0 -1px 0 var(--border);background:var(--bg);box-sizing:border-box}
 .editor-sheet-cell-input {display:block;width:100%;height:100%;border:0;background:transparent;padding:8px 6px;outline:none;box-sizing:border-box}
 .editor-sheet-filter-header-cell .editor-sheet-cell-input {padding-right:28px}

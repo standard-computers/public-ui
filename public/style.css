@@ -55,7 +55,7 @@ blockquote {font-family:"Open Sans", sans-serif;font-weight:normal;font-size:cal
 canvas {outline:none !important}
 li {list-style:none}
 #editor-text-content ul, #editor-text-content ol {margin:0 0 0 1.5em;padding-left:1.5em}
-#editor-text-content {tab-size:4;white-space:pre-wrap}
+#editor-text-content {tab-size:4;white-space:pre-wrap;position:relative}
 #editor-text-content ul {list-style-type:disc}
 #editor-text-content ol {list-style-type:decimal}
 #editor-text-content li {list-style:inherit}

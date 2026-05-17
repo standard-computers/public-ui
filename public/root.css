@@ -213,6 +213,21 @@
 .message {z-index:42069;position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100%);background:var(--secondary-bg);color:var(--fg);padding:12px 18px;border-radius:var(--radius);font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,0.25);opacity:0;pointer-events:none;transition:transform 0.35s ease, opacity 0.35s ease}
 .message.show {transform:translateX(-50%) translateY(0);opacity:1}
 .message.background-red, .message.background-green {color:white}
+.standard-notification-tray {position:fixed;top:14px;right:14px;z-index:42070;display:flex;flex-direction:column;gap:10px;width:min(360px,calc(100vw - 28px));pointer-events:none}
+.standard-notification {pointer-events:auto;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius);background:var(--transparent-bg);color:var(--fg);box-shadow:var(--shadow);backdrop-filter:blur(var(--blur));opacity:0;transform:translateX(18px);transition:opacity 180ms ease, transform 180ms ease}
+.standard-notification.show {opacity:1;transform:translateX(0)}
+.standard-notification-main {display:grid;grid-template-columns:34px minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:12px}
+.standard-notification-icon {width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:var(--radius);background:var(--secondary-bg)}
+.standard-notification-icon svg {width:22px;height:22px;display:block;color:var(--fg)}
+.standard-notification-copy {min-width:0}
+.standard-notification-title {font-weight:700;font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.standard-notification-message {margin-top:3px;font-size:12px;line-height:1.3;color:var(--faded);overflow-wrap:anywhere}
+.standard-notification-dismiss, .standard-notification-toggle {width:30px;height:30px;padding:4px;display:flex;align-items:center;justify-content:center}
+.standard-notification-dismiss svg, .standard-notification-toggle svg {width:18px;height:18px}
+.standard-notification[data-expanded="true"] .standard-notification-toggle svg {transform:rotate(180deg)}
+.standard-notification-details {display:none;border-top:1px solid var(--border);padding:10px 12px 12px 56px;font-size:12px;line-height:1.35;color:var(--fg);background:var(--secondary-bg)}
+.standard-notification[data-expanded="true"] .standard-notification-details {display:block}
+@media (max-width: 560px) {.standard-notification-tray {top:10px;right:10px;width:calc(100vw - 20px)}}
 .file-open-progress {z-index:42068;position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100%);min-width:min(420px,calc(100vw - 32px));max-width:min(480px,calc(100vw - 32px));background:var(--secondary-bg);color:var(--fg);padding:12px 14px;border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,0.25);opacity:0;pointer-events:none;transition:transform 0.35s ease, opacity 0.35s ease}
 .file-open-progress.interactive {pointer-events:auto}
 .file-open-progress.show {transform:translateX(-50%) translateY(0);opacity:1}

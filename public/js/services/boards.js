@@ -767,6 +767,25 @@
                                 }
                             });
                         };
+                        const bringContextShapeToFront = () => {
+                            const shape = boardOperations[contextShapeIndex];
+                            if (shape?.type !== "shape") return;
+                            boardOperations.splice(contextShapeIndex, 1);
+                            boardOperations.push(shape);
+                            contextShapeIndex = boardOperations.length - 1;
+                            selectedOperationIndex = contextShapeIndex;
+                            setTool("select");
+                            renderOperations();
+                        };
+                        const deleteContextShape = () => {
+                            const shape = boardOperations[contextShapeIndex];
+                            if (shape?.type !== "shape") return;
+                            boardOperations.splice(contextShapeIndex, 1);
+                            contextShapeIndex = -1;
+                            selectedOperationIndex = -1;
+                            selectionAction = null;
+                            renderOperations();
+                        };
                         const parsePositivePixel = value => {
                             const number = Math.round(Number.parseFloat(String(value || "")));
                             return Number.isFinite(number) && number > 0 ? number : null;
@@ -921,6 +940,16 @@
                             renderOperations();
                         }, true);
                         canvas.contextmenu([{
+                            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon space-right" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 7.5h15M4.5 12h9M4.5 16.5h15" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.25h3.75v3.75h-3.75z" /></svg>`,
+                            label: "On Top",
+                            visible: () => contextShapeIndex >= 0,
+                            action: bringContextShapeToFront
+                        }, {
+                            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z"/></svg>`,
+                            label: "Background Color",
+                            visible: () => contextShapeIndex >= 0,
+                            action: () => changeShapeProperty("fillColor", "Background color", "rgba(76, 139, 245, 0.18)")
+                        }, {
                             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m9-9H3" /></svg>`,
                             label: "Border Color",
                             visible: () => contextShapeIndex >= 0,
@@ -934,11 +963,6 @@
                                 return Number.isFinite(number) && number >= 0 ? number : null;
                             })
                         }, {
-                            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m15 11.25-3-3m0 0-3 3m3-3v11.25M4.5 19.5h15" /></svg>`,
-                            label: "Fill",
-                            visible: () => contextShapeIndex >= 0,
-                            action: () => changeShapeProperty("fillColor", "Fill", "rgba(76, 139, 245, 0.18)")
-                        }, {
                             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5M3.75 15h16.5" /></svg>`,
                             label: "Width",
                             visible: () => contextShapeIndex >= 0,
@@ -948,6 +972,12 @@
                             label: "Height",
                             visible: () => contextShapeIndex >= 0,
                             action: () => changeShapeProperty("height", "Height", "110", parsePositivePixel)
+                        }, {
+                            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`,
+                            label: "Delete",
+                            destructive: true,
+                            visible: () => contextShapeIndex >= 0,
+                            action: deleteContextShape
                         }]);
                         windowBody.querySelector('button[data="tool-draw"]')?.addEventListener("click", () => setTool("draw"));
                         windowBody.querySelector('button[data="tool-erase"]')?.addEventListener("click", () => setTool("erase"));

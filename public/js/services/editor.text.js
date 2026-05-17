@@ -34,6 +34,28 @@
     const TEXT_INPUT_SYNC_DEBOUNCE_MS = 120;
     const TEXT_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" style="fill:none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path fill="none" style="fill:none" stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>`;
     const TEXT_TABLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75V5.25Zm0 4.5h16.5M3.75 14.25h16.5M9.25 5.25v13.5M14.75 5.25v13.5" /></svg>`;
+    const TEXT_SHAPE_ICON = `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3.75" y="4.5" width="7.5" height="7.5" rx="1.25" /><circle cx="16.75" cy="8.25" r="3.75" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 19.5h12l-6-6-6 6Z" /></svg>`;
+    const TEXT_SHAPE_OPTIONS = [{
+        type: "rectangle",
+        label: "Rectangle",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="1.5" /></svg>`
+    }, {
+        type: "rounded-rectangle",
+        label: "Rounded Rectangle",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="4" /></svg>`
+    }, {
+        type: "ellipse",
+        label: "Ellipse",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><ellipse cx="12" cy="12" rx="8" ry="5.5" /></svg>`
+    }, {
+        type: "triangle",
+        label: "Triangle",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 4 21 20H3L12 4Z" /></svg>`
+    }, {
+        type: "diamond",
+        label: "Diamond",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 3 21 12 12 21 3 12 12 3Z" /></svg>`
+    }];
     const TEXT_ALIGN_ICONS = {
         left: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M4 10.5h10M4 14.5h16M4 18.5h10" /></svg>`,
         center: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M7 10.5h10M4 14.5h16M7 18.5h10" /></svg>`,
@@ -45,6 +67,9 @@
     let textEditorSelectionChangeBound = false;
     let activeTextImageFrame = null;
     let activeTextImageResizeState = null;
+    let activeTextShapeFrame = null;
+    let activeTextShapeResizeState = null;
+    let activeTextShapeMoveState = null;
     let activeTextTableResizeState = null;
     let activeTextTableResizeHandle = null;
     let activeTextPageViewEnabled = false;
@@ -226,6 +251,11 @@
         clone.querySelectorAll(".editor-text-table-resize-handle").forEach((handleNode) => handleNode.remove());
         clone.querySelectorAll(".editor-text-search-marker").forEach((markerNode) => markerNode.remove());
         clone.querySelectorAll("[data-editor-image-selected=\"1\"]").forEach((node) => node.removeAttribute("data-editor-image-selected"));
+        clone.querySelectorAll(".editor-text-shape-frame").forEach((node) => {
+            node.removeAttribute("data-editor-shape-selected");
+            node.style.outline = "";
+            node.style.boxShadow = "";
+        });
         return clone.innerHTML;
     };
     const readTextEditorContent = (textArea = findTextEditorNode()) => {
@@ -272,12 +302,153 @@
         if (!frameNode) return;
         if (activeTextImageFrame === frameNode) return;
         clearActiveTextImageSelection();
+        clearActiveTextShapeSelection({skipSync: true});
         activeTextImageFrame = frameNode;
         frameNode.dataset.editorImageSelected = "1";
         frameNode.style.outline = "2px solid var(--blue)";
         frameNode.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.12)";
         ["nw", "ne", "sw", "se"].forEach((position) => frameNode.appendChild(createTextEditorImageHandle(position)));
         updateTextToolbarState();
+    };
+    const isTextEditorShapeOnTop = (frameNode) => frameNode?.dataset?.textWrap === "overlay";
+    const clearActiveTextShapeSelection = ({skipSync = false} = {}) => {
+        if (!activeTextShapeFrame) return;
+        activeTextShapeFrame.style.outline = "";
+        activeTextShapeFrame.style.boxShadow = "";
+        activeTextShapeFrame.querySelectorAll(".editor-text-image-handle").forEach((handleNode) => handleNode.remove());
+        activeTextShapeFrame.removeAttribute("data-editor-shape-selected");
+        activeTextShapeFrame = null;
+        activeTextShapeResizeState = null;
+        activeTextShapeMoveState = null;
+        if (!skipSync) syncTextEditorStateFromDom();
+    };
+    const selectTextEditorShapeFrame = (frameNode) => {
+        if (!frameNode) return;
+        if (activeTextShapeFrame === frameNode) return;
+        clearActiveTextImageSelection({skipSync: true});
+        clearActiveTextShapeSelection({skipSync: true});
+        activeTextShapeFrame = frameNode;
+        frameNode.dataset.editorShapeSelected = "1";
+        frameNode.style.outline = "2px solid var(--blue)";
+        frameNode.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.12)";
+        ["nw", "ne", "sw", "se"].forEach((position) => frameNode.appendChild(createTextEditorImageHandle(position)));
+        updateTextToolbarState();
+    };
+    const getTextEditorShapePathMarkup = (shapeType = "rectangle") => {
+        if (shapeType === "ellipse") return `<ellipse cx="50" cy="50" rx="46" ry="32" />`;
+        if (shapeType === "triangle") return `<path d="M50 4 L96 96 H4 Z" />`;
+        if (shapeType === "diamond") return `<path d="M50 4 L96 50 L50 96 L4 50 Z" />`;
+        if (shapeType === "rounded-rectangle") return `<rect x="5" y="12" width="90" height="76" rx="14" />`;
+        return `<rect x="5" y="16" width="90" height="68" rx="4" />`;
+    };
+    const normalizeTextEditorShapeFrame = (frameNode) => {
+        if (!frameNode) return;
+        const width = Math.max(24, Number.parseFloat(frameNode.style.width || frameNode.dataset.shapeWidth || "") || (frameNode.dataset.shapeType === "triangle" || frameNode.dataset.shapeType === "diamond" ? 140 : 170));
+        const height = Math.max(24, Number.parseFloat(frameNode.style.height || frameNode.dataset.shapeHeight || "") || (frameNode.dataset.shapeType === "triangle" || frameNode.dataset.shapeType === "diamond" ? 140 : 110));
+        frameNode.classList.add("editor-text-shape-frame");
+        frameNode.contentEditable = "false";
+        frameNode.dataset.textWrap = isTextEditorShapeOnTop(frameNode) ? "overlay" : "inline";
+        frameNode.style.display = "inline-block";
+        frameNode.style.width = `${Math.round(width)}px`;
+        frameNode.style.height = `${Math.round(height)}px`;
+        frameNode.style.maxWidth = isTextEditorShapeOnTop(frameNode) ? "" : "100%";
+        frameNode.style.margin = isTextEditorShapeOnTop(frameNode) ? "0" : "8px 0";
+        frameNode.style.verticalAlign = "middle";
+        frameNode.style.lineHeight = "0";
+        frameNode.style.userSelect = "none";
+        frameNode.style.cursor = isTextEditorShapeOnTop(frameNode) ? "move" : "pointer";
+        if (isTextEditorShapeOnTop(frameNode)) {
+            frameNode.style.position = "absolute";
+            frameNode.style.zIndex = frameNode.style.zIndex || "3";
+            frameNode.style.left = frameNode.style.left || "0px";
+            frameNode.style.top = frameNode.style.top || "0px";
+        } else {
+            frameNode.style.position = "relative";
+            frameNode.style.left = "";
+            frameNode.style.top = "";
+            frameNode.style.zIndex = "";
+        }
+        const svgNode = frameNode.querySelector("svg");
+        if (svgNode) {
+            svgNode.setAttribute("width", "100%");
+            svgNode.setAttribute("height", "100%");
+            svgNode.setAttribute("viewBox", "0 0 100 100");
+            svgNode.setAttribute("preserveAspectRatio", "none");
+            svgNode.style.display = "block";
+            svgNode.style.pointerEvents = "none";
+        }
+    };
+    const createTextEditorShapeFrame = (shapeType = "rectangle") => {
+        const frameNode = document.createElement("span");
+        const width = shapeType === "triangle" || shapeType === "diamond" ? 140 : 170;
+        const height = shapeType === "triangle" || shapeType === "diamond" ? 140 : 110;
+        frameNode.className = "editor-text-shape-frame";
+        frameNode.dataset.shapeType = shapeType;
+        frameNode.dataset.shapeWidth = String(width);
+        frameNode.dataset.shapeHeight = String(height);
+        frameNode.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none" fill="rgba(76, 139, 245, 0.18)" stroke="#1f2937" stroke-width="2">${getTextEditorShapePathMarkup(shapeType)}</svg>`;
+        normalizeTextEditorShapeFrame(frameNode);
+        return frameNode;
+    };
+    const ensureTextEditorShapeFrames = (rootNode = findTextEditorNode()) => {
+        if (!rootNode?.querySelectorAll) return;
+        rootNode.querySelectorAll(".editor-text-shape-frame").forEach(normalizeTextEditorShapeFrame);
+    };
+    const applyTextEditorShapeWrapMode = (frameNode, onTop = false) => {
+        const textArea = findTextEditorNode();
+        if (!frameNode || !textArea) return false;
+        if (onTop) {
+            const frameRect = frameNode.getBoundingClientRect();
+            const editorRect = textArea.getBoundingClientRect();
+            frameNode.dataset.textWrap = "overlay";
+            frameNode.style.position = "absolute";
+            frameNode.style.left = `${Math.max(0, Math.round(frameRect.left - editorRect.left + textArea.scrollLeft))}px`;
+            frameNode.style.top = `${Math.max(0, Math.round(frameRect.top - editorRect.top + textArea.scrollTop))}px`;
+        } else {
+            frameNode.dataset.textWrap = "inline";
+        }
+        normalizeTextEditorShapeFrame(frameNode);
+        selectTextEditorShapeFrame(frameNode);
+        syncTextEditorStateFromDom();
+        return true;
+    };
+    const setTextEditorShapeColor = (frameNode, property = "fill", color = "") => {
+        const svgNode = frameNode?.querySelector?.("svg");
+        const nextColor = String(color || "").trim();
+        if (!svgNode || !nextColor) return false;
+        svgNode.setAttribute(property, nextColor);
+        selectTextEditorShapeFrame(frameNode);
+        syncTextEditorStateFromDom();
+        return true;
+    };
+    const showTextEditorShapeColorDialogue = (frameNode, property = "fill", title = "Shape color", placeholder = "#4c8bf5") => {
+        const svgNode = frameNode?.querySelector?.("svg");
+        if (!svgNode) return false;
+        inputDialogue({
+            title,
+            placeholder,
+            value: svgNode.getAttribute(property) || placeholder,
+            confirmation: (_, rawValue) => setTextEditorShapeColor(frameNode, property, rawValue)
+        });
+        return true;
+    };
+    const insertTextEditorShape = (shapeType = "rectangle") => {
+        const textArea = findTextEditorNode();
+        if (!textArea || !isRichTextDocument()) return false;
+        const frameNode = createTextEditorShapeFrame(shapeType);
+        insertNodeAtTextCaret(textArea, frameNode);
+        selectTextEditorShapeFrame(frameNode);
+        textArea.focus();
+        rememberTextSelection();
+        syncTextEditorStateFromDom();
+        return true;
+    };
+    const deleteTextEditorShape = (frameNode = activeTextShapeFrame) => {
+        if (!frameNode?.classList?.contains("editor-text-shape-frame")) return false;
+        if (activeTextShapeFrame === frameNode) clearActiveTextShapeSelection({skipSync: true});
+        frameNode.remove();
+        syncTextEditorStateFromDom();
+        return true;
     };
     const normalizeTextEditorImageNode = (imageNode) => {
         if (!imageNode) return;
@@ -455,6 +626,7 @@
         if (isRichTextDocument()) {
             if (textArea.innerHTML !== nextContent) textArea.innerHTML = nextContent;
             ensureTextEditorImageFrames(textArea);
+            ensureTextEditorShapeFrames(textArea);
             normalizeTextEditorTables(textArea);
             prepareEditorLinks(textArea);
             return;
@@ -498,7 +670,7 @@
         if (!editorNode) return false;
         if (savedTextSelectionRange
             && editorNode.contains(savedTextSelectionRange.commonAncestorContainer)
-            && !savedTextSelectionRange.commonAncestorContainer?.closest?.(".editor-text-image-frame")) {
+            && !savedTextSelectionRange.commonAncestorContainer?.closest?.(".editor-text-image-frame, .editor-text-shape-frame")) {
             selection.removeAllRanges();
             selection.addRange(savedTextSelectionRange.cloneRange());
             return true;
@@ -1476,6 +1648,7 @@
         if (!textArea) return "";
         const clone = textArea.cloneNode(true);
         clone.querySelectorAll(".editor-text-page-break-spacer, .editor-text-search-marker, .editor-text-image-handle, .editor-text-table-resize-handle").forEach((node) => node.remove());
+        clone.querySelectorAll(".editor-text-shape-frame").forEach((node) => node.remove());
         return clone.innerText || clone.textContent || "";
     };
     const getTextEditorPageCount = (portal = findTextPortal()) => {
@@ -1756,6 +1929,7 @@
         const alignmentButton = findInPortal("#editor-sheet-style-align");
         const highlightButton = findInPortal("#editor-sheet-style-highlight");
         const listButton = findInPortal("#editor-sheet-style-list");
+        const shapeButton = findInPortal("#editor-sheet-style-shape");
         const imageButton = findInPortal("#editor-sheet-style-image");
         const tableButton = findInPortal("#editor-sheet-style-table");
         const otherButton = findInPortal("#editor-sheet-style-other");
@@ -1778,6 +1952,7 @@
             }
             if (event.key === "Escape") {
                 clearActiveTextImageSelection();
+                clearActiveTextShapeSelection();
                 return;
             }
             if (event.key === "Tab" && !event.altKey && !event.ctrlKey && !event.metaKey) {
@@ -1841,6 +2016,44 @@
                 destructive: true,
                 action: (_, __, target) => deleteTextTable(target)
             }], "table, th, td");
+        textArea.addEventListener("contextmenu", (event) => {
+            const frameNode = event.target?.closest?.(".editor-text-shape-frame");
+            if (!frameNode || !textArea.contains(frameNode)) return;
+            selectTextEditorShapeFrame(frameNode);
+        }, true);
+        textArea.contextmenu([{
+            className: "context-menu-item-switch",
+            visible: (_, target) => !!target?.closest?.(".editor-text-shape-frame"),
+            get content() {
+                return children([
+                    div({content: children([
+                        switcher({id: "editor-text-shape-wrap-toggle", style: "menu-switcher float-right", checked: isTextEditorShapeOnTop(activeTextShapeFrame)}),
+                        `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon space-right" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 7.5h15M4.5 12h9M4.5 16.5h15" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.25h3.75v3.75h-3.75z" /></svg>`,
+                        `<span>On Top</span>`
+                    ])})
+                ]);
+            },
+            action: (_, __, target) => {
+                const frameNode = target?.closest?.(".editor-text-shape-frame") || activeTextShapeFrame;
+                applyTextEditorShapeWrapMode(frameNode, !isTextEditorShapeOnTop(frameNode));
+            }
+        }, {
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z"/></svg>`,
+            label: "Background Color",
+            visible: (_, target) => !!target?.closest?.(".editor-text-shape-frame"),
+            action: (_, __, target) => showTextEditorShapeColorDialogue(target?.closest?.(".editor-text-shape-frame") || activeTextShapeFrame, "fill", "Background color", "rgba(76, 139, 245, 0.18)")
+        }, {
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5h15M7 16 17 6" /></svg>`,
+            label: "Border Color",
+            visible: (_, target) => !!target?.closest?.(".editor-text-shape-frame"),
+            action: (_, __, target) => showTextEditorShapeColorDialogue(target?.closest?.(".editor-text-shape-frame") || activeTextShapeFrame, "stroke", "Border color", "#1f2937")
+        }, {
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`,
+            label: "Delete",
+            destructive: true,
+            visible: (_, target) => !!target?.closest?.(".editor-text-shape-frame"),
+            action: (_, __, target) => deleteTextEditorShape(target?.closest?.(".editor-text-shape-frame") || activeTextShapeFrame)
+        }], ".editor-text-shape-frame");
         textArea.addEventListener("paste", async (event) => {
             const clipboard = event.clipboardData;
             const imageItems = Array.from(clipboard?.items || []).filter((item) => item.type?.startsWith("image/"));
@@ -1878,8 +2091,17 @@
                 return;
             }
             const frameNode = event.target?.closest?.(".editor-text-image-frame");
+            const shapeFrameNode = event.target?.closest?.(".editor-text-shape-frame");
+            if (shapeFrameNode && textArea.contains(shapeFrameNode)) {
+                event.preventDefault();
+                event.stopPropagation();
+                selectTextEditorShapeFrame(shapeFrameNode);
+                textArea.focus();
+                return;
+            }
             if (!frameNode) {
                 clearActiveTextImageSelection();
+                clearActiveTextShapeSelection();
                 return;
             }
             event.preventDefault();
@@ -1890,13 +2112,31 @@
         textArea.addEventListener("focusout", () => {
             window.setTimeout(() => {
                 const editorNode = findTextEditorNode(portal);
-                if (!editorNode?.contains(document.activeElement)) clearActiveTextImageSelection();
+                if (!editorNode?.contains(document.activeElement)) {
+                    clearActiveTextImageSelection();
+                    clearActiveTextShapeSelection();
+                }
             }, 0);
         });
         textArea.addEventListener("mousedown", (event) => {
             const handleNode = event.target?.closest?.(".editor-text-image-handle");
             if (!handleNode) return;
             const frameNode = handleNode.closest(".editor-text-image-frame");
+            const shapeFrameNode = handleNode.closest(".editor-text-shape-frame");
+            if (shapeFrameNode) {
+                event.preventDefault();
+                event.stopPropagation();
+                selectTextEditorShapeFrame(shapeFrameNode);
+                activeTextShapeResizeState = {
+                    frameNode: shapeFrameNode,
+                    handle: handleNode.dataset.resizeHandle || "se",
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    startWidth: shapeFrameNode.getBoundingClientRect().width || 170,
+                    startHeight: shapeFrameNode.getBoundingClientRect().height || 110
+                };
+                return;
+            }
             const imageNode = frameNode?.querySelector("img");
             if (!frameNode || !imageNode) return;
             event.preventDefault();
@@ -1928,6 +2168,28 @@
                     return;
                 }
                 updateTextTableResizeHover(event);
+                if (activeTextShapeMoveState) {
+                    event.preventDefault();
+                    const {frameNode, startX, startY, startLeft, startTop} = activeTextShapeMoveState;
+                    frameNode.style.left = `${Math.round(startLeft + event.clientX - startX)}px`;
+                    frameNode.style.top = `${Math.round(startTop + event.clientY - startY)}px`;
+                    return;
+                }
+                if (activeTextShapeResizeState) {
+                    event.preventDefault();
+                    const {handle, frameNode, startX, startY, startWidth, startHeight} = activeTextShapeResizeState;
+                    const horizontalDelta = event.clientX - startX;
+                    const verticalDelta = event.clientY - startY;
+                    const widthDelta = handle.includes("w") ? -horizontalDelta : horizontalDelta;
+                    const heightDelta = handle.includes("n") ? -verticalDelta : verticalDelta;
+                    const nextWidth = Math.max(32, startWidth + widthDelta);
+                    const nextHeight = Math.max(32, startHeight + heightDelta);
+                    frameNode.style.width = `${Math.round(nextWidth)}px`;
+                    frameNode.style.height = `${Math.round(nextHeight)}px`;
+                    frameNode.dataset.shapeWidth = String(Math.round(nextWidth));
+                    frameNode.dataset.shapeHeight = String(Math.round(nextHeight));
+                    return;
+                }
                 if (!activeTextImageResizeState) return;
                 event.preventDefault();
                 const {handle, imageNode, startX, startY, startWidth, aspectRatio, frameNode} = activeTextImageResizeState;
@@ -1950,17 +2212,39 @@
                     syncTextEditorStateFromDom();
                     return;
                 }
+                if (activeTextShapeMoveState || activeTextShapeResizeState) {
+                    activeTextShapeMoveState = null;
+                    activeTextShapeResizeState = null;
+                    rememberTextSelection();
+                    syncTextEditorStateFromDom();
+                    return;
+                }
                 if (!activeTextImageResizeState) return;
                 activeTextImageResizeState = null;
                 rememberTextSelection();
                 syncTextEditorStateFromDom();
             });
             document.addEventListener("mousedown", (event) => {
-                if (event.target?.closest?.(".editor-text-image-frame")) return;
+                if (event.target?.closest?.(".editor-text-image-frame, .editor-text-shape-frame")) return;
                 clearActiveTextImageSelection();
+                clearActiveTextShapeSelection();
             });
         }
-        [boldButton, italicButton, underlineButton, linkButton, textColorButton, backgroundColorButton, alignmentButton, highlightButton, listButton, imageButton, tableButton, otherButton].forEach(bindTextToolbarButtonFocus);
+        textArea.addEventListener("mousedown", (event) => {
+            const shapeFrameNode = event.target?.closest?.(".editor-text-shape-frame");
+            if (!shapeFrameNode || !isTextEditorShapeOnTop(shapeFrameNode) || event.target?.closest?.(".editor-text-image-handle")) return;
+            event.preventDefault();
+            event.stopPropagation();
+            selectTextEditorShapeFrame(shapeFrameNode);
+            activeTextShapeMoveState = {
+                frameNode: shapeFrameNode,
+                startX: event.clientX,
+                startY: event.clientY,
+                startLeft: Number.parseFloat(shapeFrameNode.style.left || "0") || 0,
+                startTop: Number.parseFloat(shapeFrameNode.style.top || "0") || 0
+            };
+        });
+        [boldButton, italicButton, underlineButton, linkButton, textColorButton, backgroundColorButton, alignmentButton, highlightButton, listButton, shapeButton, imageButton, tableButton, otherButton].forEach(bindTextToolbarButtonFocus);
         if (fontFamilySelect && fontFamilySelect.dataset.bound !== "1") {
             fontFamilySelect.dataset.bound = "1";
             fontFamilySelect.addEventListener("change", () => execTextEditorCommand("fontName", window.StandardUI?.getSearchComboBoxValue?.(fontFamilySelect) || fontFamilySelect.value || "Inter"));
@@ -2079,6 +2363,14 @@
                     action: () => applyTextListStyle("OL", "upper-roman")
                 }
             ]);
+        }
+        if (shapeButton && shapeButton.dataset.bound !== "1") {
+            shapeButton.dataset.bound = "1";
+            shapeButton.popoutmenu(TEXT_SHAPE_OPTIONS.map((shape) => ({
+                icon: shape.icon,
+                label: shape.label,
+                action: () => insertTextEditorShape(shape.type)
+            })));
         }
         if (imageButton && imageButton.dataset.bound !== "1") {
             imageButton.dataset.bound = "1";
@@ -2293,6 +2585,7 @@
                                 button({id: "editor-sheet-style-align", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: TEXT_ALIGN_ICONS.left}),
                                 button({id: "editor-sheet-style-highlight", style: "naked align-bottom small-margin-right inner-radius", title: "Highlight", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.494141 1.1171875 C 12.366141 1.1171875 12.238125 1.1661719 12.140625 1.2636719 L 9.1484375 4.2578125 C 8.0944375 5.3118125 7.299125 6.5957656 6.828125 8.0097656 L 5.5742188 11.775391 C 5.4752187 12.069391 5.3098438 12.338594 5.0898438 12.558594 L 3.3027344 14.345703 C 2.9117344 14.736703 2.9117344 15.369766 3.3027344 15.759766 L 3.8554688 16.3125 L 1.2851562 19.009766 C 0.78015625 19.540766 0.99835938 20.416438 1.6933594 20.648438 L 4.6074219 21.591797 C 4.9524219 21.706797 5.3316094 21.625906 5.5996094 21.378906 L 7.328125 19.783203 L 8.2539062 20.708984 C 8.4489063 20.903984 8.7049375 21.001953 8.9609375 21.001953 C 9.2169375 21.001953 9.4729687 20.903984 9.6679688 20.708984 L 11.455078 18.921875 C 11.675078 18.701875 11.941328 18.5355 12.236328 18.4375 L 16.001953 17.183594 C 17.415953 16.712594 18.700859 15.917281 19.755859 14.863281 L 22.748047 11.869141 C 22.943047 11.674141 22.943047 11.357109 22.748047 11.162109 C 22.552047 10.967109 22.236016 10.967109 22.041016 11.162109 L 19.048828 14.15625 C 19.040972 14.164106 19.031323 14.16991 19.023438 14.177734 L 9.8359375 4.9882812 C 9.8431253 4.981042 9.8482537 4.9720588 9.8554688 4.9648438 L 12.847656 1.9707031 C 13.042656 1.7757031 13.042656 1.4586719 12.847656 1.2636719 C 12.750156 1.1661719 12.622141 1.1171875 12.494141 1.1171875 z M 9.171875 5.7382812 L 18.273438 14.841797 C 17.49882 15.44921 16.624226 15.921729 15.685547 16.234375 L 11.919922 17.490234 C 11.477922 17.637234 11.076094 17.884844 10.746094 18.214844 L 8.9609375 20.001953 L 4.0097656 15.052734 L 5.796875 13.265625 C 6.125875 12.936625 6.3734844 12.533797 6.5214844 12.091797 L 7.7773438 8.3261719 C 8.0908498 7.387136 8.5643624 6.513116 9.171875 5.7382812 z"/></svg>`}),
                                 button({id: "editor-sheet-style-list", style: "naked align-bottom small-margin-right inner-radius", title: "List", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`}),
+                                button({id: "editor-sheet-style-shape", style: "naked align-bottom small-margin-right inner-radius", title: "Shape", icon: TEXT_SHAPE_ICON}),
                                 button({id: "editor-sheet-style-image", style: "naked align-bottom small-margin-right inner-radius", title: "Image", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`}),
                                 button({id: "editor-sheet-style-table", style: "naked align-bottom small-margin-right inner-radius", title: "Table", icon: TEXT_TABLE_ICON}),
                                 button({id: "editor-sheet-style-other", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" /></svg>`}),

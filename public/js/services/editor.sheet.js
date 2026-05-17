@@ -51,6 +51,7 @@
     let activeSheetChartInteraction = null;
     let activeSheetImageInteraction = null;
     let activeSheetFilterMenu = null;
+    let isFirstSheetRowFrozen = false;
     const sheetResolvedColorCache = new Map();
     const SHEET_CHART_DEFAULT_WIDTH = 360;
     const SHEET_CHART_DEFAULT_HEIGHT = 240;
@@ -427,6 +428,7 @@
         links: buildSheetLinksPayload(),
         locked: buildSheetLocksPayload(),
         filters: buildSheetFiltersPayload(),
+        freezeFirstRow: isFirstSheetRowFrozen === true,
         columnWidths: buildSheetDimensionPayload(sheetColumnWidths, sheetColumns, getDefaultSheetColumnWidth()),
         rowHeights: buildSheetDimensionPayload(sheetRowHeights, sheetRows, SHEET_DEFAULT_ROW_HEIGHT),
         charts: sheetCharts.map((chartItem) => ({...chartItem, data: (chartItem.data || []).map((item) => ({...item}))})),
@@ -485,6 +487,7 @@
         activeSheetColumn = Number.isInteger(rawPayload?.activeSheetColumn) ? rawPayload.activeSheetColumn : null;
         sheetRows = Number.isInteger(rawPayload?.rows) && rawPayload.rows > 0 ? rawPayload.rows : DEFAULT_SHEET_ROWS;
         sheetColumns = Number.isInteger(rawPayload?.columns) && rawPayload.columns > 0 ? rawPayload.columns : DEFAULT_SHEET_COLUMNS;
+        isFirstSheetRowFrozen = rawPayload?.freezeFirstRow === true || Number(rawPayload?.frozenRows) >= 1;
         setSheetFiltersState(rawPayload?.filters);
         Object.assign(sheetColumnWidths, normalizeSheetDimensionPayload(rawPayload?.columnWidths, sheetColumns, SHEET_MIN_CELL_WIDTH, SHEET_MAX_CELL_WIDTH));
         Object.assign(sheetRowHeights, normalizeSheetDimensionPayload(rawPayload?.rowHeights, sheetRows, SHEET_MIN_ROW_HEIGHT, SHEET_MAX_ROW_HEIGHT));
@@ -516,6 +519,7 @@
             links: buildSheetLinksPayload(),
             locked: buildSheetLocksPayload(),
             filters: buildSheetFiltersPayload(),
+            freezeFirstRow: isFirstSheetRowFrozen === true,
             columnWidths: buildSheetDimensionPayload(sheetColumnWidths, sheetColumns, getDefaultSheetColumnWidth()),
             rowHeights: buildSheetDimensionPayload(sheetRowHeights, sheetRows, SHEET_DEFAULT_ROW_HEIGHT),
             charts: sheetCharts.map((chartItem) => ({...chartItem, data: (chartItem.data || []).map((item) => ({...item}))})),
@@ -538,6 +542,8 @@
             links: state?.links || {},
             locked: state?.locked || {},
             filters: state?.filters || null,
+            freezeFirstRow: state?.freezeFirstRow === true,
+            frozenRows: state?.frozenRows,
             columnWidths: state?.columnWidths || {},
             rowHeights: state?.rowHeights || {},
             charts: state?.charts || [],
@@ -736,6 +742,7 @@
         activeSheetDisplayTitle = "";
         sheetRows = DEFAULT_SHEET_ROWS;
         sheetColumns = DEFAULT_SHEET_COLUMNS;
+        isFirstSheetRowFrozen = false;
         sheetGridScrollBound = false;
         isGrowingSheetGrid = false;
         modular.show(SERVICE_ID, 0, {newInstance: true});
@@ -1619,6 +1626,11 @@
         const numericValue = Number(value);
         return Number.isFinite(numericValue) ? numericValue : null;
     };
+    const toSheetAggregateNumericValue = (value) => {
+        if (value === null || typeof value === "undefined") return null;
+        if (typeof value === "string" && value.trim() === "") return null;
+        return toSheetNumericValue(value);
+    };
     const isSheetStringLiteral = (value = "") => {
         const text = String(value || "").trim();
         return /^(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')$/.test(text);
@@ -1807,18 +1819,18 @@
                 if (range) {
                     range.references.forEach((reference) => {
                         const referencedValue = evaluateSheetCell(reference, new Set(visited));
-                        const numericValue = toSheetNumericValue(referencedValue);
+                        const numericValue = toSheetAggregateNumericValue(referencedValue);
                         if (numericValue !== null) numericValues.push(numericValue);
                     });
                     return;
                 }
                 const tokenValue = getSheetArgumentValue(cleanedToken, new Set(visited));
-                const numericValue = toSheetNumericValue(tokenValue);
+                const numericValue = toSheetAggregateNumericValue(tokenValue);
                 if (functionName === "COUNT") {
                     if (numericValue !== null) numericValues.push(numericValue);
                     return;
                 }
-                numericValues.push(numericValue ?? 0);
+                if (numericValue !== null) numericValues.push(numericValue);
             });
             let functionValue = "#ERR";
             if (functionName === "SUM") functionValue = numericValues.reduce((total, value) => total + value, 0);
@@ -3115,6 +3127,20 @@
             node.style.setProperty("--editor-sheet-columns", String(sheetColumns));
         });
     };
+    const applySheetFreezeState = () => {
+        const grid = document.getElementById("editor-sheet-grid");
+        const gridWrap = document.getElementById("editor-sheet-grid-wrap");
+        [grid, gridWrap].forEach((node) => {
+            if (!node) return;
+            node.classList.toggle("editor-sheet-freeze-first-row", isFirstSheetRowFrozen === true);
+            node.style.setProperty("--editor-sheet-header-height", `${SHEET_HEADER_HEIGHT}px`);
+        });
+    };
+    const toggleFirstSheetRowFreeze = () => {
+        isFirstSheetRowFrozen = !isFirstSheetRowFrozen;
+        applySheetFreezeState();
+        saveSheetPortalState();
+    };
     const syncSheetGridLayout = () => {
         const sheetWorkspace = document.querySelector(".editor-sheet-workspace");
         const gridPanel = document.querySelector(".editor-sheet-grid-panel");
@@ -3147,6 +3173,7 @@
             rowNode.style.height = `${getSheetRowHeight(rowIndex)}px`;
         }
         updateSheetGridColumnCount();
+        applySheetFreezeState();
     };
     const appendSheetColumnNodes = (columnIndex = 0) => {
         const headerRow = document.getElementById("editor-sheet-header-row");
@@ -3564,6 +3591,16 @@
                     {
                         label: "Insert Row Below",
                         action: () => insertSheetRowAt(rowIndex + 1)
+                    },
+                    {
+                        label: "Freeze Row",
+                        visible: () => rowIndex === 0 && !isFirstSheetRowFrozen,
+                        action: () => toggleFirstSheetRowFreeze()
+                    },
+                    {
+                        label: "Unfreeze Row",
+                        visible: () => rowIndex === 0 && isFirstSheetRowFrozen,
+                        action: () => toggleFirstSheetRowFreeze()
                     },
                     "separator",
                     {
