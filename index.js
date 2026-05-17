@@ -1953,6 +1953,8 @@ app.get("/api/files/download", (req, res) => {
                 return;
             }
             const filename = path.basename(filePath) || "download.bin";
+            const inlinePreview = String(req.query.inline || "") === "1";
+            const isPdfPreview = inlinePreview && /\.pdf$/i.test(filename);
             let receivedStatus = false;
             let settleTimeout = null;
             let messageCount = 0;
@@ -1970,8 +1972,8 @@ app.get("/api/files/download", (req, res) => {
                     contentType: payload.contentType,
                     payloadBytes: payload.byteLength
                 });
-                res.setHeader("Content-Type", payload.contentType);
-                res.setHeader("Content-Disposition", `attachment; filename=\"${filename}\"`);
+                res.setHeader("Content-Type", isPdfPreview ? "application/pdf" : payload.contentType);
+                res.setHeader("Content-Disposition", `${isPdfPreview ? "inline" : "attachment"}; filename=\"${filename}\"`);
                 res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
                 res.setHeader("Content-Length", `${payload.byteLength}`);
                 const cleanupTempFile = () => {

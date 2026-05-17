@@ -3,6 +3,7 @@
     const SVG_FILE_PATTERN = /\.svg$/i;
     const SVG_MARKUP_PATTERN = /^\s*<svg[\s>]/i;
     const VIDEO_FILE_PATTERN = /\.(mp4|webm|mov|m4v|avi|mkv|mpeg|mpg|ogv)$/i;
+    const PDF_FILE_PATTERN = /\.pdf$/i;
     const CODE_FILE_PATTERN = /\.(js|mjs|cjs|ts|tsx|jsx|json|css|scss|sass|less|html|htm|xml|yml|yaml|toml|ini|conf|cfg|env|sql|py|rb|php|java|c|h|hpp|cpp|cs|go|rs|swift|kt|kts|sh|bash|ps1|bat|cmd|pl|lua|r|dart|scala|clj|groovy|std|stds)$/i;
     const IMAGE_VIEWER_MAX_WIDTH = 750;
     const IMAGE_VIEWER_MAX_HEIGHT = 750;
@@ -28,6 +29,8 @@
     let activeVideoProgressRecord = null;
     let activeVideoLastSavedAt = 0;
     let activeVideoLastSavedTime = -1;
+    let activePdfFilePath = "";
+    let activePdfFileSource = "";
     let activeStandardDataReference = "";
     let activeStandardDataPayload = {};
     let activeArticleRecord = {};
@@ -386,6 +389,10 @@
         if (cacheBust) params.set("cb", `${Date.now()}`);
         return `/api/files/download?${params.toString()}`;
     };
+    const pdfPreviewUrl = (filePath = "") => {
+        if (!filePath) return "";
+        return `/api/files/download?${new URLSearchParams({path: filePath, inline: "1"}).toString()}`;
+    };
     const revokeActiveObjectUrl = key => {
         const activeUrl = key === "image" ? activeImageObjectUrl : activeVideoObjectUrl;
         if (!activeUrl) return;
@@ -630,6 +637,16 @@
         const pathLabel = document.getElementById("internals-video-preview-path");
         if (pathLabel) pathLabel.textContent = activeVideoFilePath || "No file selected";
         updatePortalTitle(2, activeVideoFilePath);
+    };
+    const updatePdfPreview = (portal = findInternalsWindow(7)?.portal) => {
+        const root = portal?.window?.() || document;
+        const pdfPreview = root.querySelector("#internals-pdf-preview");
+        if (!pdfPreview) return;
+        pdfPreview.src = activePdfFileSource || "about:blank";
+        pdfPreview.title = activePdfFilePath || "PDF preview";
+        const pathLabel = root.querySelector("#internals-pdf-preview-path");
+        if (pathLabel) pathLabel.textContent = activePdfFilePath || "No file selected";
+        updatePortalTitle(7, activePdfFilePath, portal);
     };
     const formatStandardDataPayload = () => {
         if (typeof activeStandardDataPayload === "string") {
@@ -1049,6 +1066,13 @@
         activeVideoLastSavedTime = -1;
         if (activeVideoFilePath) void loadActiveVideoProgress(activeVideoFilePath);
     };
+    const restorePdfStateFromPortal = (portal = findInternalsWindow(7)?.portal) => {
+        const state = portal?.windowState?.() || {};
+        if (state?.directive) activePdfFilePath = String(state.directive);
+        activePdfFileSource = typeof state?.cachedContent?.source === "string" && state.cachedContent.source.trim()
+            ? state.cachedContent.source
+            : (activePdfFilePath ? pdfPreviewUrl(activePdfFilePath) : "");
+    };
 
     const restoreStandardDataStateFromPortal = () => {
         const state = findInternalsWindow(3)?.portal?.windowState?.() || {};
@@ -1196,6 +1220,16 @@
         void loadActiveVideoProgress(filePath);
         return true;
     };
+    const openPdfFilePath = (rawPath = "", sourceNode = null) => {
+        const filePath = getPathForDownload(rawPath);
+        if (!filePath) return false;
+        activePdfFilePath = filePath;
+        activePdfFileSource = pdfPreviewUrl(filePath);
+        const portal = modular.show("com.standard.internals", 7, {newInstance: true});
+        syncPortalWindowState(7, {directive: filePath, cachedContent: {source: activePdfFileSource}}, portal);
+        updatePdfPreview(portal);
+        return true;
+    };
     const openStandardData = (standardReference = "", payload = {}, sourceNode = null) => {
         activeStandardDataReference = String(standardReference || "").trim() || "Unknown";
         activeStandardDataPayload = payload ?? {};
@@ -1252,6 +1286,7 @@
     window.StandardInternals.openImageFilePath = (rawPath = "", sourceNode = null) => openImageFilePath(rawPath, sourceNode);
     window.StandardInternals.openVideoFilePath = (rawPath = "", sourceNode = null) => openVideoFilePath(rawPath, sourceNode);
     window.StandardInternals.openVideoSource = (rawPath = "", source = "", options = {}) => openVideoSource(rawPath, source, options);
+    window.StandardInternals.openPdfFilePath = (rawPath = "", sourceNode = null) => openPdfFilePath(rawPath, sourceNode);
     window.addEventListener("beforeunload", () => {
         void saveActiveVideoProgress({force: true});
         revokeActiveObjectUrl("image");
@@ -1263,6 +1298,7 @@
     window.StandardInternals.openFilePath = (rawPath = "", sourceNode = null) => {
         if (IMAGE_FILE_PATTERN.test(String(rawPath || ""))) return openImageFilePath(rawPath, sourceNode);
         if (VIDEO_FILE_PATTERN.test(String(rawPath || ""))) return openVideoFilePath(rawPath, sourceNode);
+        if (PDF_FILE_PATTERN.test(String(rawPath || ""))) return openPdfFilePath(rawPath, sourceNode);
         return openTextFilePath(rawPath, sourceNode);
     };
     modular.register(new Service("com.standard.internals", [
@@ -1377,6 +1413,17 @@
             route: () => div({style: "large-padding-top small-padding fill", content: div({id: "internals-app-settings-host", style: "internals-app-settings-host padded"})}),
             afterRender: function () {
                 void renderAppSettingsPortal(this.portal);
+            }
+        }),
+        new Portal({
+            title: "PDF Viewer",
+            internal: true,
+            dimensions: [820, 640],
+            navigation: false,
+            route: () => div({style: "large-padding-top fill internals-pdf-viewer-shell", content: `<iframe id="internals-pdf-preview" class="internals-pdf-preview radius" src="${activePdfFileSource || "about:blank"}" title="${escapeHtml(activePdfFilePath || "PDF preview")}"></iframe>`}),
+            afterRender: function () {
+                restorePdfStateFromPortal(this.portal);
+                updatePdfPreview(this.portal);
             }
         })
     ]));

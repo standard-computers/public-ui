@@ -16,6 +16,8 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .internals-image-viewer-center {width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .internals-image-preview-host {display:flex;align-items:center;justify-content:center;max-width:100%;max-height:100%;overflow:hidden}
 .internals-image-preview-host img, .internals-image-preview-host svg {flex:0 0 auto}
+.internals-pdf-viewer-shell {height:100%;box-sizing:border-box;overflow:hidden}
+.internals-pdf-preview {display:block;width:100%;height:100%;min-height:560px;border:0;background:var(--secondary-bg)}
 .masonry {column-count:3;column-gap:2rem;padding:0 18px 10px 10px}
 .note-tile {break-inside:avoid;margin-bottom:1rem;display:inline-block;width:100%;max-height:400px}
 .notes-empty-state {min-height:340px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;color:var(--faded)}
@@ -373,6 +375,18 @@ input.calendar-recurrence-number {width:46px;padding:5px 6px;text-align:center}
 .editor-sheet-row:first-child .editor-sheet-row-header {z-index:5}
 .editor-sheet-cell {position:relative;border-right:1px solid var(--border);border-bottom:1px solid var(--border);box-shadow:inset 0 -1px 0 var(--border);background:var(--bg);box-sizing:border-box}
 .editor-sheet-cell-input {display:block;width:100%;height:100%;border:0;background:transparent;padding:8px 6px;outline:none;box-sizing:border-box}
+.editor-sheet-filter-header-cell .editor-sheet-cell-input {padding-right:28px}
+.editor-sheet-filter-button {display:none;position:absolute;right:4px;top:50%;transform:translateY(-50%);width:20px;height:20px;padding:0;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:calc(var(--radius) - 6px);background:var(--secondary-bg);color:var(--fg);font-size:12px;line-height:1;z-index:2}
+.editor-sheet-filter-header-cell .editor-sheet-filter-button {display:flex}
+.editor-sheet-filter-button:hover,.editor-sheet-filter-button.active {background:var(--bg);box-shadow:var(--small-shadow)}
+.editor-sheet-filter-menu {display:flex;flex-direction:column;gap:4px;min-width:240px;max-width:320px;max-height:none;overflow:hidden;padding:6px;background:var(--bg)}
+.editor-sheet-filter-search {box-sizing:border-box;width:100%;height:34px;margin:2px 0 4px 0;padding:7px 9px;border:1px solid var(--border);border-radius:calc(var(--radius) - 4px);background:var(--bg);color:var(--fg);font:inherit;line-height:1.2}
+.editor-sheet-filter-values {display:flex;flex-direction:column;gap:2px;max-height:168px;overflow:auto;padding-right:2px}
+.editor-sheet-filter-menu-item {display:flex;align-items:center;width:100%;min-height:30px;margin:0;padding:6px 8px;text-align:left;border:0;border-radius:calc(var(--radius) - 5px);background:transparent;color:var(--fg);font:inherit;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.editor-sheet-filter-menu-item:hover {background:var(--secondary-bg)}
+.editor-sheet-filter-menu-separator {height:1px;margin:4px 0;background:var(--secondary-border)}
+.editor-sheet-filter-menu-note {padding:6px 8px;color:var(--faded);font-size:calc(var(--fs) - 2px)}
+.editor-sheet-row-filtered-out {display:none !important}
 .editor-sheet-cell-input[readonly] {cursor:default}
 .editor-sheet-cell-input:focus,
 .editor-sheet-cell-input.active,
@@ -540,3 +554,34 @@ body.editor-sheet-resizing-rows {cursor:row-resize}
 .settings-interface-drawer {max-height:0;overflow:hidden;transition:max-height 180ms ease}
 .settings-interface-item.open .settings-interface-drawer {max-height:96px}
 .settings-interface-drawer-inner {align-items:center;border-top:1px solid var(--border);padding:10px}
+
+/*EMAIL*/
+.email-shell {display:grid;grid-template-columns:minmax(230px, 34%) minmax(0, 1fr);height:100%;min-height:0;overflow:hidden;background:var(--bg);border:1px solid var(--border);border-radius:calc(var(--radius) - 2px)}
+.email-list-pane {display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--border);background:var(--secondary-bg)}
+.email-list-header {display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);flex:none}
+.email-list-header h3 {margin:0;font-size:calc(var(--fs) + 2px)}
+.email-count {min-width:24px;text-align:center;padding:3px 7px;border-radius:999px;background:var(--bg);border:1px solid var(--border);font-size:calc(var(--fs) - 2px);font-weight:700}
+.email-message-list {overflow:auto;min-height:0}
+.email-message-item {display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;background:transparent;min-width:0}
+.email-message-item:hover {background:var(--bg)}
+.email-message-item.active {background:var(--bg);box-shadow:inset 3px 0 0 var(--primary)}
+.email-message-item.unread .email-message-sender,.email-message-item.unread .email-message-subject {font-weight:800}
+.email-message-row {display:flex;align-items:baseline;gap:8px;min-width:0}
+.email-message-sender {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}
+.email-message-date {flex:none;max-width:86px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:calc(var(--fs) - 3px);opacity:0.68}
+.email-message-subject {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.email-message-snippet {font-size:calc(var(--fs) - 2px);opacity:0.72;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.email-reading-pane {min-width:0;min-height:0;overflow:auto;padding:18px 22px;background:var(--bg)}
+.email-reading-header {padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid var(--border)}
+.email-reading-header h2 {margin:0 0 12px 0;font-size:calc(var(--fs) + 8px);line-height:1.2;overflow-wrap:anywhere}
+.email-reading-meta {display:grid;gap:5px;font-size:calc(var(--fs) - 1px);opacity:0.78;overflow-wrap:anywhere}
+.email-reading-meta strong {display:inline-block;min-width:42px;margin-right:7px;opacity:0.8}
+.email-reading-body {white-space:pre-wrap;line-height:1.5;overflow-wrap:anywhere}
+.email-reading-empty,.email-empty-state {height:100%;min-height:320px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;color:var(--faded)}
+.email-empty-icon {width:72px;height:72px;object-fit:contain;opacity:0.72}
+.email-empty-label {font-weight:700;color:var(--fg)}
+
+@media (max-width: 720px) {
+    .email-shell {grid-template-columns:1fr;grid-template-rows:minmax(180px, 42%) minmax(0, 1fr)}
+    .email-list-pane {border-right:0;border-bottom:1px solid var(--border)}
+}

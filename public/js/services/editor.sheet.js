@@ -25,6 +25,11 @@
     const sheetRowHeights = {};
     const sheetCharts = [];
     const sheetImages = [];
+    const sheetFilters = {
+        range: null,
+        criteria: {},
+        sort: null
+    };
     let sheetRows = DEFAULT_SHEET_ROWS;
     let sheetColumns = DEFAULT_SHEET_COLUMNS;
     let activeSheetCell = "A1";
@@ -45,6 +50,7 @@
     let activeSheetImageId = "";
     let activeSheetChartInteraction = null;
     let activeSheetImageInteraction = null;
+    let activeSheetFilterMenu = null;
     const sheetResolvedColorCache = new Map();
     const SHEET_CHART_DEFAULT_WIDTH = 360;
     const SHEET_CHART_DEFAULT_HEIGHT = 240;
@@ -157,6 +163,11 @@
     const clearSheetImages = () => {
         sheetImages.splice(0, sheetImages.length);
         activeSheetImageId = "";
+    };
+    const clearSheetFilters = () => {
+        sheetFilters.range = null;
+        sheetFilters.criteria = {};
+        sheetFilters.sort = null;
     };
     const normalizeSheetDimensionPayload = (rawDimensions = {}, maxCount = 0, minValue = 0, maxValue = Number.POSITIVE_INFINITY) => {
         if (!rawDimensions || typeof rawDimensions !== "object" || Array.isArray(rawDimensions)) return {};
@@ -320,6 +331,67 @@
     const buildSheetTypesPayload = () => Object.fromEntries(Object.entries(sheetCellTypes).map(([cell, type]) => [cell, normalizeSheetCellType(type)]).filter(([, type]) => type));
     const buildSheetLinksPayload = () => Object.fromEntries(Object.entries(sheetCellLinks).map(([cell, link]) => [cell, normalizeSheetHyperlinkUrl(link)]).filter(([, link]) => link));
     const buildSheetLocksPayload = () => Object.fromEntries(Object.keys(sheetCellLocks).filter((cell) => isSheetCellLocked(cell)).map((cell) => [cell, 1]));
+    const normalizeSheetFilterState = (rawFilters = null) => {
+        if (!rawFilters || typeof rawFilters !== "object" || Array.isArray(rawFilters)) return {range: null, criteria: {}, sort: null};
+        const rawRange = rawFilters.range;
+        let range = null;
+        if (rawRange && typeof rawRange === "object" && !Array.isArray(rawRange)) {
+            const minRow = Math.trunc(Number(rawRange.minRow));
+            const maxRow = Math.trunc(Number(rawRange.maxRow));
+            const minColumn = Math.trunc(Number(rawRange.minColumn));
+            const maxColumn = Math.trunc(Number(rawRange.maxColumn));
+            if (
+                Number.isInteger(minRow)
+                && Number.isInteger(maxRow)
+                && Number.isInteger(minColumn)
+                && Number.isInteger(maxColumn)
+                && minRow >= 0
+                && minColumn >= 0
+                && maxRow >= minRow
+                && maxColumn >= minColumn
+            ) {
+                range = {
+                    minRow: Math.min(minRow, Math.max(sheetRows - 1, 0)),
+                    maxRow: Math.min(maxRow, Math.max(sheetRows - 1, 0)),
+                    minColumn: Math.min(minColumn, Math.max(sheetColumns - 1, 0)),
+                    maxColumn: Math.min(maxColumn, Math.max(sheetColumns - 1, 0))
+                };
+            }
+        }
+        const criteria = {};
+        if (range && rawFilters.criteria && typeof rawFilters.criteria === "object" && !Array.isArray(rawFilters.criteria)) {
+            Object.entries(rawFilters.criteria).forEach(([rawColumnIndex, rawCriterion]) => {
+                const columnIndex = Math.trunc(Number(rawColumnIndex));
+                if (!Number.isInteger(columnIndex) || columnIndex < range.minColumn || columnIndex > range.maxColumn) return;
+                const values = Array.isArray(rawCriterion?.values)
+                    ? rawCriterion.values.map((value) => String(value ?? ""))
+                    : [];
+                const query = String(rawCriterion?.query ?? "").trim();
+                if (values.length || query) criteria[String(columnIndex)] = {values: [...new Set(values)], query};
+            });
+        }
+        const rawSort = rawFilters.sort;
+        let sort = null;
+        if (range && rawSort && typeof rawSort === "object" && !Array.isArray(rawSort)) {
+            const columnIndex = Math.trunc(Number(rawSort.columnIndex));
+            const direction = String(rawSort.direction || "").toLowerCase() === "desc" ? "desc" : "asc";
+            if (Number.isInteger(columnIndex) && columnIndex >= range.minColumn && columnIndex <= range.maxColumn) {
+                sort = {columnIndex, direction};
+            }
+        }
+        return {range, criteria, sort};
+    };
+    const buildSheetFiltersPayload = () => {
+        const normalized = normalizeSheetFilterState(sheetFilters);
+        if (!normalized.range) return null;
+        return normalized;
+    };
+    const setSheetFiltersState = (rawFilters = null) => {
+        const normalized = normalizeSheetFilterState(rawFilters);
+        sheetFilters.range = normalized.range;
+        sheetFilters.criteria = normalized.criteria;
+        sheetFilters.sort = normalized.sort;
+    };
     const captureActiveSheetInput = () => {
         const activeElement = document.activeElement;
         const id = String(activeElement?.id || "");
@@ -354,6 +426,7 @@
         types: buildSheetTypesPayload(),
         links: buildSheetLinksPayload(),
         locked: buildSheetLocksPayload(),
+        filters: buildSheetFiltersPayload(),
         columnWidths: buildSheetDimensionPayload(sheetColumnWidths, sheetColumns, getDefaultSheetColumnWidth()),
         rowHeights: buildSheetDimensionPayload(sheetRowHeights, sheetRows, SHEET_DEFAULT_ROW_HEIGHT),
         charts: sheetCharts.map((chartItem) => ({...chartItem, data: (chartItem.data || []).map((item) => ({...item}))})),
@@ -372,6 +445,7 @@
         clearSheetRowHeights();
         clearSheetCharts();
         clearSheetImages();
+        clearSheetFilters();
         const payloadCells = rawPayload?.cells;
         if (payloadCells && typeof payloadCells === "object") {
             Object.entries(payloadCells).forEach(([cell, value]) => {
@@ -411,6 +485,7 @@
         activeSheetColumn = Number.isInteger(rawPayload?.activeSheetColumn) ? rawPayload.activeSheetColumn : null;
         sheetRows = Number.isInteger(rawPayload?.rows) && rawPayload.rows > 0 ? rawPayload.rows : DEFAULT_SHEET_ROWS;
         sheetColumns = Number.isInteger(rawPayload?.columns) && rawPayload.columns > 0 ? rawPayload.columns : DEFAULT_SHEET_COLUMNS;
+        setSheetFiltersState(rawPayload?.filters);
         Object.assign(sheetColumnWidths, normalizeSheetDimensionPayload(rawPayload?.columnWidths, sheetColumns, SHEET_MIN_CELL_WIDTH, SHEET_MAX_CELL_WIDTH));
         Object.assign(sheetRowHeights, normalizeSheetDimensionPayload(rawPayload?.rowHeights, sheetRows, SHEET_MIN_ROW_HEIGHT, SHEET_MAX_ROW_HEIGHT));
         if (Array.isArray(rawPayload?.charts)) {
@@ -440,6 +515,7 @@
             types: buildSheetTypesPayload(),
             links: buildSheetLinksPayload(),
             locked: buildSheetLocksPayload(),
+            filters: buildSheetFiltersPayload(),
             columnWidths: buildSheetDimensionPayload(sheetColumnWidths, sheetColumns, getDefaultSheetColumnWidth()),
             rowHeights: buildSheetDimensionPayload(sheetRowHeights, sheetRows, SHEET_DEFAULT_ROW_HEIGHT),
             charts: sheetCharts.map((chartItem) => ({...chartItem, data: (chartItem.data || []).map((item) => ({...item}))})),
@@ -461,6 +537,7 @@
             types: state?.types || {},
             links: state?.links || {},
             locked: state?.locked || {},
+            filters: state?.filters || null,
             columnWidths: state?.columnWidths || {},
             rowHeights: state?.rowHeights || {},
             charts: state?.charts || [],
@@ -650,6 +727,7 @@
         clearSheetRowHeights();
         clearSheetCharts();
         clearSheetImages();
+        clearSheetFilters();
         window.StandardPlastic?.removeInlineStyleEditor?.(false);
         activeSheetCell = "A1";
         activeSheetRow = null;
@@ -852,6 +930,7 @@
                     style: "editor-sheet-cell",
                     content: children([
                         input({id: `sheet-cell-${cellReference}`, style: "editor-sheet-cell-input", value: ""}),
+                        button({id: `editor-sheet-filter-${cellReference}`, style: "editor-sheet-filter-button", title: "Sort and filter", content: "v"}),
                         div({style: "editor-sheet-cell-lock-indicator", content: SHEET_LOCK_ICON})
                     ])
                 }));
@@ -1828,6 +1907,298 @@
         if (cellType === "date") return formatSheetDateValue(rawValue.startsWith("=") ? evaluatedValue : rawValue);
         return String(evaluatedValue);
     };
+    const getSheetFilterValue = (cellReference = "") => String(getSheetCellDisplayValue(cellReference) ?? "");
+    const formatSheetFilterMenuValue = (value = "") => {
+        const text = String(value ?? "");
+        return text.trim() ? text : "(Blanks)";
+    };
+    const isSheetFilterRangeEqual = (firstRange = null, secondRange = null) => !!(firstRange && secondRange
+        && firstRange.minRow === secondRange.minRow
+        && firstRange.maxRow === secondRange.maxRow
+        && firstRange.minColumn === secondRange.minColumn
+        && firstRange.maxColumn === secondRange.maxColumn);
+    const getSheetFilterRangeFromSelection = () => {
+        captureActiveSheetInput();
+        const selectedReferences = getActiveSheetCellReferences();
+        const selectedBounds = getSheetReferenceBounds(selectedReferences);
+        const usedBounds = getSheetUsedRangeBounds();
+        if (!usedBounds) return null;
+        const hasMultipleCellsSelected = selectedReferences.length > 1;
+        if (hasMultipleCellsSelected && selectedBounds) {
+            const selectedCoversFullRows = selectedBounds.maxRow - selectedBounds.minRow + 1 >= sheetRows;
+            const selectedHeaderOnly = selectedBounds.minRow === selectedBounds.maxRow;
+            return {
+                minRow: selectedCoversFullRows ? usedBounds.minRow : selectedBounds.minRow,
+                maxRow: (selectedCoversFullRows || selectedHeaderOnly)
+                    ? usedBounds.maxRow
+                    : selectedBounds.maxRow,
+                minColumn: selectedBounds.minColumn,
+                maxColumn: selectedBounds.maxColumn
+            };
+        }
+        const headerColumns = [];
+        for (let columnIndex = usedBounds.minColumn; columnIndex <= usedBounds.maxColumn; columnIndex += 1) {
+            const headerReference = getSheetCellReference(usedBounds.minRow, columnIndex);
+            if (String(sheetCellValues[headerReference] ?? "").trim()) headerColumns.push(columnIndex);
+        }
+        if (!headerColumns.length) return null;
+        return {
+            minRow: usedBounds.minRow,
+            maxRow: usedBounds.maxRow,
+            minColumn: Math.min(...headerColumns),
+            maxColumn: Math.max(...headerColumns)
+        };
+    };
+    const isSheetFilterHeaderCell = (rowIndex = 0, columnIndex = 0) => !!(sheetFilters.range
+        && rowIndex === sheetFilters.range.minRow
+        && columnIndex >= sheetFilters.range.minColumn
+        && columnIndex <= sheetFilters.range.maxColumn);
+    const getSheetFilterUniqueValues = (columnIndex = 0) => {
+        if (!sheetFilters.range) return [];
+        const values = [];
+        for (let rowIndex = sheetFilters.range.minRow + 1; rowIndex <= sheetFilters.range.maxRow; rowIndex += 1) {
+            values.push(getSheetFilterValue(getSheetCellReference(rowIndex, columnIndex)));
+        }
+        return [...new Set(values)].sort((left, right) => {
+            const leftNumber = Number(left);
+            const rightNumber = Number(right);
+            if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) return leftNumber - rightNumber;
+            return String(left).localeCompare(String(right), undefined, {numeric: true, sensitivity: "base"});
+        });
+    };
+    const rowMatchesSheetFilters = (rowIndex = 0) => {
+        if (!sheetFilters.range || rowIndex <= sheetFilters.range.minRow || rowIndex > sheetFilters.range.maxRow) return true;
+        return Object.entries(sheetFilters.criteria || {}).every(([rawColumnIndex, criterion]) => {
+            const columnIndex = Number(rawColumnIndex);
+            const allowedValues = Array.isArray(criterion?.values) ? criterion.values.map((value) => String(value ?? "")) : [];
+            const query = String(criterion?.query ?? "").trim().toLowerCase();
+            const value = getSheetFilterValue(getSheetCellReference(rowIndex, columnIndex));
+            if (query && !String(value).toLowerCase().includes(query)) return false;
+            if (!allowedValues.length) return true;
+            return allowedValues.includes(value);
+        });
+    };
+    const applySheetFilterVisibility = () => {
+        for (let rowIndex = 0; rowIndex < sheetRows; rowIndex += 1) {
+            const rowNode = document.getElementById(`editor-sheet-data-row-${rowIndex}`);
+            if (!rowNode) continue;
+            rowNode.classList.toggle("editor-sheet-row-filtered-out", !rowMatchesSheetFilters(rowIndex));
+        }
+    };
+    const refreshSheetFilterControls = () => {
+        document.querySelectorAll(".editor-sheet-filter-button").forEach((buttonNode) => {
+            const match = /^editor-sheet-filter-([A-Z]+\d+)$/i.exec(String(buttonNode.id || ""));
+            const position = match ? parseSheetCellReference(match[1]) : null;
+            const isHeaderCell = position && isSheetFilterHeaderCell(position.rowIndex, position.columnIndex);
+            const criterion = isHeaderCell ? sheetFilters.criteria?.[String(position.columnIndex)] : null;
+            buttonNode.classList.toggle("active", !!criterion?.values?.length || !!criterion?.query || sheetFilters.sort?.columnIndex === position?.columnIndex);
+            buttonNode.setAttribute("aria-hidden", isHeaderCell ? "false" : "true");
+            buttonNode.tabIndex = isHeaderCell ? 0 : -1;
+            const cellWrap = position ? getSheetCellWrap(getSheetCellReference(position.rowIndex, position.columnIndex)) : null;
+            if (cellWrap) cellWrap.classList.toggle("editor-sheet-filter-header-cell", !!isHeaderCell);
+        });
+    };
+    const clearSheetFilterCriterion = (columnIndex = 0) => {
+        delete sheetFilters.criteria[String(columnIndex)];
+        refreshSheetCells();
+        saveSheetPortalState();
+    };
+    const setSheetFilterCriterionValues = (columnIndex = 0, values = []) => {
+        const uniqueValues = [...new Set(values.map((value) => String(value ?? "")))];
+        if (uniqueValues.length) {
+            sheetFilters.criteria[String(columnIndex)] = {values: uniqueValues, query: ""};
+        } else {
+            delete sheetFilters.criteria[String(columnIndex)];
+        }
+        refreshSheetCells();
+        saveSheetPortalState();
+    };
+    const setSheetFilterSearchQuery = (columnIndex = 0, query = "") => {
+        const normalizedQuery = String(query ?? "").trim();
+        if (normalizedQuery) {
+            sheetFilters.criteria[String(columnIndex)] = {values: [], query: normalizedQuery};
+        } else {
+            delete sheetFilters.criteria[String(columnIndex)];
+        }
+        refreshSheetCells();
+        saveSheetPortalState();
+    };
+    const compareSheetSortValues = (leftValue = "", rightValue = "", direction = "asc") => {
+        const leftNumber = Number(leftValue);
+        const rightNumber = Number(rightValue);
+        let comparison = 0;
+        if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+            comparison = leftNumber - rightNumber;
+        } else {
+            const leftDate = Date.parse(leftValue);
+            const rightDate = Date.parse(rightValue);
+            if (Number.isFinite(leftDate) && Number.isFinite(rightDate)) {
+                comparison = leftDate - rightDate;
+            } else {
+                comparison = String(leftValue).localeCompare(String(rightValue), undefined, {numeric: true, sensitivity: "base"});
+            }
+        }
+        return direction === "desc" ? -comparison : comparison;
+    };
+    const getSheetFilterSortRange = (range = null) => {
+        if (!range) return null;
+        const usedBounds = getSheetUsedRangeBounds();
+        return {
+            minRow: range.minRow,
+            maxRow: Math.min(range.maxRow, Math.max(usedBounds?.maxRow ?? range.maxRow, range.minRow)),
+            minColumn: Math.min(range.minColumn, usedBounds?.minColumn ?? range.minColumn),
+            maxColumn: Math.max(range.maxColumn, usedBounds?.maxColumn ?? range.maxColumn)
+        };
+    };
+    const sortSheetFilterRangeByColumn = (columnIndex = 0, direction = "asc") => {
+        if (!sheetFilters.range) return false;
+        captureActiveSheetInput();
+        const range = getSheetFilterSortRange(sheetFilters.range);
+        if (!range || range.maxRow <= range.minRow) return false;
+        const rows = [];
+        for (let rowIndex = range.minRow + 1; rowIndex <= range.maxRow; rowIndex += 1) {
+            const cells = [];
+            for (let nextColumnIndex = range.minColumn; nextColumnIndex <= range.maxColumn; nextColumnIndex += 1) {
+                const cellReference = getSheetCellReference(rowIndex, nextColumnIndex);
+                cells.push({
+                    value: sheetCellValues[cellReference] ?? "",
+                    style: getSheetCellStyle(cellReference),
+                    type: getSheetCellType(cellReference),
+                    link: getSheetCellLink(cellReference),
+                    locked: isSheetCellLocked(cellReference)
+                });
+            }
+            rows.push({
+                originalRowIndex: rowIndex,
+                sortValue: getSheetFilterValue(getSheetCellReference(rowIndex, columnIndex)),
+                cells
+            });
+        }
+        rows.sort((left, right) => compareSheetSortValues(left.sortValue, right.sortValue, direction)
+            || (left.originalRowIndex - right.originalRowIndex));
+        rows.forEach((sourceRow, rowOffset) => {
+            const targetRowIndex = range.minRow + 1 + rowOffset;
+            sourceRow.cells.forEach((cell, columnOffset) => {
+                const targetReference = getSheetCellReference(targetRowIndex, range.minColumn + columnOffset);
+                if (cell.value === "") delete sheetCellValues[targetReference];
+                else sheetCellValues[targetReference] = cell.value;
+                setSheetCellStyle(targetReference, cell.style);
+                setSheetCellType(targetReference, cell.type);
+                setSheetCellLink(targetReference, cell.link);
+                setSheetCellLocked(targetReference, cell.locked);
+            });
+        });
+        sheetFilters.sort = {columnIndex, direction};
+        refreshSheetCells();
+        saveSheetPortalState();
+        return true;
+    };
+    const closeSheetFilterMenu = () => {
+        activeSheetFilterMenu?.remove?.();
+        activeSheetFilterMenu = null;
+    };
+    const createSheetFilterMenuButton = (label = "", action = null) => {
+        const buttonNode = document.createElement("button");
+        buttonNode.type = "button";
+        buttonNode.className = "editor-sheet-filter-menu-item";
+        buttonNode.textContent = label;
+        buttonNode.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            closeSheetFilterMenu();
+            action?.();
+        });
+        return buttonNode;
+    };
+    const appendSheetFilterMenuSeparator = (menuNode) => {
+        const separator = document.createElement("div");
+        separator.className = "editor-sheet-filter-menu-separator";
+        menuNode.appendChild(separator);
+    };
+    const openSheetFilterMenu = (buttonNode = null, columnIndex = 0) => {
+        if (!buttonNode || !sheetFilters.range) return;
+        closeSheetFilterMenu();
+        const values = getSheetFilterUniqueValues(columnIndex);
+        const criterion = sheetFilters.criteria?.[String(columnIndex)] || {};
+        const criterionValues = criterion.values || [];
+        const activeSet = new Set(criterionValues.map((value) => String(value ?? "")));
+        const visibleValues = values.slice(0, 25);
+        const menuNode = document.createElement("div");
+        menuNode.className = "custom-context-menu editor-sheet-filter-menu";
+        menuNode.addEventListener("click", (event) => event.stopPropagation());
+        menuNode.appendChild(createSheetFilterMenuButton("Sort A to Z", () => sortSheetFilterRangeByColumn(columnIndex, "asc")));
+        menuNode.appendChild(createSheetFilterMenuButton("Sort Z to A", () => sortSheetFilterRangeByColumn(columnIndex, "desc")));
+        appendSheetFilterMenuSeparator(menuNode);
+        const searchInput = document.createElement("input");
+        searchInput.className = "editor-sheet-filter-search";
+        searchInput.placeholder = "Search";
+        searchInput.value = String(criterion.query || "");
+        searchInput.addEventListener("keydown", (event) => {
+            event.stopPropagation();
+            if (event.key === "Enter") {
+                event.preventDefault();
+                closeSheetFilterMenu();
+                setSheetFilterSearchQuery(columnIndex, searchInput.value);
+            }
+            if (event.key === "Escape") closeSheetFilterMenu();
+        });
+        menuNode.appendChild(searchInput);
+        menuNode.appendChild(createSheetFilterMenuButton("Clear Filter", () => clearSheetFilterCriterion(columnIndex)));
+        menuNode.appendChild(createSheetFilterMenuButton("Select All", () => setSheetFilterCriterionValues(columnIndex, [])));
+        appendSheetFilterMenuSeparator(menuNode);
+        const valuesNode = document.createElement("div");
+        valuesNode.className = "editor-sheet-filter-values";
+        visibleValues.forEach((value) => {
+            const isSelected = !activeSet.size || activeSet.has(value);
+            valuesNode.appendChild(createSheetFilterMenuButton(`${isSelected ? "[x]" : "[ ]"} ${formatSheetFilterMenuValue(value)}`, () => {
+                const nextSet = activeSet.size ? new Set(activeSet) : new Set(values);
+                if (nextSet.has(value)) nextSet.delete(value);
+                else nextSet.add(value);
+                setSheetFilterCriterionValues(columnIndex, [...nextSet]);
+            }));
+        });
+        menuNode.appendChild(valuesNode);
+        if (values.length > visibleValues.length) {
+            appendSheetFilterMenuSeparator(menuNode);
+            const overflowNode = document.createElement("div");
+            overflowNode.className = "editor-sheet-filter-menu-note";
+            overflowNode.textContent = `${values.length - visibleValues.length} more values. Use Search to narrow.`;
+            menuNode.appendChild(overflowNode);
+        }
+        document.body.appendChild(menuNode);
+        activeSheetFilterMenu = menuNode;
+        const buttonRect = buttonNode.getBoundingClientRect();
+        menuNode.style.left = `${buttonRect.left}px`;
+        menuNode.style.top = `${buttonRect.bottom + 4}px`;
+        requestAnimationFrame(() => {
+            const menuRect = menuNode.getBoundingClientRect();
+            if (menuRect.right > window.innerWidth) menuNode.style.left = `${Math.max(4, window.innerWidth - menuRect.width - 4)}px`;
+            if (menuRect.bottom > window.innerHeight) menuNode.style.top = `${Math.max(4, buttonRect.top - menuRect.height - 4)}px`;
+            searchInput.focus();
+            searchInput.select();
+        });
+    };
+    const toggleSheetFiltersForSelection = () => {
+        const range = getSheetFilterRangeFromSelection();
+        if (!range) {
+            modular.error("No header row found for filters");
+            return false;
+        }
+        if (sheetFilters.range && isSheetFilterRangeEqual(sheetFilters.range, range)) {
+            clearSheetFilters();
+            refreshSheetCells();
+            saveSheetPortalState();
+            modular.success("Filter controls removed");
+            return true;
+        }
+        sheetFilters.range = range;
+        sheetFilters.criteria = {};
+        sheetFilters.sort = null;
+        refreshSheetCells();
+        saveSheetPortalState();
+        modular.success("Filter controls applied");
+        return true;
+    };
     const createSheetSearchMatches = (query = "") => {
         captureActiveSheetInput();
         const needle = String(query || "").trim().toLowerCase();
@@ -2434,6 +2805,8 @@
                 applySheetCellStyle(cellReference);
             }
         }
+        refreshSheetFilterControls();
+        applySheetFilterVisibility();
         updateSheetSelectionStyles();
         writeSheetEditorBar();
         renderSheetCharts();
@@ -2471,6 +2844,7 @@
     };
     const insertSheetRowAt = (rowIndex = 0) => {
         captureActiveSheetInput();
+        clearSheetFilters();
         const nextRowIndex = Math.max(0, Math.min(rowIndex, sheetRows));
         const shiftedCells = collectSheetCells().map(({cellReference, value, style, type, link, locked}) => {
             const position = parseSheetCellReference(cellReference);
@@ -2494,6 +2868,7 @@
     const deleteSheetRowAt = (rowIndex = 0) => {
         if (sheetRows <= 1) return;
         captureActiveSheetInput();
+        clearSheetFilters();
         const nextRowIndex = Math.max(0, Math.min(rowIndex, sheetRows - 1));
         const shiftedCells = collectSheetCells().flatMap(({cellReference, value, style, type, link, locked}) => {
             const position = parseSheetCellReference(cellReference);
@@ -2518,6 +2893,7 @@
     };
     const insertSheetColumnAt = (columnIndex = 0) => {
         captureActiveSheetInput();
+        clearSheetFilters();
         const nextColumnIndex = Math.max(0, Math.min(columnIndex, sheetColumns));
         const shiftedCells = collectSheetCells().map(({cellReference, value, style, type, link, locked}) => {
             const position = parseSheetCellReference(cellReference);
@@ -2541,6 +2917,7 @@
     const deleteSheetColumnAt = (columnIndex = 0) => {
         if (sheetColumns <= 1) return;
         captureActiveSheetInput();
+        clearSheetFilters();
         const nextColumnIndex = Math.max(0, Math.min(columnIndex, sheetColumns - 1));
         const shiftedCells = collectSheetCells().flatMap(({cellReference, value, style, type, link, locked}) => {
             const position = parseSheetCellReference(cellReference);
@@ -2793,6 +3170,7 @@
                 style: "editor-sheet-cell",
                 content: children([
                     input({id: `sheet-cell-${cellReference}`, style: "editor-sheet-cell-input", value: ""}),
+                    button({id: `editor-sheet-filter-${cellReference}`, style: "editor-sheet-filter-button", title: "Sort and filter", content: "v"}),
                     div({style: "editor-sheet-cell-lock-indicator", content: SHEET_LOCK_ICON})
                 ])
             }));
@@ -2816,6 +3194,7 @@
                 style: "editor-sheet-cell",
                 content: children([
                     input({id: `sheet-cell-${cellReference}`, style: "editor-sheet-cell-input", value: ""}),
+                    button({id: `editor-sheet-filter-${cellReference}`, style: "editor-sheet-filter-button", title: "Sort and filter", content: "v"}),
                     div({style: "editor-sheet-cell-lock-indicator", content: SHEET_LOCK_ICON})
                 ])
             }));
@@ -2986,6 +3365,13 @@
                 fillActiveSheetSelectionDown();
                 return;
             }
+            if (event.ctrlKey && event.shiftKey && shortcutKey === "l") {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                toggleSheetFiltersForSelection();
+                activeElement?.blur?.();
+                return;
+            }
             if (event.shiftKey && !event.ctrlKey && key === " ") {
                 event.preventDefault();
                 event.stopImmediatePropagation();
@@ -3031,6 +3417,15 @@
                 updateSheetSelectionStyles();
                 saveSheetPortalState();
             });
+            document.addEventListener("click", (event) => {
+                if (!activeSheetFilterMenu) return;
+                if (activeSheetFilterMenu.contains(event.target)) return;
+                if (event.target?.closest?.(".editor-sheet-filter-button")) return;
+                closeSheetFilterMenu();
+            }, true);
+            document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") closeSheetFilterMenu();
+            }, true);
         }
         if (document.body?.dataset.sheetResizeBound !== "1") {
             document.body.dataset.sheetResizeBound = "1";
@@ -3141,6 +3536,20 @@
                     saveSheetPortalState();
                     cellInput.blur();
                 });
+                const filterButton = document.getElementById(`editor-sheet-filter-${cellReference}`);
+                if (filterButton && filterButton.dataset.bound !== "1") {
+                    filterButton.dataset.bound = "1";
+                    filterButton.addEventListener("mousedown", (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    });
+                    filterButton.addEventListener("click", (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const position = parseSheetCellReference(cellReference);
+                        openSheetFilterMenu(filterButton, position.columnIndex);
+                    });
+                }
             }
             const rowHeader = document.getElementById(`editor-sheet-row-${rowIndex}`);
             if (rowHeader && rowHeader.dataset.bound !== "1") {

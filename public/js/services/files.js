@@ -330,6 +330,7 @@
     const isImageFilePath = (rawPath = "") => /\.(png|ico|gif|jpeg|jpg|svg|tiff|bm|avif|webp)$/i.test(String(rawPath || ""));
     const isSvgFilePath = (rawPath = "") => /\.svg$/i.test(String(rawPath || ""));
     const isVideoFilePath = (rawPath = "") => /\.(mp4|webm|mov|m4v|avi|mkv|mpeg|mpg|ogv)$/i.test(String(rawPath || ""));
+    const isPdfFilePath = (rawPath = "") => /\.pdf$/i.test(String(rawPath || ""));
     const getDefaultUploadDirectory = () => normalizeUploadDirectory(window.StandardFilesUploadDirectory || active_upload_directory || modular.working_directory || "Documents");
     const uploadSelectedFiles = async (fileList, options = {}) => {
         const files = Array.from(fileList || []);
@@ -439,6 +440,11 @@
         const download = await downloadFileForOpen(rawPath);
         return openCodeFilePath(download.path, await download.blob.text(), sourceNode);
     };
+    const openPdfInInternalsApp = async (rawPath = "", sourceNode = null) => {
+        const openPdfFilePath = await waitForServiceMethod(() => window.StandardInternals?.openPdfFilePath, "com.standard.internals");
+        if (!openPdfFilePath) return false;
+        return openPdfFilePath(rawPath, sourceNode);
+    };
     const openFilePath = async (rawPath = "", sourceNode = null) => {
         if (isWhiteboardFilePath(rawPath)) {
             return openWhiteboardInBoardsApp(rawPath, sourceNode);
@@ -460,6 +466,9 @@
         }
         if (isVideoFilePath(rawPath)) {
             return openFileInInternalsApp(rawPath, sourceNode);
+        }
+        if (isPdfFilePath(rawPath)) {
+            return openPdfInInternalsApp(rawPath, sourceNode);
         }
         return openFileInInternalsApp(rawPath, sourceNode);
     };
