@@ -683,8 +683,23 @@ function flushQueuedWsRequests(error) {
     });
 }
 
+function isBinaryWsPayload(payload) {
+    return Buffer.isBuffer(payload) || payload instanceof ArrayBuffer || ArrayBuffer.isView(payload);
+}
+
+function sendWsPayload(payload, callback = null) {
+    const options = isBinaryWsPayload(payload)
+        ? {binary: true, compress: false, fin: true}
+        : undefined;
+    if (options) {
+        wsClient.send(payload, options, callback || undefined);
+        return;
+    }
+    wsClient.send(payload, callback || undefined);
+}
+
 function sendQueuedWsPayload(entry, payload) {
-    wsClient.send(payload, err => {
+    sendWsPayload(payload, err => {
         if (err) {
             failWsRequest(entry, err);
         }
@@ -1325,7 +1340,7 @@ function withRelayBinaryUploadResponse(res, payload, {onSettled = null, requestN
         response: res,
         timeoutMessage: "Timeout waiting for upload confirmation",
         start: entry => {
-            wsClient.send(payload, err => {
+            sendWsPayload(payload, err => {
                 if (err) {
                     clearFallback();
                     failWsRequest(entry, err);
@@ -1334,7 +1349,7 @@ function withRelayBinaryUploadResponse(res, payload, {onSettled = null, requestN
                 fallbackHandle = setTimeout(() => {
                     fallbackHandle = null;
                     if (!res.headersSent) {
-                        res.send("Upload sent");
+                        res.send("Upload queued");
                     }
                     completeWsRequest(entry);
                 }, WS_BINARY_SETTLE_MS);
@@ -1922,7 +1937,7 @@ app.post("/api/upload/temp", uploadSingleFile, async (req, res) => {
         const fileName = req.file.originalname;
         const tempPayload = buildBinaryCommandPayload("temp", fileName, req.file.buffer, resolveRelayContext(req));
         withWsResponse(res, () => {
-            wsClient.send(tempPayload);
+            sendWsPayload(tempPayload);
         }, data => {
             res.type("text/plain").send(data.toString());
         }, {timeoutMessage: "Timeout waiting for upload confirmation"});
@@ -1955,7 +1970,7 @@ app.post("/api/upload", uploadSingleFile, async (req, res) => {
                     return;
                 }
                 withWsResponse(res, () => {
-                    wsClient.send(importPayload);
+                    sendWsPayload(importPayload);
                 }, data => {
                     res.send(data.toString());
                 }, {

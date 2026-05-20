@@ -54,7 +54,20 @@
                             input({id: "maps-search-input", placeholder: "Search by address or lat, lng", style: "maps-search-input", type: "text"}),
                                 div({id: "maps-search-autocomplete", style: "maps-search-autocomplete hidden"})
                             ].join("")}),
-                            button({id: "maps-search-button", style: "maps-search-button", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="smaller-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>`})
+                            button({id: "maps-search-button", style: "maps-search-button", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="smaller-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>`}),
+                            button({id: "maps-directions-toggle", style: "maps-search-button", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="smaller-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75 11.25 4.5 13.5 6.75M11.25 4.5v15m0 0L9 17.25m2.25 2.25 2.25-2.25M15.75 8.25h1.875A2.625 2.625 0 0 1 20.25 10.875v0A2.625 2.625 0 0 1 17.625 13.5H6.375A2.625 2.625 0 0 0 3.75 16.125v0A2.625 2.625 0 0 0 6.375 18.75H7.5" /></svg>`})
+                        ].join("")}) +
+                    div({id: "maps-directions-panel", style: "maps-directions-panel hidden", content: [
+                            div({style: "maps-directions-fields", content: [
+                                    input({id: "maps-directions-origin", placeholder: "Start address or lat, lng", style: "maps-directions-input", type: "text"}),
+                                    input({id: "maps-directions-destination", placeholder: "Destination address or lat, lng", style: "maps-directions-input", type: "text"})
+                                ].join("")}),
+                            div({style: "maps-directions-actions", content: [
+                                    button({id: "maps-directions-route", style: "maps-directions-action", content: "Route"}),
+                                    button({id: "maps-directions-clear", style: "maps-directions-action secondary-bordered no-background", content: "Clear"})
+                                ].join("")}),
+                            div({id: "maps-directions-summary", style: "maps-directions-summary hidden"}),
+                            `<ol id="maps-directions-steps" class="maps-directions-steps hidden"></ol>`
                         ].join("")}) +
                     div({style: "maps-controls-overlay no-background", content: [
                             button({id: "maps-zoom-in", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`}),
@@ -134,7 +147,15 @@
                 const ACTIVE_LOCATION_SOURCE_ID = "active-location-source";
                 const ACTIVE_LOCATION_LAYER_ID = "active-location-layer";
                 const ACTIVE_LOCATION_IMAGE_ID = "active-location-dot";
+                const DIRECTIONS_ROUTE_SOURCE_ID = "directions-route-source";
+                const DIRECTIONS_ROUTE_OUTLINE_LAYER_ID = "directions-route-outline-layer";
+                const DIRECTIONS_ROUTE_LAYER_ID = "directions-route-layer";
+                const DIRECTIONS_POINTS_SOURCE_ID = "directions-points-source";
+                const DIRECTIONS_POINTS_LAYER_ID = "directions-points-layer";
+                const DIRECTIONS_POINTS_LABEL_LAYER_ID = "directions-points-label-layer";
                 let activeLocationLayerHandlersAttached = false;
+                let pendingDirectionsRouteData = null;
+                let pendingDirectionsPointsData = null;
                 const formatCoordinate = (value) => Number(value).toFixed(6);
                 const buildActiveLocationFeature = (lng, lat, label = "Selected Location") => ({
                     type: "Feature",
@@ -241,6 +262,136 @@
                         }
                     }
                 };
+                const buildDirectionsRouteData = (geometry) => ({
+                    type: "FeatureCollection",
+                    features: [{
+                        type: "Feature",
+                        geometry,
+                        properties: {}
+                    }]
+                });
+                const buildDirectionsPointsData = (origin, destination) => ({
+                    type: "FeatureCollection",
+                    features: [{
+                        type: "Feature",
+                        geometry: {
+                            type: "Point",
+                            coordinates: origin.coordinates
+                        },
+                        properties: {
+                            label: "A",
+                            title: origin.label || "Start"
+                        }
+                    }, {
+                        type: "Feature",
+                        geometry: {
+                            type: "Point",
+                            coordinates: destination.coordinates
+                        },
+                        properties: {
+                            label: "B",
+                            title: destination.label || "Destination"
+                        }
+                    }]
+                });
+                const ensureDirectionsLayers = () => {
+                    if (!map.isStyleLoaded() || !pendingDirectionsRouteData || !pendingDirectionsPointsData) return;
+                    if (!map.getSource(DIRECTIONS_ROUTE_SOURCE_ID)) {
+                        map.addSource(DIRECTIONS_ROUTE_SOURCE_ID, {
+                            type: "geojson",
+                            data: pendingDirectionsRouteData
+                        });
+                    }
+                    if (!map.getLayer(DIRECTIONS_ROUTE_OUTLINE_LAYER_ID)) {
+                        map.addLayer({
+                            id: DIRECTIONS_ROUTE_OUTLINE_LAYER_ID,
+                            type: "line",
+                            source: DIRECTIONS_ROUTE_SOURCE_ID,
+                            layout: {
+                                "line-cap": "round",
+                                "line-join": "round"
+                            },
+                            paint: {
+                                "line-color": "#ffffff",
+                                "line-width": 8,
+                                "line-opacity": 0.9
+                            }
+                        });
+                    }
+                    if (!map.getLayer(DIRECTIONS_ROUTE_LAYER_ID)) {
+                        map.addLayer({
+                            id: DIRECTIONS_ROUTE_LAYER_ID,
+                            type: "line",
+                            source: DIRECTIONS_ROUTE_SOURCE_ID,
+                            layout: {
+                                "line-cap": "round",
+                                "line-join": "round"
+                            },
+                            paint: {
+                                "line-color": "#0a84ff",
+                                "line-width": 5,
+                                "line-opacity": 0.95
+                            }
+                        });
+                    }
+                    if (!map.getSource(DIRECTIONS_POINTS_SOURCE_ID)) {
+                        map.addSource(DIRECTIONS_POINTS_SOURCE_ID, {
+                            type: "geojson",
+                            data: pendingDirectionsPointsData
+                        });
+                    }
+                    if (!map.getLayer(DIRECTIONS_POINTS_LAYER_ID)) {
+                        map.addLayer({
+                            id: DIRECTIONS_POINTS_LAYER_ID,
+                            type: "circle",
+                            source: DIRECTIONS_POINTS_SOURCE_ID,
+                            paint: {
+                                "circle-color": "#ff9f0a",
+                                "circle-radius": 12,
+                                "circle-stroke-color": "#ffffff",
+                                "circle-stroke-width": 3
+                            }
+                        });
+                    }
+                    if (!map.getLayer(DIRECTIONS_POINTS_LABEL_LAYER_ID)) {
+                        map.addLayer({
+                            id: DIRECTIONS_POINTS_LABEL_LAYER_ID,
+                            type: "symbol",
+                            source: DIRECTIONS_POINTS_SOURCE_ID,
+                            layout: {
+                                "text-field": ["get", "label"],
+                                "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+                                "text-size": 12,
+                                "text-allow-overlap": true
+                            },
+                            paint: {
+                                "text-color": "#ffffff"
+                            }
+                        });
+                    }
+                };
+                const setDirectionsData = ({route, origin, destination}) => {
+                    pendingDirectionsRouteData = buildDirectionsRouteData(route.geometry);
+                    pendingDirectionsPointsData = buildDirectionsPointsData(origin, destination);
+                    ensureDirectionsLayers();
+                    map.getSource(DIRECTIONS_ROUTE_SOURCE_ID)?.setData(pendingDirectionsRouteData);
+                    map.getSource(DIRECTIONS_POINTS_SOURCE_ID)?.setData(pendingDirectionsPointsData);
+                };
+                const clearDirectionsData = () => {
+                    pendingDirectionsRouteData = null;
+                    pendingDirectionsPointsData = null;
+                    [
+                        DIRECTIONS_POINTS_LABEL_LAYER_ID,
+                        DIRECTIONS_POINTS_LAYER_ID,
+                        DIRECTIONS_ROUTE_LAYER_ID,
+                        DIRECTIONS_ROUTE_OUTLINE_LAYER_ID
+                    ].forEach((layerId) => {
+                        if (map.getLayer(layerId)) map.removeLayer(layerId);
+                    });
+                    [DIRECTIONS_POINTS_SOURCE_ID, DIRECTIONS_ROUTE_SOURCE_ID].forEach((sourceId) => {
+                        if (map.getSource(sourceId)) map.removeSource(sourceId);
+                    });
+                };
                 const setActiveLocation = (lng, lat, label = "Selected Location") => {
                     if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
                     pendingActiveLocationFeature = {lng, lat, label};
@@ -262,6 +413,14 @@
                 const zoomOutButton = document.getElementById("maps-zoom-out");
                 const styleButton = document.getElementById("maps-style");
                 const homeButton = document.getElementById("maps-home");
+                const directionsToggleButton = document.getElementById("maps-directions-toggle");
+                const directionsPanel = document.getElementById("maps-directions-panel");
+                const directionsOriginInput = document.getElementById("maps-directions-origin");
+                const directionsDestinationInput = document.getElementById("maps-directions-destination");
+                const directionsRouteButton = document.getElementById("maps-directions-route");
+                const directionsClearButton = document.getElementById("maps-directions-clear");
+                const directionsSummary = document.getElementById("maps-directions-summary");
+                const directionsSteps = document.getElementById("maps-directions-steps");
                 let cachedSearches = [];
                 let cacheWriteInFlight = Promise.resolve();
                 let activeStyleId = MAP_STYLE_OPTIONS[0].id;
@@ -287,6 +446,45 @@
                         lat: looksLikeLatLng ? first : second,
                         lng: looksLikeLatLng ? second : first
                     };
+                };
+                const fetchGeocodedLocation = async (query) => {
+                    const normalizedQuery = normalizeSearchValue(query);
+                    if (!normalizedQuery) return null;
+                    const coordinates = parseSearchCoordinates(normalizedQuery);
+                    if (coordinates) {
+                        return {
+                            coordinates: [coordinates.lng, coordinates.lat],
+                            label: normalizedQuery
+                        };
+                    }
+                    if (/^(current location|my location|here)$/i.test(normalizedQuery)) {
+                        return {
+                            coordinates: homeCoordinates,
+                            label: homeLocationLabel
+                        };
+                    }
+                    const geocodeResponse = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(normalizedQuery)}.json?limit=1&access_token=${encodeURIComponent(mapboxgl.accessToken)}`);
+                    if (!geocodeResponse.ok) throw new Error("Unable to geocode location");
+                    const geocodeData = await geocodeResponse.json();
+                    const firstFeature = geocodeData?.features?.[0];
+                    if (!Array.isArray(firstFeature?.center) || firstFeature.center.length !== 2) return null;
+                    return {
+                        coordinates: firstFeature.center,
+                        label: firstFeature.place_name || normalizedQuery
+                    };
+                };
+                const formatDistance = (meters) => {
+                    if (!Number.isFinite(meters)) return "";
+                    const miles = meters / 1609.344;
+                    return miles >= 10 ? `${Math.round(miles)} mi` : `${miles.toFixed(1)} mi`;
+                };
+                const formatDuration = (seconds) => {
+                    if (!Number.isFinite(seconds)) return "";
+                    const minutes = Math.max(1, Math.round(seconds / 60));
+                    if (minutes < 60) return `${minutes} min`;
+                    const hours = Math.floor(minutes / 60);
+                    const remainingMinutes = minutes % 60;
+                    return remainingMinutes ? `${hours} hr ${remainingMinutes} min` : `${hours} hr`;
                 };
                 const getAutocompleteMatches = (query) => {
                     const normalizedQuery = normalizeSearchValue(query).toLowerCase();
@@ -341,14 +539,99 @@
                         scheduleCachedSearchSave(query);
                         return;
                     }
-                    const geocodeResponse = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?limit=1&access_token=${mapboxgl.accessToken}`);
-                    const geocodeData = await geocodeResponse.json();
-                    const firstFeature = geocodeData?.features?.[0];
-                    const firstMatch = firstFeature?.center;
-                    if (Array.isArray(firstMatch) && firstMatch.length === 2) {
-                        flyToCoordinates(firstMatch[0], firstMatch[1], 14, firstFeature.place_name || query);
+                    const location = await fetchGeocodedLocation(query);
+                    if (Array.isArray(location?.coordinates) && location.coordinates.length === 2) {
+                        flyToCoordinates(location.coordinates[0], location.coordinates[1], 14, location.label || query);
                     }
                     scheduleCachedSearchSave(query);
+                };
+                const setDirectionsMessage = (message, isError = false) => {
+                    if (!directionsSummary) return;
+                    directionsSummary.textContent = message;
+                    directionsSummary.classList.toggle("maps-directions-error", isError);
+                    directionsSummary.classList.remove("hidden");
+                };
+                const hideDirectionsOutput = () => {
+                    directionsSummary?.classList.add("hidden");
+                    directionsSummary?.classList.remove("maps-directions-error");
+                    if (directionsSteps) {
+                        directionsSteps.innerHTML = "";
+                        directionsSteps.classList.add("hidden");
+                    }
+                };
+                const renderDirectionsSteps = (route) => {
+                    if (!directionsSteps) return;
+                    directionsSteps.innerHTML = "";
+                    const steps = route?.legs?.flatMap((leg) => leg.steps || []) || [];
+                    steps.slice(0, 12).forEach((step) => {
+                        const item = document.createElement("li");
+                        const instruction = document.createElement("span");
+                        instruction.textContent = step.maneuver?.instruction || "Continue";
+                        const distance = document.createElement("small");
+                        distance.textContent = formatDistance(step.distance);
+                        item.appendChild(instruction);
+                        if (distance.textContent) item.appendChild(distance);
+                        directionsSteps.appendChild(item);
+                    });
+                    directionsSteps.classList.toggle("hidden", !steps.length);
+                };
+                const fitDirectionsBounds = (route, origin, destination) => {
+                    const bounds = new mapboxgl.LngLatBounds();
+                    const routeCoordinates = Array.isArray(route?.geometry?.coordinates) ? route.geometry.coordinates : [];
+                    routeCoordinates.forEach((coordinate) => bounds.extend(coordinate));
+                    bounds.extend(origin.coordinates);
+                    bounds.extend(destination.coordinates);
+                    map.fitBounds(bounds, {
+                        padding: {top: 130, right: 80, bottom: 80, left: 80},
+                        maxZoom: 16,
+                        duration: 900
+                    });
+                };
+                const runDirections = async () => {
+                    const originQuery = normalizeSearchValue(directionsOriginInput?.value);
+                    const destinationQuery = normalizeSearchValue(directionsDestinationInput?.value);
+                    if (!originQuery || !destinationQuery) {
+                        setDirectionsMessage("Enter a start and destination.", true);
+                        return;
+                    }
+                    directionsRouteButton?.setAttribute("disabled", "disabled");
+                    setDirectionsMessage("Finding route...");
+                    try {
+                        const [origin, destination] = await Promise.all([
+                            fetchGeocodedLocation(originQuery),
+                            fetchGeocodedLocation(destinationQuery)
+                        ]);
+                        if (!origin || !destination) {
+                            setDirectionsMessage("Could not find one of those places.", true);
+                            return;
+                        }
+                        const coordinates = `${origin.coordinates[0]},${origin.coordinates[1]};${destination.coordinates[0]},${destination.coordinates[1]}`;
+                        const routeResponse = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?alternatives=false&geometries=geojson&overview=full&steps=true&access_token=${encodeURIComponent(mapboxgl.accessToken)}`);
+                        if (!routeResponse.ok) throw new Error("Unable to load route");
+                        const routeData = await routeResponse.json();
+                        const route = routeData?.routes?.[0];
+                        if (!route?.geometry) {
+                            setDirectionsMessage("No route found.", true);
+                            return;
+                        }
+                        setDirectionsData({route, origin, destination});
+                        setDirectionsMessage(`${formatDistance(route.distance)} • ${formatDuration(route.duration)}`);
+                        renderDirectionsSteps(route);
+                        fitDirectionsBounds(route, origin, destination);
+                        scheduleCachedSearchSave(originQuery);
+                        scheduleCachedSearchSave(destinationQuery);
+                    } catch (error) {
+                        console.error("Failed to load directions:", error);
+                        setDirectionsMessage("Directions are unavailable right now.", true);
+                    } finally {
+                        directionsRouteButton?.removeAttribute("disabled");
+                    }
+                };
+                const clearDirections = () => {
+                    clearDirectionsData();
+                    hideDirectionsOutput();
+                    if (directionsOriginInput) directionsOriginInput.value = "";
+                    if (directionsDestinationInput) directionsDestinationInput.value = "";
                 };
                 try {
                     const payload = await view.cache.get(MAPS_CACHE_KEY, {format: "json"});
@@ -357,7 +640,7 @@
                 } catch (error) {
                     console.error("Failed to load cached map searches:", error);
                 }
-                searchButton.addEventListener("click", runSearch);
+                searchButton.addEventListener("click", () => runSearch());
                 searchInput.addEventListener("keydown", (event) => {
                     if (event.key === "Enter") runSearch();
                     if (event.key === "Escape") setAutocompleteVisibility(false);
@@ -373,6 +656,20 @@
                     event.preventDefault();
                     const value = decodeURIComponent(option.getAttribute("data-maps-autocomplete-value") || "");
                     runSearch(value);
+                });
+                directionsToggleButton?.addEventListener("click", () => {
+                    directionsPanel?.classList.toggle("hidden");
+                    if (!directionsPanel?.classList.contains("hidden")) {
+                        directionsOriginInput?.focus();
+                    }
+                });
+                directionsRouteButton?.addEventListener("click", runDirections);
+                directionsClearButton?.addEventListener("click", clearDirections);
+                [directionsOriginInput, directionsDestinationInput].forEach((directionsInput) => {
+                    directionsInput?.addEventListener("keydown", (event) => {
+                        if (event.key === "Enter") runDirections();
+                        if (event.key === "Escape") directionsPanel?.classList.add("hidden");
+                    });
                 });
                 const handleDocumentClick = (event) => {
                     if (!mapShell.contains(event.target)) {
@@ -403,6 +700,9 @@
                         map.resize();
                         ensureActiveLocationLayer();
                         setActiveLocation(pendingActiveLocationFeature.lng, pendingActiveLocationFeature.lat, pendingActiveLocationFeature.label);
+                        ensureDirectionsLayers();
+                        if (pendingDirectionsRouteData) map.getSource(DIRECTIONS_ROUTE_SOURCE_ID)?.setData(pendingDirectionsRouteData);
+                        if (pendingDirectionsPointsData) map.getSource(DIRECTIONS_POINTS_SOURCE_ID)?.setData(pendingDirectionsPointsData);
                     };
                     map.once("style.load", handleStyleLoad);
                     try {

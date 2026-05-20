@@ -371,10 +371,15 @@
                     if (multiProgress) multiProgress.update({currentIndex: index, file, loaded: file.size || 1, total: file.size || 1});
                 }
             }
+        } catch (error) {
+            console.error("File upload failed:", error);
+            modular.error(error?.message || "Upload failed");
+            throw error;
         } finally {
             if (multiProgress) multiProgress.hide();
         }
         modular.refresh("com.standard.files");
+        modular.success(files.length === 1 ? `Uploaded ${files[0]?.name || "file"}` : `Uploaded ${files.length} files`);
     };
     window.StandardFilesUploadSelectedFiles = uploadSelectedFiles;
     const openWhiteboardInBoardsApp = async (rawPath = "", sourceNode = null) => {

@@ -336,10 +336,45 @@ function searchablePortals() {
 
 let activeSearchResultIndex = -1;
 let articleSearchRequestVersion = 0;
+let activeArticleSearchController = null;
 let clientContextPromise = null;
 let searchFilterMode = "";
 let searchFilterAnimating = false;
 const SEARCH_DESCRIPTION_PREFIX = "description:";
+
+function abortActiveArticleSearchController() {
+    if (!activeArticleSearchController) return;
+    const controller = activeArticleSearchController;
+    activeArticleSearchController = null;
+    if (!controller.signal?.aborted) {
+        controller.abort();
+    }
+}
+
+function cancelActiveArticleSearch({clearLoading = false} = {}) {
+    articleSearchRequestVersion++;
+    abortActiveArticleSearchController();
+    if (clearLoading) {
+        document.getElementById("search-status")?.isLoading?.(false);
+    }
+}
+
+function beginArticleSearchRequest() {
+    abortActiveArticleSearchController();
+    if (typeof AbortController !== "function") return null;
+    activeArticleSearchController = new AbortController();
+    return activeArticleSearchController;
+}
+
+function finishArticleSearchRequest(controller) {
+    if (controller && activeArticleSearchController === controller) {
+        activeArticleSearchController = null;
+    }
+}
+
+function isAbortError(error) {
+    return error?.name === "AbortError";
+}
 
 function getClientContext() {
     if (!clientContextPromise) {
@@ -605,7 +640,7 @@ function resolveArticleRecords(response) {
     return Array.isArray(firstArrayEntry) ? firstArrayEntry : [];
 }
 
-async function sendArticleCliCommand(command = "") {
+async function sendArticleCliCommand(command = "", {signal = null} = {}) {
     const normalizedCommand = String(command || "").trim();
     if (!normalizedCommand) return "";
     const usePost = normalizedCommand.length > 1500;
@@ -621,6 +656,9 @@ async function sendArticleCliCommand(command = "") {
             "Expires": "0"
         }
     };
+    if (signal) {
+        options.signal = signal;
+    }
     if (usePost) {
         options.headers["Content-Type"] = "application/json";
         options.body = JSON.stringify({query: normalizedCommand});
@@ -678,11 +716,11 @@ function enhanceArticleSearchResultIcon(result, article = {}, requestVersion = 0
     });
 }
 
-async function appendArticleSearchResults(rawQuery = "", requestVersion = 0, articleField = "title") {
+async function appendArticleSearchResults(rawQuery = "", requestVersion = 0, articleField = "title", {signal = null} = {}) {
     const command = buildArticleSearchCommand(rawQuery, articleField);
     if (!command) return [];
     try {
-        const response = await sendArticleCliCommand(command);
+        const response = await sendArticleCliCommand(command, {signal});
         if (requestVersion !== articleSearchRequestVersion) return [];
         const normalizedQuery = String(rawQuery || "").replace(/\s+/g, " ").trim();
         const sortField = articleField === "description" ? "description" : "title";
@@ -700,6 +738,7 @@ async function appendArticleSearchResults(rawQuery = "", requestVersion = 0, art
         });
         return articles;
     } catch (error) {
+        if (isAbortError(error)) return [];
         if (requestVersion === articleSearchRequestVersion) {
             console.error("Failed to search articles:", error);
         }
@@ -734,8 +773,8 @@ function renderCachedSearchResults(rawQuery = "") {
     return {calculation, matchingPortals};
 }
 
-function renderArticleSearchResults(rawQuery = "", requestVersion = 0, cachedSearch = {}, articleField = "title") {
-    return appendArticleSearchResults(rawQuery, requestVersion, articleField).then((articles) => {
+function renderArticleSearchResults(rawQuery = "", requestVersion = 0, cachedSearch = {}, articleField = "title", options = {}) {
+    return appendArticleSearchResults(rawQuery, requestVersion, articleField, options).then((articles) => {
         if (requestVersion !== articleSearchRequestVersion) return [];
         const hasCachedResults = Boolean(cachedSearch?.calculation) || Boolean(cachedSearch?.matchingPortals?.length);
         if (!hasCachedResults && articles.length) {
@@ -849,6 +888,7 @@ function renderSearchResult(portal, matchingHint) {
 
     result.append(body);
     result.onclick = () => {
+        cancelActiveArticleSearch({clearLoading: true});
         openPortal(portal);
         document.getElementById("search-box").value = "";
         clearSearchFilterPrefix();
@@ -934,6 +974,7 @@ function updateSearchResults() {
     const searchStatus = document.getElementById("search-status");
     const searchBox = document.getElementById("search-box");
     const searchResults = document.getElementById("search-results");
+    abortActiveArticleSearchController();
     const currentArticleSearchVersion = ++articleSearchRequestVersion;
     searchStatus.isLoading();
     activateSearchFilterPrefix();
@@ -955,7 +996,11 @@ function updateSearchResults() {
         resetActiveSearchResult();
     }
 
-    renderArticleSearchResults(rawQuery, currentArticleSearchVersion, cachedSearch, searchState.articleField).finally(() => {
+    const articleSearchController = beginArticleSearchRequest();
+    renderArticleSearchResults(rawQuery, currentArticleSearchVersion, cachedSearch, searchState.articleField, {
+        signal: articleSearchController?.signal || null
+    }).finally(() => {
+        finishArticleSearchRequest(articleSearchController);
         if (currentArticleSearchVersion === articleSearchRequestVersion) {
             searchStatus.isLoading(false);
         }
