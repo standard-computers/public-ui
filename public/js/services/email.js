@@ -8,6 +8,7 @@
     const buildCategoryCommand = (recordId, category) => `[email] category ${category ? escapeEmailCommandValue(category) : "\"\""} <id "${escapeEmailCommandValue(recordId)}">`;
     const buildReplyCommand = recordId => `[email] reply <id "${escapeEmailCommandValue(recordId)}">`;
     const buildMoveFolderCommand = (recordId, folder) => `[email] folder "${escapeEmailCommandValue(folder)}" <id "${escapeEmailCommandValue(recordId)}">`;
+    const EMAIL_CONTENT_PREFIX = "__STD_EMAIL_B64__:";
     const EMAIL_FOLDERS = [
         {folder: "inbox", title: "Inbox", icon: "inbox"},
         {folder: "sent", title: "Sent", icon: "sent"},
@@ -16,6 +17,8 @@
         {folder: "spam", title: "Spam", icon: "spam"},
         {folder: "deleted", title: "Deleted", icon: "deleted"}
     ];
+    const EMAIL_FONT_FAMILIES = window.StandardUI?.fontFamilies || ["Inter", "Georgia", "Times New Roman", "Courier New", "Verdana"];
+    const EMAIL_FONT_SIZES = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72"];
     const MAIL_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>`;
     const INBOX_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3" /></svg>`;
     const SENT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg>`;
@@ -26,9 +29,28 @@
     const READ_UNREAD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 9v8.25A2.25 2.25 0 0 1 19.5 19.5h-15a2.25 2.25 0 0 1-2.25-2.25V9m19.5 0A2.25 2.25 0 0 0 19.5 6.75h-15A2.25 2.25 0 0 0 2.25 9m19.5 0-8.25 5.25a2.25 2.25 0 0 1-3 0L2.25 9" /></svg>`;
     const CATEGORY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l8.682 8.682a2.25 2.25 0 0 0 3.182 0l4.318-4.318a2.25 2.25 0 0 0 0-3.182L11.159 3.659A2.25 2.25 0 0 0 9.568 3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z" /></svg>`;
     const REPLY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>`;
+    const PLUS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`;
+    const SEND_ACTION_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg>`;
     const ARCHIVE_ACTION_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>`;
     const STAR_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>`;
     const CATEGORY_ACTION_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z" /></svg>`;
+    const COMPOSER_FORMAT_COMMANDS = [{
+        command: "bold",
+        title: "Bold",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`
+    }, {
+        command: "italic",
+        title: "Italicize",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.2558594 22.003906 L 14.0058594 22.003906 L 14.0058594 20.503906 L 13.2558594 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`
+    }, {
+        command: "underline",
+        title: "Underline",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 6.0058594 2 L 6.0058594 2.75 L 6.0058594 12.585938 C 6.0058594 15.618894 8.7446099 18.001953 12.003906 18.001953 C 15.263203 18.001953 18.003906 15.618893 18.003906 12.585938 L 18.003906 2.75 L 18.003906 2 L 16.503906 2 L 16.503906 2.75 L 16.503906 12.585938 C 16.503906 14.706981 14.54261 16.501953 12.003906 16.501953 C 9.4652032 16.501953 7.5058594 14.70698 7.5058594 12.585938 L 7.5058594 2.75 L 7.5058594 2 L 6.0058594 2 z M 4.9980469 20.003906 L 4.9980469 21.503906 L 5.7480469 21.503906 L 18.251953 21.503906 L 19.001953 21.503906 L 19.001953 20.003906 L 18.251953 20.003906 L 5.7480469 20.003906 L 4.9980469 20.003906 z"/></svg>`
+    }, {
+        command: "insertUnorderedList",
+        title: "List",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`
+    }];
     let emailListPaneWidth = 340;
     let activeEmailResize = null;
     let mailboxMessages = [];
@@ -38,10 +60,19 @@
     let activeViewerMessage = null;
     let activeViewerFolderTitle = "";
     let activeViewerFolder = "";
+    let activeComposeState = {};
     const mailboxCache = new Map();
     const mailboxFetches = new Map();
     let mailboxPrefetchStarted = false;
     const escapeMarkup = value => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    const escapeCliQuotedValue = value => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const encodeEmailContent = value => {
+        const bytes = new TextEncoder().encode(String(value || ""));
+        let binary = "";
+        bytes.forEach(byte => binary += String.fromCharCode(byte));
+        return `${EMAIL_CONTENT_PREFIX}${btoa(binary)}`;
+    };
+    const serializeEmailContent = value => escapeCliQuotedValue(encodeEmailContent(value));
     const firstValue = (record, keys, fallback = "") => {
         for (const key of keys) {
             const value = record?.[key];
@@ -208,6 +239,7 @@
         id: "email-editor-toolbar",
         style: "bordered shadowed radius small-padding blurred",
         content: div({style: "faded", content: children([
+            button({style: "naked align-bottom small-margin-right inner-radius", title: "New Email", icon: PLUS_ICON, onclick: () => openBlankEmailComposer()}),
             button({style: "naked align-bottom small-margin-right inner-radius", title: "Reply", icon: REPLY_ICON, onclick: event => replyToEmailFromToolbar(event)}),
             button({style: "naked align-bottom small-margin-right inner-radius", title: "Archive", icon: ARCHIVE_ACTION_ICON, onclick: event => moveEmailFromToolbar(event, "archived")}),
             button({style: "naked align-bottom small-margin-right inner-radius", title: "Delete", icon: DELETED_ICON, onclick: event => moveEmailFromToolbar(event, "deleted")}),
@@ -368,6 +400,188 @@
         viewer?.setWindowState?.({messageId: message.id, folderTitle: activeViewerFolderTitle}, {persist: false});
         viewer?.refresh?.();
     };
+    const getReplySubject = message => {
+        const subject = String(message?.subject || "").trim();
+        return subject.toLowerCase().startsWith("re:") ? subject : `Re: ${subject || "(No subject)"}`;
+    };
+    const getEmailThreadValue = message => {
+        const raw = message?.raw || message || {};
+        return firstValue(raw, ["thread", "threadId", "thread_id", "conversation", "conversationId", "conversation_id"], message?.recordId || message?.id || "");
+    };
+    const getCurrentUserEmailAddress = async () => {
+        const cachedUser = typeof modular?.user?.readCachedUserRecord === "function" ? modular.user.readCachedUserRecord() : null;
+        const cachedEmail = firstValue(cachedUser, ["email", "mail", "address", "username", "userid", "id"]);
+        if (cachedEmail) return cachedEmail;
+        try {
+            const userRecord = typeof modular?.user?.data === "function" ? await modular.user.data() : null;
+            const userEmail = firstValue(userRecord, ["email", "mail", "address", "username", "userid", "id"]);
+            if (userEmail) return userEmail;
+        } catch (_) {
+        }
+        return modular?.user?.id?.() || "";
+    };
+    const getComposerStateFromPortal = portal => {
+        const state = portal?.windowState?.() || {};
+        const hasReplyContext = Object.prototype.hasOwnProperty.call(state, "replyTo");
+        return {
+            ...activeComposeState,
+            ...state,
+            replyTo: hasReplyContext ? state.replyTo : (activeComposeState?.replyTo || null)
+        };
+    };
+    const openEmailComposer = (composeState = {}) => {
+        activeComposeState = {
+            mode: "new",
+            to: "",
+            subject: "",
+            body: "",
+            replyTo: null,
+            ...composeState
+        };
+        const composer = modular?.show?.(EMAIL_SERVICE_ID, 2, {newInstance: true, restoreWindowContext: false});
+        composer?.setTitle?.(activeComposeState.replyTo ? "Reply" : "New Email");
+        composer?.setWindowState?.(activeComposeState, {persist: false, merge: false});
+        composer?.refresh?.();
+        return composer;
+    };
+    const openBlankEmailComposer = () => openEmailComposer();
+    const openReplyEmailComposer = context => {
+        if (!context?.message) {
+            modular?.error?.("Select an email to reply");
+            return null;
+        }
+        const message = context.message;
+        return openEmailComposer({
+            mode: "reply",
+            to: message.from || "",
+            subject: getReplySubject(message),
+            body: "",
+            replyTo: {
+                id: message.id,
+                recordId: recordIdForContext(context),
+                thread: getEmailThreadValue(message),
+                from: message.from || "",
+                to: message.to || "",
+                subject: message.subject || "(No subject)",
+                date: message.date || "",
+                folderTitle: resolveMessageFolderTitle(message, getFolderMeta(context.folder).title),
+                snippet: message.snippet || message.body || ""
+            }
+        });
+    };
+    const runComposerFormatCommand = (command, trigger) => {
+        const composerWindow = trigger?.closest?.(".draggable-window");
+        const editor = composerWindow?.querySelector?.(".email-composer-editor");
+        if (!editor) return;
+        editor.focus();
+        document.execCommand(command, false, null);
+    };
+    const applyComposerFontValue = (input, command) => {
+        const composerWindow = input?.closest?.(".draggable-window");
+        const editor = composerWindow?.querySelector?.(".email-composer-editor");
+        const value = window.StandardUI?.getSearchComboBoxValue?.(input) || input?.value || "";
+        if (!editor || !value) return;
+        editor.focus();
+        document.execCommand(command, false, value);
+    };
+    const bindEmailComposerToolbar = (root = document) => {
+        root.querySelectorAll?.(".email-composer-font-family").forEach(input => {
+            if (input.dataset.emailComposerBound === "true") return;
+            input.dataset.emailComposerBound = "true";
+            input.addEventListener("change", () => applyComposerFontValue(input, "fontName"));
+        });
+        root.querySelectorAll?.(".email-composer-font-size").forEach(input => {
+            if (input.dataset.emailComposerBound === "true") return;
+            input.dataset.emailComposerBound = "true";
+            input.addEventListener("change", () => applyComposerFontValue(input, "fontSize"));
+        });
+    };
+    const renderComposerFormattingToolbar = () => div({
+        style: "email-composer-formatbar bordered shadowed radius small-padding blurred",
+        content: div({style: "faded", content: children([
+            searchComboBox({wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo email-composer-font-family", value: "Inter", placeholder: "Font", options: EMAIL_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
+            searchComboBox({wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo email-composer-font-size", value: "12", placeholder: "Size", allow_custom: true, options: EMAIL_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
+            ...COMPOSER_FORMAT_COMMANDS.map(item => button({
+                style: "naked align-bottom small-margin-right inner-radius email-composer-format-button",
+                title: item.title,
+                icon: item.icon,
+                onclick: event => runComposerFormatCommand(item.command, event?.currentTarget || event?.target)
+            }))
+        ])})
+    });
+    const renderReplyContext = replyTo => {
+        if (!replyTo) return "";
+        return div({style: "email-reply-context", content: children([
+            div({style: "email-reply-context-title", content: children([
+                REPLY_ICON,
+                `<span>Replying to</span>`
+            ])}),
+            div({style: "email-reply-context-subject", content: escapeMarkup(replyTo.subject || "(No subject)")}),
+            div({style: "email-reply-context-meta", content: children([
+                replyTo.from ? div({content: `<strong>From</strong> ${escapeMarkup(replyTo.from)}`}) : "",
+                replyTo.to ? div({content: `<strong>To</strong> ${escapeMarkup(replyTo.to)}`}) : "",
+                replyTo.date ? div({content: `<strong>Date</strong> ${escapeMarkup(formatDate(replyTo.date))}`}) : "",
+                replyTo.folderTitle ? div({content: `<strong>Folder</strong> ${escapeMarkup(replyTo.folderTitle)}`}) : ""
+            ])}),
+            replyTo.snippet ? div({style: "email-reply-context-snippet", content: escapeMarkup(replyTo.snippet)}) : ""
+        ])});
+    };
+    const renderEmailComposer = (routeContext = {}) => {
+        const state = routeContext?.windowState?.get?.() || activeComposeState || {};
+        return div({
+            style: "large-padding-top editor-portal-shell email-composer-shell",
+            content: children([
+                renderComposerFormattingToolbar(),
+                div({style: "email-composer-fields", content: children([
+                    label({content: "To"}),
+                    input({style: "email-composer-input", type: "text", value: state.to || "", placeholder: "Recipient"}),
+                    label({content: "Subject"}),
+                    input({style: "email-composer-input", type: "text", value: state.subject || "", placeholder: "Subject"})
+                ])}),
+                renderReplyContext(state.replyTo),
+                div({style: "email-composer-editor", contenteditable: true, content: state.body || ""})
+            ])
+        });
+    };
+    const getComposerPayload = portal => {
+        const body = portal?.body?.();
+        const html = body?.querySelector?.(".email-composer-editor")?.innerHTML || "";
+        return {
+            to: body?.querySelector?.(".email-composer-input")?.value || "",
+            subject: body?.querySelectorAll?.(".email-composer-input")?.[1]?.value || "",
+            body: stripMarkup(html),
+            html
+        };
+    };
+    const buildEmailCreateCommand = async (payload = {}, state = {}) => {
+        const thread = state.replyTo?.thread || state.replyTo?.recordId || state.replyTo?.id || `email-${Date.now()}`;
+        const from = await getCurrentUserEmailAddress();
+        return `[email] + ("${escapeCliQuotedValue(thread)}", false, "${escapeCliQuotedValue(from)}", "${escapeCliQuotedValue(payload.to)}", "", "", "${escapeCliQuotedValue(payload.subject)}", "${serializeEmailContent(payload.body)}", "${serializeEmailContent(payload.html)}", "sent", @, true, false, 0, 1, "$now", @)`;
+    };
+    const sendComposedEmail = async (portal = null) => {
+        const state = getComposerStateFromPortal(portal);
+        const payload = getComposerPayload(portal);
+        if (!payload.to.trim()) {
+            modular?.error?.("Add a recipient before sending");
+            return;
+        }
+        const command = await buildEmailCreateCommand(payload, state);
+        CLI.send(command, false)
+            .then(response => {
+                if (response === 0) {
+                    modular?.error?.("Failed to send email");
+                    return;
+                }
+                portal?.close?.();
+                mailboxCache.delete("sent");
+                fetchMailboxFolder("sent", {force: true}).catch(() => {});
+                modular?.success?.("Email sent");
+            })
+            .catch(error => {
+                console.error("Failed to send email:", error);
+                modular?.error?.("Couldn't send email");
+            });
+    };
     const setMailboxMessageReadState = (context, read) => {
         const recordId = context.message.recordId || resolveEmailRecordId(context.message.raw);
         if (!recordId) {
@@ -467,17 +681,11 @@
     };
     const replyToEmailFromToolbar = event => {
         const context = contextsForToolbarAction(event)[0];
-        const recordId = recordIdForContext(context);
-        if (!recordId) {
+        if (!context?.message) {
             modular?.error?.("Select an email to reply");
             return;
         }
-        CLI.send(buildReplyCommand(recordId))
-            .then(() => modular?.success?.("Reply started"))
-            .catch(error => {
-                console.error("Failed to reply to email:", error);
-                modular?.error?.("Couldn't start reply");
-            });
+        openReplyEmailComposer(context);
     };
     const moveEmailFromToolbar = (event, folder) => {
         const contexts = contextsForToolbarAction(event);
@@ -1016,6 +1224,11 @@
         hints: ["email", "mail", "smtp"],
         dimensions: [1000, 660],
         maximized: true,
+        tools: [{
+            title: "New Email",
+            icon: PLUS_ICON,
+            onclick: () => openBlankEmailComposer()
+        }],
         svg_icon: MAIL_ICON,
         icon: "/icons/interfaces/email.png",
         routes: [{
@@ -1050,5 +1263,22 @@
         svg_icon: MAIL_ICON,
         icon: "/icons/interfaces/email.png",
         route: (_struct, routeContext) => renderEmailViewer(routeContext)
+    }), new Portal({
+        title: "New Email",
+        hints: ["new email", "compose email", "write email", "reply email"],
+        dimensions: [760, 620],
+        svg_icon: MAIL_ICON,
+        icon: "/icons/interfaces/email.png",
+        tools: [{
+            title: "Send",
+            icon: SEND_ACTION_ICON,
+            onclick: (_, context) => sendComposedEmail(context?.portal)
+        }],
+        route: (_struct, routeContext) => renderEmailComposer(routeContext),
+        afterRender: (_windowNode, routeContext) => {
+            bindEmailComposerToolbar(routeContext?.window || document);
+            const editor = routeContext?.window?.querySelector?.(".email-composer-editor");
+            requestAnimationFrame(() => editor?.focus?.());
+        }
     })]));
 })();
