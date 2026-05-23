@@ -586,6 +586,9 @@ body.editor-sheet-resizing-rows {cursor:row-resize}
 .email-message-row {display:flex;align-items:baseline;gap:8px;min-width:0}
 .email-message-sender {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}
 .email-message-date {flex:none;max-width:86px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:calc(var(--fs) - 3px);opacity:0.68}
+.email-message-category {display:inline-flex;align-items:center;gap:6px;max-width:100%;align-self:flex-start;padding:2px 7px 3px 6px;border:1px solid var(--border);border-radius:999px;background:var(--bg);font-size:calc(var(--fs) - 3px);line-height:1.2;opacity:0.86}
+.email-message-category-dot {width:9px;height:9px;min-width:9px;border-radius:50%;border:1px solid var(--secondary-border)}
+.email-message-category-name {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .email-message-subject {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .email-message-snippet {font-size:calc(var(--fs) - 2px);opacity:0.72;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .email-reading-pane {min-width:0;min-height:0;overflow:auto;padding:18px 22px;background:var(--bg)}
@@ -597,11 +600,14 @@ body.editor-sheet-resizing-rows {cursor:row-resize}
 .email-reading-empty,.email-empty-state {height:100%;min-height:320px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;color:var(--faded)}
 .email-empty-icon {width:72px;height:72px;object-fit:contain;opacity:0.72}
 .email-empty-label {font-weight:700;color:var(--fg)}
+.email-category-popout-dot {display:inline-block;width:11px;height:11px;min-width:11px;border-radius:50%;margin:2px 9px 0 0;border:1px solid var(--secondary-border);vertical-align:top}
+.email-category-popout-dot-empty {background:transparent}
 .email-composer-shell {display:flex;flex-direction:column;gap:10px;height:100%;min-height:0;box-sizing:border-box;overflow:hidden}
 .email-composer-formatbar {flex:none}
 .email-composer-format-button {min-width:30px;height:30px;padding:4px 8px;font-weight:700}
 .email-composer-fields {display:grid;grid-template-columns:auto minmax(0, 1fr);gap:8px 10px;align-items:center;flex:none;padding:2px 0 0 0}
 .email-composer-fields label {font-weight:700;opacity:0.74}
+.email-composer-to-wrapper {width:100%;min-width:0}
 .email-composer-input {width:100%;min-width:0;box-sizing:border-box;padding:7px 9px;border:1px solid var(--border);border-radius:calc(var(--radius) - 4px);background:var(--bg);color:var(--fg);font:inherit}
 .email-reply-context {flex:none;padding:12px 14px;border:1px solid var(--border);border-radius:calc(var(--radius) - 2px);background:var(--secondary-bg);display:flex;flex-direction:column;gap:7px;min-width:0}
 .email-reply-context-title {display:flex;align-items:center;gap:8px;font-weight:800;color:var(--primary)}
