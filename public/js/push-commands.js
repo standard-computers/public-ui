@@ -51,6 +51,12 @@
         const title = `${notification.title || "Notification"}`.trim();
         const message = `${notification.message || ""}`.trim();
         const icon = notification.icon || "";
+        const hasAction = typeof notification.onclick === "function";
+        if (hasAction) {
+            node.tabIndex = 0;
+            node.role = "button";
+            node.style.cursor = "pointer";
+        }
         node.innerHTML = `
             <div class="standard-notification-main">
                 <div class="standard-notification-icon" aria-hidden="true">${icon}</div>
@@ -69,15 +75,30 @@
         `;
         tray.prepend(node);
         requestAnimationFrame(() => node.classList.add("show"));
+        window.StandardNotifications.dismiss = notificationNode => {
+            notificationNode?.classList?.remove?.("show");
+            setTimeout(() => notificationNode?.remove?.(), 220);
+        };
         node.querySelector(".standard-notification-dismiss")?.addEventListener("click", () => {
-            node.classList.remove("show");
-            setTimeout(() => node.remove(), 220);
+            window.StandardNotifications.dismiss(node);
         });
         node.querySelector(".standard-notification-toggle")?.addEventListener("click", event => {
             const expanded = node.dataset.expanded !== "true";
             node.dataset.expanded = expanded ? "true" : "false";
             event.currentTarget.setAttribute("aria-expanded", expanded ? "true" : "false");
         });
+        if (hasAction) {
+            const runAction = event => {
+                if (event?.target?.closest?.("button")) return;
+                notification.onclick(node, event);
+            };
+            node.addEventListener("click", runAction);
+            node.addEventListener("keydown", event => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                runAction(event);
+            });
+        }
         return node;
     };
 

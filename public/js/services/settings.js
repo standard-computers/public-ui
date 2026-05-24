@@ -51,12 +51,6 @@
         document.body.removeChild(anchor);
         URL.revokeObjectURL(href);
     };
-    const docsRoot = "/documentation/R1";
-    let docsMap = null;
-    let documentationHistory = [];
-    let documentationHistoryIndex = -1;
-    let activeDocumentationEntry = null;
-    let documentationViewerRequestVersion = 0;
     let standardsRequestVersion = 0;
     let sharedThemes = [];
     let themeTestTimer = null;
@@ -258,172 +252,6 @@
             await new Promise(resolve => setTimeout(resolve, 50));
         }
         return null;
-    };
-    const getDocumentationSections = () => {
-        if (!docsMap) return [];
-        return Object.keys(docsMap).filter(key => /^\d+$/.test(key)).sort((a, b) => Number(a) - Number(b)).map((key) => docsMap[key]).filter(section => section?.name && Array.isArray(section.files));
-    };
-    const getDocumentationFileName = (fileEntry) => {
-        if (typeof fileEntry === "string") return fileEntry;
-        if (fileEntry && typeof fileEntry.name === "string") return fileEntry.name;
-        return "";
-    };
-    const getDocumentationFiles = (section) => {
-        if (!section || !Array.isArray(section.files)) return [];
-        return section.files.map((fileEntry) => ({
-            ...((fileEntry && typeof fileEntry === "object") ? fileEntry : {}),
-            name: getDocumentationFileName(fileEntry)
-        })).filter(({name}) => !!name);
-    };
-    const encodePathSegment = (segment = "") => encodeURIComponent(segment).replace(/%2F/g, "/");
-    const buildDocumentationFileUrl = (sectionName = "", fileName = "") => {
-        return `${docsRoot}/${encodePathSegment(sectionName)}/${encodePathSegment(fileName)}.html`;
-    };
-    const getDocumentationEntry = (sectionName = "", fileName = "") => {
-        const section = getDocumentationSections().find(({name}) => name === sectionName);
-        if (!section) return null;
-        const file = getDocumentationFiles(section).find(({name}) => name === fileName);
-        if (!file) return null;
-        return {section: section.name, file: file.name, url: buildDocumentationFileUrl(section.name, file.name)};
-    };
-    const updateDocumentationHeader = () => {
-        const backButton = document.getElementById("home-doc-nav-back");
-        if (backButton) backButton.disabled = documentationHistoryIndex <= 0;
-        const forwardButton = document.getElementById("home-doc-nav-forward");
-        if (forwardButton) forwardButton.disabled = documentationHistoryIndex >= (documentationHistory.length - 1);
-    };
-    const renderDocumentationSelectors = () => {
-        const sectionSelect = document.getElementById("home-documentation-section-select");
-        const fileSelect = document.getElementById("home-documentation-file-select");
-        if (!sectionSelect || !fileSelect) return;
-        const sections = getDocumentationSections();
-        sectionSelect.innerHTML = `<option value="">Select section</option>${sections.map((section) => `<option value="${section.name}">${section.name}</option>`).join("")}`;
-        sectionSelect.value = activeDocumentationEntry?.section || "";
-        const activeSection = sections.find(({name}) => name === activeDocumentationEntry?.section);
-        if (!activeSection) {
-            fileSelect.innerHTML = `<option value="">Select file</option>`;
-            fileSelect.value = "";
-            fileSelect.disabled = true;
-            return;
-        }
-        const sectionFiles = getDocumentationFiles(activeSection);
-        fileSelect.disabled = false;
-        fileSelect.innerHTML = `<option value="">Select file</option>${sectionFiles.map(({name}) => `<option value="${name}">${name}</option>`).join("")}`;
-        fileSelect.value = activeDocumentationEntry?.file || "";
-    };
-    const renderDocumentationViewer = async () => {
-        const viewerRoot = document.getElementById("home-documentation-viewer");
-        if (!viewerRoot) return;
-        if (!activeDocumentationEntry) {
-            viewerRoot.innerHTML = div({style: "faded", content: "Select a documentation file to preview it here."});
-            return;
-        }
-        const requestVersion = ++documentationViewerRequestVersion;
-        viewerRoot.innerHTML = `<div id="home-documentation-content" class="home-documentation-content bordered radius padded fill"></div>`;
-        const contentRoot = document.getElementById("home-documentation-content");
-        if (!contentRoot) return;
-        contentRoot.innerHTML = div({style: "faded", content: "Loading documentation..."});
-        try {
-            const response = await fetch(activeDocumentationEntry.url);
-            if (!response.ok) throw new Error(`Failed to load documentation (${response.status})`);
-            const markup = await response.text();
-            if (requestVersion !== documentationViewerRequestVersion) return;
-            contentRoot.replaceChildren();
-            const parser = new DOMParser();
-            const parsed = parser.parseFromString(markup, "text/html");
-            const sourceNodes = parsed.body ? Array.from(parsed.body.childNodes) : [];
-            const fragment = document.createDocumentFragment();
-            sourceNodes.forEach((node) => fragment.appendChild(node.cloneNode(true)));
-            contentRoot.appendChild(fragment);
-        } catch (_) {
-            if (requestVersion !== documentationViewerRequestVersion) return;
-            contentRoot.innerHTML = div({style: "faded", content: "Unable to load documentation file."});
-        }
-    };
-    const renderDocumentationRoute = () => {
-        renderDocumentationSelectors();
-        renderDocumentationViewer();
-        updateDocumentationHeader();
-    };
-    const setActiveDocumentationEntry = (entry, addToHistory = true) => {
-        if (!entry) return;
-        activeDocumentationEntry = entry;
-        if (addToHistory) {
-            documentationHistory = documentationHistory.slice(0, documentationHistoryIndex + 1);
-            documentationHistory.push(entry);
-            documentationHistoryIndex = documentationHistory.length - 1;
-        }
-        renderDocumentationRoute();
-    };
-    const openDocumentationEntry = (sectionName = "", fileName = "", addToHistory = true) => {
-        const entry = getDocumentationEntry(sectionName, fileName);
-        if (!entry) return;
-        setActiveDocumentationEntry(entry, addToHistory);
-    };
-    const initializeDocumentationRoute = () => {
-        const root = document.getElementById("home-documentation-root");
-        if (!root) return;
-        const backButton = document.getElementById("home-doc-nav-back");
-        if (backButton) {
-            backButton.onclick = () => {
-                if (documentationHistoryIndex <= 0) return;
-                documentationHistoryIndex -= 1;
-                activeDocumentationEntry = documentationHistory[documentationHistoryIndex];
-                renderDocumentationRoute();
-            };
-        }
-        const forwardButton = document.getElementById("home-doc-nav-forward");
-        if (forwardButton) {
-            forwardButton.onclick = () => {
-                if (documentationHistoryIndex >= (documentationHistory.length - 1)) return;
-                documentationHistoryIndex += 1;
-                activeDocumentationEntry = documentationHistory[documentationHistoryIndex];
-                renderDocumentationRoute();
-            };
-        }
-        const sectionSelect = document.getElementById("home-documentation-section-select");
-        if (sectionSelect) {
-            sectionSelect.onchange = (event) => {
-                const sectionName = event.target?.value;
-                if (!sectionName) return;
-                const section = getDocumentationSections().find(({name}) => name === sectionName);
-                const firstFileName = getDocumentationFileName(section?.files?.[0]);
-                if (!firstFileName) return;
-                openDocumentationEntry(sectionName, firstFileName);
-            };
-        }
-        const fileSelect = document.getElementById("home-documentation-file-select");
-        if (fileSelect) fileSelect.onchange = (event) => {
-            const fileName = event.target?.value;
-            if (!fileName || !activeDocumentationEntry?.section) return;
-            openDocumentationEntry(activeDocumentationEntry.section, fileName);
-        };
-        const openExternalButton = document.getElementById("home-doc-open-external");
-        if (openExternalButton) {
-            openExternalButton.onclick = () => {
-                if (!activeDocumentationEntry?.url) return;
-                window.open(activeDocumentationEntry.url, "_blank");
-            };
-        }
-        fetch(`${docsRoot}/map.json`).then((response) => {
-            if (!response.ok) throw new Error(`Failed to load map.json (${response.status})`);
-            return response.json();
-        }).then((map) => {
-            docsMap = map;
-            const firstSection = getDocumentationSections()[0];
-            if (!firstSection) {
-                renderDocumentationRoute();
-                return;
-            }
-            const firstFileName = getDocumentationFileName(firstSection.files[0]);
-            if (!firstFileName) {
-                renderDocumentationRoute();
-                return;
-            }
-            openDocumentationEntry(firstSection.name, firstFileName);
-        }).catch(() => {
-            if (document.getElementById("home-documentation-viewer")) document.getElementById("home-documentation-viewer").innerHTML = div({style: "faded", content: "Unable to load documentation map."});
-        });
     };
     const formatBytes = (value = 0) => {
         const bytes = Number(value) || 0;
@@ -1534,8 +1362,8 @@
                         }).filter((option) => option.label && option.value);
                         return div({style: "small-padding", content: children([
                             div({style: "margin-bottom", content: children([
-                                select({id: "home-history-interface-select", style: "home-documentation-select small-margin-right", options: interfaces}),
-                                select({id: "home-history-mode-select", style: "home-documentation-select small-margin-right", options: [{label: "Cache", value: "Cache"}, {label: "Use", value: "Use"}]}),
+                                select({id: "home-history-interface-select", style: "home-history-select small-margin-right", options: interfaces}),
+                                select({id: "home-history-mode-select", style: "home-history-select small-margin-right", options: [{label: "Cache", value: "Cache"}, {label: "Use", value: "Use"}]}),
                                 button({id: "home-history-refresh-cache", style: "tiny inner-radius small-margin-right", content: "Refresh"}),
                                 button({id: "home-history-clear-cache", style: "tiny inner-radius", content: "Clear"})
                             ])}),
@@ -1543,28 +1371,6 @@
                         ])});
                     },
                     afterRender: () => initializeHistoryRoute()
-                }, {
-                    text: "Manual",
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>`,
-                    route: () => div({id: "home-documentation-root", style: "small-padding", content: children([
-                        div({style: "brick no-wrap", content: children([
-                            div({style: "inline margin-right", content: children([
-                                button({id: "home-doc-nav-back", style: "small naked hover-zoom",
-                                    disabled: true,
-                                    icon: `<svg class="smaller-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>`
-                                }),
-                                button({id: "home-doc-nav-forward", style: "small naked hover-zoom",
-                                    disabled: true,
-                                    icon: `<svg class="smaller-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>`
-                                })
-                            ])}),
-                            div({style: "inline margin-right", content: h({level: 3, id: "home-documentation-title", style: "very-small-padding-top padding-left inline", content: "Documentation"})}),
-                            div({style: "inline small-margin-right faded", content: `<select id="home-documentation-section-select" class="home-documentation-select inline"><option value="">Select section</option></select>`}),
-                            div({style: "inline faded", content: `<select id="home-documentation-file-select" class="home-documentation-select inline"><option value="">Select file</option></select>`}),
-                        ])}),
-                        div({id: "home-documentation-viewer", style: "brick small-padding-top padding-right", content: div({style: "faded padding-top margin-top", content: "Loading documentation..."})})
-                    ])}),
-                    afterRender: () => initializeDocumentationRoute()
                 }, {
                     text: "Standards",
                     icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>`,

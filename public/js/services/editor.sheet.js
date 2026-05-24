@@ -592,6 +592,7 @@
         activeSheetDisplayTitle = "";
         saveSheetPortalState();
         updateSheetPortalTitle();
+        await window.StandardFilesRefreshCache?.();
         modular.success(`Saved ${normalizedPath} (${bytes.length} bytes)`);
         return true;
     };
@@ -2399,6 +2400,7 @@
             const response = await fetch(uploadUrl, {method: "POST", body: formData});
             if (!response.ok) throw new Error(`Upload failed (${response.status})`);
         }
+        await window.StandardFilesRefreshCache?.();
         return targetDirectory ? `${targetDirectory}/${file.name}` : file.name;
     };
     const insertSheetImage = (src = "", alt = "") => {

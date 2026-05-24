@@ -464,6 +464,7 @@
         }, {merge: false});
         syncCodeEditorPresentation(portal);
         updateCodeEditorPortalTitle(portal);
+        await window.StandardFilesRefreshCache?.();
         modular.success(`Saved ${normalizedPath} (${bytes.length} bytes)`);
         return true;
     };

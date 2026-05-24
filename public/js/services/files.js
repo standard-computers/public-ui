@@ -332,6 +332,19 @@
     const isVideoFilePath = (rawPath = "") => /\.(mp4|webm|mov|m4v|avi|mkv|mpeg|mpg|ogv)$/i.test(String(rawPath || ""));
     const isPdfFilePath = (rawPath = "") => /\.pdf$/i.test(String(rawPath || ""));
     const getDefaultUploadDirectory = () => normalizeUploadDirectory(window.StandardFilesUploadDirectory || active_upload_directory || modular.working_directory || "Documents");
+    const refreshFilesRecordCache = () => {
+        if (typeof window.StandardFilesRefreshCache === "function") return window.StandardFilesRefreshCache();
+        const refreshFiles = window.StandardRecordSearch?.refreshFiles;
+        if (typeof refreshFiles !== "function") return Promise.resolve(null);
+        return refreshFiles.call(window.StandardRecordSearch).catch(error => {
+            console.error("Failed to refresh files cache:", error);
+            return null;
+        });
+    };
+    const refreshFilesAfterMutation = () => {
+        modular.refresh("com.standard.files");
+        return refreshFilesRecordCache();
+    };
     const uploadSelectedFiles = async (fileList, options = {}) => {
         const files = Array.from(fileList || []);
         if (!files.length) return;
@@ -378,7 +391,7 @@
         } finally {
             if (multiProgress) multiProgress.hide();
         }
-        modular.refresh("com.standard.files");
+        await refreshFilesAfterMutation();
         modular.success(files.length === 1 ? `Uploaded ${files[0]?.name || "file"}` : `Uploaded ${files.length} files`);
     };
     window.StandardFilesUploadSelectedFiles = uploadSelectedFiles;
@@ -499,9 +512,10 @@
         const filePath = getFilePathForRemoveCommand(rawPath);
         if (!filePath) return;
         const fileName = filePath.split("/").pop() || "file";
-        CLI.send(CLI.buildFilesCommand("remove", filePath)).then(response => {
+        CLI.send(CLI.buildFilesCommand("remove", filePath)).then(async response => {
             if (response !== 0 && response !== "false" && response !== false) {
                 removeDeletedFileTile(rawPath, tile);
+                await refreshFilesRecordCache();
                 modular.success(`Deleted ${fileName}`);
             } else {
                 modular.error(`Failed to delete ${fileName}`);
@@ -526,7 +540,7 @@
                     ? `${normalizedSource.substring(0, normalizedSource.lastIndexOf("/"))}/${trimmedName}`
                     : trimmedName;
                 await CLI.send(CLI.buildFilesCommand("move", normalizedSource, targetPath));
-                modular.refresh("com.standard.files");
+                await refreshFilesAfterMutation();
             }
         });
     };
@@ -542,7 +556,7 @@
                     ? `${String(baseDirectory).replace(/\/+$/, "")}/${trimmedName}`
                     : trimmedName;
                 await CLI.send(CLI.buildFilesCommand("folders", targetPath));
-                modular.refresh("com.standard.files");
+                await refreshFilesAfterMutation();
             }
         });
     };
@@ -611,7 +625,7 @@
                 modular.error(`Failed to move ${fileName}`);
                 return false;
             }
-            modular.refresh("com.standard.files");
+            await refreshFilesAfterMutation();
             if (document.getElementById("documents")) loadDocumentsDirectory(current_documents_directory);
             modular.success(`Moved ${fileName} to ${destinationPath}`);
             return true;

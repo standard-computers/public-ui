@@ -203,6 +203,7 @@
                     await CLI.send(CLI.buildFilesCommand("move", boardPath, targetPath));
                     if (sanitizeBoardName(activeBoardName) === currentBoardName) activeBoardName = nextBoardName;
                     if (typeof refreshBoardsList === "function") refreshBoardsList();
+                    await window.StandardFilesRefreshCache?.();
                 } catch (_) {
                     modular.error("Unable to rename board");
                 }
@@ -220,6 +221,7 @@
                 try {
                     await CLI.send(CLI.buildFilesCommand("remove", boardPath));
                     if (typeof refreshBoardsList === "function") refreshBoardsList();
+                    await window.StandardFilesRefreshCache?.();
                 } catch (_) {
                     modular.error("Unable to delete board");
                 }
@@ -282,9 +284,10 @@
     };
     const triggerBoardSave = sourceNode => {
         const doSave = boardName => {
-            saveBoardToBoardsFolder(boardName, getBoardsCanvas(sourceNode)).then(result => {
+            saveBoardToBoardsFolder(boardName, getBoardsCanvas(sourceNode)).then(async result => {
                 activeBoardName = boardName;
                 if (typeof refreshBoardsList === "function") refreshBoardsList();
+                await window.StandardFilesRefreshCache?.();
                 modular.success(`Saved Boards/${result.fileName} (${result.byteCount} bytes)`);
             }).catch(error => {
                 modular.error(error.message || "Board save failed");

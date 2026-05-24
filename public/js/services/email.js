@@ -77,6 +77,20 @@
         }
         return fallback;
     };
+    const firstValueLoose = (record, keys, fallback = "") => {
+        const direct = firstValue(record, keys);
+        if (direct) return direct;
+        if (!record || typeof record !== "object") return fallback;
+        const normalizedEntries = Object.entries(record).reduce((entries, [key, value]) => {
+            entries[String(key).toLowerCase()] = value;
+            return entries;
+        }, {});
+        for (const key of keys) {
+            const value = normalizedEntries[String(key).toLowerCase()];
+            if (value !== undefined && value !== null && `${value}`.trim() !== "") return value;
+        }
+        return fallback;
+    };
     const stripMarkup = value => {
         const raw = String(value ?? "");
         if (!/<[a-z][\s\S]*>/i.test(raw)) return raw;
@@ -106,6 +120,24 @@
             minute: "2-digit"
         });
     };
+    const getMessageSortTime = message => {
+        const rawValue = message?.date;
+        if (rawValue === undefined || rawValue === null || rawValue === "") return 0;
+        if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+            return rawValue < 10000000000 ? rawValue * 1000 : rawValue;
+        }
+        const trimmed = String(rawValue).trim();
+        if (/^\d+$/.test(trimmed)) {
+            const numericValue = Number(trimmed);
+            if (Number.isFinite(numericValue)) return numericValue < 10000000000 ? numericValue * 1000 : numericValue;
+        }
+        const parsed = new Date(trimmed).getTime();
+        return Number.isNaN(parsed) ? 0 : parsed;
+    };
+    const sortMailboxMessagesNewestFirst = messages => messages
+        .map((message, index) => ({message, index, sortTime: getMessageSortTime(message)}))
+        .sort((a, b) => (b.sortTime - a.sortTime) || (a.index - b.index))
+        .map(entry => entry.message);
     const parseBooleanValue = value => {
         if (value === true || value === false) return value;
         const normalized = String(value ?? "").trim().toLowerCase();
@@ -147,6 +179,7 @@
         if (payload && typeof payload === "object") {
             for (const key of ["emails", "email", "messages", "mail", "inbox", "items", "records", "data"]) {
                 if (Array.isArray(payload[key])) return payload[key];
+                if (payload[key] && typeof payload[key] === "object") return [payload[key]];
             }
             return [payload];
         }
@@ -198,6 +231,18 @@
             raw: record
         };
     };
+    const emailMessageMatchesId = (message, emailId = "") => {
+        const safeEmailId = String(emailId || "").trim();
+        if (!safeEmailId) return false;
+        const raw = message?.raw || message || {};
+        const candidates = [
+            message?.id,
+            message?.recordId,
+            resolveEmailRecordId(raw),
+            resolveEmailViewId(raw, "")
+        ];
+        return candidates.some(value => String(value ?? "").trim() === safeEmailId);
+    };
     const countUnreadMessages = messages => messages.filter(message => message.unread).length;
     const getFolderMeta = folder => EMAIL_FOLDERS.find(item => item.folder === folder) || EMAIL_FOLDERS[0];
     const resolveMessageFolderTitle = (message, fallbackTitle = "") => {
@@ -205,7 +250,7 @@
         const meta = EMAIL_FOLDERS.find(item => item.folder === folder || item.title.toLowerCase() === String(folder).toLowerCase());
         return meta?.title || folder || fallbackTitle;
     };
-    const parseMailboxMessages = response => parseResponse(response).map(normalizeMessage);
+    const parseMailboxMessages = response => sortMailboxMessagesNewestFirst(parseResponse(response).map(normalizeMessage));
     const getContactEmail = contact => {
         const formatted = formatAddress(firstValue(contact, ["email", "mail", "emailAddress", "email_address"]));
         const match = String(formatted || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
@@ -250,7 +295,8 @@
     };
     const setMailboxCache = (folder, messages = [], error = null) => {
         const meta = getFolderMeta(folder);
-        mailboxCache.set(folder, {folder, title: meta.title, messages, error, unreadCount: countUnreadMessages(messages)});
+        const sortedMessages = sortMailboxMessagesNewestFirst(messages);
+        mailboxCache.set(folder, {folder, title: meta.title, messages: sortedMessages, error, unreadCount: countUnreadMessages(sortedMessages)});
         updateEmailRouteUnreadCounts();
         return mailboxCache.get(folder);
     };
@@ -266,6 +312,64 @@
             .finally(() => mailboxFetches.delete(folder));
         mailboxFetches.set(folder, fetchPromise);
         return fetchPromise;
+    };
+    const fetchEmailById = async emailId => {
+        const safeEmailId = String(emailId || "").trim();
+        if (!safeEmailId) return null;
+        try {
+            const inboxCache = await fetchMailboxFolder("inbox", {force: true});
+            const inboxMessage = (inboxCache?.messages || []).find(message => emailMessageMatchesId(message, safeEmailId));
+            if (inboxMessage) return inboxMessage;
+        } catch (error) {
+            console.error("Failed to refresh inbox for email notification:", error);
+        }
+        try {
+            const response = await CLI.send(`[email] <id "${escapeEmailCommandValue(safeEmailId)}">`);
+            const messages = parseMailboxMessages(response);
+            const message = messages.find(entry => emailMessageMatchesId(entry, safeEmailId)) || messages[0] || null;
+            if (!message) return null;
+            const folder = firstValue(message.raw || message, ["folder", "mailbox", "folderName", "folder_name"], "inbox");
+            const folderMeta = EMAIL_FOLDERS.find(item => item.folder === folder || item.title.toLowerCase() === String(folder).toLowerCase());
+            const targetFolder = folderMeta?.folder || "inbox";
+            const cache = mailboxCache.get(targetFolder);
+            if (cache && !cache.messages.some(entry => emailMessageMatchesId(entry, safeEmailId))) {
+                setMailboxCache(targetFolder, [message, ...cache.messages], null);
+            }
+            return message;
+        } catch (error) {
+            console.error("Failed to load email notification:", error);
+            return null;
+        }
+    };
+    const refreshEmailNotificationViews = () => {
+        const inboxCache = mailboxCache.get("inbox");
+        if (inboxCache) refreshRenderedMailboxFolder("inbox", inboxCache);
+        updateEmailRouteUnreadCounts();
+    };
+    const notifyEmail = async ({data = []} = {}) => {
+        const emailId = String(data?.[0] ?? "").trim();
+        const message = await fetchEmailById(emailId);
+        const fallbackLabel = emailId ? `Email ${emailId}` : "Email";
+        const sender = String(message?.from || "").trim();
+        const snippet = String(message?.snippet || message?.body || "").trim();
+        const details = [sender ? `From: ${sender}` : "", snippet].filter(Boolean);
+        window.StandardNotifications?.show?.({
+            type: "email",
+            title: message?.subject || "New email",
+            message: sender ? `From ${sender}` : (message ? "Email received" : fallbackLabel),
+            details,
+            icon: MAIL_ICON,
+            onclick: notificationNode => {
+                window.StandardNotifications?.dismiss?.(notificationNode);
+                if (message) {
+                    openEmailViewer(message, resolveMessageFolderTitle(message, "Inbox"));
+                    markEmailMessageReadFromNotification(message);
+                    return;
+                }
+                modular?.start?.(EMAIL_SERVICE_ID);
+            }
+        });
+        refreshEmailNotificationViews();
     };
     const prefetchMailboxFolders = () => {
         if (mailboxPrefetchStarted) return;
@@ -458,6 +562,26 @@
         const subject = String(message?.subject || "").trim();
         return subject.toLowerCase().startsWith("re:") ? subject : `Re: ${subject || "(No subject)"}`;
     };
+    const getReplyRecipient = (message, context = null) => {
+        const raw = message?.raw || message || {};
+        return message?.from
+            || formatAddress(firstValueLoose(raw, [
+                "from",
+                "sender",
+                "author",
+                "from_email",
+                "fromEmail",
+                "fromAddress",
+                "from_address",
+                "senderEmail",
+                "sender_email",
+                "senderAddress",
+                "sender_address",
+                "mailFrom",
+                "mail_from"
+            ]))
+            || String(context?.item?.querySelector?.(".email-message-sender")?.textContent || "").trim();
+    };
     const getEmailThreadValue = message => {
         const raw = message?.raw || message || {};
         return firstValue(raw, ["thread", "threadId", "thread_id", "conversation", "conversationId", "conversation_id"], message?.recordId || message?.id || "");
@@ -512,9 +636,10 @@
             return null;
         }
         const message = context.message;
+        const recipient = getReplyRecipient(message, context);
         return openEmailComposer({
             mode: "reply",
-            to: message.from || "",
+            to: recipient,
             subject: getReplySubject(message),
             body: "",
             replyTo: {
@@ -569,6 +694,14 @@
             sendComposedEmail(portal);
         });
     };
+    const syncEmailComposerFields = (portal = null) => {
+        const state = getComposerStateFromPortal(portal);
+        const body = portal?.body?.();
+        const toInput = body?.querySelector?.(".email-composer-to-input");
+        if (toInput && state.to) {
+            window.StandardUI?.setSearchComboBoxValue?.(toInput, state.to);
+        }
+    };
     const renderComposerFormattingToolbar = () => div({
         style: "email-composer-formatbar bordered shadowed radius small-padding blurred",
         content: div({style: "faded", content: children([
@@ -600,7 +733,8 @@
         ])});
     };
     const renderEmailComposer = async (routeContext = {}) => {
-        const state = routeContext?.windowState?.get?.() || activeComposeState || {};
+        const routeState = routeContext?.windowState?.get?.() || {};
+        const state = {...(activeComposeState || {}), ...routeState};
         const contactOptions = buildEmailContactOptions(await fetchEmailContacts());
         return div({
             style: "large-padding-top editor-portal-shell email-composer-shell",
@@ -689,6 +823,28 @@
                 console.error("Failed to update email read state:", error);
                 modular?.error?.(nextReadState ? "Couldn't mark email as read" : "Couldn't mark email as unread");
             });
+    };
+    const markEmailMessageReadFromNotification = message => {
+        if (!message || !isMessageUnread(message)) return;
+        const folderTitle = resolveMessageFolderTitle(message, "Inbox");
+        const folder = EMAIL_FOLDERS.find(item => item.title === folderTitle || item.folder === folderTitle)?.folder || "inbox";
+        const context = findMailboxMessageContextById(message.id, folder);
+        const fallbackContext = {
+            item: null,
+            workspace: null,
+            folder,
+            cache: mailboxCache.get(folder),
+            messageId: message.id,
+            message
+        };
+        const readContext = context?.message ? context : fallbackContext;
+        const recordId = setMailboxMessageReadState(readContext, true);
+        if (!recordId) return;
+        if (readContext.cache) syncMailboxMessageCache(folder, readContext.cache.messages);
+        refreshEmailNotificationViews();
+        CLI.send(buildReadStateCommand(recordId, true)).catch(error => {
+            console.error("Failed to mark notification email as read:", error);
+        });
     };
     const updateSelectedMailboxMessagesReadState = (contexts = []) => {
         const validContexts = contexts.filter(context => context?.message && context?.cache);
@@ -1385,6 +1541,10 @@
         }
         return fetchMailboxFolder(folder).then(renderCachedMailbox);
     };
+    window.StandardEmail = window.StandardEmail || {};
+    window.StandardEmail.notifyEmail = notifyEmail;
+    window.StandardEmail.fetchEmailById = fetchEmailById;
+    window.StandardNotifications?.register?.("email", window.StandardEmail.notifyEmail);
     fetchEmailContacts().catch(() => {});
     modular.register(new Service(EMAIL_SERVICE_ID, [new Portal({
         title: "Email",
@@ -1445,6 +1605,7 @@
         afterRender: (_windowNode, routeContext) => {
             bindEmailComposerToolbar(routeContext?.window || document);
             bindEmailComposerSendShortcut(routeContext?.portal);
+            syncEmailComposerFields(routeContext?.portal);
             const editor = routeContext?.window?.querySelector?.(".email-composer-editor");
             requestAnimationFrame(() => editor?.focus?.());
         }

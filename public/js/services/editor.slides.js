@@ -696,6 +696,7 @@
         activeSlideDeckFilePath = normalizedPath;
         saveSlidePortalState();
         updateSlidesPortalTitle();
+        await window.StandardFilesRefreshCache?.();
         modular.success(`Saved ${normalizedPath} (${bytes.length} bytes)`);
         return true;
     };
@@ -980,6 +981,7 @@
                 setSlideBackground(activeSlide, {type: "image", value: uploadedPath});
                 renderSlideCanvas();
                 saveSlidePortalState();
+                await window.StandardFilesRefreshCache?.();
                 hideSlideBackgroundMenu();
             } catch (error) {
                 console.error("Failed to upload slide background image:", error);
@@ -1706,6 +1708,7 @@
             const response = await fetch(uploadUrl, {method: "POST", body: formData});
             if (!response.ok) throw new Error(`Upload failed (${response.status})`);
         }
+        await window.StandardFilesRefreshCache?.();
         return targetDirectory ? `${targetDirectory}/${file.name}` : file.name;
     };
     const createSlideBlock = (type = "text") => {

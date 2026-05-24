@@ -77,7 +77,7 @@ The Electron setup flow can save endpoint and token configuration into `user_dat
 - `electron-main.js`: Electron bootstrap
 - `preload.js`: Electron preload bridge
 - `views/`: Handlebars templates
-- `public/`: static assets and documentation
+- `public/`: static assets
 
 ## License
 

@@ -76,7 +76,7 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
         {command: "[categories]", key: "categories", label: "categories", serviceId: "com.standard.calendar", portalIndex: 1},
         {command: "[contacts]", key: "contacts", label: "contacts", serviceId: "com.standard.contacts", portalIndex: 0},
         {command: "[events]", key: "events", label: "events", serviceId: "com.standard.calendar", portalIndex: 0},
-        {command: "[files]", key: "files", label: "files", serviceId: "com.standard.files", portalIndex: 0},
+        {command: "[files]", key: "files", label: "files", serviceId: "com.standard.files", portalIndex: 0, replaceOnRefresh: true},
         {command: "[notes]", key: "notes", label: "notes", serviceId: "com.standard.notes", portalIndex: 0},
         {command: "[user]", key: "user", label: "user", serviceId: "com.standard.settings", portalIndex: 0}
     ];
@@ -231,6 +231,29 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
     const getPortalConfigs = (portal = {}) => COMMAND_CONFIGS.filter(config => {
         return config.serviceId === portal?.serviceId && (config.portalIndex ?? 0) === (portal?.portalIndex ?? 0);
     });
+    const getCommandConfigByKey = (key = "") => COMMAND_CONFIGS.find(config => config.key === key);
+    const refreshCommandConfig = async (config, {merge = false} = {}) => {
+        if (!config) return cacheState;
+        await window.StandardRecordSearch.loadCache();
+        const nextCacheRecords = {...(cacheState?.records || {})};
+        const response = await CLI.send(config.command);
+        const resolvedRecords = resolveResponseRecords(config, response);
+        if (Array.isArray(resolvedRecords)) {
+            nextCacheRecords[config.key] = merge
+                ? mergeRecordsById(nextCacheRecords[config.key], resolvedRecords)
+                : resolvedRecords.map(normalizeRecord).filter(Boolean);
+        }
+        const nextState = setCacheState({
+            updatedAt: new Date().toISOString(),
+            records: nextCacheRecords
+        });
+        try {
+            await writeCache(nextState);
+        } catch (error) {
+            console.error("Failed to persist search records cache:", error);
+        }
+        return nextState;
+    };
 
     return {
         configs: COMMAND_CONFIGS,
@@ -259,7 +282,9 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
                     const response = await CLI.send(config.command);
                     const resolvedRecords = resolveResponseRecords(config, response);
                     if (Array.isArray(resolvedRecords)) {
-                        nextCacheRecords[config.key] = mergeRecordsById(nextCacheRecords[config.key], resolvedRecords);
+                        nextCacheRecords[config.key] = config.replaceOnRefresh
+                            ? resolvedRecords.map(normalizeRecord).filter(Boolean)
+                            : mergeRecordsById(nextCacheRecords[config.key], resolvedRecords);
                     }
                 } catch (error) {
                     console.error(`Failed to refresh ${config.command}:`, error);
@@ -275,6 +300,14 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
                 console.error("Failed to persist search records cache:", error);
             }
             return nextState;
+        },
+        async refreshKey(key = "", options = {}) {
+            const config = getCommandConfigByKey(key);
+            if (!config) return cacheState;
+            return refreshCommandConfig(config, options);
+        },
+        async refreshFiles() {
+            return this.refreshKey("files");
         },
         getCache() {
             return cacheState;
@@ -309,6 +342,14 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
     };
 })();
 window.StandardRecordSearch.loadCache();
+window.StandardFilesRefreshCache = () => {
+    const refreshFiles = window.StandardRecordSearch?.refreshFiles;
+    if (typeof refreshFiles !== "function") return Promise.resolve(null);
+    return refreshFiles.call(window.StandardRecordSearch).catch(error => {
+        console.error("Failed to refresh files cache:", error);
+        return null;
+    });
+};
 
 function searchablePortals() {
     const servicePortals = (modular.running || []).flatMap((service) => {
@@ -1118,11 +1159,51 @@ initGlobalFileDrop(async (files) => {
             if (multiProgress) multiProgress.hide();
         }
         modular.refresh("com.standard.files");
+        await window.StandardFilesRefreshCache?.();
     } finally {
         globalDropUploadInFlight = false;
     }
 });
 let serviceWindowCache = [];
+function getSearchFocusProtectedRect() {
+    const nodes = [
+        document.querySelector("#search-box-container .search-box-field"),
+        document.getElementById("interface-shortcuts")
+    ].filter(node => node && window.getComputedStyle(node).display !== "none");
+    const rects = nodes
+        .map(node => node.getBoundingClientRect())
+        .filter(rect => rect.width > 0 && rect.height > 0);
+    if (!rects.length) return null;
+    const margin = 24;
+    return {
+        left: Math.max(0, Math.min(...rects.map(rect => rect.left)) - margin),
+        top: Math.max(0, Math.min(...rects.map(rect => rect.top)) - margin),
+        right: Math.min(window.innerWidth, Math.max(...rects.map(rect => rect.right)) + margin),
+        bottom: Math.min(window.innerHeight, Math.max(...rects.map(rect => rect.bottom)) + margin)
+    };
+}
+function rectsOverlap(left, top, width, height, rect) {
+    if (!rect) return false;
+    return left < rect.right && left + width > rect.left && top < rect.bottom && top + height > rect.top;
+}
+function getParkedServiceWindowPosition(win, index, lanes, protectedRect, margin) {
+    const scale = 0.3;
+    const visualWidth = Math.max(90, win.offsetWidth * scale);
+    const visualHeight = Math.max(56, win.offsetHeight * scale);
+    const side = index % 2 === 0 ? "left" : "right";
+    const lane = lanes[side];
+    const left = side === "left" ? margin : Math.max(margin, window.innerWidth - win.offsetWidth - margin);
+    let top = lane.top;
+    const visualLeft = left + ((win.offsetWidth - visualWidth) / 2);
+    if (rectsOverlap(visualLeft, top + ((win.offsetHeight - visualHeight) / 2), visualWidth, visualHeight, protectedRect)) {
+        top = protectedRect.bottom + margin - ((win.offsetHeight - visualHeight) / 2);
+    }
+    if (top + visualHeight > window.innerHeight - margin) {
+        top = Math.max(margin, (protectedRect?.top ?? window.innerHeight) - visualHeight - margin);
+    }
+    lane.top = top + visualHeight + margin;
+    return {left, top};
+}
 function parkServiceWindows() {
     const windows = Array.from(document.querySelectorAll('.draggable-window:not(.minimized)'));
     if (!windows.length) return;
@@ -1135,21 +1216,20 @@ function parkServiceWindows() {
         });
     }
     const margin = 16;
-    let leftTop = margin;
-    let rightTop = margin;
+    const protectedRect = getSearchFocusProtectedRect();
+    const lanes = {
+        left: {top: margin},
+        right: {top: margin}
+    };
     windows.forEach((win, index) => {
         win.classList.add('service-window-parked');
-        const targetTop = index % 2 === 0 ? leftTop : rightTop;
-        const targetLeft = index % 2 === 0 ? margin : Math.max(margin, window.innerWidth - win.offsetWidth - margin);
+        const target = getParkedServiceWindowPosition(win, index, lanes, protectedRect, margin);
+        const targetTop = target.top;
+        const targetLeft = target.left;
         win.style.top = `${targetTop}px`;
         win.style.left = `${targetLeft}px`;
         if (win.portal && typeof win.portal.minimize === "function") {
             win.portal.minimize({left: win.style.left, top: win.style.top});
-        }
-        if (index % 2 === 0) {
-            leftTop += win.offsetHeight + margin;
-        } else {
-            rightTop += win.offsetHeight + margin;
         }
     });
 }
@@ -1308,17 +1388,6 @@ document.addEventListener("keydown", function (e) {
         return;
     }
 
-    if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || e.key === " ") {
-        return;
-    }
-    const actionable = activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA" || activeElement.tagName === "SELECT" || activeElement.isContentEditable);
-    if (!actionable) {
-        e.preventDefault();
-        const searchBox = focusSearchBoxForTyping();
-        if (!searchBox) return;
-        searchBox.value += e.key;
-        searchBox.dispatchEvent(new Event("input"));
-    }
 }, true);
 document.addEventListener("keyup", function (e) {
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown" && e.key !== "Up" && e.key !== "Down") return;
