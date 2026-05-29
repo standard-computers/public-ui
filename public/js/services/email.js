@@ -6,7 +6,6 @@
     const buildReadStateCommand = (recordId, read) => `[email] read ${read ? "true" : "false"} <id "${escapeEmailCommandValue(recordId)}">`;
     const buildStarredStateCommand = (recordId, starred) => `[email] starred ${starred ? "true" : "false"} <id "${escapeEmailCommandValue(recordId)}">`;
     const buildCategoryCommand = (recordId, category) => `[email] category ${category ? normalizeCategoryRecordId(category) : "\"\""} <id ${normalizeCategoryRecordId(recordId)}>`;
-    const buildReplyCommand = recordId => `[email] reply <id "${escapeEmailCommandValue(recordId)}">`;
     const buildMoveFolderCommand = (recordId, folder) => `[email] folder "${escapeEmailCommandValue(folder)}" <id "${escapeEmailCommandValue(recordId)}">`;
     const buildDeleteEmailCommand = recordId => `[email] - <id ${normalizeCategoryRecordId(recordId)}>`;
     const EMAIL_FOLDERS = [
@@ -34,23 +33,12 @@
     const ARCHIVE_ACTION_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>`;
     const STAR_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>`;
     const CATEGORY_ACTION_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z" /></svg>`;
-    const COMPOSER_FORMAT_COMMANDS = [{
-        command: "bold",
-        title: "Bold",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`
-    }, {
-        command: "italic",
-        title: "Italicize",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.2558594 22.003906 L 14.0058594 22.003906 L 14.0058594 20.503906 L 13.2558594 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`
-    }, {
-        command: "underline",
-        title: "Underline",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 6.0058594 2 L 6.0058594 2.75 L 6.0058594 12.585938 C 6.0058594 15.618894 8.7446099 18.001953 12.003906 18.001953 C 15.263203 18.001953 18.003906 15.618893 18.003906 12.585938 L 18.003906 2.75 L 18.003906 2 L 16.503906 2 L 16.503906 2.75 L 16.503906 12.585938 C 16.503906 14.706981 14.54261 16.501953 12.003906 16.501953 C 9.4652032 16.501953 7.5058594 14.70698 7.5058594 12.585938 L 7.5058594 2.75 L 7.5058594 2 L 6.0058594 2 z M 4.9980469 20.003906 L 4.9980469 21.503906 L 5.7480469 21.503906 L 18.251953 21.503906 L 19.001953 21.503906 L 19.001953 20.003906 L 18.251953 20.003906 L 5.7480469 20.003906 L 4.9980469 20.003906 z"/></svg>`
-    }, {
-        command: "insertUnorderedList",
-        title: "List",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`
-    }];
+    const COMPOSER_FORMAT_COMMANDS = [
+        {command: "bold", title: "Bold", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`},
+        {command: "italic", title: "Italicize", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.2558594 22.003906 L 14.0058594 22.003906 L 14.0058594 20.503906 L 13.2558594 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`},
+        {command: "underline", title: "Underline", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 6.0058594 2 L 6.0058594 2.75 L 6.0058594 12.585938 C 6.0058594 15.618894 8.7446099 18.001953 12.003906 18.001953 C 15.263203 18.001953 18.003906 15.618893 18.003906 12.585938 L 18.003906 2.75 L 18.003906 2 L 16.503906 2 L 16.503906 2.75 L 16.503906 12.585938 C 16.503906 14.706981 14.54261 16.501953 12.003906 16.501953 C 9.4652032 16.501953 7.5058594 14.70698 7.5058594 12.585938 L 7.5058594 2.75 L 7.5058594 2 L 6.0058594 2 z M 4.9980469 20.003906 L 4.9980469 21.503906 L 5.7480469 21.503906 L 18.251953 21.503906 L 19.001953 21.503906 L 19.001953 20.003906 L 18.251953 20.003906 L 5.7480469 20.003906 L 4.9980469 20.003906 z"/></svg>`},
+        {command: "insertUnorderedList", title: "List", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`}
+    ];
     let emailListPaneWidth = 340;
     let activeEmailResize = null;
     let mailboxMessages = [];
@@ -91,6 +79,7 @@
         }
         return fallback;
     };
+    const EMAIL_THREAD_KEYS = ["thread", "TR", "threadId", "thread_id", "conversation", "conversationId", "conversation_id"];
     const stripMarkup = value => {
         const raw = String(value ?? "");
         if (!/<[a-z][\s\S]*>/i.test(raw)) return raw;
@@ -113,19 +102,12 @@
         if (!value) return "";
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return String(value);
-        return date.toLocaleString(undefined, {
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit"
-        });
+        return date.toLocaleString(undefined, {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
     };
     const getMessageSortTime = message => {
         const rawValue = message?.date;
         if (rawValue === undefined || rawValue === null || rawValue === "") return 0;
-        if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
-            return rawValue < 10000000000 ? rawValue * 1000 : rawValue;
-        }
+        if (typeof rawValue === "number" && Number.isFinite(rawValue)) return rawValue < 10000000000 ? rawValue * 1000 : rawValue;
         const trimmed = String(rawValue).trim();
         if (/^\d+$/.test(trimmed)) {
             const numericValue = Number(trimmed);
@@ -134,10 +116,7 @@
         const parsed = new Date(trimmed).getTime();
         return Number.isNaN(parsed) ? 0 : parsed;
     };
-    const sortMailboxMessagesNewestFirst = messages => messages
-        .map((message, index) => ({message, index, sortTime: getMessageSortTime(message)}))
-        .sort((a, b) => (b.sortTime - a.sortTime) || (a.index - b.index))
-        .map(entry => entry.message);
+    const sortMailboxMessagesNewestFirst = messages => messages.map((message, index) => ({message, index, sortTime: getMessageSortTime(message)})).sort((a, b) => (b.sortTime - a.sortTime) || (a.index - b.index)).map(entry => entry.message);
     const parseBooleanValue = value => {
         if (value === true || value === false) return value;
         const normalized = String(value ?? "").trim().toLowerCase();
@@ -185,40 +164,20 @@
         }
         return [];
     };
-    const resolveEmailRecordId = record => firstValue(record, [
-        "id",
-        "ID",
-        "_id",
-        "recordId",
-        "recordID",
-        "record_id",
-        "emailid",
-        "emailId",
-        "email_id"
-    ]);
-    const resolveEmailViewId = (record, index) => firstValue(record, [
-        "id",
-        "ID",
-        "_id",
-        "recordId",
-        "recordID",
-        "record_id",
-        "emailid",
-        "emailId",
-        "email_id",
-        "messageId",
-        "message_id"
-    ], `message-${index}`);
+    const resolveEmailRecordId = record => firstValue(record, ["id", "ID", "_id", "recordId", "recordID", "record_id", "emailid", "emailId", "email_id"]);
+    const resolveEmailViewId = (record, index) => firstValue(record, ["id", "ID", "_id", "recordId", "recordID", "record_id", "emailid", "emailId", "email_id", "messageId", "message_id"], `message-${index}`);
     const normalizeMessage = (record, index) => {
         const body = firstValue(record, ["body", "content", "text", "message", "html", "snippet", "preview"]);
         const subject = String(firstValue(record, ["subject", "title", "name"], "(No subject)")).trim() || "(No subject)";
         const from = formatAddress(firstValue(record, ["from", "sender", "author", "from_email", "fromEmail"]));
         const to = formatAddress(firstValue(record, ["to", "recipient", "recipients", "to_email", "toEmail"]));
         const date = firstValue(record, ["date", "timestamp", "created", "created_at", "received", "received_at", "sent", "sent_at"]);
+        const thread = firstValueLoose(record, EMAIL_THREAD_KEYS);
         const recordId = String(resolveEmailRecordId(record) || "");
         return {
             id: String(resolveEmailViewId(record, index)),
             recordId,
+            thread,
             subject,
             from,
             to,
@@ -235,12 +194,7 @@
         const safeEmailId = String(emailId || "").trim();
         if (!safeEmailId) return false;
         const raw = message?.raw || message || {};
-        const candidates = [
-            message?.id,
-            message?.recordId,
-            resolveEmailRecordId(raw),
-            resolveEmailViewId(raw, "")
-        ];
+        const candidates = [message?.id, message?.recordId, resolveEmailRecordId(raw), resolveEmailViewId(raw, "")];
         return candidates.some(value => String(value ?? "").trim() === safeEmailId);
     };
     const countUnreadMessages = messages => messages.filter(message => message.unread).length;
@@ -265,32 +219,24 @@
     const parseContactsResponse = response => Array.isArray(response?.contacts) ? response.contacts
         : Array.isArray(response?.contact) ? response.contact
             : parseResponse(response);
-    const buildEmailContactOptions = contacts => contacts
-        .map(contact => {
-            const email = getContactEmail(contact);
-            if (!email) return null;
-            const name = getContactName(contact);
-            return {
-                value: email,
-                label: email
-            };
-        })
-        .filter(Boolean);
+    const buildEmailContactOptions = contacts => contacts.map(contact => {
+        const email = getContactEmail(contact);
+        if (!email) return null;
+        const name = getContactName(contact);
+        return {value: email, label: email};
+    }).filter(Boolean);
     const fetchEmailContacts = ({force = false} = {}) => {
         if (!force && emailContactsCache.length) return Promise.resolve(emailContactsCache);
         if (!force && emailContactsFetch) return emailContactsFetch;
-        emailContactsFetch = CLI.send("[contacts]")
-            .then(response => {
-                emailContactsCache = parseContactsResponse(response);
-                return emailContactsCache;
-            })
-            .catch(error => {
-                console.error("Failed to load contacts for email composer:", error);
-                return emailContactsCache;
-            })
-            .finally(() => {
-                emailContactsFetch = null;
-            });
+        emailContactsFetch = CLI.send("[contacts]").then(response => {
+            emailContactsCache = parseContactsResponse(response);
+            return emailContactsCache;
+        }).catch(error => {
+            console.error("Failed to load contacts for email composer:", error);
+            return emailContactsCache;
+        }).finally(() => {
+            emailContactsFetch = null;
+        });
         return emailContactsFetch;
     };
     const setMailboxCache = (folder, messages = [], error = null) => {
@@ -303,13 +249,10 @@
     const fetchMailboxFolder = (folder, {force = false} = {}) => {
         if (!force && mailboxCache.has(folder)) return Promise.resolve(mailboxCache.get(folder));
         if (!force && mailboxFetches.has(folder)) return mailboxFetches.get(folder);
-        const fetchPromise = CLI.send(buildFolderCommand(folder))
-            .then(response => setMailboxCache(folder, parseMailboxMessages(response), null))
-            .catch(error => {
-                console.error(`Failed to load ${folder}:`, error);
-                return setMailboxCache(folder, [], error);
-            })
-            .finally(() => mailboxFetches.delete(folder));
+        const fetchPromise = CLI.send(buildFolderCommand(folder)).then(response => setMailboxCache(folder, parseMailboxMessages(response), null)).catch(error => {
+            console.error(`Failed to load ${folder}:`, error);
+            return setMailboxCache(folder, [], error);
+        }).finally(() => mailboxFetches.delete(folder));
         mailboxFetches.set(folder, fetchPromise);
         return fetchPromise;
     };
@@ -332,9 +275,7 @@
             const folderMeta = EMAIL_FOLDERS.find(item => item.folder === folder || item.title.toLowerCase() === String(folder).toLowerCase());
             const targetFolder = folderMeta?.folder || "inbox";
             const cache = mailboxCache.get(targetFolder);
-            if (cache && !cache.messages.some(entry => emailMessageMatchesId(entry, safeEmailId))) {
-                setMailboxCache(targetFolder, [message, ...cache.messages], null);
-            }
+            if (cache && !cache.messages.some(entry => emailMessageMatchesId(entry, safeEmailId))) setMailboxCache(targetFolder, [message, ...cache.messages], null);
             return message;
         } catch (error) {
             console.error("Failed to load email notification:", error);
@@ -454,10 +395,8 @@
         });
     };
     const updateEmailRouteUnreadCounts = () => {
-        const emailWindows = Array.from(document.querySelectorAll(".draggable-window"))
-            .filter(windowNode => windowNode?.portal?.serviceId?.() === EMAIL_SERVICE_ID);
-        const routeLabels = (emailWindows.length ? emailWindows : [document])
-            .flatMap(root => Array.from(root.querySelectorAll(".sidebar-item > span")));
+        const emailWindows = Array.from(document.querySelectorAll(".draggable-window")).filter(windowNode => windowNode?.portal?.serviceId?.() === EMAIL_SERVICE_ID);
+        const routeLabels = (emailWindows.length ? emailWindows : [document]).flatMap(root => Array.from(root.querySelectorAll(".sidebar-item > span")));
         EMAIL_FOLDERS.forEach(({folder, title}) => {
             const label = routeLabels.find(node => node?.childNodes?.[0]?.textContent === title || node?.textContent?.trim()?.startsWith(title));
             if (!label) return;
@@ -508,20 +447,12 @@
     const syncMailboxMessageCache = (folder, messages) => {
         const currentCache = mailboxCache.get(folder);
         const meta = getFolderMeta(folder);
-        mailboxCache.set(folder, {
-            folder,
-            title: currentCache?.title || meta.title,
-            messages,
-            error: currentCache?.error || null,
-            unreadCount: countUnreadMessages(messages)
-        });
+        mailboxCache.set(folder, {folder, title: currentCache?.title || meta.title, messages, error: currentCache?.error || null, unreadCount: countUnreadMessages(messages)});
     };
     const refreshMailboxContext = ({workspace, folder} = {}) => {
         const cache = mailboxCache.get(folder);
         if (cache) refreshRenderedMailboxFolder(folder, cache);
-        if (workspace) {
-            requestAnimationFrame(() => bindEmailMessageContextMenus(workspace));
-        }
+        if (workspace) requestAnimationFrame(() => bindEmailMessageContextMenus(workspace));
         updateEmailRouteUnreadCounts();
     };
     const escapeSelectorValue = value => typeof window.CSS?.escape === "function" ? window.CSS.escape(String(value ?? "")) : String(value ?? "").replace(/"/g, "\\\"");
@@ -564,33 +495,14 @@
     };
     const getReplyRecipient = (message, context = null) => {
         const raw = message?.raw || message || {};
-        return message?.from
-            || formatAddress(firstValueLoose(raw, [
-                "from",
-                "sender",
-                "author",
-                "from_email",
-                "fromEmail",
-                "fromAddress",
-                "from_address",
-                "senderEmail",
-                "sender_email",
-                "senderAddress",
-                "sender_address",
-                "mailFrom",
-                "mail_from"
-            ]))
-            || String(context?.item?.querySelector?.(".email-message-sender")?.textContent || "").trim();
+        return message?.from || formatAddress(firstValueLoose(raw, ["from", "sender", "author", "from_email", "fromEmail", "fromAddress", "from_address", "senderEmail", "sender_email", "senderAddress", "sender_address", "mailFrom", "mail_from"])) || String(context?.item?.querySelector?.(".email-message-sender")?.textContent || "").trim()
     };
     const getEmailThreadValue = message => {
         const raw = message?.raw || message || {};
-        return firstValue(raw, ["thread", "threadId", "thread_id", "conversation", "conversationId", "conversation_id"], message?.recordId || message?.id || "");
+        return message?.thread || firstValueLoose(raw, EMAIL_THREAD_KEYS, message?.recordId || message?.id || "");
     };
     const buildStandardEmailAddress = username => {
-        const normalizedUsername = String(username || "")
-            .trim()
-            .replace(/@.*$/, "")
-            .replace(/[^a-zA-Z0-9._-]/g, "");
+        const normalizedUsername = String(username || "").trim().replace(/@.*$/, "").replace(/[^a-zA-Z0-9._-]/g, "");
         return normalizedUsername ? `${normalizedUsername}@standardemail.net` : "";
     };
     const getCurrentUserEmailAddress = async () => {
@@ -718,10 +630,7 @@
     const renderReplyContext = replyTo => {
         if (!replyTo) return "";
         return div({style: "email-reply-context", content: children([
-            div({style: "email-reply-context-title", content: children([
-                REPLY_ICON,
-                `<span>Replying to</span>`
-            ])}),
+            div({style: "email-reply-context-title", content: children([REPLY_ICON, `<span>Replying to</span>`])}),
             div({style: "email-reply-context-subject", content: escapeMarkup(replyTo.subject || "(No subject)")}),
             div({style: "email-reply-context-meta", content: children([
                 replyTo.from ? div({content: `<strong>From</strong> ${escapeMarkup(replyTo.from)}`}) : "",
@@ -803,9 +712,7 @@
             context.message.raw.read = read;
             context.message.raw.seen = read;
         }
-        if (context.item) {
-            context.item.classList.toggle("unread", context.message.unread);
-        }
+        if (context.item) context.item.classList.toggle("unread", context.message.unread);
         return recordId;
     };
     const updateMailboxMessageReadState = target => {
@@ -817,12 +724,10 @@
         syncMailboxMessageCache(context.folder, context.cache.messages);
         applyEmailMessageItemStyles(context.workspace || document);
         updateEmailRouteUnreadCounts();
-        CLI.send(buildReadStateCommand(recordId, nextReadState))
-            .then(() => modular?.success?.(nextReadState ? "Marked email as read" : "Marked email as unread"))
-            .catch(error => {
-                console.error("Failed to update email read state:", error);
-                modular?.error?.(nextReadState ? "Couldn't mark email as read" : "Couldn't mark email as unread");
-            });
+        CLI.send(buildReadStateCommand(recordId, nextReadState)).then(() => modular?.success?.(nextReadState ? "Marked email as read" : "Marked email as unread")).catch(error => {
+            console.error("Failed to update email read state:", error);
+            modular?.error?.(nextReadState ? "Couldn't mark email as read" : "Couldn't mark email as unread");
+        });
     };
     const markEmailMessageReadFromNotification = message => {
         if (!message || !isMessageUnread(message)) return;
@@ -850,9 +755,7 @@
         const validContexts = contexts.filter(context => context?.message && context?.cache);
         if (!validContexts.length) return;
         const nextReadState = validContexts.some(context => isMessageUnread(context.message));
-        const updates = validContexts
-            .map(context => ({context, recordId: setMailboxMessageReadState(context, nextReadState)}))
-            .filter(update => update.recordId);
+        const updates = validContexts.map(context => ({context, recordId: setMailboxMessageReadState(context, nextReadState)})).filter(update => update.recordId);
         if (!updates.length) return;
         const touchedFolders = new Set();
         const touchedWorkspaces = new Set();
@@ -923,7 +826,7 @@
             modular?.error?.("Select an email first");
             return;
         }
-        contexts.forEach(context => moveMailboxMessageContextToFolder(context, folder));
+        moveMailboxMessageContextsToFolder(contexts, folder);
     };
     const toggleStarredFromToolbar = event => {
         const contexts = contextsForToolbarAction(event).filter(context => context?.message);
@@ -947,20 +850,16 @@
             return;
         }
         refreshToolbarContexts(updates.map(update => update.context));
-        Promise.all(updates.map(({recordId}) => CLI.send(buildStarredStateCommand(recordId, nextStarredState))))
-            .then(() => modular?.success?.(nextStarredState ? "Starred email" : "Unstarred email"))
-            .catch(error => {
-                console.error("Failed to update email starred state:", error);
-                modular?.error?.(nextStarredState ? "Couldn't star email" : "Couldn't unstar email");
-            });
+        Promise.all(updates.map(({recordId}) => CLI.send(buildStarredStateCommand(recordId, nextStarredState)))).then(() => modular?.success?.(nextStarredState ? "Starred email" : "Unstarred email")).catch(error => {
+            console.error("Failed to update email starred state:", error);
+            modular?.error?.(nextStarredState ? "Couldn't star email" : "Couldn't unstar email");
+        });
     };
     const normalizeCategoryRecordId = value => String(value ?? "").replace(/^@/, "").trim();
     const getCategoryRecordId = category => normalizeCategoryRecordId(firstValue(category, ["id", "ID", "_id", "recordId", "record_id"]));
     const getCategoryName = category => String(firstValue(category, ["name", "title"], "Untitled")).trim() || "Untitled";
     const getCategoryColor = category => String(firstValue(category, ["color", "colour"], "transparent")).trim() || "transparent";
-    const parseCategoriesResponse = response => Array.isArray(response?.categories) ? response.categories
-        : Array.isArray(response?.cats) ? response.cats
-            : parseResponse(response);
+    const parseCategoriesResponse = response => Array.isArray(response?.categories) ? response.categories : Array.isArray(response?.cats) ? response.cats : parseResponse(response);
     const fetchEmailCategories = async () => parseCategoriesResponse(await CLI.send("[cats]"));
     const openCalendarCategoriesPortal = () => {
         if (typeof window.StandardCalendar?.openCategories === "function") {
@@ -988,12 +887,10 @@
             return;
         }
         refreshToolbarContexts(updates.map(update => update.context));
-        Promise.all(updates.map(({recordId}) => CLI.send(buildCategoryCommand(recordId, categoryId))))
-            .then(() => modular?.success?.(categoryId ? `Categorized as ${categoryName || categoryId}` : "Category cleared"))
-            .catch(error => {
-                console.error("Failed to categorize email:", error);
-                modular?.error?.("Couldn't categorize email");
-            });
+        Promise.all(updates.map(({recordId}) => CLI.send(buildCategoryCommand(recordId, categoryId)))).then(() => modular?.success?.(categoryId ? `Categorized as ${categoryName || categoryId}` : "Category cleared")).catch(error => {
+            console.error("Failed to categorize email:", error);
+            modular?.error?.("Couldn't categorize email");
+        });
     };
     const ensureEmailCategoryPopoutAnchor = () => {
         if (emailCategoryPopoutAnchor?.isConnected) return emailCategoryPopoutAnchor;
@@ -1020,25 +917,17 @@
             return;
         }
         emailCategoryPopoutItems.splice(0, emailCategoryPopoutItems.length);
-        categories
-            .filter(category => getCategoryRecordId(category))
-            .forEach(category => {
-                const categoryName = getCategoryName(category);
-                const categoryColor = getCategoryColor(category);
-                emailCategoryPopoutItems.push({
-                    content: children([
-                        div({style: "email-category-popout-dot", background: categoryColor}),
-                        `<span>${escapeMarkup(categoryName)}</span>`
-                    ]),
-                    action: () => applyCategoryToEmailContexts(contexts, category)
-                });
+        categories.filter(category => getCategoryRecordId(category)).forEach(category => {
+            const categoryName = getCategoryName(category);
+            const categoryColor = getCategoryColor(category);
+            emailCategoryPopoutItems.push({
+                content: children([div({style: "email-category-popout-dot", background: categoryColor}), `<span>${escapeMarkup(categoryName)}</span>`]),
+                action: () => applyCategoryToEmailContexts(contexts, category)
             });
+        });
         if (emailCategoryPopoutItems.length) emailCategoryPopoutItems.push("separator");
         emailCategoryPopoutItems.push({
-            content: children([
-                div({style: "email-category-popout-dot email-category-popout-dot-empty"}),
-                "<span>Clear Category</span>"
-            ]),
+            content: children([div({style: "email-category-popout-dot email-category-popout-dot-empty"}), "<span>Clear Category</span>"]),
             action: () => applyCategoryToEmailContexts(contexts, null)
         }, {
             icon: CATEGORY_ICON,
@@ -1046,12 +935,7 @@
             action: () => openCalendarCategoriesPortal()
         });
         const anchor = ensureEmailCategoryPopoutAnchor();
-        anchor.dispatchEvent(new MouseEvent("click", {
-            bubbles: true,
-            cancelable: true,
-            clientX: event?.clientX || 0,
-            clientY: event?.clientY || 0
-        }));
+        anchor.dispatchEvent(new MouseEvent("click", {bubbles: true, cancelable: true, clientX: event?.clientX || 0, clientY: event?.clientY || 0}));
     };
     const categorizeEmailFromToolbar = async event => {
         const contexts = contextsForToolbarAction(event).filter(context => context?.message);
@@ -1087,15 +971,66 @@
         }
         if (selectedMailboxMessageId === context.messageId) selectedMailboxMessageId = nextSourceMessages[0]?.id || "";
         refreshMailboxContext(context);
-        CLI.send(buildMoveFolderCommand(recordId, destinationFolder))
-            .then(() => modular?.success?.(`Moved email to ${getFolderMeta(destinationFolder).title}`))
-            .catch(error => {
-                console.error("Failed to move email:", error);
-                modular?.error?.(`Couldn't move email to ${getFolderMeta(destinationFolder).title}`);
-            });
+        CLI.send(buildMoveFolderCommand(recordId, destinationFolder)).then(() => modular?.success?.(`Moved email to ${getFolderMeta(destinationFolder).title}`)).catch(error => {
+            console.error("Failed to move email:", error);
+            modular?.error?.(`Couldn't move email to ${getFolderMeta(destinationFolder).title}`);
+        });
+    };
+    const moveMailboxMessageContextsToFolder = (contexts = [], destinationFolder) => {
+        const destinationMeta = getFolderMeta(destinationFolder);
+        const seen = new Set();
+        const updates = contexts.map(context => {
+            if (!context?.message || !context?.cache || context.folder === destinationFolder) return null;
+            const key = `${context.folder}:${context.messageId}`;
+            if (seen.has(key)) return null;
+            seen.add(key);
+            const recordId = context.message.recordId || resolveEmailRecordId(context.message.raw);
+            if (!recordId) return null;
+            return {context, recordId: String(recordId), message: {...context.message, recordId: String(recordId)}};
+        }).filter(Boolean);
+        if (!updates.length) {
+            if (contexts.some(context => context?.message && !recordIdForContext(context))) modular?.error?.("Couldn't move email: missing record id");
+            return;
+        }
+        const touchedFolders = new Set([destinationFolder]);
+        const movedIdsByFolder = new Map();
+        updates.forEach(({context}) => {
+            if (!movedIdsByFolder.has(context.folder)) movedIdsByFolder.set(context.folder, new Set());
+            movedIdsByFolder.get(context.folder).add(context.messageId);
+            selectedMailboxMessageIds.delete(context.messageId);
+        });
+        movedIdsByFolder.forEach((messageIds, folder) => {
+            const cache = mailboxCache.get(folder);
+            if (!cache) return;
+            const nextMessages = cache.messages.filter(message => !messageIds.has(message.id));
+            syncMailboxMessageCache(folder, nextMessages);
+            if (selectedMailboxMessageId && messageIds.has(selectedMailboxMessageId)) selectedMailboxMessageId = nextMessages[0]?.id || "";
+            touchedFolders.add(folder);
+        });
+        const destinationCache = mailboxCache.get(destinationFolder);
+        if (destinationCache) {
+            const existingDestinationIds = new Set(destinationCache.messages.map(message => message.id));
+            const movedMessages = updates.map(({message}) => message).filter(message => !existingDestinationIds.has(message.id));
+            syncMailboxMessageCache(destinationFolder, [...movedMessages, ...destinationCache.messages]);
+        }
+        touchedFolders.forEach(folder => refreshRenderedMailboxFolder(folder, mailboxCache.get(folder)));
+        Promise.all(updates.map(({recordId}) => CLI.send(buildMoveFolderCommand(recordId, destinationFolder)))).then(() => {
+            modular?.success?.(updates.length === 1 ? `Moved email to ${destinationMeta.title}` : `Moved ${updates.length} emails to ${destinationMeta.title}`);
+        }).catch(error => {
+            console.error("Failed to move email:", error);
+            modular?.error?.(`Couldn't move email to ${destinationMeta.title}`);
+        });
     };
     const moveMailboxMessageToFolder = (target, destinationFolder) => {
         moveMailboxMessageContextToFolder(findMailboxMessageContext(target), destinationFolder);
+    };
+    const getMailboxDragContexts = target => {
+        const context = findMailboxMessageContext(target);
+        if (!context.message || !context.cache) return [];
+        if (!context.item?.classList?.contains("active")) return [context];
+        const selectedItems = Array.from(context.workspace?.querySelectorAll?.(".email-message-item.active") || []);
+        const selectedContexts = selectedItems.map(findMailboxMessageContext).filter(selectedContext => selectedContext.message && selectedContext.cache && selectedContext.folder === context.folder);
+        return selectedContexts.length ? selectedContexts : [context];
     };
     const getContextsForMailboxMenuAction = target => {
         const context = findMailboxMessageContext(target);
@@ -1112,10 +1047,7 @@
         const contexts = getContextsForMailboxMenuAction(target).filter(context => context?.message && context?.cache && context.folder === "deleted");
         if (!contexts.length) return;
         const count = contexts.length;
-        confirmationDialogue({
-            title: count === 1 ? "Permanently Delete Email" : "Permanently Delete Emails",
-            content: count === 1 ? "You're sure you want to permanently delete this email?" : `You're sure you want to permanently delete these ${count} emails?`,
-            confirmation: () => {
+        confirmationDialogue({title: count === 1 ? "Permanently Delete Email" : "Permanently Delete Emails", content: count === 1 ? "You're sure you want to permanently delete this email?" : `You're sure you want to permanently delete these ${count} emails?`, confirmation: () => {
                 const updates = contexts.map(context => ({context, recordId: recordIdForContext(context)})).filter(update => update.recordId);
                 if (!updates.length) {
                     modular?.error?.("Couldn't delete email: missing record id");
@@ -1131,12 +1063,10 @@
                     }
                     refreshRenderedMailboxFolder("deleted", mailboxCache.get("deleted"));
                 }
-                Promise.all(updates.map(({recordId}) => CLI.send(buildDeleteEmailCommand(recordId))))
-                    .then(() => modular?.success?.(count === 1 ? "Deleted email" : "Deleted emails"))
-                    .catch(error => {
-                        console.error("Failed to permanently delete email:", error);
-                        modular?.error?.("Couldn't delete email");
-                    });
+                Promise.all(updates.map(({recordId}) => CLI.send(buildDeleteEmailCommand(recordId)))).then(() => modular?.success?.(count === 1 ? "Deleted email" : "Deleted emails")).catch(error => {
+                    console.error("Failed to permanently delete email:", error);
+                    modular?.error?.("Couldn't delete email");
+                });
             }
         });
     };
@@ -1193,6 +1123,10 @@
             return null;
         }
     };
+    const findEmailDragContexts = dragData => {
+        const entries = Array.isArray(dragData?.messages) ? dragData.messages : (dragData?.messageId ? [dragData] : []);
+        return entries.map(entry => findMailboxMessageContextById(entry?.messageId, entry?.sourceFolder)).filter(context => context.message && context.cache);
+    };
     const resolveEmailSidebarFolder = target => {
         const route = target?.closest?.(".sidebar-item");
         if (!route?.closest?.(".draggable-window")?.portal || route.closest(".draggable-window").portal.serviceId?.() !== EMAIL_SERVICE_ID) return "";
@@ -1213,10 +1147,12 @@
             item.addEventListener("dragstart", event => {
                 const context = findMailboxMessageContext(item);
                 if (!context.message) return;
+                const contexts = getMailboxDragContexts(item);
+                const messages = contexts.map(dragContext => ({messageId: dragContext.messageId, sourceFolder: dragContext.folder}));
                 event.stopPropagation();
                 event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData(EMAIL_DRAG_MIME, JSON.stringify({messageId: context.messageId, sourceFolder: context.folder}));
-                event.dataTransfer.setData("text/plain", context.message.subject || "Email");
+                event.dataTransfer.setData(EMAIL_DRAG_MIME, JSON.stringify({messageId: context.messageId, sourceFolder: context.folder, messages}));
+                event.dataTransfer.setData("text/plain", contexts.length === 1 ? (context.message.subject || "Email") : `${contexts.length} emails`);
                 document.body.classList.remove("drag-active");
             });
             item.addEventListener("dragend", event => {
@@ -1267,20 +1203,14 @@
                     document.body.classList.remove("drag-active");
                     const dragData = readEmailDragData(event);
                     const destinationFolder = resolveEmailSidebarFolder(route);
-                    if (!dragData?.messageId || !dragData?.sourceFolder || !destinationFolder) return;
-                    const context = findMailboxMessageContextById(dragData.messageId, dragData.sourceFolder);
-                    moveMailboxMessageContextToFolder(context, destinationFolder);
+                    if (!destinationFolder) return;
+                    const contexts = findEmailDragContexts(dragData);
+                    moveMailboxMessageContextsToFolder(contexts, destinationFolder);
                 });
             });
         });
     };
-    const isEmailReadShortcut = event => (
-        event.ctrlKey
-        && !event.altKey
-        && !event.metaKey
-        && !event.shiftKey
-        && event.key?.toLowerCase?.() === "u"
-    );
+    const isEmailReadShortcut = event => (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key?.toLowerCase?.() === "u");
     const isEditableShortcutTarget = target => !!target?.closest?.("input, textarea, select, [contenteditable='true'], [contenteditable='']");
     const getFocusedEmailWindow = target => {
         const targetWindow = target?.closest?.(".draggable-window");
@@ -1290,19 +1220,12 @@
         return null;
     };
     const findFocusedMailboxWorkspace = target => getFocusedEmailWindow(target)?.querySelector?.(".email-workspace") || null;
-    const isEmailSelectAllShortcut = event => (
-        event.ctrlKey
-        && !event.altKey
-        && !event.metaKey
-        && !event.shiftKey
-        && event.key?.toLowerCase?.() === "a"
-    );
+    const isEmailSelectAllShortcut = event => (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key?.toLowerCase?.() === "a");
     const findSelectedMailboxItemForShortcut = target => {
         const workspace = findFocusedMailboxWorkspace(target);
         if (!workspace) return null;
         const escapedSelectedId = escapeSelectorValue(selectedMailboxMessageId);
-        return workspace.querySelector(".email-message-item.active")
-            || (selectedMailboxMessageId ? workspace.querySelector(`.email-message-item[data="${escapedSelectedId}"]`) : null);
+        return workspace.querySelector(".email-message-item.active") || (selectedMailboxMessageId ? workspace.querySelector(`.email-message-item[data="${escapedSelectedId}"]`) : null);
     };
     const findSelectedMailboxContextsForShortcut = target => {
         const workspace = findFocusedMailboxWorkspace(target);
@@ -1403,7 +1326,7 @@
         data: message.id,
         onclick: event => {
             const item = event.target?.closest?.(".email-message-item");
-            selectMailboxMessage(item?.getAttribute("data"), item?.closest?.(".email-shell"));
+            selectMailboxMessage(item?.getAttribute("data"), item?.closest?.(".email-shell"), event.ctrlKey && !event.altKey && !event.metaKey);
         },
         ondblclick: event => {
             event.stopPropagation();
@@ -1421,12 +1344,7 @@
         ])
     });
     const renderReadingPane = (message, folderTitle = "") => {
-        if (!message) {
-            return div({
-                style: "email-reading-empty",
-                content: "Select an email to read."
-            });
-        }
+        if (!message) return div({style: "email-reading-empty", content: "Select an email to read."});
         const resolvedFolderTitle = resolveMessageFolderTitle(message, folderTitle);
         return children([
             div({style: "email-reading-header", content: children([
@@ -1446,33 +1364,22 @@
         const message = activeViewerMessage;
         const folderTitle = activeViewerFolderTitle || state.folderTitle || "";
         requestAnimationFrame(() => bindEmailCategoryToolbarButtons(document));
-        return div({
-            style: "email-workspace",
-            content: children([
+        return div({style: "email-workspace large-padding-top", content: children([
                 renderEmailToolbar(),
                 div({style: "spacer"}),
-                div({
-                    style: "email-reading-pane",
-                    content: message
-                        ? renderReadingPane(message, folderTitle)
-                        : div({style: "email-reading-empty", content: "Double-click an email to open it here."})
-                })
+                div({style: "email-reading-pane radius", content: message ? renderReadingPane(message, folderTitle) : div({style: "email-reading-empty", content: "Double-click an email to open it here."})})
             ])
         });
     };
     const renderMailbox = (messages, {folder = "inbox", title = "Inbox", error = null} = {}) => {
         activeMailboxFolder = folder;
         mailboxMessages = messages;
-        if (!mailboxMessages.some(message => message.id === selectedMailboxMessageId)) {
-            selectedMailboxMessageId = mailboxMessages[0]?.id || "";
-        }
+        if (!mailboxMessages.some(message => message.id === selectedMailboxMessageId)) selectedMailboxMessageId = mailboxMessages[0]?.id || "";
         const availableMessageIds = new Set(mailboxMessages.map(message => message.id));
         Array.from(selectedMailboxMessageIds).forEach(messageId => {
             if (!availableMessageIds.has(messageId)) selectedMailboxMessageIds.delete(messageId);
         });
-        if (!selectedMailboxMessageIds.size && selectedMailboxMessageId) {
-            selectedMailboxMessageIds.add(selectedMailboxMessageId);
-        }
+        if (!selectedMailboxMessageIds.size && selectedMailboxMessageId) selectedMailboxMessageIds.add(selectedMailboxMessageId);
         const selectedMessage = mailboxMessages.find(message => message.id === selectedMailboxMessageId) || mailboxMessages[0];
         const mailbox = div({
             style: "email-shell",
@@ -1512,11 +1419,23 @@
             ])
         });
     };
-    const selectMailboxMessage = (messageId, root = document) => {
+    const selectMailboxMessage = (messageId, root = document, additive = false) => {
         root = root || document;
-        selectedMailboxMessageId = messageId || selectedMailboxMessageId;
-        selectedMailboxMessageIds.clear();
-        if (selectedMailboxMessageId) selectedMailboxMessageIds.add(selectedMailboxMessageId);
+        const nextMessageId = messageId || selectedMailboxMessageId;
+        if (!nextMessageId) return;
+        if (additive) {
+            if (selectedMailboxMessageIds.has(nextMessageId)) {
+                selectedMailboxMessageIds.delete(nextMessageId);
+                if (!selectedMailboxMessageIds.size) selectedMailboxMessageIds.add(nextMessageId);
+            } else {
+                selectedMailboxMessageIds.add(nextMessageId);
+            }
+            selectedMailboxMessageId = selectedMailboxMessageIds.has(nextMessageId) ? nextMessageId : Array.from(selectedMailboxMessageIds)[0] || nextMessageId;
+        } else {
+            selectedMailboxMessageId = nextMessageId;
+            selectedMailboxMessageIds.clear();
+            selectedMailboxMessageIds.add(selectedMailboxMessageId);
+        }
         const selectedMessage = mailboxMessages.find(message => message.id === selectedMailboxMessageId) || mailboxMessages[0];
         const folderTitle = getFolderMeta(root.closest?.(".email-workspace")?.getAttribute("data") || activeMailboxFolder).title;
         root.querySelectorAll(".email-message-item").forEach(item => {

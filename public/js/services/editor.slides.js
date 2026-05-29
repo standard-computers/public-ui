@@ -59,10 +59,7 @@
     let slidePresentationIndex = 0;
     let savedSlideSelectionOffsets = null;
     const resolvedSlideColorCache = new Map();
-    const findSlidesPortal = () => [...Array.from(document.querySelectorAll(".draggable-window"))]
-        .reverse()
-        .find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID)
-        ?.portal;
+    const findSlidesPortal = () => [...Array.from(document.querySelectorAll(".draggable-window"))].reverse().find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID)?.portal;
     const prioritizePortalDomForLegacyLookups = (portal = null) => {
         const windowNode = portal?.window?.();
         const parentNode = windowNode?.parentElement;
@@ -173,9 +170,7 @@
         if (!(surfaceNode instanceof HTMLElement)) return;
         const normalizedBackground = normalizeSlideBackground(background);
         surfaceNode.style.backgroundColor = normalizedBackground?.type === "color" ? normalizedBackground.value : "var(--secondary-bg)";
-        surfaceNode.style.backgroundImage = normalizedBackground?.type === "image"
-            ? `url("${getSlideBackgroundDownloadUrl(normalizedBackground.value)}")`
-            : (normalizedBackground?.type === "color" || !showGrid ? "none" : "linear-gradient(to right, var(--border) 1px, transparent 1px),linear-gradient(to bottom, var(--border) 1px, transparent 1px)");
+        surfaceNode.style.backgroundImage = normalizedBackground?.type === "image" ? `url("${getSlideBackgroundDownloadUrl(normalizedBackground.value)}")` : (normalizedBackground?.type === "color" || !showGrid ? "none" : "linear-gradient(to right, var(--border) 1px, transparent 1px),linear-gradient(to bottom, var(--border) 1px, transparent 1px)");
         surfaceNode.style.backgroundSize = normalizedBackground?.type === "image" ? "cover" : (normalizedBackground?.type === "color" || !showGrid ? "auto" : "20px 20px");
         surfaceNode.style.backgroundPosition = normalizedBackground?.type === "image" ? "center center" : "0 0";
         surfaceNode.style.backgroundRepeat = normalizedBackground?.type === "image" ? "no-repeat" : (normalizedBackground?.type === "color" || !showGrid ? "no-repeat" : "repeat");
@@ -203,10 +198,7 @@
         const data = Array.isArray(rawData) ? rawData : [];
         return data.map((item, index) => {
             const value = Number(item?.value ?? item?.y ?? item?.amount);
-            return {
-                label: String(item?.label ?? item?.name ?? item?.x ?? `Item ${index + 1}`),
-                value: Number.isFinite(value) ? value : 0
-            };
+            return {label: String(item?.label ?? item?.name ?? item?.x ?? `Item ${index + 1}`), value: Number.isFinite(value) ? value : 0};
         }).filter((item) => item.label || item.value);
     };
     const normalizeSlideChartBlock = (block = {}) => {
@@ -495,9 +487,7 @@
         return true;
     };
     const hideSlideInlineStyleEditor = () => {
-        if (typeof window.StandardPlastic?.removeInlineStyleEditor === "function") {
-            window.StandardPlastic.removeInlineStyleEditor(false);
-        }
+        if (typeof window.StandardPlastic?.removeInlineStyleEditor === "function") window.StandardPlastic.removeInlineStyleEditor(false);
     };
     const blurSlideTextEditing = () => {
         const activeEditor = document.activeElement?.closest?.(".editor-slide-text-content");
@@ -519,9 +509,7 @@
             x: event?.clientX ?? selectionRect?.left ?? (blockRect.right - 20),
             y: event?.clientY ?? selectionRect?.bottom ?? (blockRect.top + 20),
             value: getSlideSelectionStyle(block, selectionOffsets),
-            onchange: (updatedStyle = {}) => {
-                applyInlineStyleToSlideSelection(block.id, selectionOffsets, updatedStyle, activeContentNode);
-            }
+            onchange: (updatedStyle = {}) => applyInlineStyleToSlideSelection(block.id, selectionOffsets, updatedStyle, activeContentNode)
         });
     };
     const scheduleSlideInlineStyleEditor = (blockId = selectedSlideBlockId, contentNode = null, event = null) => {
@@ -533,12 +521,8 @@
     };
     const getSlideTextEditorFromSelection = () => {
         const selection = window.getSelection();
-        const anchorElement = selection?.anchorNode instanceof Element
-            ? selection.anchorNode
-            : selection?.anchorNode?.parentElement || null;
-        return document.activeElement?.closest?.(".editor-slide-text-content")
-            || anchorElement?.closest?.(".editor-slide-text-content")
-            || null;
+        const anchorElement = selection?.anchorNode instanceof Element ? selection.anchorNode : selection?.anchorNode?.parentElement || null;
+        return document.activeElement?.closest?.(".editor-slide-text-content") || anchorElement?.closest?.(".editor-slide-text-content") || null;
     };
     const handleSlideSelectionChange = () => {
         const contentNode = getSlideTextEditorFromSelection();
@@ -679,9 +663,7 @@
         const slidesFile = new File([bytes], fileName, {type: "application/octet-stream"});
         let saved = false;
         if (typeof window.StandardUploads?.uploadFile === "function") {
-            const response = await window.StandardUploads.uploadFile(slidesFile, uploadPath, {
-                label: `Saving ${fileName}`
-            });
+            const response = await window.StandardUploads.uploadFile(slidesFile, uploadPath, {label: `Saving ${fileName}`});
             saved = !!response?.ok;
         } else {
             const formData = new FormData();
@@ -701,11 +683,7 @@
         return true;
     };
     const saveNewSlidesDeckToDocuments = () => {
-        inputDialogue({
-            title: "File name",
-            placeholder: "slideshow.slds",
-            value: "slideshow.slds",
-            confirmation: async (_, inputFileName) => {
+        inputDialogue({title: "File name", placeholder: "slideshow.slds", value: "slideshow.slds", confirmation: async (_, inputFileName) => {
                 if (!modular.validateFileName(inputFileName)) return;
                 const safeFileName = sanitizeSlidesFileName(inputFileName) || "slideshow.slds";
                 await saveSlidesDeckToPath(`Documents/${safeFileName}`);
@@ -850,10 +828,7 @@
         const menu = document.createElement("div");
         menu.id = "editor-slide-context-menu";
         menu.className = "editor-slide-context-menu";
-        menu.innerHTML = [
-            `<button type="button" data-action="rename" class="editor-slide-context-action">Rename</button>`,
-            `<button type="button" data-action="delete" class="editor-slide-context-action danger">Delete</button>`
-        ].join("");
+        menu.innerHTML = [`<button type="button" data-action="rename" class="editor-slide-context-action">Rename</button>`, `<button type="button" data-action="delete" class="editor-slide-context-action danger">Delete</button>`].join("");
         menu.addEventListener("click", (event) => {
             const action = event.target?.dataset?.action;
             const slideId = contextMenuSlideId;
@@ -861,11 +836,7 @@
             const slide = activeSlideDeck.find((item) => item.id === slideId);
             if (!slide) return hideSlideContextMenu();
             if (action === "rename") {
-                inputDialogue({
-                    title: "Slide name",
-                    placeholder: "Untitled Slide",
-                    value: slide.title || "",
-                    confirmation: (_, nextTitle) => {
+                inputDialogue({title: "Slide name", placeholder: "Untitled Slide", value: slide.title || "", confirmation: (_, nextTitle) => {
                         slide.title = (nextTitle || "").trim() || slide.title || "Untitled Slide";
                         renderSlideSidebar();
                         saveSlidePortalState();
@@ -876,10 +847,7 @@
                     hideSlideContextMenu();
                     return;
                 }
-                confirmationDialogue({
-                    title: "Delete slide",
-                    content: `Delete "${slide.title}"?`,
-                    confirmation: () => {
+                confirmationDialogue({title: "Delete slide", content: `Delete "${slide.title}"?`, confirmation: () => {
                         activeSlideDeck = activeSlideDeck.filter((item) => item.id !== slideId);
                         if (activeSlideId === slideId) activeSlideId = activeSlideDeck[0]?.id || activeSlideId;
                         selectedSlideBlockId = null;
@@ -967,9 +935,7 @@
             const uploadUrl = targetDirectory ? `/api/upload?directory=${encodeURIComponent(targetDirectory)}` : "/api/upload";
             try {
                 if (typeof window.StandardUploads?.uploadFile === "function") {
-                    const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
-                        label: `Uploading ${file.name || "image"}`
-                    });
+                    const response = await window.StandardUploads.uploadFile(file, uploadUrl, {label: `Uploading ${file.name || "image"}`});
                     if (!response?.ok) throw new Error(`Upload failed (${response?.status || 0})`);
                 } else {
                     const formData = new FormData();
@@ -1105,10 +1071,7 @@
             const previewNode = createSlideThumbnailNode(slide, previewWidth);
             const metaNode = document.createElement("div");
             metaNode.className = "editor-slide-item-meta";
-            metaNode.innerHTML = [
-                `<span class="editor-slide-item-index">${index + 1}</span>`,
-                `<span class="editor-slide-item-title">${slide.title || `Slide ${index + 1}`}</span>`
-            ].join("");
+            metaNode.innerHTML = [`<span class="editor-slide-item-index">${index + 1}</span>`, `<span class="editor-slide-item-title">${slide.title || `Slide ${index + 1}`}</span>`].join("");
             slideButton.appendChild(previewNode);
             slideButton.appendChild(metaNode);
             slideButton.draggable = true;
@@ -1214,9 +1177,7 @@
                 selectedSlideBlockId = block.id;
                 rememberSlideSelection(contentNode);
                 const selectionOffsets = getSlideSelectionOffsets(contentNode);
-                if (!selectionOffsets || selectionOffsets.start !== selectionOffsets.end) {
-                    scheduleSlideInlineStyleEditor(block.id, contentNode, event);
-                }
+                if (!selectionOffsets || selectionOffsets.start !== selectionOffsets.end) scheduleSlideInlineStyleEditor(block.id, contentNode, event);
                 updateSlideToolbarState();
             });
             contentNode.addEventListener("contextmenu", (event) => {
@@ -1334,10 +1295,7 @@
         const canvasRect = bounds.canvas.getBoundingClientRect();
         const pointFromRect = (sourceRect = null) => {
             if (!sourceRect) return null;
-            return {
-                x: snapSlideValue(sourceRect.left - canvasRect.left),
-                y: snapSlideValue(sourceRect.bottom - canvasRect.top + SLIDE_GRID_SIZE)
-            };
+            return {x: snapSlideValue(sourceRect.left - canvasRect.left), y: snapSlideValue(sourceRect.bottom - canvasRect.top + SLIDE_GRID_SIZE)};
         };
         const contentNode = getSlideTextEditorFromSelection();
         if (contentNode instanceof HTMLElement) {
@@ -1372,20 +1330,12 @@
         if (selectedBlock) return {x: snapSlideValue(selectedBlock.x + SLIDE_GRID_SIZE), y: snapSlideValue(selectedBlock.y + SLIDE_GRID_SIZE)};
         return {x: SLIDE_GRID_SIZE, y: SLIDE_GRID_SIZE};
     };
-    const parseSlideChartDataInput = (rawText = "") => String(rawText || "").split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line, index) => {
-            const parts = line.split(/,|\t/).map((part) => part.trim());
-            const value = Number(parts[1] ?? parts[0]);
-            return {
-                label: parts.length > 1 ? (parts[0] || `Item ${index + 1}`) : `Item ${index + 1}`,
-                value: Number.isFinite(value) ? value : 0
-            };
-        }).filter((item) => item.label || item.value);
-    const serializeSlideChartData = (data = SLIDE_CHART_DEFAULT_DATA) => normalizeSlideChartData(data)
-        .map((item) => `${item.label}, ${item.value}`)
-        .join("\n");
+    const parseSlideChartDataInput = (rawText = "") => String(rawText || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line, index) => {
+        const parts = line.split(/,|\t/).map((part) => part.trim());
+        const value = Number(parts[1] ?? parts[0]);
+        return {label: parts.length > 1 ? (parts[0] || `Item ${index + 1}`) : `Item ${index + 1}`, value: Number.isFinite(value) ? value : 0};
+    }).filter((item) => item.label || item.value);
+    const serializeSlideChartData = (data = SLIDE_CHART_DEFAULT_DATA) => normalizeSlideChartData(data).map((item) => `${item.label}, ${item.value}`).join("\n");
     const getSlideChartDataPlaceholder = (chartType = "bar") => {
         if (chartType === "pie") return "Segment, Value\nHardware, 42\nSoftware, 33\nServices, 25";
         if (chartType === "scatter") return "Point, Value\nA, 12\nB, 28\nC, 18";
@@ -1698,9 +1648,7 @@
         const targetDirectory = getSlidesFileDirectory(activeSlideDeckFilePath) || "Documents";
         const uploadUrl = targetDirectory ? `/api/upload?directory=${encodeURIComponent(targetDirectory)}` : "/api/upload";
         if (typeof window.StandardUploads?.uploadFile === "function") {
-            const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
-                label: `Uploading ${file.name || "image"}`
-            });
+            const response = await window.StandardUploads.uploadFile(file, uploadUrl, {label: `Uploading ${file.name || "image"}`});
             if (!response?.ok) throw new Error(`Upload failed (${response?.status || 0})`);
         } else {
             const formData = new FormData();
@@ -1770,7 +1718,6 @@
                 saveSlidePortalState();
             });
         }
-
         const addTextButton = document.getElementById("editor-slide-add-text");
         if (addTextButton && addTextButton.dataset.bound !== "1") {
             addTextButton.dataset.bound = "1";
@@ -1812,30 +1759,21 @@
             fontSizeSelect.addEventListener("mousedown", () => rememberSlideSelection());
             fontSizeSelect.addEventListener("change", (event) => {
                 const nextSize = String(event?.target?.value || "").trim();
-                applySlideToolbarStyle((style) => ({
-                    ...style,
-                    fontSize: nextSize ? `${nextSize}px` : ""
-                }));
+                applySlideToolbarStyle((style) => ({...style, fontSize: nextSize ? `${nextSize}px` : ""}));
             });
         }
         if (boldButton && boldButton.dataset.bound !== "1") {
             boldButton.dataset.bound = "1";
             boldButton.addEventListener("click", (event) => {
                 event.preventDefault();
-                applySlideToolbarStyle((style) => ({
-                    ...style,
-                    fontWeight: style.fontWeight === "bold" ? "" : "bold"
-                }));
+                applySlideToolbarStyle((style) => ({...style, fontWeight: style.fontWeight === "bold" ? "" : "bold"}));
             });
         }
         if (italicButton && italicButton.dataset.bound !== "1") {
             italicButton.dataset.bound = "1";
             italicButton.addEventListener("click", (event) => {
                 event.preventDefault();
-                applySlideToolbarStyle((style) => ({
-                    ...style,
-                    fontStyle: style.fontStyle === "italic" ? "" : "italic"
-                }));
+                applySlideToolbarStyle((style) => ({...style, fontStyle: style.fontStyle === "italic" ? "" : "italic"}));
             });
         }
         if (textColorButton && textColorButton.dataset.bound !== "1") {
@@ -1843,10 +1781,7 @@
             textColorButton.popoutmenu(SLIDE_TEXT_COLORS.map((colorOption) => ({
                 label: colorOption.label,
                 icon: `<div class="inline round small-icon space-right" style="background:${colorOption.value || "transparent"};border:1px solid var(--border)"></div>`,
-                action: () => applySlideToolbarStyle((style) => ({
-                    ...style,
-                    color: colorOption.value || ""
-                }))
+                action: () => applySlideToolbarStyle((style) => ({...style, color: colorOption.value || ""}))
             })));
         }
         if (backgroundColorButton && backgroundColorButton.dataset.bound !== "1") {
@@ -1854,30 +1789,15 @@
             backgroundColorButton.popoutmenu(SLIDE_BACKGROUND_COLORS.map((colorOption) => ({
                 label: colorOption.label,
                 icon: `<div class="inline round small-icon space-right" style="background:${colorOption.value || "transparent"};border:1px solid var(--border)"></div>`,
-                action: () => applySlideToolbarStyle((style) => ({
-                    ...style,
-                    backgroundColor: colorOption.value || ""
-                }))
+                action: () => applySlideToolbarStyle((style) => ({...style, backgroundColor: colorOption.value || ""}))
             })));
         }
         if (alignmentButton && alignmentButton.dataset.bound !== "1") {
             alignmentButton.dataset.bound = "1";
             alignmentButton.popoutmenu([
-                {
-                    label: "Align Left",
-                    icon: SLIDE_ALIGN_ICONS.left,
-                    action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "left"}))
-                },
-                {
-                    label: "Align Center",
-                    icon: SLIDE_ALIGN_ICONS.center,
-                    action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "center"}))
-                },
-                {
-                    label: "Align Right",
-                    icon: SLIDE_ALIGN_ICONS.right,
-                    action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "right"}))
-                }
+                {label: "Align Left", icon: SLIDE_ALIGN_ICONS.left, action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "left"}))},
+                {label: "Align Center", icon: SLIDE_ALIGN_ICONS.center, action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "center"}))},
+                {label: "Align Right", icon: SLIDE_ALIGN_ICONS.right, action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "right"}))}
             ]);
         }
         const backgroundButton = document.getElementById("editor-slide-background-button");
@@ -1924,7 +1844,6 @@
         renderSlideCanvas();
         updateSlideToolbarState();
     };
-
     modular.register(new Service(SERVICE_ID, [
         new Portal({
             title: "Slides",
@@ -1935,9 +1854,7 @@
             tools: [{
                 title: "Save",
                 icon: modular.icons.save,
-                onclick: () => {
-                    saveLoadedSlidesDeck();
-                }
+                onclick: () => saveLoadedSlidesDeck()
             }],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" /></svg>`,
             icon: "/icons/pwrpnt.png",

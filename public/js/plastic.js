@@ -4,6 +4,8 @@ if (document.getElementById("launch-interfaces")) document.getElementById("launc
 });
 function applyCommonAttributes(el, n) {
     if (!n) return;
+    const altSync = n.altSync ?? n.altsync ?? n.alt_sync ?? n["alt-sync"];
+    if (altSync !== undefined && altSync !== null && `${altSync}`.trim()) el.setAttribute("alt-sync", `${altSync}`.trim());
     if (n.index) el.setAttribute("item-index", n.index);
     if (n.name) el.setAttribute("name", n.name);
     if (n.background) el.style.backgroundColor = n.background;

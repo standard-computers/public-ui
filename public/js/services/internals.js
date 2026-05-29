@@ -47,13 +47,7 @@
         return 0;
     };
     const updateInternalsProgress = (token, label = "Opening file", percent = 100) => {
-        window.StandardDownloads?.updateOpenProgress?.({
-            label,
-            loaded: percent,
-            total: 100,
-            indeterminate: false,
-            token
-        });
+        window.StandardDownloads?.updateOpenProgress?.({label, loaded: percent, total: 100, indeterminate: false, token});
     };
     const hideInternalsProgress = (token, delay = 220) => {
         window.setTimeout(() => window.StandardDownloads?.hideOpenProgress?.(token), delay);
@@ -88,10 +82,7 @@
     };
     const normalizeArticleMarkdownSource = (value = "") => {
         const raw = String(value || "");
-        return raw
-            .replace(/\r\n/g, "\n")
-            .replace(/\r/g, "\n")
-            .replace(/\\n/g, "\n");
+        return raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\\n/g, "\n");
     };
     const renderArticleMarkdownInline = (value = "") => {
         return escapeHtml(value)
@@ -375,9 +366,7 @@
             imagePreview.onload = () => autoSizeImagePortalToImage(imagePreview, {resizeWindow: autoSizeWindow, portal});
             imagePreview.src = activeImageFileSource;
             previewHost.appendChild(imagePreview);
-            if (imagePreview.complete && imagePreview.naturalWidth > 0 && imagePreview.naturalHeight > 0) {
-                autoSizeImagePortalToImage(imagePreview, {resizeWindow: autoSizeWindow, portal});
-            }
+            if (imagePreview.complete && imagePreview.naturalWidth > 0 && imagePreview.naturalHeight > 0) autoSizeImagePortalToImage(imagePreview, {resizeWindow: autoSizeWindow, portal});
         }
         const pathLabel = root.querySelector("#internals-image-preview-path");
         if (pathLabel) pathLabel.textContent = activeImageFilePath || "No file selected";
@@ -412,10 +401,6 @@
         reader.onerror = () => reject(reader.error || new Error("Failed to read blob"));
         reader.readAsDataURL(blob);
     });
-    const getSvgSourceFromMarkup = (markup = "") => {
-        const svgMarkup = String(markup || "").trim();
-        return svgMarkup ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}` : "";
-    };
     const getSvgMarkupFromSource = (source = "") => {
         const rawSource = String(source || "").trim();
         if (!rawSource) return "";
@@ -518,12 +503,8 @@
         bodyNode.style.maxHeight = "";
         const contentNode = bodyNode.parentElement;
         const contentStyles = contentNode ? window.getComputedStyle(contentNode) : null;
-        const contentRightExtras = contentStyles
-            ? (Number.parseFloat(contentStyles.marginRight) || 0) + (Number.parseFloat(contentStyles.paddingRight) || 0) + (Number.parseFloat(contentStyles.borderRightWidth) || 0)
-            : 0;
-        const contentBottomExtras = contentStyles
-            ? (Number.parseFloat(contentStyles.marginBottom) || 0) + (Number.parseFloat(contentStyles.paddingBottom) || 0) + (Number.parseFloat(contentStyles.borderBottomWidth) || 0)
-            : 0;
+        const contentRightExtras = contentStyles ? (Number.parseFloat(contentStyles.marginRight) || 0) + (Number.parseFloat(contentStyles.paddingRight) || 0) + (Number.parseFloat(contentStyles.borderRightWidth) || 0) : 0;
+        const contentBottomExtras = contentStyles ? (Number.parseFloat(contentStyles.marginBottom) || 0) + (Number.parseFloat(contentStyles.paddingBottom) || 0) + (Number.parseFloat(contentStyles.borderBottomWidth) || 0) : 0;
         windowNode.style.width = `${Math.ceil(requiredBodyWidth + bodyNode.offsetLeft + contentRightExtras)}px`;
         windowNode.style.height = `${Math.ceil(requiredBodyHeight + bodyNode.offsetTop + contentBottomExtras)}px`;
         bodyNode.style.overflow = "hidden";
@@ -601,9 +582,7 @@
         const rawCurrentTime = completed && duration > 0 ? duration : (Number(videoPreview.currentTime) || 0);
         const currentTime = Math.max(0, duration > 0 ? Math.min(rawCurrentTime, duration) : rawCurrentTime);
         const now = Date.now();
-        if (!force && now - activeVideoLastSavedAt < VIDEO_PROGRESS_SAVE_INTERVAL_MS && Math.abs(currentTime - activeVideoLastSavedTime) < 1) {
-            return;
-        }
+        if (!force && now - activeVideoLastSavedAt < VIDEO_PROGRESS_SAVE_INTERVAL_MS && Math.abs(currentTime - activeVideoLastSavedTime) < 1) return;
         const progressRecord = {currentTime, duration, updatedAt: new Date(now).toISOString()};
         activeVideoProgressRecord = progressRecord;
         activeVideoLastSavedAt = now;
@@ -619,18 +598,10 @@
     const updateVideoPreview = () => {
         const videoPreview = document.getElementById("internals-video-preview");
         if (!videoPreview) return;
-        videoPreview.onloadedmetadata = () => {
-            applyActiveVideoResume();
-        };
-        videoPreview.ontimeupdate = () => {
-            saveActiveVideoProgress();
-        };
-        videoPreview.onpause = () => {
-            saveActiveVideoProgress({force: true});
-        };
-        videoPreview.onended = () => {
-            saveActiveVideoProgress({force: true, completed: true});
-        };
+        videoPreview.onloadedmetadata = () => applyActiveVideoResume();
+        videoPreview.ontimeupdate = () => saveActiveVideoProgress();
+        videoPreview.onpause = () => saveActiveVideoProgress({force: true});
+        videoPreview.onended = () => saveActiveVideoProgress({force: true, completed: true});
         videoPreview.src = activeVideoFileSource;
         videoPreview.setAttribute("title", activeVideoFilePath || "Video preview");
         videoPreview.load();
@@ -713,9 +684,7 @@
         const contentNode = bodyNode.parentElement;
         const contentStyles = contentNode ? window.getComputedStyle(contentNode) : null;
         const bodyPaddingY = (Number.parseFloat(bodyStyles.paddingTop) || 0) + (Number.parseFloat(bodyStyles.paddingBottom) || 0);
-        const contentBottomExtras = contentStyles
-            ? (Number.parseFloat(contentStyles.marginBottom) || 0) + (Number.parseFloat(contentStyles.paddingBottom) || 0) + (Number.parseFloat(contentStyles.borderBottomWidth) || 0)
-            : 0;
+        const contentBottomExtras = contentStyles ? (Number.parseFloat(contentStyles.marginBottom) || 0) + (Number.parseFloat(contentStyles.paddingBottom) || 0) + (Number.parseFloat(contentStyles.borderBottomWidth) || 0) : 0;
         const routeShell = articlePreview.parentElement;
         const requiredBodyHeight = Math.max(220, Math.ceil((routeShell?.scrollHeight || articlePreview.scrollHeight) + bodyPaddingY));
         windowNode.style.height = `${Math.ceil(requiredBodyHeight + bodyNode.offsetTop + contentBottomExtras)}px`;
@@ -740,10 +709,7 @@
     const articleTextField = (id = "", labelText = "", value = "", {textareaField = false} = {}) => {
         return div({content: children([
             div({style: "bold small-padding", content: labelText}),
-            div({style: "padded", content: textareaField
-                ? textarea({id, style: "undecorated no-padding internals-article-edit-textarea fill", value: String(value ?? "")})
-                : input({id, style: "undecorated no-padding fill", value: String(value ?? "")})
-            })
+            div({style: "padded", content: textareaField ? textarea({id, style: "undecorated no-padding internals-article-edit-textarea fill", value: String(value ?? "")}) : input({id, style: "undecorated no-padding fill", value: String(value ?? "")})})
         ])});
     };
     const getSettingsPortalState = (portal = findInternalsWindow(6)?.portal) => {
@@ -786,9 +752,7 @@
         const rows = settingEntries.map(([name, setting]) => {
             const type = escapeHtml(setting?.type || "text");
             const restrictions = window.StandardAppSettings?.restrictionValues?.(setting) || [];
-            const meta = restrictions.length && String(setting?.type || "").toLowerCase() !== "boolean"
-                ? `${type} - ${restrictions.map(escapeHtml).join(", ")}`
-                : type;
+            const meta = restrictions.length && String(setting?.type || "").toLowerCase() !== "boolean" ? `${type} - ${restrictions.map(escapeHtml).join(", ")}` : type;
             return `<label class="internals-app-setting-row bordered inner-radius small-padding" data-setting-row="${escapeHtml(name)}">
                 <span class="internals-app-setting-label">${escapeHtml(setting?.label || name)}</span>
                 <span class="internals-app-setting-meta faded">${escapeHtml(meta)}</span>
@@ -824,10 +788,7 @@
         const portal = context?.portal || findInternalsWindow(6)?.portal;
         const {serviceId, title} = getSettingsPortalState(portal);
         if (!serviceId) return;
-        confirmationDialogue({
-            title: "Reset Settings",
-            content: `Delete saved settings for ${title || serviceId} and restore defaults?`,
-            confirmation: async () => {
+        confirmationDialogue({title: "Reset Settings", content: `Delete saved settings for ${title || serviceId} and restore defaults?`, confirmation: async () => {
                 const reset = await window.StandardAppSettings?.reset?.(serviceId);
                 if (reset) {
                     modular.success(`Reset ${title || serviceId} settings`);
@@ -1098,9 +1059,7 @@
     const restorePdfStateFromPortal = (portal = findInternalsWindow(7)?.portal) => {
         const state = portal?.windowState?.() || {};
         if (state?.directive) activePdfFilePath = String(state.directive);
-        activePdfFileSource = typeof state?.cachedContent?.source === "string" && state.cachedContent.source.trim()
-            ? state.cachedContent.source
-            : (activePdfFilePath ? pdfPreviewUrl(activePdfFilePath) : "");
+        activePdfFileSource = typeof state?.cachedContent?.source === "string" && state.cachedContent.source.trim() ? state.cachedContent.source : (activePdfFilePath ? pdfPreviewUrl(activePdfFilePath) : "");
     };
 
     const restoreStandardDataStateFromPortal = () => {
@@ -1284,12 +1243,7 @@
         if (!normalizedServiceId) return false;
         const title = String(options?.title || normalizedServiceId).trim();
         const portal = modular.show("com.standard.internals", 6, {newInstance: true});
-        syncPortalWindowState(6, {
-            serviceId: normalizedServiceId,
-            title,
-            sourcePortalIndex: options?.sourcePortalIndex ?? 0,
-            sourceInstanceId: options?.sourceInstanceId || "default"
-        }, portal);
+        syncPortalWindowState(6, {serviceId: normalizedServiceId, title, sourcePortalIndex: options?.sourcePortalIndex ?? 0, sourceInstanceId: options?.sourceInstanceId || "default"}, portal);
         void renderAppSettingsPortal(portal);
         return true;
     };
@@ -1413,9 +1367,7 @@
             route: () => div({style: "large-padding-top small-padding", content: children([
                 div({style: "internals-article-modify-header", content: children([
                     img({id: "modify-article-icon", style: "article-icon internals-article-modify-icon inline", src: articleIconSrc(activeArticleRecord, {preferPreview: true})}),
-                    div({style: "internals-article-modify-title-fields", content: children([
-                        articleTextField("modify-article-title", "Title", activeArticleRecord?.title),
-                    ])})
+                    div({style: "internals-article-modify-title-fields", content: children([articleTextField("modify-article-title", "Title", activeArticleRecord?.title)])})
                 ])}),
                 articleTextField("modify-article-link", "Link", activeArticleRecord?.link),
                 articleTextField("modify-article-description", "Description", activeArticleRecord?.description),

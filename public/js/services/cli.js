@@ -1,98 +1,90 @@
 (async () => {
-    let commandHistory = [];
-    let historyIndex = -1;
+    let cmdHist = [];
+    let histInd = -1;
     let pendingCommand = "";
-    let historyLoaded = false;
-    let pendingResponses = 0;
+    let histLoad = false;
+    let pendRes = 0;
     const escapeHtml = (value = "") => `${value}`.replace(/[&<>"']/g, character => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[character] || character));
-    const CLI_BACKGROUND = "#1f1b1b";
-    const CLI_GREEN = "#08ac05";
     const renderCliBlock = (value = "", variant = "result") => {
-        const blockStyle = variant === "command" ? `margin:0;padding:2px 6px;background:${CLI_GREEN};color:${CLI_BACKGROUND};font-family:Consolas, serif;white-space:pre-wrap;word-break:break-word;display:block;width:100%;box-sizing:border-box;` : `margin:0;color:${CLI_GREEN};font-family:Consolas, serif;white-space:pre-wrap;word-break:break-word;`;
-        const blockClass = variant === "command" ? "brick" : "";
-        return `<pre class="${blockClass}" style="${blockStyle}">${escapeHtml(value)}</pre>`;
+        const bs = variant === "command" ? `margin:0;padding:2px 6px;background:#08ac05;color:#1f1b1b;font-family:Consolas, serif;white-space:pre-wrap;word-break:break-word;display:block;width:100%;box-sizing:border-box;` : `margin:0;color:#08ac05;font-family:Consolas, serif;white-space:pre-wrap;word-break:break-word;`;
+        const bc = variant === "command" ? "brick" : "";
+        return `<pre class="${bc}" style="${bs}">${escapeHtml(value)}</pre>`;
     };
     const getScrollableAncestor = element => {
-        let current = element?.parentElement || null;
-        while (current) {
-            const style = window.getComputedStyle(current);
-            const overflowY = style?.overflowY || "";
-            if ((overflowY === "auto" || overflowY === "scroll") && current.scrollHeight > current.clientHeight) return current;
-            current = current.parentElement;
+        let c = element?.parentElement || null;
+        while (c) {
+            const stl = window.getComputedStyle(c);
+            const oy = stl?.overflowY || "";
+            if ((oy === "auto" || oy === "scroll") && c.scrollHeight > c.clientHeight) return c;
+            c = c.parentElement;
         }
         return null;
     };
     const scrollCliToBottom = () => {
         const recipient = document.getElementById("append-cli-reciprocate");
-        const scrollContainer = recipient?.closest(".window-body") || getScrollableAncestor(recipient) || recipient;
-        if (!scrollContainer || scrollContainer.scrollHeight <= scrollContainer.clientHeight) return;
+        const sc = recipient?.closest(".window-body") || getScrollableAncestor(recipient) || recipient;
+        if (!sc || sc.scrollHeight <= sc.clientHeight) return;
         requestAnimationFrame(() => {
-            if (typeof scrollContainer.scrollTo === "function") {
-                scrollContainer.scrollTo({top: scrollContainer.scrollHeight});
+            if (typeof sc.scrollTo === "function") {
+                sc.scrollTo({top: sc.scrollHeight});
                 return;
             }
-            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            sc.scrollTop = sc.scrollHeight;
         });
     };
-    const appendCliBlock = (value = "", variant = "result") => {
-        document.getElementById("append-cli-reciprocate").append(div({style: "brick", content: renderCliBlock(value, variant)}));
-    };
+    const appendCliBlock = (value = "", variant = "result") => document.getElementById("append-cli-reciprocate").append(div({style: "brick", content: renderCliBlock(value, variant)}));
     const setCliLoading = isLoading => {
-        const status = document.getElementById("cli-status");
-        if (!status || typeof status.isLoading !== "function") return;
+        const sts = document.getElementById("cli-status");
+        if (!sts || typeof sts.isLoading !== "function") return;
         if (isLoading) {
-            pendingResponses += 1;
-            status.isLoading();
-            status.textContent = String.fromCodePoint(0x28F7);
+            pendRes += 1;
+            sts.isLoading();
+            sts.textContent = String.fromCodePoint(0x28F7);
             return;
         }
-        pendingResponses = Math.max(0, pendingResponses - 1);
-        if (pendingResponses === 0) status.isLoading(false);
+        pendRes = Math.max(0, pendRes - 1);
+        if (pendRes === 0) sts.isLoading(false);
     };
     const loadHistory = async cache => {
-        if (historyLoaded) return;
-        historyLoaded = true;
+        if (histLoad) return;
+        histLoad = true;
         try {
             const cachedHistory = await cache.get("history");
-            if (Array.isArray(cachedHistory)) commandHistory = cachedHistory.filter(value => typeof value === "string");
+            if (Array.isArray(cachedHistory)) cmdHist = cachedHistory.filter(value => typeof value === "string");
         } catch (_) {
-            commandHistory = [];
+            cmdHist = [];
         }
     };
     const saveHistory = async cache => {
         try {
-            await cache.create("history", commandHistory.slice(-100));
+            await cache.create("history", cmdHist.slice(-100));
         } catch (_) {
         }
     };
-    const moveCaretToEnd = input => {
-        input.selectionStart = input.selectionEnd = input.value.length;
+    const moveCaretToEnd = input => input.selectionStart = input.selectionEnd = input.value.length;
+    const showHistoryEntry = (cmdr, i) => {
+        cmdr.value = cmdHist[i] || "";
+        moveCaretToEnd(cmdr);
     };
-    const showHistoryEntry = (commander, index) => {
-        commander.value = commandHistory[index] || "";
-        moveCaretToEnd(commander);
-    };
-    const executeCliValue = (cli_value, context) => {
-        if (cli_value === "clear") {
+    const executeCliValue = (cliv, context) => {
+        if (cliv === "clear") {
             document.getElementById("append-cli-reciprocate").empty();
             return;
         }
-        if (cli_value === "exit") {
+        if (cliv === "exit") {
             context?.portal?.hide?.();
             return;
         }
-        appendCliBlock(`$ ${cli_value}`, "command");
+        appendCliBlock(`$ ${cliv}`, "command");
         scrollCliToBottom();
         setCliLoading(true);
-        CLI.send(cli_value, false).then(d => {
+        CLI.send(cliv, false).then(d => {
             appendCliBlock(`${d ?? ""}`, "result");
             scrollCliToBottom();
-        }).catch(error => {
-            appendCliBlock(error?.message || "Unable to run command.", "result");
+        }).catch(e => {
+            appendCliBlock(e?.message || "Unable to run command.", "result");
             scrollCliToBottom();
-        }).finally(() => {
-            setCliLoading(false);
-        });
+        }).finally(() => setCliLoading(false));
     };
     modular.register(new Service("com.standard.cli", [new Portal({
         title: "CLI",
@@ -114,45 +106,45 @@
             ])})}),
         afterRender: async (_, context) => {
             await loadHistory(context.cache);
-            const commander = document.getElementById("cli-commander");
-            commander.focus();
-            commander.onkeydown = e => {
+            const cmdr = document.getElementById("cli-commander");
+            cmdr.focus();
+            cmdr.onkeydown = e => {
                 if (e.key === "ArrowUp") {
-                    if (!commandHistory.length) return;
+                    if (!cmdHist.length) return;
                     e.preventDefault();
-                    if (historyIndex === -1) {
-                        pendingCommand = commander.value;
-                        historyIndex = commandHistory.length - 1;
+                    if (histInd === -1) {
+                        pendingCommand = cmdr.value;
+                        histInd = cmdHist.length - 1;
                     } else {
-                        historyIndex = Math.max(0, historyIndex - 1);
+                        histInd = Math.max(0, histInd - 1);
                     }
-                    showHistoryEntry(commander, historyIndex);
+                    showHistoryEntry(cmdr, histInd);
                     return;
                 }
                 if (e.key === "ArrowDown") {
-                    if (historyIndex === -1) return;
+                    if (histInd === -1) return;
                     e.preventDefault();
-                    if (historyIndex < commandHistory.length - 1) {
-                        historyIndex += 1;
-                        showHistoryEntry(commander, historyIndex);
+                    if (histInd < cmdHist.length - 1) {
+                        histInd += 1;
+                        showHistoryEntry(cmdr, histInd);
                     } else {
-                        historyIndex = -1;
-                        commander.value = pendingCommand;
-                        moveCaretToEnd(commander);
+                        histInd = -1;
+                        cmdr.value = pendingCommand;
+                        moveCaretToEnd(cmdr);
                     }
                     return;
                 }
                 if (e.key === "Enter") {
                     e.preventDefault();
-                    const cli_value = commander.value.trim();
-                    if (cli_value) {
-                        commandHistory.push(cli_value);
-                        historyIndex = -1;
+                    const cliv = cmdr.value.trim();
+                    if (cliv) {
+                        cmdHist.push(cliv);
+                        histInd = -1;
                         pendingCommand = "";
                         saveHistory(context.cache);
                     }
-                    if (cli_value) executeCliValue(cli_value, context);
-                    commander.value = "";
+                    if (cliv) executeCliValue(cliv, context);
+                    cmdr.value = "";
                 }
             };
         }

@@ -5,41 +5,16 @@
     const MAPS_CACHE_KEY = "recent-searches";
     const MAPS_CACHE_LIMIT = 10;
     const MAP_STYLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3" /></svg>`;
-    const MAP_STYLE_OPTIONS = [{
-        id: "default",
-        label: "Default",
-        style: "mapbox://styles/mapbox/streets-v12"
-    }, {
-        id: "monochrome",
-        label: "Monochrome",
-        style: "mapbox://styles/mapbox/standard",
-        config: {basemap: {theme: "monochrome"}}
-    }, {
-        id: "outdoors",
-        label: "Outdoors",
-        style: "mapbox://styles/mapbox/outdoors-v12"
-    }, {
-        id: "satellite",
-        label: "Satellite",
-        style: "mapbox://styles/mapbox/satellite-streets-v12"
-    }, {
-        id: "warm",
-        label: "Warm",
-        style: "mapbox://styles/mapbox/standard",
-        config: {basemap: {lightPreset: "dusk"}}
-    }, {
-        id: "dark",
-        label: "Dark",
-        style: "mapbox://styles/mapbox/dark-v11"
-    }, {
-        id: "light",
-        label: "Light",
-        style: "mapbox://styles/mapbox/light-v11"
-    }, {
-        id: "navigation",
-        label: "Navigation",
-        style: "mapbox://styles/mapbox/navigation-day-v1"
-    }];
+    const MAP_STYLE_OPTIONS = [
+        {id: "default", label: "Default", style: "mapbox://styles/mapbox/streets-v12"},
+        {id: "monochrome", label: "Monochrome", style: "mapbox://styles/mapbox/standard", config: {basemap: {theme: "monochrome"}}},
+        {id: "outdoors", label: "Outdoors", style: "mapbox://styles/mapbox/outdoors-v12"},
+        {id: "satellite", label: "Satellite", style: "mapbox://styles/mapbox/satellite-streets-v12"},
+        {id: "warm", label: "Warm", style: "mapbox://styles/mapbox/standard", config: {basemap: {lightPreset: "dusk"}}},
+        {id: "dark", label: "Dark", style: "mapbox://styles/mapbox/dark-v11"},
+        {id: "light", label: "Light", style: "mapbox://styles/mapbox/light-v11"},
+        {id: "navigation", label: "Navigation", style: "mapbox://styles/mapbox/navigation-day-v1"}
+    ];
     modular.register(new Service("com.standard.maps", [
         new Portal({
             title: "Maps",
@@ -67,7 +42,21 @@
                                     button({id: "maps-directions-clear", style: "maps-directions-action secondary-bordered no-background", content: "Clear"})
                                 ].join("")}),
                             div({id: "maps-directions-summary", style: "maps-directions-summary hidden"}),
-                            `<ol id="maps-directions-steps" class="maps-directions-steps hidden"></ol>`
+                            `<ol id="maps-directions-steps" class="maps-directions-steps hidden"></ol>`,
+                            div({id: "maps-directions-result-actions", style: "maps-directions-result-actions hidden", content: [
+                                    button({id: "maps-directions-start", style: "maps-directions-action", content: "Start"}),
+                                    button({id: "maps-directions-print", style: "maps-directions-action secondary-bordered no-background", content: "Print"})
+                                ].join("")}),
+                            div({id: "maps-directions-navigation", style: "maps-directions-navigation hidden", content: [
+                                    div({id: "maps-directions-navigation-count", style: "maps-directions-navigation-count"}),
+                                    div({id: "maps-directions-navigation-instruction", style: "maps-directions-navigation-instruction"}),
+                                    div({id: "maps-directions-navigation-distance", style: "maps-directions-navigation-distance"}),
+                                    div({style: "maps-directions-navigation-actions", content: [
+                                            button({id: "maps-directions-previous-step", style: "maps-directions-action secondary-bordered no-background", content: "Back"}),
+                                            button({id: "maps-directions-next-step", style: "maps-directions-action", content: "Next"}),
+                                            button({id: "maps-directions-stop", style: "maps-directions-action secondary-bordered no-background", content: "End"})
+                                        ].join("")})
+                                ].join("")})
                         ].join("")}) +
                     div({style: "maps-controls-overlay no-background", content: [
                             button({id: "maps-zoom-in", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`}),
@@ -122,12 +111,7 @@
                     return;
                 }
                 mapboxgl.accessToken = mapboxToken;
-                const map = new mapboxgl.Map({
-                    container: mapContainer,
-                    zoom: 11.2,
-                    center: [-84.513611, 39.103699],
-                    style: 'mapbox://styles/mapbox/streets-v12'
-                });
+                const map = new mapboxgl.Map({container: mapContainer, zoom: 11.2, center: [-84.513611, 39.103699], style: 'mapbox://styles/mapbox/streets-v12'});
                 map.once("load", () => {
                     syncMapViewport();
                     map.resize();
@@ -139,11 +123,7 @@
                 let homeCoordinates = defaultCenter;
                 let homeLocationLabel = defaultLocationLabel;
                 let activeLocationPopup = null;
-                let pendingActiveLocationFeature = {
-                    lng: defaultCenter[0],
-                    lat: defaultCenter[1],
-                    label: defaultLocationLabel
-                };
+                let pendingActiveLocationFeature = {lng: defaultCenter[0], lat: defaultCenter[1], label: defaultLocationLabel};
                 const ACTIVE_LOCATION_SOURCE_ID = "active-location-source";
                 const ACTIVE_LOCATION_LAYER_ID = "active-location-layer";
                 const ACTIVE_LOCATION_IMAGE_ID = "active-location-dot";
@@ -159,19 +139,13 @@
                 const formatCoordinate = (value) => Number(value).toFixed(6);
                 const buildActiveLocationFeature = (lng, lat, label = "Selected Location") => ({
                     type: "Feature",
-                    geometry: {
-                        type: "Point",
-                        coordinates: [lng, lat]
-                    },
+                    geometry: {type: "Point", coordinates: [lng, lat]},
                     properties: {
                         label,
                         coordinatesLabel: `${formatCoordinate(lat)}, ${formatCoordinate(lng)}`
                     }
                 });
-                const buildActiveLocationData = (lng, lat, label = "Selected Location") => ({
-                    type: "FeatureCollection",
-                    features: [buildActiveLocationFeature(lng, lat, label)]
-                });
+                const buildActiveLocationData = (lng, lat, label = "Selected Location") => ({type: "FeatureCollection", features: [buildActiveLocationFeature(lng, lat, label)]});
                 const clearActiveLocationPopup = () => {
                     activeLocationPopup?.remove();
                     activeLocationPopup = null;
@@ -223,11 +197,7 @@
                     popupContent.appendChild(title);
                     popupContent.appendChild(coordinates);
                     clearActiveLocationPopup();
-                    activeLocationPopup = new mapboxgl.Popup({
-                        closeButton: false,
-                        closeOnClick: false,
-                        offset: 18
-                    }).setLngLat([lng, lat]).setDOMContent(popupContent).addTo(map);
+                    activeLocationPopup = new mapboxgl.Popup({closeButton: false, closeOnClick: false, offset: 18}).setLngLat([lng, lat]).setDOMContent(popupContent).addTo(map);
                 };
                 const handleActiveLocationMouseleave = () => {
                     map.getCanvas().style.cursor = "";
@@ -235,26 +205,10 @@
                 };
                 const ensureActiveLocationLayer = () => {
                     if (!map.isStyleLoaded()) return;
-                    if (!map.hasImage(ACTIVE_LOCATION_IMAGE_ID)) {
-                        map.addImage(ACTIVE_LOCATION_IMAGE_ID, createActiveLocationImage(), {pixelRatio: 2});
-                    }
-                    if (!map.getSource(ACTIVE_LOCATION_SOURCE_ID)) {
-                        map.addSource(ACTIVE_LOCATION_SOURCE_ID, {
-                            type: "geojson",
-                            data: buildActiveLocationData(pendingActiveLocationFeature.lng, pendingActiveLocationFeature.lat, pendingActiveLocationFeature.label)
-                        });
-                    }
+                    if (!map.hasImage(ACTIVE_LOCATION_IMAGE_ID)) map.addImage(ACTIVE_LOCATION_IMAGE_ID, createActiveLocationImage(), {pixelRatio: 2});
+                    if (!map.getSource(ACTIVE_LOCATION_SOURCE_ID)) map.addSource(ACTIVE_LOCATION_SOURCE_ID, {type: "geojson", data: buildActiveLocationData(pendingActiveLocationFeature.lng, pendingActiveLocationFeature.lat, pendingActiveLocationFeature.label)});
                     if (!map.getLayer(ACTIVE_LOCATION_LAYER_ID)) {
-                        map.addLayer({
-                            id: ACTIVE_LOCATION_LAYER_ID,
-                            type: "symbol",
-                            source: ACTIVE_LOCATION_SOURCE_ID,
-                            layout: {
-                                "icon-image": ACTIVE_LOCATION_IMAGE_ID,
-                                "icon-size": 1.125,
-                                "icon-allow-overlap": true
-                            }
-                        });
+                        map.addLayer({id: ACTIVE_LOCATION_LAYER_ID, type: "symbol", source: ACTIVE_LOCATION_SOURCE_ID, layout: {"icon-image": ACTIVE_LOCATION_IMAGE_ID, "icon-size": 1.125, "icon-allow-overlap": true}});
                         if (!activeLocationLayerHandlersAttached) {
                             activeLocationLayerHandlersAttached = true;
                             map.on("mouseenter", ACTIVE_LOCATION_LAYER_ID, handleActiveLocationMouseenter);
@@ -262,14 +216,7 @@
                         }
                     }
                 };
-                const buildDirectionsRouteData = (geometry) => ({
-                    type: "FeatureCollection",
-                    features: [{
-                        type: "Feature",
-                        geometry,
-                        properties: {}
-                    }]
-                });
+                const buildDirectionsRouteData = (geometry) => ({type: "FeatureCollection", features: [{type: "Feature", geometry, properties: {}}]});
                 const buildDirectionsPointsData = (origin, destination) => ({
                     type: "FeatureCollection",
                     features: [{
@@ -296,79 +243,12 @@
                 });
                 const ensureDirectionsLayers = () => {
                     if (!map.isStyleLoaded() || !pendingDirectionsRouteData || !pendingDirectionsPointsData) return;
-                    if (!map.getSource(DIRECTIONS_ROUTE_SOURCE_ID)) {
-                        map.addSource(DIRECTIONS_ROUTE_SOURCE_ID, {
-                            type: "geojson",
-                            data: pendingDirectionsRouteData
-                        });
-                    }
-                    if (!map.getLayer(DIRECTIONS_ROUTE_OUTLINE_LAYER_ID)) {
-                        map.addLayer({
-                            id: DIRECTIONS_ROUTE_OUTLINE_LAYER_ID,
-                            type: "line",
-                            source: DIRECTIONS_ROUTE_SOURCE_ID,
-                            layout: {
-                                "line-cap": "round",
-                                "line-join": "round"
-                            },
-                            paint: {
-                                "line-color": "#ffffff",
-                                "line-width": 8,
-                                "line-opacity": 0.9
-                            }
-                        });
-                    }
-                    if (!map.getLayer(DIRECTIONS_ROUTE_LAYER_ID)) {
-                        map.addLayer({
-                            id: DIRECTIONS_ROUTE_LAYER_ID,
-                            type: "line",
-                            source: DIRECTIONS_ROUTE_SOURCE_ID,
-                            layout: {
-                                "line-cap": "round",
-                                "line-join": "round"
-                            },
-                            paint: {
-                                "line-color": "#0a84ff",
-                                "line-width": 5,
-                                "line-opacity": 0.95
-                            }
-                        });
-                    }
-                    if (!map.getSource(DIRECTIONS_POINTS_SOURCE_ID)) {
-                        map.addSource(DIRECTIONS_POINTS_SOURCE_ID, {
-                            type: "geojson",
-                            data: pendingDirectionsPointsData
-                        });
-                    }
-                    if (!map.getLayer(DIRECTIONS_POINTS_LAYER_ID)) {
-                        map.addLayer({
-                            id: DIRECTIONS_POINTS_LAYER_ID,
-                            type: "circle",
-                            source: DIRECTIONS_POINTS_SOURCE_ID,
-                            paint: {
-                                "circle-color": "#ff9f0a",
-                                "circle-radius": 12,
-                                "circle-stroke-color": "#ffffff",
-                                "circle-stroke-width": 3
-                            }
-                        });
-                    }
-                    if (!map.getLayer(DIRECTIONS_POINTS_LABEL_LAYER_ID)) {
-                        map.addLayer({
-                            id: DIRECTIONS_POINTS_LABEL_LAYER_ID,
-                            type: "symbol",
-                            source: DIRECTIONS_POINTS_SOURCE_ID,
-                            layout: {
-                                "text-field": ["get", "label"],
-                                "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-                                "text-size": 12,
-                                "text-allow-overlap": true
-                            },
-                            paint: {
-                                "text-color": "#ffffff"
-                            }
-                        });
-                    }
+                    if (!map.getSource(DIRECTIONS_ROUTE_SOURCE_ID)) map.addSource(DIRECTIONS_ROUTE_SOURCE_ID, {type: "geojson", data: pendingDirectionsRouteData});
+                    if (!map.getLayer(DIRECTIONS_ROUTE_OUTLINE_LAYER_ID)) map.addLayer({id: DIRECTIONS_ROUTE_OUTLINE_LAYER_ID, type: "line", source: DIRECTIONS_ROUTE_SOURCE_ID, layout: {"line-cap": "round", "line-join": "round"}, paint: {"line-color": "#ffffff", "line-width": 8, "line-opacity": 0.9}});
+                    if (!map.getLayer(DIRECTIONS_ROUTE_LAYER_ID)) map.addLayer({id: DIRECTIONS_ROUTE_LAYER_ID, type: "line", source: DIRECTIONS_ROUTE_SOURCE_ID, layout: {"line-cap": "round", "line-join": "round"}, paint: {"line-color": "#0a84ff", "line-width": 5, "line-opacity": 0.95}});
+                    if (!map.getSource(DIRECTIONS_POINTS_SOURCE_ID)) map.addSource(DIRECTIONS_POINTS_SOURCE_ID, {type: "geojson", data: pendingDirectionsPointsData});
+                    if (!map.getLayer(DIRECTIONS_POINTS_LAYER_ID)) map.addLayer({id: DIRECTIONS_POINTS_LAYER_ID, type: "circle", source: DIRECTIONS_POINTS_SOURCE_ID, paint: {"circle-color": "#ff9f0a", "circle-radius": 12, "circle-stroke-color": "#ffffff", "circle-stroke-width": 3}});
+                    if (!map.getLayer(DIRECTIONS_POINTS_LABEL_LAYER_ID)) map.addLayer({id: DIRECTIONS_POINTS_LABEL_LAYER_ID, type: "symbol", source: DIRECTIONS_POINTS_SOURCE_ID, layout: {"text-field": ["get", "label"], "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"], "text-size": 12, "text-allow-overlap": true}, paint: {"text-color": "#ffffff"}});
                 };
                 const setDirectionsData = ({route, origin, destination}) => {
                     pendingDirectionsRouteData = buildDirectionsRouteData(route.geometry);
@@ -380,12 +260,7 @@
                 const clearDirectionsData = () => {
                     pendingDirectionsRouteData = null;
                     pendingDirectionsPointsData = null;
-                    [
-                        DIRECTIONS_POINTS_LABEL_LAYER_ID,
-                        DIRECTIONS_POINTS_LAYER_ID,
-                        DIRECTIONS_ROUTE_LAYER_ID,
-                        DIRECTIONS_ROUTE_OUTLINE_LAYER_ID
-                    ].forEach((layerId) => {
+                    [DIRECTIONS_POINTS_LABEL_LAYER_ID, DIRECTIONS_POINTS_LAYER_ID, DIRECTIONS_ROUTE_LAYER_ID, DIRECTIONS_ROUTE_OUTLINE_LAYER_ID].forEach((layerId) => {
                         if (map.getLayer(layerId)) map.removeLayer(layerId);
                     });
                     [DIRECTIONS_POINTS_SOURCE_ID, DIRECTIONS_ROUTE_SOURCE_ID].forEach((sourceId) => {
@@ -421,9 +296,21 @@
                 const directionsClearButton = document.getElementById("maps-directions-clear");
                 const directionsSummary = document.getElementById("maps-directions-summary");
                 const directionsSteps = document.getElementById("maps-directions-steps");
+                const directionsResultActions = document.getElementById("maps-directions-result-actions");
+                const directionsStartButton = document.getElementById("maps-directions-start");
+                const directionsPrintButton = document.getElementById("maps-directions-print");
+                const directionsNavigation = document.getElementById("maps-directions-navigation");
+                const directionsNavigationCount = document.getElementById("maps-directions-navigation-count");
+                const directionsNavigationInstruction = document.getElementById("maps-directions-navigation-instruction");
+                const directionsNavigationDistance = document.getElementById("maps-directions-navigation-distance");
+                const directionsPreviousStepButton = document.getElementById("maps-directions-previous-step");
+                const directionsNextStepButton = document.getElementById("maps-directions-next-step");
+                const directionsStopButton = document.getElementById("maps-directions-stop");
                 let cachedSearches = [];
                 let cacheWriteInFlight = Promise.resolve();
                 let activeStyleId = MAP_STYLE_OPTIONS[0].id;
+                let activeDirections = null;
+                let activeDirectionsStepIndex = 0;
                 const normalizeSearchValue = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
                 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[character] || character));
                 const getSearchCachePayload = () => ({searches: cachedSearches});
@@ -432,9 +319,7 @@
                     autocomplete.classList.toggle("hidden", !visible);
                 };
                 const updateCachedSearches = (query) => {
-                    cachedSearches = [query]
-                        .concat(cachedSearches.filter((entry) => entry.toLowerCase() !== query.toLowerCase()))
-                        .slice(0, MAPS_CACHE_LIMIT);
+                    cachedSearches = [query].concat(cachedSearches.filter((entry) => entry.toLowerCase() !== query.toLowerCase())).slice(0, MAPS_CACHE_LIMIT);
                 };
                 const parseSearchCoordinates = (query) => {
                     const coordinateMatch = query.match(/^\s*(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)\s*$/);
@@ -442,36 +327,20 @@
                     const first = Number.parseFloat(coordinateMatch[1]);
                     const second = Number.parseFloat(coordinateMatch[2]);
                     const looksLikeLatLng = Math.abs(first) <= 90 && Math.abs(second) <= 180;
-                    return {
-                        lat: looksLikeLatLng ? first : second,
-                        lng: looksLikeLatLng ? second : first
-                    };
+                    return {lat: looksLikeLatLng ? first : second, lng: looksLikeLatLng ? second : first};
                 };
                 const fetchGeocodedLocation = async (query) => {
                     const normalizedQuery = normalizeSearchValue(query);
                     if (!normalizedQuery) return null;
                     const coordinates = parseSearchCoordinates(normalizedQuery);
-                    if (coordinates) {
-                        return {
-                            coordinates: [coordinates.lng, coordinates.lat],
-                            label: normalizedQuery
-                        };
-                    }
-                    if (/^(current location|my location|here)$/i.test(normalizedQuery)) {
-                        return {
-                            coordinates: homeCoordinates,
-                            label: homeLocationLabel
-                        };
-                    }
+                    if (coordinates) return {coordinates: [coordinates.lng, coordinates.lat], label: normalizedQuery};
+                    if (/^(current location|my location|here)$/i.test(normalizedQuery)) return {coordinates: homeCoordinates, label: homeLocationLabel};
                     const geocodeResponse = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(normalizedQuery)}.json?limit=1&access_token=${encodeURIComponent(mapboxgl.accessToken)}`);
                     if (!geocodeResponse.ok) throw new Error("Unable to geocode location");
                     const geocodeData = await geocodeResponse.json();
                     const firstFeature = geocodeData?.features?.[0];
                     if (!Array.isArray(firstFeature?.center) || firstFeature.center.length !== 2) return null;
-                    return {
-                        coordinates: firstFeature.center,
-                        label: firstFeature.place_name || normalizedQuery
-                    };
+                    return {coordinates: firstFeature.center, label: firstFeature.place_name || normalizedQuery};
                 };
                 const formatDistance = (meters) => {
                     if (!Number.isFinite(meters)) return "";
@@ -489,15 +358,12 @@
                 const getAutocompleteMatches = (query) => {
                     const normalizedQuery = normalizeSearchValue(query).toLowerCase();
                     if (!normalizedQuery) return cachedSearches.slice(0, MAPS_CACHE_LIMIT);
-                    return cachedSearches
-                        .filter((entry) => entry.toLowerCase().includes(normalizedQuery))
-                        .sort((a, b) => {
+                    return cachedSearches.filter((entry) => entry.toLowerCase().includes(normalizedQuery)).sort((a, b) => {
                         const aStarts = a.toLowerCase().startsWith(normalizedQuery);
                         const bStarts = b.toLowerCase().startsWith(normalizedQuery);
                         if (aStarts !== bStarts) return aStarts ? -1 : 1;
                         return a.localeCompare(b);
-                    })
-                        .slice(0, MAPS_CACHE_LIMIT);
+                    }).slice(0, MAPS_CACHE_LIMIT);
                 };
                 const renderAutocomplete = (query = "") => {
                     if (!autocomplete) return;
@@ -515,9 +381,7 @@
                     if (!normalizedQuery) return;
                     updateCachedSearches(normalizedQuery);
                     renderAutocomplete(searchInput?.value ?? "");
-                    cacheWriteInFlight = cacheWriteInFlight
-                        .catch(() => undefined)
-                        .then(() => new Promise((resolve) => {
+                    cacheWriteInFlight = cacheWriteInFlight.catch(() => undefined).then(() => new Promise((resolve) => {
                         setTimeout(async () => {
                             try {
                                 await view.cache.create(MAPS_CACHE_KEY, getSearchCachePayload(), {format: "json"});
@@ -540,9 +404,7 @@
                         return;
                     }
                     const location = await fetchGeocodedLocation(query);
-                    if (Array.isArray(location?.coordinates) && location.coordinates.length === 2) {
-                        flyToCoordinates(location.coordinates[0], location.coordinates[1], 14, location.label || query);
-                    }
+                    if (Array.isArray(location?.coordinates) && location.coordinates.length === 2) flyToCoordinates(location.coordinates[0], location.coordinates[1], 14, location.label || query);
                     scheduleCachedSearchSave(query);
                 };
                 const setDirectionsMessage = (message, isError = false) => {
@@ -552,18 +414,23 @@
                     directionsSummary.classList.remove("hidden");
                 };
                 const hideDirectionsOutput = () => {
+                    activeDirections = null;
+                    activeDirectionsStepIndex = 0;
                     directionsSummary?.classList.add("hidden");
                     directionsSummary?.classList.remove("maps-directions-error");
                     if (directionsSteps) {
                         directionsSteps.innerHTML = "";
                         directionsSteps.classList.add("hidden");
                     }
+                    directionsResultActions?.classList.add("hidden");
+                    directionsNavigation?.classList.add("hidden");
                 };
+                const getDirectionsSteps = (route) => route?.legs?.flatMap((leg) => leg.steps || []) || [];
                 const renderDirectionsSteps = (route) => {
                     if (!directionsSteps) return;
                     directionsSteps.innerHTML = "";
-                    const steps = route?.legs?.flatMap((leg) => leg.steps || []) || [];
-                    steps.slice(0, 12).forEach((step) => {
+                    const steps = getDirectionsSteps(route);
+                    steps.forEach((step) => {
                         const item = document.createElement("li");
                         const instruction = document.createElement("span");
                         instruction.textContent = step.maneuver?.instruction || "Continue";
@@ -574,6 +441,54 @@
                         directionsSteps.appendChild(item);
                     });
                     directionsSteps.classList.toggle("hidden", !steps.length);
+                    directionsResultActions?.classList.toggle("hidden", !steps.length);
+                };
+                const updateNavigationStep = (stepIndex) => {
+                    if (!activeDirections?.steps?.length) return;
+                    activeDirectionsStepIndex = Math.min(Math.max(stepIndex, 0), activeDirections.steps.length - 1);
+                    const step = activeDirections.steps[activeDirectionsStepIndex];
+                    if (directionsNavigationCount) directionsNavigationCount.textContent = `Step ${activeDirectionsStepIndex + 1} of ${activeDirections.steps.length}`;
+                    if (directionsNavigationInstruction) directionsNavigationInstruction.textContent = step.maneuver?.instruction || "Continue";
+                    if (directionsNavigationDistance) directionsNavigationDistance.textContent = formatDistance(step.distance);
+                    directionsPreviousStepButton?.toggleAttribute("disabled", activeDirectionsStepIndex === 0);
+                    directionsNextStepButton?.toggleAttribute("disabled", activeDirectionsStepIndex === activeDirections.steps.length - 1);
+                    const coordinates = step.maneuver?.location;
+                    if (Array.isArray(coordinates) && coordinates.length === 2) {
+                        map.easeTo({center: coordinates, zoom: Math.max(map.getZoom(), 16), bearing: step.maneuver?.bearing_after ?? map.getBearing(), pitch: 45, duration: 700});
+                    }
+                };
+                const startDirectionsNavigation = () => {
+                    if (!activeDirections?.steps?.length) {
+                        setDirectionsMessage("Create a route before starting navigation.", true);
+                        return;
+                    }
+                    directionsNavigation?.classList.remove("hidden");
+                    updateNavigationStep(0);
+                };
+                const stopDirectionsNavigation = () => {
+                    directionsNavigation?.classList.add("hidden");
+                    activeDirectionsStepIndex = 0;
+                    if (activeDirections?.route && activeDirections?.origin && activeDirections?.destination) {
+                        fitDirectionsBounds(activeDirections.route, activeDirections.origin, activeDirections.destination);
+                    }
+                };
+                const printDirections = () => {
+                    if (!activeDirections?.steps?.length) {
+                        setDirectionsMessage("Create a route before printing directions.", true);
+                        return;
+                    }
+                    const title = `${activeDirections.origin.label || "Start"} to ${activeDirections.destination.label || "Destination"}`;
+                    const summary = `${formatDistance(activeDirections.route.distance)} / ${formatDuration(activeDirections.route.duration)}`;
+                    const steps = activeDirections.steps.map((step) => `<li><strong>${escapeHtml(step.maneuver?.instruction || "Continue")}</strong><small>${escapeHtml(formatDistance(step.distance))}</small></li>`).join("");
+                    const printWindow = window.open("", "_blank", "width=720,height=900");
+                    if (!printWindow) {
+                        window.print();
+                        return;
+                    }
+                    printWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(title)}</title><style>body{font-family:Arial,sans-serif;margin:32px;color:#111}h1{font-size:22px;margin:0 0 8px}p{margin:0 0 20px;color:#555}ol{padding-left:24px}li{margin:0 0 14px;break-inside:avoid}small{display:block;margin-top:4px;color:#555}</style></head><body><h1>${escapeHtml(title)}</h1><p>${escapeHtml(summary)}</p><ol>${steps}</ol></body></html>`);
+                    printWindow.document.close();
+                    printWindow.focus();
+                    printWindow.print();
                 };
                 const fitDirectionsBounds = (route, origin, destination) => {
                     const bounds = new mapboxgl.LngLatBounds();
@@ -581,11 +496,7 @@
                     routeCoordinates.forEach((coordinate) => bounds.extend(coordinate));
                     bounds.extend(origin.coordinates);
                     bounds.extend(destination.coordinates);
-                    map.fitBounds(bounds, {
-                        padding: {top: 130, right: 80, bottom: 80, left: 80},
-                        maxZoom: 16,
-                        duration: 900
-                    });
+                    map.fitBounds(bounds, {padding: {top: 130, right: 80, bottom: 80, left: 80}, maxZoom: 16, duration: 900});
                 };
                 const runDirections = async () => {
                     const originQuery = normalizeSearchValue(directionsOriginInput?.value);
@@ -594,13 +505,19 @@
                         setDirectionsMessage("Enter a start and destination.", true);
                         return;
                     }
+                    activeDirections = null;
+                    activeDirectionsStepIndex = 0;
+                    directionsResultActions?.classList.add("hidden");
+                    directionsNavigation?.classList.add("hidden");
+                    if (directionsSteps) {
+                        directionsSteps.innerHTML = "";
+                        directionsSteps.classList.add("hidden");
+                    }
+                    clearDirectionsData();
                     directionsRouteButton?.setAttribute("disabled", "disabled");
                     setDirectionsMessage("Finding route...");
                     try {
-                        const [origin, destination] = await Promise.all([
-                            fetchGeocodedLocation(originQuery),
-                            fetchGeocodedLocation(destinationQuery)
-                        ]);
+                        const [origin, destination] = await Promise.all([fetchGeocodedLocation(originQuery), fetchGeocodedLocation(destinationQuery)]);
                         if (!origin || !destination) {
                             setDirectionsMessage("Could not find one of those places.", true);
                             return;
@@ -614,9 +531,12 @@
                             setDirectionsMessage("No route found.", true);
                             return;
                         }
+                        activeDirections = {route, origin, destination, steps: getDirectionsSteps(route)};
+                        activeDirectionsStepIndex = 0;
                         setDirectionsData({route, origin, destination});
-                        setDirectionsMessage(`${formatDistance(route.distance)} • ${formatDuration(route.duration)}`);
+                        setDirectionsMessage(`${formatDistance(route.distance)} / ${formatDuration(route.duration)}`);
                         renderDirectionsSteps(route);
+                        directionsNavigation?.classList.add("hidden");
                         fitDirectionsBounds(route, origin, destination);
                         scheduleCachedSearchSave(originQuery);
                         scheduleCachedSearchSave(destinationQuery);
@@ -665,6 +585,11 @@
                 });
                 directionsRouteButton?.addEventListener("click", runDirections);
                 directionsClearButton?.addEventListener("click", clearDirections);
+                directionsStartButton?.addEventListener("click", startDirectionsNavigation);
+                directionsPrintButton?.addEventListener("click", printDirections);
+                directionsPreviousStepButton?.addEventListener("click", () => updateNavigationStep(activeDirectionsStepIndex - 1));
+                directionsNextStepButton?.addEventListener("click", () => updateNavigationStep(activeDirectionsStepIndex + 1));
+                directionsStopButton?.addEventListener("click", stopDirectionsNavigation);
                 [directionsOriginInput, directionsDestinationInput].forEach((directionsInput) => {
                     directionsInput?.addEventListener("keydown", (event) => {
                         if (event.key === "Enter") runDirections();
@@ -672,9 +597,7 @@
                     });
                 });
                 const handleDocumentClick = (event) => {
-                    if (!mapShell.contains(event.target)) {
-                        setAutocompleteVisibility(false);
-                    }
+                    if (!mapShell.contains(event.target)) setAutocompleteVisibility(false);
                 };
                 document.addEventListener("click", handleDocumentClick);
                 detachMapsSearchHandlers = () => document.removeEventListener("click", handleDocumentClick);
@@ -713,11 +636,7 @@
                         console.error("Failed to apply map style:", error);
                     }
                 };
-                styleButton?.popoutmenu(MAP_STYLE_OPTIONS.map((styleOption) => ({
-                    icon: MAP_STYLE_ICON,
-                    label: styleOption.label,
-                    action: () => applyMapStyle(styleOption)
-                })));
+                styleButton?.popoutmenu(MAP_STYLE_OPTIONS.map((styleOption) => ({icon: MAP_STYLE_ICON, label: styleOption.label, action: () => applyMapStyle(styleOption)})));
                 zoomInButton.addEventListener("click", () => map.zoomIn());
                 zoomOutButton.addEventListener("click", () => map.zoomOut());
                 homeButton.addEventListener("click", () => flyToCoordinates(homeCoordinates[0], homeCoordinates[1], 13, homeLocationLabel));

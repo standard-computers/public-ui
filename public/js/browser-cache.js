@@ -2,7 +2,6 @@
     const CACHE_NAME = "standard-browser-cache-v1";
     const INDEX_KEY = "standard-browser-cache-index-v1";
     const CACHE_URL_PREFIX = "/__standard_browser_cache__";
-
     const supportsBrowserCache = () => typeof window !== "undefined" && "caches" in window && typeof localStorage !== "undefined";
     const nowIso = () => new Date().toISOString();
     const asString = value => `${value ?? ""}`.trim();
@@ -16,20 +15,14 @@
     const readIndex = () => {
         try {
             const parsed = JSON.parse(localStorage.getItem(INDEX_KEY) || "{}");
-            return parsed && typeof parsed === "object" && parsed.entries && typeof parsed.entries === "object"
-                ? parsed
-                : {version: 1, entries: {}};
+            return parsed && typeof parsed === "object" && parsed.entries && typeof parsed.entries === "object" ? parsed : {version: 1, entries: {}};
         } catch (_) {
             return {version: 1, entries: {}};
         }
     };
     const writeIndex = index => {
         try {
-            localStorage.setItem(INDEX_KEY, JSON.stringify({
-                version: 1,
-                updatedAt: nowIso(),
-                entries: index?.entries && typeof index.entries === "object" ? index.entries : {}
-            }));
+            localStorage.setItem(INDEX_KEY, JSON.stringify({version: 1, updatedAt: nowIso(), entries: index?.entries && typeof index.entries === "object" ? index.entries : {}}));
         } catch (_) {
         }
     };
@@ -48,36 +41,14 @@
         reader.readAsDataURL(blob);
     });
     const responseFromValue = (value, {format = "", contentType = "", label = "", source = ""} = {}) => {
-        if (value instanceof Response) {
-            return {response: value, size: Number(value.headers.get("content-length")) || 0, contentType: value.headers.get("content-type") || contentType || "application/octet-stream", label, source};
-        }
-        if (value instanceof Blob) {
-            return {
-                response: new Response(value, {headers: {"Content-Type": contentType || value.type || "application/octet-stream"}}),
-                size: value.size || 0,
-                contentType: contentType || value.type || "application/octet-stream",
-                label,
-                source
-            };
-        }
+        if (value instanceof Response) return {response: value, size: Number(value.headers.get("content-length")) || 0, contentType: value.headers.get("content-type") || contentType || "application/octet-stream", label, source};
+        if (value instanceof Blob) return {response: new Response(value, {headers: {"Content-Type": contentType || value.type || "application/octet-stream"}}), size: value.size || 0, contentType: contentType || value.type || "application/octet-stream", label, source};
         if (typeof value === "string") {
             const resolvedType = contentType || (format === "json" ? "application/json" : "text/plain; charset=utf-8");
-            return {
-                response: new Response(value, {headers: {"Content-Type": resolvedType}}),
-                size: value.length,
-                contentType: resolvedType,
-                label,
-                source
-            };
+            return {response: new Response(value, {headers: {"Content-Type": resolvedType}}), size: value.length, contentType: resolvedType, label, source};
         }
         const json = JSON.stringify(value ?? {}, null, 2);
-        return {
-            response: new Response(json, {headers: {"Content-Type": contentType || "application/json"}}),
-            size: json.length,
-            contentType: contentType || "application/json",
-            label,
-            source
-        };
+        return {response: new Response(json, {headers: {"Content-Type": contentType || "application/json"}}), size: json.length, contentType: contentType || "application/json", label, source};
     };
     const openCache = async () => {
         if (!supportsBrowserCache()) throw new Error("Browser cache is unavailable");
@@ -97,9 +68,7 @@
         if (responseType === "dataUrl") return blobToDataUrl(await response.blob());
         if (responseType === "objectUrl") return URL.createObjectURL(await response.blob());
         const contentType = `${response.headers.get("content-type") || ""}`.toLowerCase();
-        if (responseType === "json" || options.format === "json" || contentType.includes("application/json")) {
-            return response.json();
-        }
+        if (responseType === "json" || options.format === "json" || contentType.includes("application/json")) return response.json();
         return response.text();
     };
     const write = async (interfaceName, key, value, options = {}) => {
@@ -147,10 +116,7 @@
     };
     const list = async ({interfaceName = "", kind = ""} = {}) => {
         const index = readIndex();
-        return Object.values(index.entries || {})
-            .filter(entry => !interfaceName || entry.interfaceName === interfaceName)
-            .filter(entry => !kind || entry.kind === kind)
-            .sort((left, right) => `${right.updatedAt || ""}`.localeCompare(`${left.updatedAt || ""}`));
+        return Object.values(index.entries || {}).filter(entry => !interfaceName || entry.interfaceName === interfaceName).filter(entry => !kind || entry.kind === kind).sort((left, right) => `${right.updatedAt || ""}`.localeCompare(`${left.updatedAt || ""}`));
     };
     const clear = async ({interfaceName = ""} = {}) => {
         const entries = await list({interfaceName});
@@ -165,17 +131,5 @@
         list: (options = {}) => list({...options, interfaceName}),
         clear: () => clear({interfaceName})
     });
-
-    window.StandardBrowserCache = {
-        available: supportsBrowserCache,
-        get: read,
-        getResponse,
-        set: write,
-        create: write,
-        delete: remove,
-        list,
-        clear,
-        createAdapter,
-        blobToDataUrl
-    };
+    window.StandardBrowserCache = {available: supportsBrowserCache, get: read, getResponse, set: write, create: write, delete: remove, list, clear, createAdapter, blobToDataUrl};
 })();

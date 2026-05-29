@@ -1,28 +1,18 @@
 (() => {
     const SERVICE_ID = "com.standard.editor.code";
     const CODE_EDITOR_KEYWORDS = new Set([
-        "abstract", "alias", "and", "as", "asm", "assert", "async", "await", "auto", "base", "begin",
-        "bool", "boolean", "break", "by", "byte", "case", "catch", "char", "checked", "class", "const",
-        "constructor", "continue", "crate", "data", "debugger", "declare", "def", "default", "defer",
-        "delete", "del", "do", "double", "dynamic", "echo", "elif", "else", "elseif", "end", "ensure",
-        "enum", "event", "except", "export", "extends", "extern", "false", "final", "finally", "fixed",
-        "fn", "for", "foreach", "from", "func", "function", "fun", "global", "goto", "if", "impl",
-        "implements", "import", "in", "include", "inline", "instanceof", "interface", "internal", "is",
-        "lambda", "let", "library", "loop", "match", "module", "mut", "namespace", "native", "new",
-        "nil", "not", "null", "object", "operator", "or", "out", "override", "package", "params",
-        "partial", "pass", "private", "protected", "protocol", "pub", "public", "raise", "readonly",
-        "record", "redo", "ref", "register", "repeat", "require", "rescue", "return", "sealed", "select",
-        "self", "short", "signed", "sizeof", "static", "string", "struct", "sub", "super", "switch",
-        "template", "then", "this", "throw", "throws", "trait", "transient", "true", "try", "type",
-        "typedef", "typeof", "unchecked", "union", "unless", "unsafe", "unsigned", "until", "use",
+        "abstract", "alias", "and", "as", "asm", "assert", "async", "await", "auto", "base", "begin", "bool", "boolean", "break", "by", "byte", "case", "catch", "char", "checked", "class", "const",
+        "constructor", "continue", "crate", "data", "debugger", "declare", "def", "default", "defer", "delete", "del", "do", "double", "dynamic", "echo", "elif", "else", "elseif", "end", "ensure",
+        "enum", "event", "except", "export", "extends", "extern", "false", "final", "finally", "fixed", "fn", "for", "foreach", "from", "func", "function", "fun", "global", "goto", "if", "impl",
+        "implements", "import", "in", "include", "inline", "instanceof", "interface", "internal", "is", "lambda", "let", "library", "loop", "match", "module", "mut", "namespace", "native", "new",
+        "nil", "not", "null", "object", "operator", "or", "out", "override", "package", "params", "partial", "pass", "private", "protected", "protocol", "pub", "public", "raise", "readonly",
+        "record", "redo", "ref", "register", "repeat", "require", "rescue", "return", "sealed", "select", "self", "short", "signed", "sizeof", "static", "string", "struct", "sub", "super", "switch",
+        "template", "then", "this", "throw", "throws", "trait", "transient", "true", "try", "type", "typedef", "typeof", "unchecked", "union", "unless", "unsafe", "unsigned", "until", "use",
         "using", "val", "var", "virtual", "void", "volatile", "when", "where", "while", "with", "yield"
     ]);
     const CODE_EDITOR_BUILTINS = new Set([
-        "array", "bigint", "binary", "bool", "boolean", "buffer", "byte", "date", "datetime", "decimal",
-        "dict", "document", "element", "error", "exception", "false", "float", "int", "integer", "json",
-        "list", "map", "nan", "none", "null", "number", "object", "promise", "regex", "regexp", "result",
-        "self", "set", "some", "string", "symbol", "table", "this", "true", "undefined", "vec", "void",
-        "window"
+        "array", "bigint", "binary", "bool", "boolean", "buffer", "byte", "date", "datetime", "decimal", "dict", "document", "element", "error", "exception", "false", "float", "int", "integer", "json",
+        "list", "map", "nan", "none", "null", "number", "object", "promise", "regex", "regexp", "result", "self", "set", "some", "string", "symbol", "table", "this", "true", "undefined", "vec", "void", "window"
     ]);
     const CODE_EDITOR_LINE_COMMENT_STARTS = ["//", "#", "--", ";", "%"];
     const CODE_EDITOR_BLOCK_COMMENTS = [
@@ -44,12 +34,7 @@
         const baseName = trimmedName.split("/").pop() || "";
         return baseName.replace(/^\.+/, "");
     };
-    const escapeCodeMarkup = (value = "") => String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+    const escapeCodeMarkup = (value = "") => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     const wrapCodeToken = (type = "", value = "") => {
         const safeValue = escapeCodeMarkup(value);
         if (!safeValue) return "";
@@ -260,11 +245,7 @@
         if (statePath) return statePath;
         const windowNode = portal?.window?.();
         const textareaNode = getPortalCodeEditorInput(portal);
-        return normalizeCodeFilePath(
-            windowNode?.dataset?.codeFilePath
-            || textareaNode?.dataset?.codeFilePath
-            || ""
-        );
+        return normalizeCodeFilePath(windowNode?.dataset?.codeFilePath || textareaNode?.dataset?.codeFilePath || "");
     };
     const syncPortalRememberedCodePath = (portal, rawPath = "") => {
         const normalizedPath = normalizeCodeFilePath(rawPath);
@@ -277,9 +258,7 @@
     const setPortalCodeState = (portal, nextState = {}, options = {}) => {
         if (!portal || typeof portal.setWindowState !== "function") return getPortalCodeState(portal);
         portal.setWindowState(nextState, options);
-        if (Object.prototype.hasOwnProperty.call(nextState || {}, "directive")) {
-            syncPortalRememberedCodePath(portal, nextState?.directive || "");
-        }
+        if (Object.prototype.hasOwnProperty.call(nextState || {}, "directive")) syncPortalRememberedCodePath(portal, nextState?.directive || "");
         return getPortalCodeState(portal);
     };
     const getPortalCodeEditorInput = (portal) => portal?.window?.()?.querySelector?.("#editor-code-content") || null;
@@ -444,9 +423,7 @@
         const codeFile = new File([bytes], fileName, {type: "application/octet-stream"});
         let saved = false;
         if (typeof window.StandardUploads?.uploadFile === "function") {
-            const response = await window.StandardUploads.uploadFile(codeFile, uploadPath, {
-                label: `Saving ${fileName}`
-            });
+            const response = await window.StandardUploads.uploadFile(codeFile, uploadPath, {label: `Saving ${fileName}`});
             saved = !!response?.ok;
         } else {
             const formData = new FormData();
@@ -458,10 +435,7 @@
             modular.error("Unable to save code file");
             return false;
         }
-        setPortalCodeState(portal, {
-            directive: normalizedPath,
-            cachedContent: nextContent
-        }, {merge: false});
+        setPortalCodeState(portal, {directive: normalizedPath, cachedContent: nextContent}, {merge: false});
         syncCodeEditorPresentation(portal);
         updateCodeEditorPortalTitle(portal);
         await window.StandardFilesRefreshCache?.();
@@ -469,11 +443,7 @@
         return true;
     };
     const saveNewCodeFileToDocuments = (portal) => {
-        inputDialogue({
-            title: "File name",
-            placeholder: "code.js",
-            value: "code.js",
-            confirmation: async (_, inputFileName) => {
+        inputDialogue({title: "File name", placeholder: "code.js", value: "code.js", confirmation: async (_, inputFileName) => {
                 if (!modular.validateFileName(inputFileName)) return;
                 const safeFileName = sanitizeNewCodeFileName(inputFileName) || "code.js";
                 await saveCodeEditorContentToPath(portal, `Documents/${safeFileName}`);
@@ -503,10 +473,7 @@
     window.StandardCodeEditor.openCodeFilePath = (rawPath = "", content = "") => {
         const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
         if (portal) {
-            setPortalCodeState(portal, {
-                directive: normalizeCodeFilePath(rawPath),
-                cachedContent: String(content ?? "")
-            }, {merge: false});
+            setPortalCodeState(portal, {directive: normalizeCodeFilePath(rawPath), cachedContent: String(content ?? "")}, {merge: false});
             portal.refresh();
             hydrateCodeEditorFromState(portal);
             updateCodeEditorPortalTitle(portal);
@@ -525,9 +492,7 @@
             tools: [{
                 title: "Save",
                 icon: modular.icons.save,
-                onclick: (_, context) => {
-                    saveLoadedCodeFile(context?.portal);
-                }
+                onclick: (_, context) => saveLoadedCodeFile(context?.portal)
             }],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" /></svg>`,
             icon: "/icons/code.png",

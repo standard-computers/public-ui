@@ -59,6 +59,15 @@ document.querySelectorAll(".cancel").forEach(c => c.addEventListener("click", ()
     document.querySelectorAll(".window").forEach(w => w.out())
     document.getElementById("cover").out();
 }));
+function getAltSyncPropertyValue(source = {}, ...args) {
+    const value = source?.altSync ?? source?.altsync ?? source?.alt_sync ?? source?.["alt-sync"] ?? "";
+    return typeof value === "function" ? value(...args) : value;
+}
+function applyAltSyncProperty(element, source = {}, ...args) {
+    const value = String(getAltSyncPropertyValue(source, ...args) || "").trim();
+    if (!element || !value) return;
+    element.setAttribute("alt-sync", value);
+}
 HTMLElement.prototype.out = function () {
     let e = this;
     e.style.opacity = 1;
@@ -98,6 +107,7 @@ Element.prototype.contextmenu = function (items, selector = null) {
             itemCount += 1;
             const option = document.createElement("div");
             option.className = "context-menu-item";
+            applyAltSyncProperty(option, item, ele, lastClickedTarget);
             if (item.className) option.classList.add(...String(item.className).split(/\s+/).filter(Boolean));
             if (item.destructive) option.classList.add("text-red");
             const label = typeof item.label === "function" ? item.label(ele, lastClickedTarget) : item.label;
@@ -125,6 +135,7 @@ Element.prototype.contextmenu = function (items, selector = null) {
         return itemCount;
     }
     function showMenu(x, y) {
+        menu.__altSyncOwnerWindow = ele.closest?.(".draggable-window") || null;
         if (!buildMenu()) {
             hideMenu();
             return;
@@ -176,6 +187,7 @@ Element.prototype.popoutmenu = function (items, selector = null) {
             }
             const option = document.createElement("div");
             option.className = "context-menu-item";
+            applyAltSyncProperty(option, item, ele, lastClickedTarget);
             if (item.className) option.classList.add(...String(item.className).split(/\s+/).filter(Boolean));
             if (item.destructive) option.classList.add("text-red");
             if (item.content) {
@@ -186,6 +198,8 @@ Element.prototype.popoutmenu = function (items, selector = null) {
                 option.textContent = item.label;
             }
             option.onclick = (e) => {
+                const interactiveTarget = e.target.closest('button, a, input, select, textarea, [contenteditable="true"]');
+                if (item.interactive && interactiveTarget && option.contains(interactiveTarget)) return;
                 e.preventDefault();
                 e.stopPropagation();
                 hideMenu();
@@ -198,9 +212,11 @@ Element.prototype.popoutmenu = function (items, selector = null) {
                 }
             };
             menu.appendChild(option);
+            if (typeof item.bind === "function") item.bind(option, ele, lastClickedTarget, menu, hideMenu);
         });
     }
     function showMenu(x, y) {
+        menu.__altSyncOwnerWindow = ele.closest?.(".draggable-window") || null;
         buildMenu();
         menu.style.left = x + "px";
         menu.style.top = y + "px";
@@ -774,7 +790,6 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
         padding: "2px 4px",
         borderRadius: "4px",
         fontSize: "14px",
-        fontWeight: "700",
         lineHeight: "1",
         zIndex: "2147483647",
         pointerEvents: "none",
@@ -784,6 +799,29 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
     let initialized = false;
     let overlayLayer = null;
     let overlayEntries = [];
+
+    function getFocusedInterfaceWindow() {
+        const focusedWindow = document.querySelector(".draggable-window.window-focused");
+        if (focusedWindow) return focusedWindow;
+        const windows = Array.from(document.querySelectorAll(".draggable-window"));
+        return windows.reduce((frontWindow, windowNode) => {
+            const frontZ = Number.parseInt(frontWindow?.style?.zIndex || "0", 10) || 0;
+            const nodeZ = Number.parseInt(windowNode?.style?.zIndex || "0", 10) || 0;
+            return nodeZ > frontZ ? windowNode : frontWindow;
+        }, null);
+    }
+
+    function getTargetInterfaceWindow(target) {
+        const menu = target?.closest?.(".custom-context-menu");
+        if (menu?.__altSyncOwnerWindow?.isConnected) return menu.__altSyncOwnerWindow;
+        return target?.closest?.(".draggable-window") || null;
+    }
+
+    function isTargetInFocusedInterface(target) {
+        const targetWindow = getTargetInterfaceWindow(target);
+        if (!targetWindow) return true;
+        return targetWindow === getFocusedInterfaceWindow();
+    }
 
     function ensureOverlayLayer() {
         if (overlayLayer?.isConnected) return overlayLayer;
@@ -802,7 +840,7 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
     }
 
     function getTargets() {
-        return Array.from(document.querySelectorAll(`[${ATTRIBUTE_NAME}]`)).filter(target => {
+        const visibleTargets = Array.from(document.querySelectorAll(`[${ATTRIBUTE_NAME}]`)).filter(target => {
             const label = String(target.getAttribute(ATTRIBUTE_NAME) || "").trim();
             if (!label) return false;
             if (!target.isConnected) return false;
@@ -813,6 +851,8 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
                 && style.visibility !== "hidden"
                 && style.display !== "none";
         });
+        const focusedTargets = visibleTargets.filter(isTargetInFocusedInterface).filter(target => getTargetInterfaceWindow(target));
+        return focusedTargets.length ? focusedTargets : visibleTargets.filter(target => !getTargetInterfaceWindow(target));
     }
 
     function normalizeKey(value = "") {
@@ -903,10 +943,17 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
         triggerTarget(target);
     }
 
+    function handlePointerdown(event) {
+        if (!active) return;
+        if (event.target?.closest?.(`.${OVERLAY_CLASS}, .alt-sync-overlay-layer`)) return;
+        deactivate();
+    }
+
     function init() {
         if (initialized) return;
         initialized = true;
         document.addEventListener("keydown", handleKeydown);
+        document.addEventListener("pointerdown", handlePointerdown, true);
         window.addEventListener("blur", deactivate);
         window.addEventListener("resize", () => {
             if (active) positionOverlays();

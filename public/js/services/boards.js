@@ -8,13 +8,7 @@
     const updateFileOpenProgress = (state = {}) => window.StandardDownloads?.updateOpenProgress?.(state);
     const hideFileOpenProgress = token => window.StandardDownloads?.hideOpenProgress?.(token);
     const downloadBoardForOpen = async (rawPath = "") => {
-        const download = await window.StandardDownloads.downloadForOpen(rawPath, {
-            pathNormalizer: getBoardPathForDownload,
-            emptyPathMessage: "Board path is required",
-            errorMessage: "Unable to read board file",
-            fallbackFileName: "board",
-            autoHide: false
-        });
+        const download = await window.StandardDownloads.downloadForOpen(rawPath, {pathNormalizer: getBoardPathForDownload, emptyPathMessage: "Board path is required", errorMessage: "Unable to read board file", fallbackFileName: "board", autoHide: false});
         return {...download, boardPath: download.path};
     };
     const isBoardsWindow = node => {
@@ -185,11 +179,7 @@
         if (!boardPath) return;
         const currentName = getBoardFileName(boardPath);
         const currentBoardName = sanitizeBoardName(currentName);
-        inputDialogue({
-            title: "Rename board",
-            placeholder: "Board name",
-            value: currentBoardName,
-            confirmation: async (_, renamed) => {
+        inputDialogue({title: "Rename board", placeholder: "Board name", value: currentBoardName, confirmation: async (_, renamed) => {
                 const nextBoardName = sanitizeBoardName(renamed);
                 if (!nextBoardName) {
                     modular.error("Board name is required");
@@ -214,10 +204,7 @@
         const boardPath = getBoardFilePath(rawPath);
         if (!boardPath) return;
         const boardName = sanitizeBoardName(getBoardFileName(boardPath)) || "this board";
-        confirmationDialogue({
-            title: "Delete board",
-            content: `You're sure you want to delete ${boardName}?`,
-            confirmation: async () => {
+        confirmationDialogue({title: "Delete board", content: `You're sure you want to delete ${boardName}?`, confirmation: async () => {
                 try {
                     await CLI.send(CLI.buildFilesCommand("remove", boardPath));
                     if (typeof refreshBoardsList === "function") refreshBoardsList();
@@ -237,27 +224,13 @@
         operations: boardOperations
     });
     const shapeIcon = `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3.75" y="4.5" width="7.5" height="7.5" rx="1.25" /><circle cx="16.75" cy="8.25" r="3.75" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 19.5h12l-6-6-6 6Z" /></svg>`;
-    const boardShapeOptions = [{
-        type: "rectangle",
-        label: "Rectangle",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="1.5" /></svg>`
-    }, {
-        type: "rounded-rectangle",
-        label: "Rounded Rectangle",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="4" /></svg>`
-    }, {
-        type: "ellipse",
-        label: "Ellipse",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><ellipse cx="12" cy="12" rx="8" ry="5.5" /></svg>`
-    }, {
-        type: "triangle",
-        label: "Triangle",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 4 21 20H3L12 4Z" /></svg>`
-    }, {
-        type: "diamond",
-        label: "Diamond",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 3 21 12 12 21 3 12 12 3Z" /></svg>`
-    }];
+    const boardShapeOptions = [
+        {type: "rectangle", label: "Rectangle", icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="1.5" /></svg>`},
+        {type: "rounded-rectangle", label: "Rounded Rectangle", icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="4" /></svg>`},
+        {type: "ellipse", label: "Ellipse", icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><ellipse cx="12" cy="12" rx="8" ry="5.5" /></svg>`},
+        {type: "triangle", label: "Triangle", icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 4 21 20H3L12 4Z" /></svg>`},
+        {type: "diamond", label: "Diamond", icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 3 21 12 12 21 3 12 12 3Z" /></svg>`}
+    ];
     const saveBoardToBoardsFolder = async (boardName, canvas = null) => {
         const fileName = `${boardName}.wtb`;
         const payload = buildBoardPayload(canvas);
@@ -289,15 +262,10 @@
                 if (typeof refreshBoardsList === "function") refreshBoardsList();
                 await window.StandardFilesRefreshCache?.();
                 modular.success(`Saved Boards/${result.fileName} (${result.byteCount} bytes)`);
-            }).catch(error => {
-                modular.error(error.message || "Board save failed");
-            });
+            }).catch(error => modular.error(error.message || "Board save failed"));
         };
         if (!activeBoardName) {
-            inputDialogue({
-                title: "Board name",
-                placeholder: "e.g. roadmap_q1",
-                confirmation: (_, boardTitle) => {
+            inputDialogue({title: "Board name", placeholder: "e.g. roadmap_q1", confirmation: (_, boardTitle) => {
                     const boardName = sanitizeBoardName(boardTitle);
                     if (!boardName) {
                         modular.error("Board name is required");
@@ -343,15 +311,11 @@
             tools: [{
                 title: "Save",
                 icon: modular.icons.save,
-                onclick: (_, routeContext) => {
-                    triggerBoardSave(routeContext?.window || routeContext?.struct?.body || null);
-                }
+                onclick: (_, routeContext) => triggerBoardSave(routeContext?.window || routeContext?.struct?.body || null)
             }, {
                 title: "New Board",
                 icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
-                onclick: (event, routeContext) => {
-                    openNewBoardMenu(event, routeContext);
-                }
+                onclick: (event, routeContext) => openNewBoardMenu(event, routeContext)
             }],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" /></svg>`,
             icon: "/icons/interfaces/whiteboard.png",
@@ -549,9 +513,7 @@
                                     };
                                     img.src = operation.dataUrl;
                                 }
-                                if (operation?.type === "shape") {
-                                    renderShapeOperation(operation);
-                                }
+                                if (operation?.type === "shape") renderShapeOperation(operation);
                             });
                             const selectedOperation = boardOperations[selectedOperationIndex];
                             if (isSelectableOperation(selectedOperation)) {
@@ -601,12 +563,7 @@
                             return {x: ((e.clientX - rect.left) / scale) + canvasOrigin.x, y: ((e.clientY - rect.top) / scale) + canvasOrigin.y};
                         };
                         const isSelectableOperation = operation => operation?.type === "image" || operation?.type === "shape";
-                        const getOperationBounds = operation => ({
-                            x: Number(operation?.x) || 0,
-                            y: Number(operation?.y) || 0,
-                            width: Math.max(1, Number(operation?.width) || 1),
-                            height: Math.max(1, Number(operation?.height) || 1)
-                        });
+                        const getOperationBounds = operation => ({x: Number(operation?.x) || 0, y: Number(operation?.y) || 0, width: Math.max(1, Number(operation?.width) || 1), height: Math.max(1, Number(operation?.height) || 1)});
                         const getSelectableOperationIndexAtPos = pos => {
                             for (let i = boardOperations.length - 1; i >= 0; i--) {
                                 const operation = boardOperations[i];
@@ -734,12 +691,7 @@
                             const viewportSize = getViewportSize();
                             const visibleLeft = (-translate.x) / scale;
                             const visibleTop = (-translate.y) / scale;
-                            return {
-                                x: visibleLeft + ((viewportSize.width / scale) - width) / 2,
-                                y: visibleTop + ((viewportSize.height / scale) - height) / 2,
-                                width,
-                                height
-                            };
+                            return {x: visibleLeft + ((viewportSize.width / scale) - width) / 2, y: visibleTop + ((viewportSize.height / scale) - height) / 2, width, height};
                         };
                         const insertShape = shapeType => {
                             const dimensions = shapeType === "triangle" || shapeType === "diamond" ? getCenteredInsertionRect(140, 140) : getCenteredInsertionRect(170, 110);
@@ -758,11 +710,7 @@
                         const changeShapeProperty = (property, title, placeholder, parser = value => value) => {
                             const shape = boardOperations[contextShapeIndex];
                             if (shape?.type !== "shape") return;
-                            inputDialogue({
-                                title,
-                                placeholder,
-                                value: shape[property],
-                                confirmation: (_, rawValue) => {
+                            inputDialogue({title, placeholder, value: shape[property], confirmation: (_, rawValue) => {
                                     const nextValue = parser(rawValue);
                                     if (nextValue === null || nextValue === undefined || nextValue === "") return;
                                     shape[property] = nextValue;
@@ -811,11 +759,7 @@
                                 selectedOperationIndex = operationIndex;
                                 if (operationIndex >= 0) {
                                     const selectedOperation = boardOperations[operationIndex];
-                                    selectionAction = {
-                                        type: "move",
-                                        offsetX: pos.x - selectedOperation.x,
-                                        offsetY: pos.y - selectedOperation.y
-                                    };
+                                    selectionAction = {type: "move", offsetX: pos.x - selectedOperation.x, offsetY: pos.y - selectedOperation.y};
                                 } else {
                                     selectionAction = null;
                                 }
@@ -824,12 +768,7 @@
                             }
                             drawing = true;
                             const pos = getPos(e);
-                            currentStroke = {
-                                type: tool === "erase" ? "erase" : "stroke",
-                                color: pickedColor,
-                                width: tool === "erase" ? 20 : 2,
-                                points: [pos]
-                            };
+                            currentStroke = {type: tool === "erase" ? "erase" : "stroke", color: pickedColor, width: tool === "erase" ? 20 : 2, points: [pos]};
                             boardOperations.push(currentStroke);
                             renderOperations();
                         };
@@ -929,11 +868,7 @@
                         const shapeButton = windowBody.querySelector('button[data="action-shapes"]');
                         if (shapeButton && !shapeButton.__boardsShapesMenuAttached) {
                             shapeButton.__boardsShapesMenuAttached = true;
-                            shapeButton.popoutmenu(boardShapeOptions.map(shape => ({
-                                icon: shape.icon,
-                                label: shape.label,
-                                action: () => insertShape(shape.type)
-                            })));
+                            shapeButton.popoutmenu(boardShapeOptions.map(shape => ({icon: shape.icon, label: shape.label, action: () => insertShape(shape.type)})));
                         }
                         canvas.addEventListener("contextmenu", event => {
                             const operationIndex = getSelectableOperationIndexAtPos(getPos(event));

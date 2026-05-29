@@ -34,19 +34,13 @@
         let lastStatus = indicator.dataset.status || "connected";
         let initialized = false;
         function update(nextStatus) {
-            if (!statuses.includes(nextStatus)) {
-                return;
-            }
+            if (!statuses.includes(nextStatus)) return;
             statuses.forEach(state => indicator.classList.remove(`status-${state}`));
             indicator.classList.add(`status-${nextStatus}`);
             indicator.dataset.status = nextStatus;
             statusText.textContent = STATUS_COPY[nextStatus] || nextStatus;
             if (initialized && lastStatus !== nextStatus) {
-                const copyMap = {
-                    connected: "Device connection restored",
-                    connecting: "Attempting to connect…",
-                    disconnected: "Device connection lost"
-                };
+                const copyMap = {connected: "Device connection restored", connecting: "Attempting to connect…", disconnected: "Device connection lost"};
                 showToast(copyMap[nextStatus] || `Status changed: ${nextStatus}`, nextStatus);
             }
             initialized = true;
@@ -64,9 +58,7 @@
         source.onmessage = event => {
             try {
                 const payload = JSON.parse(event.data);
-                if (payload && payload.status) {
-                    setStatus(payload.status);
-                }
+                if (payload && payload.status) setStatus(payload.status);
             } catch (err) {
                 console.error("Failed to parse status event", err);
             }

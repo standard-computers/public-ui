@@ -21,20 +21,21 @@
     const TEXT_HIGHLIGHT_COLOR = "#fef08a";
     const TEXT_DOCUMENT_CONTENT_PREFIX = "__STD_TEXT_EDITOR_B64__:";
     const TEXT_DOCUMENT_VIEW_SETTINGS_KEY = "std.textEditor.documentViewSettings";
-    const TEXT_PAGE_VIEW_WIDTH = "8.5in";
-    const TEXT_PAGE_VIEW_MIN_HEIGHT = "11in";
+    const TEXT_PAGE_DIMENSION_UNITS = ["in", "px"];
+    const TEXT_PAGE_DEFAULT_DIMENSIONS = {width: 8.5, height: 11, uom: "in"};
     const TEXT_PAGE_VIEW_PADDING = "1in";
     const TEXT_PAGE_VIEW_GAP = "28px";
-    const TEXT_PAGE_VIEW_WIDTH_PX = 816;
-    const TEXT_PAGE_VIEW_HEIGHT_PX = 1056;
+    const TEXT_PAGE_VIEW_UNIT_PX = 96;
     const TEXT_PAGE_VIEW_PADDING_PX = 96;
     const TEXT_PAGE_VIEW_GAP_PX = 28;
-    const TEXT_PAGE_VIEW_CONTENT_HEIGHT_PX = TEXT_PAGE_VIEW_HEIGHT_PX - (TEXT_PAGE_VIEW_PADDING_PX * 2);
-    const TEXT_PAGE_VIEW_PAGE_PITCH_PX = TEXT_PAGE_VIEW_HEIGHT_PX + TEXT_PAGE_VIEW_GAP_PX;
     const TEXT_INPUT_SYNC_DEBOUNCE_MS = 120;
+    const TEXT_INDENT_STEP_PX = 48;
     const TEXT_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" style="fill:none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path fill="none" style="fill:none" stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>`;
     const TEXT_TABLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75V5.25Zm0 4.5h16.5M3.75 14.25h16.5M9.25 5.25v13.5M14.75 5.25v13.5" /></svg>`;
     const TEXT_SHAPE_ICON = `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3.75" y="4.5" width="7.5" height="7.5" rx="1.25" /><circle cx="16.75" cy="8.25" r="3.75" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 19.5h12l-6-6-6 6Z" /></svg>`;
+    const TEXT_INDENT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>`;
+    const TEXT_INDENT_RIGHT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.49 12 3.75 3.75m0 0-3.75 3.75m3.75-3.75H3.74V4.499"/></svg>`;
+    const TEXT_INDENT_LEFT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m7.49 12-3.75 3.75m0 0 3.75 3.75m-3.75-3.75h16.5V4.499"/></svg>`;
     const TEXT_SHAPE_OPTIONS = [{
         type: "rectangle",
         label: "Rectangle",
@@ -74,6 +75,7 @@
     let activeTextTableResizeHandle = null;
     let activeTextPageViewEnabled = false;
     let activeTextRulerEnabled = false;
+    let activeTextPageDimensions = {...TEXT_PAGE_DEFAULT_DIMENSIONS};
     let activeTextFooterSettings = {text: "", pageNumbers: false};
     let textEditorDeferredSyncTimer = null;
     const resolvedTextColorCache = new Map();
@@ -105,6 +107,59 @@
     const isPlainTextFilePath = (rawPath = "") => getTextFileExtension(rawPath) === "txt";
     const getDefaultTextDocumentPageViewPreference = (rawPath = "") => !isPlainTextFilePath(rawPath);
     const getDefaultTextFooterSettings = () => ({text: "", pageNumbers: false});
+    const roundTextPageDimension = (value = 0, uom = "in") => {
+        const precision = uom === "px" ? 0 : 2;
+        const factor = 10 ** precision;
+        return Math.round((Number(value) || 0) * factor) / factor;
+    };
+    const textPageDimensionToPx = (value = 0, uom = "in") => {
+        const numericValue = Math.max(0, Number(value) || 0);
+        return uom === "px" ? numericValue : numericValue * TEXT_PAGE_VIEW_UNIT_PX;
+    };
+    const textPageDimensionFromPx = (value = 0, uom = "in") => {
+        const numericValue = Math.max(0, Number(value) || 0);
+        return uom === "px" ? numericValue : numericValue / TEXT_PAGE_VIEW_UNIT_PX;
+    };
+    const normalizeTextPageDimensions = (dimensions = {}) => {
+        const source = dimensions && typeof dimensions === "object" ? dimensions : {};
+        const sourceUom = TEXT_PAGE_DIMENSION_UNITS.includes(String(source.uom || "").toLowerCase())
+            ? String(source.uom).toLowerCase()
+            : TEXT_PAGE_DEFAULT_DIMENSIONS.uom;
+        const fallbackWidthPx = textPageDimensionToPx(TEXT_PAGE_DEFAULT_DIMENSIONS.width, TEXT_PAGE_DEFAULT_DIMENSIONS.uom);
+        const fallbackHeightPx = textPageDimensionToPx(TEXT_PAGE_DEFAULT_DIMENSIONS.height, TEXT_PAGE_DEFAULT_DIMENSIONS.uom);
+        const widthPx = Math.max(240, textPageDimensionToPx(source.width, sourceUom) || fallbackWidthPx);
+        const heightPx = Math.max(320, textPageDimensionToPx(source.height, sourceUom) || fallbackHeightPx);
+        return {
+            width: roundTextPageDimension(textPageDimensionFromPx(widthPx, sourceUom), sourceUom),
+            height: roundTextPageDimension(textPageDimensionFromPx(heightPx, sourceUom), sourceUom),
+            uom: sourceUom
+        };
+    };
+    const getTextPageDimensionsPx = (dimensions = activeTextPageDimensions) => {
+        const normalizedDimensions = normalizeTextPageDimensions(dimensions);
+        return {
+            width: Math.round(textPageDimensionToPx(normalizedDimensions.width, normalizedDimensions.uom)),
+            height: Math.round(textPageDimensionToPx(normalizedDimensions.height, normalizedDimensions.uom))
+        };
+    };
+    const getTextPageDimensionsCss = (dimensions = activeTextPageDimensions) => {
+        const normalizedDimensions = normalizeTextPageDimensions(dimensions);
+        return {
+            width: `${normalizedDimensions.width}${normalizedDimensions.uom}`,
+            height: `${normalizedDimensions.height}${normalizedDimensions.uom}`
+        };
+    };
+    const getTextPageContentHeightPx = (dimensions = activeTextPageDimensions) => {
+        return Math.max(1, getTextPageDimensionsPx(dimensions).height - (TEXT_PAGE_VIEW_PADDING_PX * 2));
+    };
+    const getTextPagePitchPx = (dimensions = activeTextPageDimensions) => getTextPageDimensionsPx(dimensions).height + TEXT_PAGE_VIEW_GAP_PX;
+    const areTextPageDimensionsEqual = (left = {}, right = {}) => {
+        const normalizedLeft = normalizeTextPageDimensions(left);
+        const normalizedRight = normalizeTextPageDimensions(right);
+        return normalizedLeft.uom === normalizedRight.uom
+            && Math.abs(normalizedLeft.width - normalizedRight.width) < 0.01
+            && Math.abs(normalizedLeft.height - normalizedRight.height) < 0.01;
+    };
     const normalizeTextFooterSettings = (settings = {}) => ({
         text: String(settings?.text || ""),
         pageNumbers: !!settings?.pageNumbers
@@ -158,6 +213,17 @@
     const persistTextDocumentRulerPreference = (rawPath = "", enabled = activeTextRulerEnabled) => {
         return persistTextDocumentViewPreference(rawPath, {rulerEnabled: !!enabled});
     };
+    const getStoredTextDocumentPageDimensions = (rawPath = "") => {
+        const normalizedPath = normalizeTextFilePath(rawPath);
+        if (!normalizedPath) return null;
+        const settings = readStoredTextDocumentViewSettings();
+        return settings[normalizedPath]?.pageDimensions && typeof settings[normalizedPath].pageDimensions === "object"
+            ? normalizeTextPageDimensions(settings[normalizedPath].pageDimensions)
+            : null;
+    };
+    const persistTextDocumentPageDimensions = (rawPath = "", dimensions = activeTextPageDimensions) => {
+        return persistTextDocumentViewPreference(rawPath, {pageDimensions: normalizeTextPageDimensions(dimensions)});
+    };
     const getStoredTextDocumentFooterSettings = (rawPath = "") => {
         const normalizedPath = normalizeTextFilePath(rawPath);
         if (!normalizedPath) return null;
@@ -195,10 +261,19 @@
         activeTextFooterSettings = normalizeTextFooterSettings(getStoredTextDocumentFooterSettings(rawPath) || fallback);
         return activeTextFooterSettings;
     };
+    const loadTextDocumentPageDimensions = (rawPath = "", fallback = TEXT_PAGE_DEFAULT_DIMENSIONS) => {
+        if (isPlainTextFilePath(rawPath)) {
+            activeTextPageDimensions = normalizeTextPageDimensions(TEXT_PAGE_DEFAULT_DIMENSIONS);
+            return activeTextPageDimensions;
+        }
+        activeTextPageDimensions = normalizeTextPageDimensions(getStoredTextDocumentPageDimensions(rawPath) || fallback);
+        return activeTextPageDimensions;
+    };
     const loadTextDocumentViewPreferences = (rawPath = "", pageFallback = false, rulerFallback = false) => {
         loadTextDocumentPageViewPreference(rawPath, pageFallback);
         loadTextDocumentRulerPreference(rawPath, rulerFallback);
         loadTextDocumentFooterSettings(rawPath);
+        loadTextDocumentPageDimensions(rawPath);
     };
     const shouldHideTextEditorBar = (rawPath = "") => {
         const extension = getTextFileExtension(rawPath);
@@ -292,8 +367,9 @@
         }));
     };
     const getTextEditorPageBreakSpacerHeight = (currentPageHeight = 0) => {
-        const usedPageHeight = Math.max(0, Math.min(TEXT_PAGE_VIEW_CONTENT_HEIGHT_PX, Number(currentPageHeight) || 0));
-        return (TEXT_PAGE_VIEW_CONTENT_HEIGHT_PX - usedPageHeight) + (TEXT_PAGE_VIEW_PADDING_PX * 2) + TEXT_PAGE_VIEW_GAP_PX;
+        const contentHeightPx = getTextPageContentHeightPx();
+        const usedPageHeight = Math.max(0, Math.min(contentHeightPx, Number(currentPageHeight) || 0));
+        return (contentHeightPx - usedPageHeight) + (TEXT_PAGE_VIEW_PADDING_PX * 2) + TEXT_PAGE_VIEW_GAP_PX;
     };
     const getTextEditorNodeVisualHeight = (node, rootNode = findTextEditorNode()) => {
         if (!node || !rootNode) return 0;
@@ -628,12 +704,7 @@ a { color: #1d4ed8; text-decoration: underline; }
     const showTextEditorShapeColorDialogue = (frameNode, property = "fill", title = "Shape color", placeholder = "#4c8bf5") => {
         const svgNode = frameNode?.querySelector?.("svg");
         if (!svgNode) return false;
-        inputDialogue({
-            title,
-            placeholder,
-            value: svgNode.getAttribute(property) || placeholder,
-            confirmation: (_, rawValue) => setTextEditorShapeColor(frameNode, property, rawValue)
-        });
+        inputDialogue({title, placeholder, value: svgNode.getAttribute(property) || placeholder, confirmation: (_, rawValue) => setTextEditorShapeColor(frameNode, property, rawValue)});
         return true;
     };
     const insertTextEditorShape = (shapeType = "rectangle") => {
@@ -724,11 +795,7 @@ a { color: #1d4ed8; text-decoration: underline; }
     const showTextEditorImageLengthDialogue = (frameNode, property = "width", title = "Image size") => {
         const imageNode = getTextEditorImageNodeFromFrame(frameNode);
         if (!imageNode) return false;
-        inputDialogue({
-            title,
-            placeholder: "auto, 240px, or 50%",
-            value: getTextEditorImageDisplayedLength(imageNode, property),
-            confirmation: (_, rawValue) => {
+        inputDialogue({title, placeholder: "auto, 240px, or 50%", value: getTextEditorImageDisplayedLength(imageNode, property), confirmation: (_, rawValue) => {
                 const nextValue = normalizeTextEditorCssLength(rawValue, {allowAuto: true, allowEmpty: true});
                 if (nextValue === null) {
                     modular.error("Enter a valid CSS length");
@@ -742,22 +809,13 @@ a { color: #1d4ed8; text-decoration: underline; }
     const showTextEditorImageBorderColorDialogue = (frameNode) => {
         const imageNode = getTextEditorImageNodeFromFrame(frameNode);
         if (!imageNode) return false;
-        inputDialogue({
-            title: "Image border color",
-            placeholder: "#1f2937, red, or transparent",
-            value: imageNode.style.borderColor || "",
-            confirmation: (_, rawValue) => setTextEditorImageStyle(frameNode, {borderColor: String(rawValue || "").trim() || "transparent"})
-        });
+        inputDialogue({title: "Image border color", placeholder: "#1f2937, red, or transparent", value: imageNode.style.borderColor || "", confirmation: (_, rawValue) => setTextEditorImageStyle(frameNode, {borderColor: String(rawValue || "").trim() || "transparent"})});
         return true;
     };
     const showTextEditorImageBorderLengthDialogue = (frameNode, property = "borderWidth", title = "Image border width") => {
         const imageNode = getTextEditorImageNodeFromFrame(frameNode);
         if (!imageNode) return false;
-        inputDialogue({
-            title,
-            placeholder: "0, 1px, or 0.1rem",
-            value: imageNode.style[property] || (property === "borderWidth" ? "0px" : imageNode.style.borderRadius || frameNode.style.borderRadius || "10px"),
-            confirmation: (_, rawValue) => {
+        inputDialogue({title, placeholder: "0, 1px, or 0.1rem", value: imageNode.style[property] || (property === "borderWidth" ? "0px" : imageNode.style.borderRadius || frameNode.style.borderRadius || "10px"), confirmation: (_, rawValue) => {
                 const nextValue = normalizeTextEditorCssLength(rawValue, {allowEmpty: property === "borderWidth"});
                 if (nextValue === null) {
                     modular.error("Enter a valid CSS length");
@@ -928,6 +986,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         cachedContent: activeTextEditorContent,
         pageViewEnabled: activeTextPageViewEnabled,
         rulerEnabled: activeTextRulerEnabled,
+        pageDimensions: normalizeTextPageDimensions(activeTextPageDimensions),
         footer: normalizeTextFooterSettings(activeTextFooterSettings)
     });
     const setTextEditorPortalState = (portal = findTextPortal(), options = {}) => {
@@ -947,6 +1006,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             typeof state?.rulerEnabled === "boolean" ? state.rulerEnabled : false
         );
         if (state?.footer && typeof state.footer === "object") activeTextFooterSettings = normalizeTextFooterSettings(state.footer);
+        if (state?.pageDimensions && typeof state.pageDimensions === "object") activeTextPageDimensions = normalizeTextPageDimensions(state.pageDimensions);
     };
     const updateTextEditorPortalTitle = (editorPortal = findTextPortal()) => {
         if (editorPortal?.setTitle) {
@@ -1095,12 +1155,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         const selectedText = getTextSelectionPlainText().trim();
         if (!selectedText && !allowEmptyText) return false;
         rememberTextSelection();
-        inputDialogue({
-            title: "Hyperlink",
-            titleholder: "Text",
-            title_entry: true,
-            title_value: selectedText,
-            placeholder: "Link",
+        inputDialogue({title: "Hyperlink", titleholder: "Text", title_entry: true, title_value: selectedText, placeholder: "Link",
             confirmation: (textValue, linkValue) => {
                 if (!applyTextEditorHyperlink(textValue, linkValue)) modular.error("Enter text and a link");
             }
@@ -1274,11 +1329,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             });
             return true;
         }
-        inputDialogue({
-            title: "Search",
-            placeholder: "Find text",
-            value: initialValue,
-            confirmation: (_, query) => {
+        inputDialogue({title: "Search", placeholder: "Find text", value: initialValue, confirmation: (_, query) => {
                 const match = createTextEditorSearchMatches(query, portal)[0];
                 if (!scrollToTextEditorSearchMatch(match, portal)) modular.error("No matches found");
             }
@@ -1567,6 +1618,89 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         return null;
     };
+    const getTextBlockIndentPx = (node) => {
+        if (!node) return 0;
+        const rawIndent = node.style?.marginLeft || getComputedStyle(node).marginLeft || "0";
+        const numericIndent = Number.parseFloat(rawIndent);
+        return Number.isFinite(numericIndent) ? Math.max(0, numericIndent) : 0;
+    };
+    const isTextIndentableBlock = (node) => {
+        if (!node || node.nodeType !== Node.ELEMENT_NODE || isTextPageBreakSpacer(node)) return false;
+        if (node.closest?.(".editor-text-image-frame, .editor-text-shape-frame")) return false;
+        const tagName = String(node.tagName || "").toUpperCase();
+        if (["P", "DIV", "LI", "TD", "TH", "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE"].includes(tagName)) return true;
+        const display = getComputedStyle(node).display;
+        return display === "block" || display === "list-item";
+    };
+    const getTopLevelTextIndentBlocks = (textArea = findTextEditorNode()) => {
+        if (!textArea) return [];
+        normalizeTextEditorTopLevelTextNodes(textArea);
+        const childBlocks = Array.from(textArea.children).filter(isTextIndentableBlock);
+        if (childBlocks.length) return childBlocks;
+        return (textArea.innerText || textArea.textContent || "").trim() ? [textArea] : [];
+    };
+    const getSelectedTextIndentBlocks = (range, textArea = findTextEditorNode()) => {
+        if (!range || !textArea) return [];
+        const blockSelector = "p, div, li, td, th, h1, h2, h3, h4, h5, h6, blockquote";
+        const candidates = Array.from(textArea.querySelectorAll(blockSelector)).filter(isTextIndentableBlock);
+        const selectedBlocks = candidates.filter((node) => {
+            try {
+                return range.intersectsNode(node);
+            } catch (_) {
+                return false;
+            }
+        });
+        if (selectedBlocks.length) return selectedBlocks;
+        const target = getTextSelectionBlockTarget(range.startContainer?.nodeType === Node.TEXT_NODE ? range.startContainer.parentElement : range.startContainer);
+        return isTextIndentableBlock(target) ? [target] : [];
+    };
+    const getSelectedTextListItems = (range, textArea = findTextEditorNode()) => {
+        if (!range || !textArea) return [];
+        return Array.from(textArea.querySelectorAll("li")).filter((listItemNode) => {
+            try {
+                return range.intersectsNode(listItemNode);
+            } catch (_) {
+                return false;
+            }
+        });
+    };
+    const applyTextBlockIndent = (blockNodes = [], direction = "right") => {
+        const delta = direction === "left" ? -TEXT_INDENT_STEP_PX : TEXT_INDENT_STEP_PX;
+        blockNodes.forEach((blockNode) => {
+            const nextIndent = Math.max(0, getTextBlockIndentPx(blockNode) + delta);
+            blockNode.style.marginLeft = nextIndent ? `${nextIndent}px` : "";
+        });
+        return blockNodes.length > 0;
+    };
+    const execTextEditorIndentCommand = (direction = "right") => {
+        document.execCommand("styleWithCSS", false, true);
+        return document.execCommand(direction === "left" ? "outdent" : "indent", false, null);
+    };
+    const applyTextEditorIndent = (direction = "right") => {
+        const textArea = findTextEditorNode();
+        if (!textArea || shouldHideTextEditorBar(activeTextEditorFilePath)) return false;
+        restoreTextSelection();
+        textArea.focus();
+        const selection = window.getSelection();
+        if (!selection?.rangeCount || !isSelectionInsideTextEditor(selection)) return false;
+        const range = selection.getRangeAt(0);
+        const selectedListItems = range.collapsed ? [] : getSelectedTextListItems(range, textArea);
+        if (getTextSelectionListItem() || selectedListItems.length) {
+            const didApplyListIndent = execTextEditorIndentCommand(direction);
+            rememberTextSelection();
+            syncTextEditorStateFromDom();
+            requestAnimationFrame(() => updateTextEditorRulerPosition());
+            return didApplyListIndent;
+        }
+        const targetBlocks = range.collapsed
+            ? getTopLevelTextIndentBlocks(textArea)
+            : getSelectedTextIndentBlocks(range, textArea);
+        const didApply = applyTextBlockIndent(targetBlocks, direction);
+        rememberTextSelection();
+        syncTextEditorStateFromDom();
+        requestAnimationFrame(() => updateTextEditorRulerPosition());
+        return didApply;
+    };
     const placeCaretAtStart = (targetNode) => {
         if (!targetNode) return;
         const selection = window.getSelection();
@@ -1651,17 +1785,6 @@ a { color: #1d4ed8; text-decoration: underline; }
         const boundedValue = Math.max(1, Math.min(400, numericValue));
         return `${Math.round(boundedValue * 10) / 10}`.replace(/\.0$/, "");
     };
-    const getLegacyTextFontSizeValue = (rawFontSize = "") => {
-        const numericValue = Number(String(rawFontSize || "").replace(/px$/i, ""));
-        if (!Number.isFinite(numericValue)) return "3";
-        if (numericValue <= 9) return "1";
-        if (numericValue <= 11) return "2";
-        if (numericValue <= 13) return "3";
-        if (numericValue <= 18) return "4";
-        if (numericValue <= 24) return "5";
-        if (numericValue <= 36) return "6";
-        return "7";
-    };
     const normalizeFontFamilyForToolbar = (fontFamily = "") => {
         const primaryFont = String(fontFamily || "").split(",")[0].replace(/^["']|["']$/g, "").trim();
         return TEXT_FONT_FAMILIES.includes(primaryFont) ? primaryFont : (primaryFont || "Inter");
@@ -1677,6 +1800,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         const textColorButton = document.getElementById("editor-sheet-style-color");
         const backgroundColorButton = document.getElementById("editor-sheet-style-background");
         const alignmentButton = document.getElementById("editor-sheet-style-align");
+        const indentButton = document.getElementById("editor-sheet-style-indent");
         const highlightButton = document.getElementById("editor-sheet-style-highlight");
         const listButton = document.getElementById("editor-sheet-style-list");
         if (!editorNode || shouldHideTextEditorBar(activeTextEditorFilePath)) return;
@@ -1719,6 +1843,10 @@ a { color: #1d4ed8; text-decoration: underline; }
             alignmentButton.innerHTML = TEXT_ALIGN_ICONS[alignment] || TEXT_ALIGN_ICONS.left;
             alignmentButton.className = `${alignment !== "left" ? "tiny primary" : ""} naked align-bottom small-margin-right inner-radius`.trim();
         }
+        if (indentButton) {
+            setTextToolbarButtonState(indentButton, getActiveTextIndentPx() > 0 || !!activeList);
+            syncTextToolbarIconColor(indentButton);
+        }
         if (highlightButton) {
             const highlightResolved = resolveTextColor(backgroundColor);
             const isHighlighted = !!highlightResolved && highlightResolved === resolveTextColor(TEXT_HIGHLIGHT_COLOR);
@@ -1732,6 +1860,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             setTextToolbarButtonState(listButton, !!activeList);
             syncTextToolbarIconColor(listButton);
         }
+        if (activeTextRulerEnabled) requestAnimationFrame(() => updateTextEditorRulerPosition());
     };
     const runTextEditorStateSync = (portal = findTextPortal()) => {
         restoreEditorWindowState(portal);
@@ -1828,12 +1957,31 @@ a { color: #1d4ed8; text-decoration: underline; }
             return bestCard;
         }, null)?.node || pageCards[0];
     };
+    const getActiveTextIndentPx = () => {
+        const styleTarget = getTextSelectionStyleTarget();
+        const listItemNode = getTextSelectionListItem(styleTarget);
+        const blockNode = listItemNode || getTextSelectionBlockTarget(styleTarget);
+        return getTextBlockIndentPx(blockNode);
+    };
+    const getActiveTextIndentMarkerOffsetPx = (pageRect) => {
+        const editorNode = findTextEditorNode();
+        const styleTarget = getTextSelectionStyleTarget();
+        const listItemNode = getTextSelectionListItem(styleTarget);
+        const blockNode = listItemNode || getTextSelectionBlockTarget(styleTarget);
+        if (!pageRect || !blockNode || blockNode === editorNode || !editorNode?.contains?.(blockNode)) {
+            return TEXT_PAGE_VIEW_PADDING_PX + getActiveTextIndentPx();
+        }
+        const blockRect = blockNode.getBoundingClientRect?.();
+        if (!blockRect) return TEXT_PAGE_VIEW_PADDING_PX + getActiveTextIndentPx();
+        return Math.round(blockRect.left - pageRect.left);
+    };
     const updateTextEditorRulerPosition = (portal = findTextPortal()) => {
         const rulerLayer = findTextEditorRulerLayer(portal);
         if (!rulerLayer || rulerLayer.style.display === "none") return false;
         const horizontalRuler = rulerLayer.querySelector(".editor-text-ruler-horizontal");
         const verticalRuler = rulerLayer.querySelector(".editor-text-ruler-vertical");
         const cornerNode = rulerLayer.querySelector(".editor-text-ruler-corner");
+        const indentMarker = rulerLayer.querySelector(".editor-text-ruler-indent-marker");
         const focusedPage = getFocusedTextEditorPageCard(portal);
         const stageNode = findTextEditorStage(portal);
         const bodyNode = portal?.body?.();
@@ -1859,10 +2007,15 @@ a { color: #1d4ed8; text-decoration: underline; }
         verticalRuler.style.height = `${verticalHeight}px`;
         const verticalOffset = Math.round(pageRect.top - stageRect.top - verticalTop);
         verticalRuler.style.backgroundPosition = `0 ${verticalOffset}px, 0 ${verticalOffset}px, 0 ${verticalOffset}px`;
+        const tickSize = Number(rulerLayer.dataset.tickSize || TEXT_PAGE_VIEW_UNIT_PX);
         verticalRuler.querySelectorAll(".editor-text-ruler-label-vertical").forEach((labelNode) => {
             const value = Number(labelNode.dataset.rulerValue || 0);
-            labelNode.style.top = `${verticalOffset + (value * TEXT_PAGE_VIEW_PADDING_PX)}px`;
+            labelNode.style.top = `${verticalOffset + (value * tickSize)}px`;
         });
+        if (indentMarker) {
+            const markerLeft = Math.max(0, Math.min(Math.round(pageRect.width) - 10, getActiveTextIndentMarkerOffsetPx(pageRect)));
+            indentMarker.style.left = `${markerLeft}px`;
+        }
         return true;
     };
     const renderTextEditorRulerLayer = (enabled = activeTextRulerEnabled, stageNode = findTextEditorStage(), rulerLayer = findTextEditorRulerLayer(), portal = findTextPortal()) => {
@@ -1879,20 +2032,34 @@ a { color: #1d4ed8; text-decoration: underline; }
             requestAnimationFrame(() => updateTextEditorRulerPosition(portal));
             return true;
         }
-        const horizontalMarks = Array.from({length: 9}, (_, index) => {
-            const left = index * TEXT_PAGE_VIEW_PADDING_PX;
-            return `<span class="editor-text-ruler-label editor-text-ruler-label-horizontal" data-ruler-value="${index}" style="left:${left}px">${index}</span>`;
+        const pageSizePx = getTextPageDimensionsPx();
+        const rulerUnit = activeTextPageDimensions.uom === "px" ? "px" : "in";
+        const tickSize = rulerUnit === "px" ? 100 : TEXT_PAGE_VIEW_UNIT_PX;
+        const minorTickSize = rulerUnit === "px" ? 50 : TEXT_PAGE_VIEW_UNIT_PX / 2;
+        const microTickSize = rulerUnit === "px" ? 25 : TEXT_PAGE_VIEW_UNIT_PX / 4;
+        const horizontalCount = Math.max(2, Math.floor(pageSizePx.width / tickSize) + 2);
+        const verticalCount = Math.max(2, Math.floor(pageSizePx.height / tickSize) + 2);
+        const horizontalMarks = Array.from({length: horizontalCount}, (_, index) => {
+            const left = index * tickSize;
+            const label = rulerUnit === "px" ? index * tickSize : index;
+            return `<span class="editor-text-ruler-label editor-text-ruler-label-horizontal" data-ruler-value="${index}" style="left:${left}px">${label}</span>`;
         }).join("");
-        const verticalMarks = Array.from({length: 12}, (_, index) => {
-            const top = index * TEXT_PAGE_VIEW_PADDING_PX;
-            return `<span class="editor-text-ruler-label editor-text-ruler-label-vertical" data-ruler-value="${index}" style="top:${top}px">${index}</span>`;
+        const verticalMarks = Array.from({length: verticalCount}, (_, index) => {
+            const top = index * tickSize;
+            const label = rulerUnit === "px" ? index * tickSize : index;
+            return `<span class="editor-text-ruler-label editor-text-ruler-label-vertical" data-ruler-value="${index}" style="top:${top}px">${label}</span>`;
         }).join("");
         rulerLayer.innerHTML = `
             <div class="editor-text-ruler-corner"></div>
-            <div class="editor-text-ruler editor-text-ruler-horizontal" aria-hidden="true">${horizontalMarks}</div>
+            <div class="editor-text-ruler editor-text-ruler-horizontal" aria-hidden="true">${horizontalMarks}<span class="editor-text-ruler-indent-marker"></span></div>
             <div class="editor-text-ruler editor-text-ruler-vertical" aria-hidden="true">${verticalMarks}</div>
         `;
         rulerLayer.dataset.rendered = "1";
+        rulerLayer.dataset.tickSize = String(tickSize);
+        const horizontalRuler = rulerLayer.querySelector(".editor-text-ruler-horizontal");
+        const verticalRuler = rulerLayer.querySelector(".editor-text-ruler-vertical");
+        if (horizontalRuler) horizontalRuler.style.backgroundSize = `${tickSize}px 100%,${minorTickSize}px 100%,${microTickSize}px 100%`;
+        if (verticalRuler) verticalRuler.style.backgroundSize = `100% ${tickSize}px,100% ${minorTickSize}px,100% ${microTickSize}px`;
         requestAnimationFrame(() => updateTextEditorRulerPosition(portal));
         return true;
     };
@@ -1990,11 +2157,16 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (!stageNode || !backdropNode) return false;
         const totalPages = Math.max(1, Number(pageCount) || 1);
         const renderedPageCount = Number(backdropNode.dataset.renderedPageCount || 0);
+        const pageHeightPx = getTextPageDimensionsPx().height;
         if (renderedPageCount !== totalPages) {
             backdropNode.innerHTML = Array.from({length: totalPages}, (_, index) => {
-                return `<div class="editor-text-page-card" data-page-number="${index + 1}" style="height:${TEXT_PAGE_VIEW_HEIGHT_PX}px;"></div>`;
+                return `<div class="editor-text-page-card" data-page-number="${index + 1}" style="height:${pageHeightPx}px;"></div>`;
             }).join("");
             backdropNode.dataset.renderedPageCount = String(totalPages);
+        } else {
+            backdropNode.querySelectorAll(".editor-text-page-card").forEach((pageCard) => {
+                pageCard.style.height = `${pageHeightPx}px`;
+            });
         }
         renderTextEditorPageFooters(backdropNode);
         stageNode.classList.toggle("editor-text-stage-page-view", activeTextPageViewEnabled);
@@ -2007,7 +2179,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (!(windowNode instanceof HTMLElement) || !(bodyNode instanceof HTMLElement)) return false;
         const windowRect = windowNode.getBoundingClientRect();
         const bodyWidth = bodyNode.clientWidth || bodyNode.getBoundingClientRect().width || 0;
-        const missingWidth = Math.ceil(TEXT_PAGE_VIEW_WIDTH_PX - bodyWidth);
+        const missingWidth = Math.ceil(getTextPageDimensionsPx().width - bodyWidth);
         if (missingWidth <= 0) return false;
         const nextWidth = Math.ceil((windowRect.width || windowNode.clientWidth || 0) + missingWidth);
         const nextState = {width: `${nextWidth}px`};
@@ -2024,13 +2196,15 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (!textArea) return 1;
         clearTextEditorPageBreakSpacers(textArea);
         if (!activeTextPageViewEnabled) return 1;
+        const contentHeightPx = getTextPageContentHeightPx();
+        const pagePitchPx = getTextPagePitchPx();
         let currentPageHeight = 0;
         let pageCount = 1;
         Array.from(textArea.childNodes).forEach((node) => {
             if (isTextPageBreakSpacer(node)) return;
             const nodeHeight = getTextEditorNodeVisualHeight(node, textArea);
             if (!nodeHeight) return;
-            if (currentPageHeight > 0 && currentPageHeight + nodeHeight > TEXT_PAGE_VIEW_CONTENT_HEIGHT_PX) {
+            if (currentPageHeight > 0 && currentPageHeight + nodeHeight > contentHeightPx) {
                 const spacerNode = document.createElement("div");
                 spacerNode.className = "editor-text-page-break-spacer";
                 spacerNode.contentEditable = "false";
@@ -2045,7 +2219,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         });
         const totalVisualHeight = Math.max(0, textArea.scrollHeight || 0);
         const pagesFromScrollHeight = totalVisualHeight > 0
-            ? Math.ceil((totalVisualHeight + TEXT_PAGE_VIEW_GAP_PX) / TEXT_PAGE_VIEW_PAGE_PITCH_PX)
+            ? Math.ceil((totalVisualHeight + TEXT_PAGE_VIEW_GAP_PX) / pagePitchPx)
             : 1;
         pageCount = Math.max(pageCount, pagesFromScrollHeight);
         return pageCount;
@@ -2057,18 +2231,20 @@ a { color: #1d4ed8; text-decoration: underline; }
         const measureNode = findTextEditorPageMeasure(portal);
         const pageViewEnabled = !!enabled;
         const requiredPages = pageViewEnabled ? paginateTextEditorFlow(textArea) : 1;
+        const pageDimensionsCss = getTextPageDimensionsCss();
+        const pageDimensionsPx = getTextPageDimensionsPx();
         const totalPageHeight = requiredPages > 0
-            ? (requiredPages * TEXT_PAGE_VIEW_HEIGHT_PX) + ((requiredPages - 1) * TEXT_PAGE_VIEW_GAP_PX)
-            : TEXT_PAGE_VIEW_HEIGHT_PX;
+            ? (requiredPages * pageDimensionsPx.height) + ((requiredPages - 1) * TEXT_PAGE_VIEW_GAP_PX)
+            : pageDimensionsPx.height;
         if (!pageViewEnabled) clearTextEditorPageBreakSpacers(textArea);
         renderTextEditorPageBackdrop(requiredPages, stageNode, backdropNode);
         renderTextEditorRulerLayer(activeTextRulerEnabled, stageNode, findTextEditorRulerLayer(portal), portal);
         requestAnimationFrame(() => updateTextEditorRulerPosition(portal));
         textArea.classList.toggle("editor-text-page-view", pageViewEnabled);
         if (stageNode) {
-            stageNode.style.width = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
-            stageNode.style.maxWidth = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
-            stageNode.style.minWidth = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
+            stageNode.style.width = pageViewEnabled ? pageDimensionsCss.width : "";
+            stageNode.style.maxWidth = pageViewEnabled ? pageDimensionsCss.width : "";
+            stageNode.style.minWidth = pageViewEnabled ? pageDimensionsCss.width : "";
             stageNode.style.minHeight = pageViewEnabled ? `${totalPageHeight}px` : "";
             stageNode.style.height = "";
             stageNode.style.margin = pageViewEnabled ? `${TEXT_PAGE_VIEW_GAP} auto calc(${TEXT_PAGE_VIEW_GAP} * 1.5)` : "";
@@ -2085,9 +2261,9 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         const bodyNode = portal?.body?.();
         if (bodyNode) bodyNode.style.overflowX = pageViewEnabled ? "auto" : "";
-        textArea.style.width = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
-        textArea.style.maxWidth = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
-        textArea.style.minWidth = pageViewEnabled ? TEXT_PAGE_VIEW_WIDTH : "";
+        textArea.style.width = pageViewEnabled ? pageDimensionsCss.width : "";
+        textArea.style.maxWidth = pageViewEnabled ? pageDimensionsCss.width : "";
+        textArea.style.minWidth = pageViewEnabled ? pageDimensionsCss.width : "";
         textArea.style.minHeight = pageViewEnabled ? `${totalPageHeight}px` : "";
         textArea.style.height = pageViewEnabled ? `${totalPageHeight}px` : "";
         textArea.style.padding = pageViewEnabled ? TEXT_PAGE_VIEW_PADDING : "";
@@ -2126,6 +2302,110 @@ a { color: #1d4ed8; text-decoration: underline; }
         const renderedPages = Number(backdropNode?.dataset?.renderedPageCount || 0);
         if (renderedPages > 0) return renderedPages;
         return Math.max(1, backdropNode?.querySelectorAll?.(".editor-text-page-card")?.length || 1);
+    };
+    const formatTextPageDimensionInputValue = (value = 0, uom = "in") => {
+        return uom === "px" ? String(Math.round(Number(value) || 0)) : String(roundTextPageDimension(value, uom));
+    };
+    const convertTextPageDimensionsUom = (dimensions = activeTextPageDimensions, nextUom = "in") => {
+        const normalizedDimensions = normalizeTextPageDimensions(dimensions);
+        const normalizedNextUom = TEXT_PAGE_DIMENSION_UNITS.includes(nextUom) ? nextUom : normalizedDimensions.uom;
+        const widthPx = textPageDimensionToPx(normalizedDimensions.width, normalizedDimensions.uom);
+        const heightPx = textPageDimensionToPx(normalizedDimensions.height, normalizedDimensions.uom);
+        return normalizeTextPageDimensions({
+            width: textPageDimensionFromPx(widthPx, normalizedNextUom),
+            height: textPageDimensionFromPx(heightPx, normalizedNextUom),
+            uom: normalizedNextUom
+        });
+    };
+    const applyTextEditorPageDimensions = (dimensions = activeTextPageDimensions, portal = findTextPortal()) => {
+        activeTextPageDimensions = normalizeTextPageDimensions(dimensions);
+        if (activeTextEditorFilePath) persistTextDocumentPageDimensions(activeTextEditorFilePath, activeTextPageDimensions);
+        const rulerLayer = findTextEditorRulerLayer(portal);
+        if (rulerLayer) rulerLayer.dataset.rendered = "0";
+        applyTextEditorPageView(activeTextPageViewEnabled, findTextEditorNode(portal), portal);
+        syncEditorWindowState(portal);
+        updateTextToolbarState();
+        return activeTextPageDimensions;
+    };
+    const renderTextEditorPageDimensionsMenuContent = () => {
+        const dimensions = normalizeTextPageDimensions(activeTextPageDimensions);
+        const uomLabel = dimensions.uom.toUpperCase();
+        return `
+            <div class="editor-text-page-dimensions" data-page-dimensions>
+                <div class="editor-text-menu-stats-label">Page size</div>
+                <div class="editor-text-page-dimension-inputs">
+                    <label>
+                        <span>W</span>
+                        <input class="editor-text-page-dimension-input" data-page-dimension-field="width" type="number" min="0" step="${dimensions.uom === "px" ? "1" : "0.01"}" value="${formatTextPageDimensionInputValue(dimensions.width, dimensions.uom)}">
+                        <em data-page-dimension-unit>${uomLabel}</em>
+                    </label>
+                    <label>
+                        <span>H</span>
+                        <input class="editor-text-page-dimension-input" data-page-dimension-field="height" type="number" min="0" step="${dimensions.uom === "px" ? "1" : "0.01"}" value="${formatTextPageDimensionInputValue(dimensions.height, dimensions.uom)}">
+                        <em data-page-dimension-unit>${uomLabel}</em>
+                    </label>
+                </div>
+                <select class="editor-text-page-dimension-uom" aria-label="Page size unit">
+                    ${TEXT_PAGE_DIMENSION_UNITS.map((unit) => `<option value="${unit}" ${unit === dimensions.uom ? "selected" : ""}>${unit.toUpperCase()}</option>`).join("")}
+                </select>
+                <div class="editor-text-page-resize-action" data-page-resize-action>
+                    <button class="primary editor-text-page-resize-button" type="button">Resize page</button>
+                </div>
+            </div>
+        `;
+    };
+    const bindTextEditorPageDimensionsMenu = (optionNode, portal = findTextPortal(), hideMenu = () => {}) => {
+        const rootNode = optionNode?.querySelector?.("[data-page-dimensions]");
+        if (!rootNode) return;
+        let pendingDimensions = normalizeTextPageDimensions(activeTextPageDimensions);
+        const widthInput = rootNode.querySelector('[data-page-dimension-field="width"]');
+        const heightInput = rootNode.querySelector('[data-page-dimension-field="height"]');
+        const uomSelect = rootNode.querySelector(".editor-text-page-dimension-uom");
+        const resizeAction = rootNode.querySelector("[data-page-resize-action]");
+        const resizeButton = rootNode.querySelector(".editor-text-page-resize-button");
+        const syncResizeButton = () => {
+            const hasChanged = !areTextPageDimensionsEqual(pendingDimensions, activeTextPageDimensions);
+            resizeAction?.classList.toggle("is-visible", hasChanged);
+        };
+        const syncInputs = () => {
+            const uomLabel = pendingDimensions.uom.toUpperCase();
+            if (widthInput) {
+                widthInput.step = pendingDimensions.uom === "px" ? "1" : "0.01";
+                widthInput.value = formatTextPageDimensionInputValue(pendingDimensions.width, pendingDimensions.uom);
+            }
+            if (heightInput) {
+                heightInput.step = pendingDimensions.uom === "px" ? "1" : "0.01";
+                heightInput.value = formatTextPageDimensionInputValue(pendingDimensions.height, pendingDimensions.uom);
+            }
+            rootNode.querySelectorAll("[data-page-dimension-unit]").forEach((node) => {
+                node.textContent = uomLabel;
+            });
+            if (uomSelect) uomSelect.value = pendingDimensions.uom;
+            syncResizeButton();
+        };
+        const readInputs = () => {
+            pendingDimensions = normalizeTextPageDimensions({
+                width: widthInput?.value,
+                height: heightInput?.value,
+                uom: uomSelect?.value || pendingDimensions.uom
+            });
+            syncResizeButton();
+        };
+        [widthInput, heightInput].forEach((inputNode) => {
+            inputNode?.addEventListener("input", readInputs);
+            inputNode?.addEventListener("change", readInputs);
+        });
+        uomSelect?.addEventListener("change", () => {
+            pendingDimensions = convertTextPageDimensionsUom(pendingDimensions, uomSelect.value);
+            syncInputs();
+        });
+        resizeButton?.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            applyTextEditorPageDimensions(pendingDimensions, portal);
+            hideMenu();
+        });
+        syncResizeButton();
     };
     const renderTextEditorStatsMenuContent = (portal = findTextPortal()) => {
         const statsText = getTextEditorStatsText(findTextEditorNode(portal));
@@ -2405,6 +2685,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         const textColorButton = findInPortal("#editor-sheet-style-color");
         const backgroundColorButton = findInPortal("#editor-sheet-style-background");
         const alignmentButton = findInPortal("#editor-sheet-style-align");
+        const indentButton = findInPortal("#editor-sheet-style-indent");
         const highlightButton = findInPortal("#editor-sheet-style-highlight");
         const listButton = findInPortal("#editor-sheet-style-list");
         const shapeButton = findInPortal("#editor-sheet-style-shape");
@@ -2776,7 +3057,7 @@ a { color: #1d4ed8; text-decoration: underline; }
                 startTop: Number.parseFloat(shapeFrameNode.style.top || "0") || 0
             };
         });
-        [boldButton, italicButton, underlineButton, linkButton, textColorButton, backgroundColorButton, alignmentButton, highlightButton, listButton, shapeButton, imageButton, tableButton, otherButton].forEach(bindTextToolbarButtonFocus);
+        [boldButton, italicButton, underlineButton, linkButton, textColorButton, backgroundColorButton, alignmentButton, indentButton, highlightButton, listButton, shapeButton, imageButton, tableButton, otherButton].forEach(bindTextToolbarButtonFocus);
         if (fontFamilySelect && fontFamilySelect.dataset.bound !== "1") {
             fontFamilySelect.dataset.bound = "1";
             fontFamilySelect.addEventListener("change", () => execTextEditorCommand("fontName", window.StandardUI?.getSearchComboBoxValue?.(fontFamilySelect) || fontFamilySelect.value || "Inter"));
@@ -2847,6 +3128,21 @@ a { color: #1d4ed8; text-decoration: underline; }
                     label: "Align Right",
                     icon: TEXT_ALIGN_ICONS.right,
                     action: () => execTextEditorCommand("justifyRight")
+                }
+            ]);
+        }
+        if (indentButton && indentButton.dataset.bound !== "1") {
+            indentButton.dataset.bound = "1";
+            indentButton.popoutmenu([
+                {
+                    label: "Indent Left",
+                    icon: TEXT_INDENT_LEFT_ICON,
+                    action: () => applyTextEditorIndent("left")
+                },
+                {
+                    label: "Indent Right",
+                    icon: TEXT_INDENT_RIGHT_ICON,
+                    action: () => applyTextEditorIndent("right")
                 }
             ]);
         }
@@ -2955,6 +3251,13 @@ a { color: #1d4ed8; text-decoration: underline; }
                 },
                 action: () => toggleTextEditorRuler(undefined, portal)
             }, {
+                className: "editor-text-menu-page-dimensions",
+                interactive: true,
+                get content() {
+                    return renderTextEditorPageDimensionsMenuContent();
+                },
+                bind: (optionNode, _, __, ___, hideMenu) => bindTextEditorPageDimensionsMenu(optionNode, portal, hideMenu)
+            }, {
                 className: "editor-text-menu-stats",
                 get content() {
                     return renderTextEditorStatsMenuContent(portal);
@@ -3025,10 +3328,14 @@ a { color: #1d4ed8; text-decoration: underline; }
         activeTextFooterSettings = isPlainTextFilePath(normalizedPath)
             ? getDefaultTextFooterSettings()
             : normalizeTextFooterSettings(state?.footer || activeTextFooterSettings);
+        activeTextPageDimensions = isPlainTextFilePath(normalizedPath)
+            ? normalizeTextPageDimensions(TEXT_PAGE_DEFAULT_DIMENSIONS)
+            : normalizeTextPageDimensions(state?.pageDimensions || activeTextPageDimensions);
         activeTextEditorContent = readTextEditorContent(findTextEditorNode(portal));
         persistTextDocumentPageViewPreference(normalizedPath, activeTextPageViewEnabled);
         persistTextDocumentRulerPreference(normalizedPath, activeTextRulerEnabled);
         persistTextDocumentFooterSettings(normalizedPath, activeTextFooterSettings);
+        persistTextDocumentPageDimensions(normalizedPath, activeTextPageDimensions);
         const persistedContent = encodeTextEditorContentForSave(activeTextEditorContent);
         const bytes = new TextEncoder().encode(persistedContent);
         const fileName = getTextFileName(normalizedPath);
@@ -3058,11 +3365,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         return true;
     };
     const saveNewTextFileToDocuments = (portal = findTextPortal()) => {
-        inputDialogue({
-            title: "File name",
-            placeholder: "standard.wrds",
-            value: "standard.wrds",
-            confirmation: async (_, inputFileName) => {
+        inputDialogue({title: "File name", placeholder: "standard.wrds", value: "standard.wrds", confirmation: async (_, inputFileName) => {
                 if (!modular.validateFileName(inputFileName)) return;
                 const safeFileName = sanitizeNewTextFileName(inputFileName) || "standard.wrds";
                 await saveTextEditorContentToPath(`Documents/${safeFileName}`, portal);
@@ -3083,6 +3386,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         activeTextEditorContent = "Edit Me";
         activeTextPageViewEnabled = getDefaultTextDocumentPageViewPreference(activeTextEditorFilePath);
         activeTextRulerEnabled = false;
+        activeTextPageDimensions = normalizeTextPageDimensions(TEXT_PAGE_DEFAULT_DIMENSIONS);
         activeTextFooterSettings = getDefaultTextFooterSettings();
         clearActiveTextImageSelection({skipSync: true});
         const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
@@ -3113,7 +3417,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             title: "Text",
             hints: ["text editor", "create text file", "new text file"],
             action: openFreshTextEditor,
-            dimensions: [800, 600],
+            dimensions: [900, 750],
             horizontal_nav: true,
             centered_nav: true,
             tools: [{
@@ -3133,21 +3437,22 @@ a { color: #1d4ed8; text-decoration: underline; }
             icon: "/icons/interfaces/editor.png",
             route: () => div({style: "large-padding-top", content: children([
                     div({id: "editor-text-toolbar", style: "bordered shadowed radius small-padding blurred", content: div({style: "faded", content: children([
-                                searchComboBox({id: "editor-sheet-font-family", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: TEXT_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
-                                searchComboBox({id: "editor-sheet-font-size", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: TEXT_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
-                                button({id: "editor-sheet-style-bold", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`}),
-                                button({id: "editor-sheet-style-italic", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.2558594 22.003906 L 14.0058594 22.003906 L 14.0058594 20.503906 L 13.2558594 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`}),
-                                button({id: "editor-sheet-style-underline", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 6.0058594 2 L 6.0058594 2.75 L 6.0058594 12.585938 C 6.0058594 15.618894 8.7446099 18.001953 12.003906 18.001953 C 15.263203 18.001953 18.003906 15.618893 18.003906 12.585938 L 18.003906 2.75 L 18.003906 2 L 16.503906 2 L 16.503906 2.75 L 16.503906 12.585938 C 16.503906 14.706981 14.54261 16.501953 12.003906 16.501953 C 9.4652032 16.501953 7.5058594 14.70698 7.5058594 12.585938 L 7.5058594 2.75 L 7.5058594 2 L 6.0058594 2 z M 4.9980469 20.003906 L 4.9980469 21.503906 L 5.7480469 21.503906 L 18.251953 21.503906 L 19.001953 21.503906 L 19.001953 20.003906 L 18.251953 20.003906 L 5.7480469 20.003906 L 4.9980469 20.003906 z"/></svg>`}),
-                                button({id: "editor-sheet-style-link", style: "naked align-bottom small-margin-right inner-radius", title: "Hyperlink", icon: TEXT_LINK_ICON}),
-                                button({id: "editor-sheet-style-color", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
-                                button({id: "editor-sheet-style-background", style: "naked align-bottom small-margin-right inner-radius", title: "Background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
-                                button({id: "editor-sheet-style-align", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: TEXT_ALIGN_ICONS.left}),
-                                button({id: "editor-sheet-style-highlight", style: "naked align-bottom small-margin-right inner-radius", title: "Highlight", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.494141 1.1171875 C 12.366141 1.1171875 12.238125 1.1661719 12.140625 1.2636719 L 9.1484375 4.2578125 C 8.0944375 5.3118125 7.299125 6.5957656 6.828125 8.0097656 L 5.5742188 11.775391 C 5.4752187 12.069391 5.3098438 12.338594 5.0898438 12.558594 L 3.3027344 14.345703 C 2.9117344 14.736703 2.9117344 15.369766 3.3027344 15.759766 L 3.8554688 16.3125 L 1.2851562 19.009766 C 0.78015625 19.540766 0.99835938 20.416438 1.6933594 20.648438 L 4.6074219 21.591797 C 4.9524219 21.706797 5.3316094 21.625906 5.5996094 21.378906 L 7.328125 19.783203 L 8.2539062 20.708984 C 8.4489063 20.903984 8.7049375 21.001953 8.9609375 21.001953 C 9.2169375 21.001953 9.4729687 20.903984 9.6679688 20.708984 L 11.455078 18.921875 C 11.675078 18.701875 11.941328 18.5355 12.236328 18.4375 L 16.001953 17.183594 C 17.415953 16.712594 18.700859 15.917281 19.755859 14.863281 L 22.748047 11.869141 C 22.943047 11.674141 22.943047 11.357109 22.748047 11.162109 C 22.552047 10.967109 22.236016 10.967109 22.041016 11.162109 L 19.048828 14.15625 C 19.040972 14.164106 19.031323 14.16991 19.023438 14.177734 L 9.8359375 4.9882812 C 9.8431253 4.981042 9.8482537 4.9720588 9.8554688 4.9648438 L 12.847656 1.9707031 C 13.042656 1.7757031 13.042656 1.4586719 12.847656 1.2636719 C 12.750156 1.1661719 12.622141 1.1171875 12.494141 1.1171875 z M 9.171875 5.7382812 L 18.273438 14.841797 C 17.49882 15.44921 16.624226 15.921729 15.685547 16.234375 L 11.919922 17.490234 C 11.477922 17.637234 11.076094 17.884844 10.746094 18.214844 L 8.9609375 20.001953 L 4.0097656 15.052734 L 5.796875 13.265625 C 6.125875 12.936625 6.3734844 12.533797 6.5214844 12.091797 L 7.7773438 8.3261719 C 8.0908498 7.387136 8.5643624 6.513116 9.171875 5.7382812 z"/></svg>`}),
-                                button({id: "editor-sheet-style-list", style: "naked align-bottom small-margin-right inner-radius", title: "List", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`}),
-                                button({id: "editor-sheet-style-shape", style: "naked align-bottom small-margin-right inner-radius", title: "Shape", icon: TEXT_SHAPE_ICON}),
-                                button({id: "editor-sheet-style-image", style: "naked align-bottom small-margin-right inner-radius", title: "Image", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`}),
-                                button({id: "editor-sheet-style-table", style: "naked align-bottom small-margin-right inner-radius", title: "Table", icon: TEXT_TABLE_ICON}),
-                                button({id: "editor-sheet-style-other", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" /></svg>`}),
+                                searchComboBox({id: "editor-sheet-font-family", altsync: "FF", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: TEXT_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
+                                searchComboBox({id: "editor-sheet-font-size", altsync: "FS", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: TEXT_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
+                                button({id: "editor-sheet-style-bold", altsync: "B", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`}),
+                                button({id: "editor-sheet-style-italic", altsync: "I", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.2558594 22.003906 L 14.0058594 22.003906 L 14.0058594 20.503906 L 13.2558594 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`}),
+                                button({id: "editor-sheet-style-underline", altsync: "U", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 6.0058594 2 L 6.0058594 2.75 L 6.0058594 12.585938 C 6.0058594 15.618894 8.7446099 18.001953 12.003906 18.001953 C 15.263203 18.001953 18.003906 15.618893 18.003906 12.585938 L 18.003906 2.75 L 18.003906 2 L 16.503906 2 L 16.503906 2.75 L 16.503906 12.585938 C 16.503906 14.706981 14.54261 16.501953 12.003906 16.501953 C 9.4652032 16.501953 7.5058594 14.70698 7.5058594 12.585938 L 7.5058594 2.75 L 7.5058594 2 L 6.0058594 2 z M 4.9980469 20.003906 L 4.9980469 21.503906 L 5.7480469 21.503906 L 18.251953 21.503906 L 19.001953 21.503906 L 19.001953 20.003906 L 18.251953 20.003906 L 5.7480469 20.003906 L 4.9980469 20.003906 z"/></svg>`}),
+                                button({id: "editor-sheet-style-link", altsync: "K", style: "naked align-bottom small-margin-right inner-radius", title: "Hyperlink", icon: TEXT_LINK_ICON}),
+                                button({id: "editor-sheet-style-color", altsync: "F", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
+                                button({id: "editor-sheet-style-background", altsync: "BG", style: "naked align-bottom small-margin-right inner-radius", title: "Background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
+                                button({id: "editor-sheet-style-align", altsync: "A", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: TEXT_ALIGN_ICONS.left}),
+                                button({id: "editor-sheet-style-indent", altsync: "D", style: "naked align-bottom small-margin-right inner-radius", title: "Indent", icon: TEXT_INDENT_ICON}),
+                                button({id: "editor-sheet-style-highlight", altsync: "H", style: "naked align-bottom small-margin-right inner-radius", title: "Highlight", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.494141 1.1171875 C 12.366141 1.1171875 12.238125 1.1661719 12.140625 1.2636719 L 9.1484375 4.2578125 C 8.0944375 5.3118125 7.299125 6.5957656 6.828125 8.0097656 L 5.5742188 11.775391 C 5.4752187 12.069391 5.3098438 12.338594 5.0898438 12.558594 L 3.3027344 14.345703 C 2.9117344 14.736703 2.9117344 15.369766 3.3027344 15.759766 L 3.8554688 16.3125 L 1.2851562 19.009766 C 0.78015625 19.540766 0.99835938 20.416438 1.6933594 20.648438 L 4.6074219 21.591797 C 4.9524219 21.706797 5.3316094 21.625906 5.5996094 21.378906 L 7.328125 19.783203 L 8.2539062 20.708984 C 8.4489063 20.903984 8.7049375 21.001953 8.9609375 21.001953 C 9.2169375 21.001953 9.4729687 20.903984 9.6679688 20.708984 L 11.455078 18.921875 C 11.675078 18.701875 11.941328 18.5355 12.236328 18.4375 L 16.001953 17.183594 C 17.415953 16.712594 18.700859 15.917281 19.755859 14.863281 L 22.748047 11.869141 C 22.943047 11.674141 22.943047 11.357109 22.748047 11.162109 C 22.552047 10.967109 22.236016 10.967109 22.041016 11.162109 L 19.048828 14.15625 C 19.040972 14.164106 19.031323 14.16991 19.023438 14.177734 L 9.8359375 4.9882812 C 9.8431253 4.981042 9.8482537 4.9720588 9.8554688 4.9648438 L 12.847656 1.9707031 C 13.042656 1.7757031 13.042656 1.4586719 12.847656 1.2636719 C 12.750156 1.1661719 12.622141 1.1171875 12.494141 1.1171875 z M 9.171875 5.7382812 L 18.273438 14.841797 C 17.49882 15.44921 16.624226 15.921729 15.685547 16.234375 L 11.919922 17.490234 C 11.477922 17.637234 11.076094 17.884844 10.746094 18.214844 L 8.9609375 20.001953 L 4.0097656 15.052734 L 5.796875 13.265625 C 6.125875 12.936625 6.3734844 12.533797 6.5214844 12.091797 L 7.7773438 8.3261719 C 8.0908498 7.387136 8.5643624 6.513116 9.171875 5.7382812 z"/></svg>`}),
+                                button({id: "editor-sheet-style-list", altsync: "L", style: "naked align-bottom small-margin-right inner-radius", title: "List", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`}),
+                                button({id: "editor-sheet-style-shape", altsync: "SH", style: "naked align-bottom small-margin-right inner-radius", title: "Shape", icon: TEXT_SHAPE_ICON}),
+                                button({id: "editor-sheet-style-image", altsync: "IM", style: "naked align-bottom small-margin-right inner-radius", title: "Image", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>`}),
+                                button({id: "editor-sheet-style-table", altsync: "X", style: "naked align-bottom small-margin-right inner-radius", title: "Table", icon: TEXT_TABLE_ICON}),
+                                button({id: "editor-sheet-style-other", altsync: "O", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" /></svg>`}),
                             ])})
                     }),
                     div({id: "editor-text-stage", style: "small-margin-top", content: children([

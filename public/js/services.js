@@ -24,6 +24,20 @@ const buildPortalIconElement = (iconMarkup = "", title = "", accent = "") => {
     iconElement.classList.add("window-icon");
     return iconElement;
 };
+const STANDARD_WIDGET_TOOL_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M 9.5 8 C 6.4802259 8 4 10.480226 4 13.5 L 4 34.5 C 4 37.519774 6.4802259 40 9.5 40 L 38.5 40 C 41.519774 40 44 37.519774 44 34.5 L 44 13.5 C 44 10.480226 41.519774 8 38.5 8 L 9.5 8 z M 9.5 11 L 38.5 11 C 39.898226 11 41 12.101774 41 13.5 L 41 34.5 C 41 35.898226 39.898226 37 38.5 37 L 9.5 37 C 8.1017741 37 7 35.898226 7 34.5 L 7 13.5 C 7 13.325222 7.0179237 13.154176 7.0507812 12.990234 C 7.2807841 11.842646 8.2765523 11 9.5 11 z M 23.5 14 A 1.50015 1.50015 0 0 0 22 15.5 L 22 25.5 A 1.50015 1.50015 0 0 0 23.5 27 L 36.5 27 A 1.50015 1.50015 0 0 0 38 25.5 L 38 15.5 A 1.50015 1.50015 0 0 0 36.5 14 L 23.5 14 z M 25 17 L 35 17 L 35 24 L 25 24 L 25 17 z"/></svg>`;
+const createWidgetPortalTool = (widget) => ({
+    title: widget?.title?.() || widget?.id?.() || "Widget",
+    icon: STANDARD_WIDGET_TOOL_ICON,
+    onclick: () => {
+        const widgetId = widget?.id?.();
+        if (!widgetId) return;
+        if (typeof modular?.showWidget === "function") {
+            modular.showWidget(widgetId, widget?.index?.() ?? 0);
+            return;
+        }
+        widget?.show?.();
+    }
+});
 const windowStateManager = (() => {
     let stateByKey = {};
     let hasExistingFile = false;
@@ -706,6 +720,7 @@ class Portal {
     #windowContext = {};
     #headerElement;
     #iconElement;
+    #portalToolElements = [];
     constructor(data) {
         this.#struct = data;
         this.#serviceId = data?.serviceId;
@@ -829,6 +844,52 @@ class Portal {
             rerenderRoute: () => this.refresh(),
             render: (content, afterRender) => this.#renderRouteContent(content, afterRender ?? this.#activeRoute?.afterRender)
         };
+    }
+    #buildPortalToolButton(tool, accent = "") {
+        if (!tool || typeof tool !== "object") return null;
+        const toolButton = document.createElement("div");
+        toolButton.classList.add('closer');
+        toolButton.title = tool.title || "";
+        toolButton.setAttribute("aria-label", tool.title || "Portal tool");
+        toolButton.dataset.portalToolTitle = `${tool.title || ""}`.trim().toLowerCase();
+        if (typeof tool.icon === "string" && tool.icon.trim() !== "") {
+            const iconMarkup = tool.icon.trim();
+            if (iconMarkup.startsWith("/") || iconMarkup.startsWith("https")) {
+                const toolIcon = document.createElement("img");
+                toolIcon.src = iconMarkup;
+                toolIcon.alt = tool.title || "Portal tool";
+                toolButton.appendChild(toolIcon);
+            } else {
+                const toolIcon = new DOMParser().parseFromString(iconMarkup, "image/svg+xml").documentElement;
+                if (accent) toolIcon.style.stroke = accent;
+                toolButton.appendChild(toolIcon);
+            }
+        }
+        toolButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            if (typeof tool.onclick === "function") {
+                tool.onclick(event, this.#createRouteContext());
+            }
+        });
+        return toolButton;
+    }
+    #widgetTools() {
+        const widgets = typeof modular?.widgetsForPortal === "function" ? modular.widgetsForPortal(this.#serviceId, this.#portalIndex) : [];
+        return widgets.map(createWidgetPortalTool);
+    }
+    #renderPortalTools(tools = this.#struct?.tools, accent = this.#struct?.accent) {
+        if (!this.#headerElement) return;
+        this.#portalToolElements.forEach(element => element?.remove?.());
+        this.#portalToolElements = [];
+        [...(Array.isArray(tools) ? tools : []), ...this.#widgetTools()].forEach(tool => {
+            const toolButton = this.#buildPortalToolButton(tool, accent);
+            if (!toolButton) return;
+            this.#headerElement.prepend(toolButton);
+            this.#portalToolElements.push(toolButton);
+        });
+    }
+    refreshWidgetTools() {
+        this.#renderPortalTools();
     }
     #syncWindowBodySize(minBodyHeight = 150) {
         if (!this.#windowDiv || !this.#windowBody) return;
@@ -972,28 +1033,7 @@ class Portal {
         if (accent) titleElement.style.color = accent;
         header.appendChild(titleElement);
         this.#updateWindowIcon(accent);
-        if (Array.isArray(tools)) {
-            tools.forEach(tool => {
-                if (!tool || typeof tool !== "object") return;
-                const toolButton = document.createElement("div");
-                toolButton.classList.add('closer');
-                toolButton.title = tool.title || "";
-                toolButton.setAttribute("aria-label", tool.title || "Portal tool");
-                toolButton.dataset.portalToolTitle = `${tool.title || ""}`.trim().toLowerCase();
-                if (typeof tool.icon === "string" && tool.icon.trim() !== "") {
-                    const toolIcon = new DOMParser().parseFromString(tool.icon, "image/svg+xml").documentElement;
-                    if (accent) toolIcon.style.stroke = accent;
-                    toolButton.appendChild(toolIcon);
-                }
-                toolButton.addEventListener("click", (event) => {
-                    event.stopPropagation();
-                    if (typeof tool.onclick === "function") {
-                        tool.onclick(event, this.#createRouteContext());
-                    }
-                });
-                header.prepend(toolButton);
-            });
-        }
+        this.#renderPortalTools(tools, accent);
         if (actionable !== false && isResizable) {
             this.#minimizeButton = document.createElement("div");
             this.#minimizeButton.classList.add('closer', 'minimize-button')
@@ -1124,7 +1164,6 @@ class Portal {
                 handle.className = `resize-handle ${position}`;
                 resizer.appendChild(handle);
                 const startResize = (e) => {
-                    if (this.#isMaximizeEnforced()) return;
                     if (e.cancelable) e.preventDefault();
                     e.stopPropagation();
                     const getPoint = (event) => {
@@ -1205,7 +1244,7 @@ class Portal {
             return target?.closest('button, .closer, .resizer, [data-no-drag], a, input, textarea, select, option');
         };
         const startDrag = (e) => {
-            if (this.#isPinned || this.#isMaximizeEnforced() || isInteractiveTarget(e.target)) return;
+            if (this.#isPinned || isInteractiveTarget(e.target)) return;
             const {x, y} = getClientPosition(e);
             dragState.offsetX = x - element.offsetLeft;
             dragState.offsetY = y - element.offsetTop;
@@ -1373,7 +1412,6 @@ class Portal {
         this.#persistWindowState();
     }
     #toggleMaximize(topMargin = 50) {
-        if (this.#isMaximizeEnforced() && this.#isMaximized) return;
         if (!this.#isMaximized) {
             this.#maximizeWindow(topMargin);
         } else if (this.#savedWindowState) {
@@ -1413,7 +1451,7 @@ class Portal {
         this.#scheduleAfterRender();
     }
     tile(direction) {
-        if (!this.#windowDiv || this.#isPinned || this.#isMaximizeEnforced()) return;
+        if (!this.#windowDiv || this.#isPinned) return;
         const outerMargin = 10;
         const topMargin = 50;
         const bottomMargin = 10;

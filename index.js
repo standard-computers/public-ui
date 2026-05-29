@@ -530,10 +530,6 @@ function resolveUserFromUsers(username = "", users = []) {
     return null;
 }
 
-function sanitizeSettingsUserFolder(userId = "") {
-    return `${userId}`.trim().replace(/[^a-zA-Z0-9_-]/g, "");
-}
-
 function resolveSessionUserFolder(session) {
     return sanitizeUserId(session?.userFolder || session?.userId || "");
 }
@@ -909,57 +905,6 @@ function normalizeTextWebSocketPayload(value = "") {
     return {
         buffer: Buffer.from(raw),
         contentType: "application/octet-stream"
-    };
-}
-
-function createWebSocketPayloadCollector(defaultContentType = "application/octet-stream") {
-    const segments = [];
-    let detectedContentType = defaultContentType;
-    return {
-        add(chunk, isBinary = true) {
-            if (isBinary) {
-                segments.push({
-                    type: "binary",
-                    value: Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-                });
-                return;
-            }
-            segments.push({
-                type: "text",
-                value: unwrapRelayTextPayload(chunk?.toString?.() ?? chunk ?? "")
-            });
-        },
-        hasData() {
-            return segments.some(segment => segment.type === "binary" ? segment.value.length > 0 : segment.value.length > 0);
-        },
-        getContentType() {
-            return detectedContentType || defaultContentType;
-        },
-        toBuffer() {
-            const parts = [];
-            let pendingText = "";
-            const flushText = () => {
-                if (!pendingText) return;
-                const normalizedTextPayload = normalizeTextWebSocketPayload(pendingText);
-                pendingText = "";
-                if (normalizedTextPayload?.buffer) {
-                    if (normalizedTextPayload.contentType && detectedContentType === defaultContentType) {
-                        detectedContentType = normalizedTextPayload.contentType;
-                    }
-                    parts.push(normalizedTextPayload.buffer);
-                }
-            };
-            for (const segment of segments) {
-                if (segment.type === "text") {
-                    pendingText += segment.value;
-                    continue;
-                }
-                flushText();
-                parts.push(segment.value);
-            }
-            flushText();
-            return parts.length ? Buffer.concat(parts) : Buffer.alloc(0);
-        }
     };
 }
 
@@ -1398,21 +1343,6 @@ app.use((err, req, res, next) => {
 ensureUserDataRoot().catch(err => console.error("Failed to prepare user data root:", err));
 const sessionPruneInterval = setInterval(pruneExpiredSessions, SESSION_PRUNE_INTERVAL_MS);
 sessionPruneInterval.unref?.();
-
-function detectServerIp() {
-    if (process.env.SERVER_IP) {
-        return process.env.SERVER_IP;
-    }
-    const interfaces = os.networkInterfaces();
-    for (const entries of Object.values(interfaces)) {
-        for (const entry of entries) {
-            if (entry.family === "IPv4" && !entry.internal) {
-                return entry.address;
-            }
-        }
-    }
-    return null;
-}
 
 function advertiseLocalHostname() {
     if (!shouldAdvertiseLocalHostname) return;

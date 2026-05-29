@@ -304,10 +304,13 @@ input.calendar-recurrence-number {width:46px;padding:5px 6px;text-align:center}
 .weather-day-label {font-size:16px;font-weight:700;margin-bottom:4px}
 .weather-day-high {font-weight:700}
 .weather-empty-state {text-align:center}
-.weather-widget {padding:4px 8px}
-.weather-widget-location {font-size:12px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.weather-widget-temp {font-size:30px;font-weight:700;line-height:1.1}
-.weather-widget-summary {font-size:calc(var(--fs) - 2px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.weather-widget {box-sizing:border-box;display:flex;flex-direction:column;gap:8px;height:100%;justify-content:center;padding:6px 8px}
+.weather-widget-location {font-size:13px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.weather-widget-current {align-items:center;display:grid;gap:8px;grid-template-columns:auto minmax(54px, auto) minmax(0, 1fr)}
+.weather-widget-icon {height:30px;width:30px}
+.weather-widget-icon img {height:30px;width:30px}
+.weather-widget-temp {font-size:30px;font-weight:800;line-height:1}
+.weather-widget-summary {font-size:14px;line-height:1.15;text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:900px) {
     .weather-hero,.weather-panels {grid-template-columns:1fr}
     .weather-hourly-list {grid-template-columns:repeat(2, minmax(0, 1fr))}
@@ -357,6 +360,8 @@ input.calendar-recurrence-number {width:46px;padding:5px 6px;text-align:center}
 .maps-directions-input {width:100%;box-sizing:border-box;background:var(--background-bg,var(--bg));border:1px solid var(--border)}
 .maps-directions-actions {display:flex;gap:6px}
 .maps-directions-action {flex:1;justify-content:center}
+.maps-directions-result-actions {display:flex;gap:6px}
+.maps-directions-result-actions.hidden {display:none}
 .maps-directions-summary {font-size:.9em;font-weight:600;padding:6px 8px;background:var(--secondary-bg);border-radius:var(--radius)}
 .maps-directions-summary.hidden {display:none}
 .maps-directions-error {color:var(--danger,#b00020)}
@@ -366,6 +371,12 @@ input.calendar-recurrence-number {width:46px;padding:5px 6px;text-align:center}
 .maps-directions-steps li:last-child {border-bottom:0}
 .maps-directions-steps span {display:block;line-height:1.25}
 .maps-directions-steps small {display:block;opacity:.7;margin-top:2px}
+.maps-directions-navigation {display:flex;flex-direction:column;gap:6px;padding:8px;background:var(--background-bg,var(--bg));border:1px solid var(--border);border-radius:var(--radius)}
+.maps-directions-navigation.hidden {display:none}
+.maps-directions-navigation-count {font-size:.78em;font-weight:700;opacity:.7;text-transform:uppercase}
+.maps-directions-navigation-instruction {font-size:.94em;font-weight:600;line-height:1.25}
+.maps-directions-navigation-distance {font-size:.82em;opacity:.7}
+.maps-directions-navigation-actions {display:flex;gap:6px}
 .maps-controls-overlay {position:absolute;right:12px;bottom:12px;z-index:4;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .maps-control-row {display:flex;gap:4px}
 .maps-control-button {margin:0 !important}

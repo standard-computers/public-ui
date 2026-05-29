@@ -19,6 +19,11 @@
         {serviceId: "com.standard.cli", title: "CLI", script: "/js/services/cli.js", icon: "/icons/interfaces/cli.png"},
         {serviceId: "com.standard.settings", title: "Settings", script: "/js/services/settings.js", icon: "/icons/interfaces/settings.png", required: true},
     ];
+    const widgetScripts = [
+        "/js/services/widgets/player.widget.js",
+        "/js/services/widgets/video.widget.js",
+        "/js/services/widgets/weather.widget.js"
+    ];
     const serviceScripts = platformInterfaces.map(({script}) => script);
     const ENABLED_APPS_CACHE_KEY = "enabled-apps";
     const normalizeEnabledAppsRecord = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -33,9 +38,7 @@
         return null;
     };
     const parseCacheLookupResponse = (payload) => {
-        if (payload === 0 || payload === "0" || payload === "" || payload === null || payload === undefined) {
-            return {exists: false, value: null, recordId: ""};
-        }
+        if (payload === 0 || payload === "0" || payload === "" || payload === null || payload === undefined) return {exists: false, value: null, recordId: ""};
         if (typeof payload === "string") {
             const trimmed = payload.trim();
             if (!trimmed || trimmed === "0") return {exists: false, value: null, recordId: ""};
@@ -72,18 +75,7 @@
         return (candidate && typeof candidate === "object" && !Array.isArray(candidate)) ? candidate : null;
     };
     const sendEnabledAppsCommand = async (query, parseJson = true) => {
-        const response = await fetch(`/api/cli?_=${Date.now()}`, {
-            method: "POST",
-            credentials: "same-origin",
-            cache: "no-store",
-            headers: {
-                "Content-Type": "application/json",
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0"
-            },
-            body: JSON.stringify({query})
-        });
+        const response = await fetch(`/api/cli?_=${Date.now()}`, {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json", "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}, body: JSON.stringify({query})});
         const responseText = await response.text().catch(() => "");
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${responseText.slice(0, 200)}`);
         if (!parseJson) return responseText;
@@ -96,9 +88,7 @@
         }
     };
     const resolveEnabledAppsUserRecordId = async () => {
-        const cachedUserRecord = typeof modular?.user?.readCachedUserRecord === "function"
-            ? modular.user.readCachedUserRecord()
-            : null;
+        const cachedUserRecord = typeof modular?.user?.readCachedUserRecord === "function" ? modular.user.readCachedUserRecord() : null;
         const cachedRecordId = sanitizeRecordId(cachedUserRecord?.id);
         if (cachedRecordId) return cachedRecordId;
         const userRecord = typeof modular?.user?.data === "function" ? await modular.user.data() : null;
@@ -170,9 +160,7 @@
                 const lookupPayload = await sendEnabledAppsCommand(buildFetchCommand(userRecordId), true);
                 const lookup = parseCacheLookupResponse(lookupPayload);
                 hasExistingRecord = lookup.exists;
-                const command = hasExistingRecord
-                    ? buildUpdateCommand(userRecordId, normalizedState, lookup.recordId)
-                    : buildCreateCommand(userRecordId, normalizedState);
+                const command = hasExistingRecord ? buildUpdateCommand(userRecordId, normalizedState, lookup.recordId) : buildCreateCommand(userRecordId, normalizedState);
                 await sendEnabledAppsCommand(command, false);
                 state = {...normalizedState};
                 hasExistingRecord = true;
@@ -223,12 +211,8 @@
             normalized.userid = normalizedUserId;
             if (!normalized.userId) normalized.userId = normalizedUserId;
         }
-        if ((normalized.settings === undefined || normalized.settings === null || normalized.settings === "") && normalized.theme !== undefined) {
-            normalized.settings = normalized.theme;
-        }
-        if ((normalized.theme === undefined || normalized.theme === null || normalized.theme === "") && normalized.settings !== undefined) {
-            normalized.theme = normalized.settings;
-        }
+        if ((normalized.settings === undefined || normalized.settings === null || normalized.settings === "") && normalized.theme !== undefined) normalized.settings = normalized.theme;
+        if ((normalized.theme === undefined || normalized.theme === null || normalized.theme === "") && normalized.settings !== undefined) normalized.theme = normalized.settings;
         return normalized;
     };
     const parseSettings = (value) => {
@@ -274,9 +258,7 @@
             }
             const payload = await response.json();
             const userRecord = normalizeUserRecord(payload?.user);
-            if (userRecord) {
-                cacheUserRecord(userRecord);
-            }
+            if (userRecord) cacheUserRecord(userRecord);
             return parseSettings(payload?.theme) || parseSettings(userRecord?.settings) || parseSettings(userRecord?.theme);
         } catch (error) {
             console.error("Failed to fetch startup theme", error);
@@ -292,7 +274,7 @@
         const bar = document.getElementById("service-loader-bar");
         if (!loader || !status || !text || !bar) return;
         interfaceShortcuts?.classList.remove("none");
-        let total = serviceScripts.length;
+        let total = serviceScripts.length + widgetScripts.length;
         let loaded = 0;
         let startupFinished = false;
         const failures = [];
@@ -300,7 +282,7 @@
         const showLoader = () => loader.classList.remove("hidden");
         const hideLoader = () => loader.classList.add("hidden");
         const updateProgress = (currentUrl = "") => {
-            const percent = Math.round((loaded / total) * 100);
+            const percent = Math.round((loaded / Math.max(total, 1)) * 100);
             bar.style.width = `${percent}%`;
             status.textContent = `${percent}% complete`;
             if (loaded === total && startupFinished && recordsFinished) {
@@ -359,13 +341,7 @@
             text.textContent = "Platform ready";
             status.textContent = "Loading search records";
             try {
-                await records.refresh({
-                    onProgress: (current, count, config) => {
-                        bar.style.width = "100%";
-                        text.textContent = `Platform ready - loading ${config?.label || config?.key || "records"}`;
-                        status.textContent = `Search records ${current}/${count}`;
-                    }
-                });
+                await records.refresh({onProgress: (current, count, config) => {bar.style.width = "100%";text.textContent = `Platform ready - loading ${config?.label || config?.key || "records"}`;status.textContent = `Search records ${current}/${count}`;}});
             } catch (error) {
                 console.error("Failed to load startup records", error);
             }
@@ -375,11 +351,9 @@
         const loadSequentially = async () => {
             showLoader();
             await window.StandardPlatformInterfaces.load();
-            const enabledServiceScripts = platformInterfaces
-                .filter(({serviceId, required}) => required || window.StandardPlatformInterfaces.isEnabled(serviceId))
-                .map(({script}) => script);
-            total = enabledServiceScripts.length;
-            for (const url of enabledServiceScripts) {
+            const enabledServiceScripts = platformInterfaces.filter(({serviceId, required}) => required || window.StandardPlatformInterfaces.isEnabled(serviceId)).map(({script}) => script);
+            total = widgetScripts.length + enabledServiceScripts.length;
+            for (const url of [...widgetScripts, ...enabledServiceScripts]) {
                 updateProgress(url);
                 try {
                     await loadScript(url);

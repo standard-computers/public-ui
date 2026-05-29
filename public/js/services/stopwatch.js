@@ -19,9 +19,7 @@
     };
     const getStopwatchWindow = () => modular.findPortalWindow?.(SERVICE_ID, 0) || null;
     const syncPortalState = (portal = getStopwatchWindow()?.portal) => {
-        if (typeof portal?.setWindowState === "function") {
-            portal.setWindowState({elapsedBeforeStart, startedAt, running, laps});
-        }
+        if (typeof portal?.setWindowState === "function") portal.setWindowState({elapsedBeforeStart, startedAt, running, laps});
     };
     const restoreState = (portal = getStopwatchWindow()?.portal) => {
         const state = portal?.windowState?.() || {};

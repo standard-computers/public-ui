@@ -317,12 +317,7 @@
     const promptForWeatherLocation = () => {
         const currentLocation = state.customLocation || state.locationLabel || "";
         if (typeof inputDialogue === "function") {
-            inputDialogue({
-                title: "Weather Location",
-                placeholder: "ZIP, city, or lat,lon",
-                value: currentLocation,
-                confirmation: (_, nextLocation) => window.standardWeather?.setLocation?.(nextLocation)
-            });
+            inputDialogue({title: "Weather Location", placeholder: "ZIP, city, or lat,lon", value: currentLocation, confirmation: (_, nextLocation) => window.standardWeather?.setLocation?.(nextLocation)});
             return;
         }
         openFallbackLocationDialogue(currentLocation);

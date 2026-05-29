@@ -55,13 +55,7 @@
     let sharedThemes = [];
     let themeTestTimer = null;
     let themeTestCountdownTimer = null;
-    const escapeHtml = (value = "") => `${value}`.replace(/[&<>"']/g, (character) => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        "\"": "&quot;",
-        "'": "&#39;"
-    }[character] || character));
+    const escapeHtml = (value = "") => `${value}`.replace(/[&<>"']/g, (character) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[character] || character));
     const parseStandardsResponse = (raw = "") => {
         const text = `${raw || ""}`;
         const matches = [...text.matchAll(/([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z0-9_]+)/g)];
@@ -100,9 +94,7 @@
         return interfaces.filter(item => item?.serviceId && item?.title);
     };
     const isPlatformInterfaceEnabled = (serviceId) => {
-        if (typeof window.StandardPlatformInterfaces?.isEnabled === "function") {
-            return window.StandardPlatformInterfaces.isEnabled(serviceId);
-        }
+        if (typeof window.StandardPlatformInterfaces?.isEnabled === "function") return window.StandardPlatformInterfaces.isEnabled(serviceId);
         return true;
     };
     const openInterfaceSettings = async (app = {}) => {
@@ -207,9 +199,7 @@
     };
     const flattenStandardRow = (value, prefix = "", output = {}) => {
         if (value && typeof value === "object" && !Array.isArray(value)) {
-            Object.entries(value).forEach(([key, childValue]) => {
-                flattenStandardRow(childValue, prefix ? `${prefix}.${key}` : key, output);
-            });
+            Object.entries(value).forEach(([key, childValue]) => flattenStandardRow(childValue, prefix ? `${prefix}.${key}` : key, output));
             return output;
         }
         output[prefix || "value"] = Array.isArray(value) ? JSON.stringify(value) : (value ?? "");
@@ -221,9 +211,7 @@
             const nestedArray = Object.values(standardData).find(Array.isArray);
             if (nestedArray) return nestedArray.map((item) => flattenStandardRow(item));
             const entries = Object.entries(standardData);
-            if (entries.length && entries.every(([, value]) => value && typeof value === "object" && !Array.isArray(value))) {
-                return entries.map(([key, value]) => flattenStandardRow(value, "", {key}));
-            }
+            if (entries.length && entries.every(([, value]) => value && typeof value === "object" && !Array.isArray(value))) return entries.map(([key, value]) => flattenStandardRow(value, "", {key}));
             return [flattenStandardRow(standardData)];
         }
         return [{value: standardData ?? ""}];
@@ -239,10 +227,7 @@
             if (!headers.includes(key)) headers.push(key);
         }));
         if (!headers.length) headers.push("value");
-        return [
-            headers.map(escapeCsvValue).join(","),
-            ...rows.map((row) => headers.map((header) => escapeCsvValue(row?.[header] ?? "")).join(","))
-        ].join("\n");
+        return [headers.map(escapeCsvValue).join(","), ...rows.map((row) => headers.map((header) => escapeCsvValue(row?.[header] ?? "")).join(","))].join("\n");
     };
     const waitForSheetsCsvLoader = async () => {
         if (typeof window.StandardSheets?.openCsvContent === "function") return window.StandardSheets.openCsvContent;
@@ -274,26 +259,15 @@
                 const source = await window.StandardBrowserCache?.get?.(interfaceName, cacheKey, {format: entry.format || "", responseType: "objectUrl"});
                 if (!source) throw new Error("Cache image not found");
                 if (typeof window.StandardInternals?.openImageSource === "function") {
-                    window.StandardInternals.openImageSource(source, {
-                        title: entry.label || cacheKey,
-                        path: `cache/${interfaceName}/${cacheKey}`,
-                        isObjectUrl: true,
-                        revokePrevious: true,
-                        sourceNode: triggerNode
-                    });
+                    window.StandardInternals.openImageSource(source, {title: entry.label || cacheKey, path: `cache/${interfaceName}/${cacheKey}`, isObjectUrl: true, revokePrevious: true, sourceNode: triggerNode});
                 } else {
                     modular.start("com.standard.internals");
                     modular.error("Internals viewer is not ready yet");
                 }
                 return;
             }
-            const value = await window.StandardBrowserCache?.get?.(interfaceName, cacheKey, {
-                format: entry.format || "",
-                responseType: entry.kind === "blob" ? "blob" : ""
-            });
-            const decoded = value instanceof Blob
-                ? `Binary cache entry\n\nInterface: ${interfaceName}\nKey: ${cacheKey}\nType: ${entry.contentType || value.type || "application/octet-stream"}\nSize: ${formatBytes(entry.size || value.size || 0)}`
-                : (typeof value === "string" ? value : JSON.stringify(value ?? {}, null, 2));
+            const value = await window.StandardBrowserCache?.get?.(interfaceName, cacheKey, {format: entry.format || "", responseType: entry.kind === "blob" ? "blob" : ""});
+            const decoded = value instanceof Blob ? `Binary cache entry\n\nInterface: ${interfaceName}\nKey: ${cacheKey}\nType: ${entry.contentType || value.type || "application/octet-stream"}\nSize: ${formatBytes(entry.size || value.size || 0)}` : (typeof value === "string" ? value : JSON.stringify(value ?? {}, null, 2));
             if (typeof window.StandardInternals?.openTextContent === "function") {
                 window.StandardInternals.openTextContent(`cache/${interfaceName}/${cacheKey}`, decoded, {readOnly: true, sourceNode: triggerNode});
             } else {
@@ -365,13 +339,7 @@
         }
         historyList.innerHTML = div({content: entries.map((entry, index) => {
             const label = escapeHtml(entry.label || entry.key || "Cache entry");
-            const detail = [
-                entry.interfaceName,
-                entry.kind || "cache",
-                entry.contentType || "",
-                formatBytes(entry.size || 0),
-                formatCacheTimestamp(entry.updatedAt || "")
-            ].filter(Boolean).map(escapeHtml).join(" · ");
+            const detail = [entry.interfaceName, entry.kind || "cache", entry.contentType || "", formatBytes(entry.size || 0), formatCacheTimestamp(entry.updatedAt || "")].filter(Boolean).map(escapeHtml).join(" · ");
             const source = entry.source ? `<div class="faded" style="font-size:12px;margin-top:4px;">${escapeHtml(entry.source)}</div>` : "";
             return `<div class="padded radius bordered hover-background align-left fill" data-cache-index="${index}">
                 <div style="display:flex;gap:8px;align-items:flex-start;justify-content:space-between;">
@@ -491,12 +459,8 @@
         }
     };
     const applyBackgroundImage = (backgroundImageFileName) => {
-        const rawValue = backgroundImageFileName === true
-            ? (window.StandardUI?.currentBackgroundImageSource || window.StandardUI?.getAppliedBackgroundImageUrl?.() || "")
-            : `${backgroundImageFileName || ""}`.trim();
-        const imageUrl = rawValue && !rawValue.startsWith("data:") && !rawValue.startsWith("blob:") && !rawValue.startsWith("http://") && !rawValue.startsWith("https://") && !rawValue.startsWith("/")
-            ? `/api/user-data/${encodeURIComponent(rawValue)}?t=${Date.now()}`
-            : rawValue;
+        const rawValue = backgroundImageFileName === true ? (window.StandardUI?.currentBackgroundImageSource || window.StandardUI?.getAppliedBackgroundImageUrl?.() || "") : `${backgroundImageFileName || ""}`.trim();
+        const imageUrl = rawValue && !rawValue.startsWith("data:") && !rawValue.startsWith("blob:") && !rawValue.startsWith("http://") && !rawValue.startsWith("https://") && !rawValue.startsWith("/") ? `/api/user-data/${encodeURIComponent(rawValue)}?t=${Date.now()}` : rawValue;
         if (typeof window.StandardUI?.applyResolvedBackgroundImage === "function") {
             window.StandardUI.applyResolvedBackgroundImage(imageUrl);
             return;
@@ -550,9 +514,7 @@
                     theme: payload
                 });
             }
-            if (typeof modular?.user?.writeUserCookie === "function") {
-                modular.user.writeUserCookie({...((currentUserRecord && typeof currentUserRecord === "object") ? currentUserRecord : {}), userid: safeUserId, settings: payload});
-            }
+            if (typeof modular?.user?.writeUserCookie === "function") modular.user.writeUserCookie({...((currentUserRecord && typeof currentUserRecord === "object") ? currentUserRecord : {}), userid: safeUserId, settings: payload});
             await window.StandardUI?.refreshTheme?.({force: true, maxAttempts: 0});
             modular.success(successMessage);
             return true;
@@ -594,17 +556,7 @@
             {name: "Border", color: themeData.border_color}
         ].filter(({color}) => `${color || ""}`.trim());
         if (!themeColors.length) return "";
-        return div({
-            style: "colors settings-theme-colors",
-            content: children(themeColors.map(({name, color}) => div({
-                style: "color-option animated",
-                background: color,
-                primary: color,
-                secondary: color,
-                title: `${name}: ${color}`,
-                content: div({style: "color-name no-wrap hidden", content: name})
-            })))
-        });
+        return div({style: "colors settings-theme-colors", content: children(themeColors.map(({name, color}) => div({style: "color-option animated", background: color, primary: color, secondary: color, title: `${name}: ${color}`, content: div({style: "color-name no-wrap hidden", content: name})})))});
     };
     const renderThemeMetricPreview = (themeData = {}) => {
         const metrics = [
@@ -613,13 +565,7 @@
             {label: "Border", value: themeData.border_width, suffix: "px"}
         ].filter(({value}) => value !== undefined && value !== null && value !== "");
         if (!metrics.length) return "";
-        return div({
-            style: "settings-theme-metrics faded center",
-            content: children(metrics.map(({label, value, suffix}) => div({
-                style: "inline border inner-radius tiny small-padding space-right tiny-text",
-                content: `${label} ${escapeHtml(value)}${suffix}`
-            })))
-        });
+        return div({style: "settings-theme-metrics faded center", content: children(metrics.map(({label, value, suffix}) => div({style: "inline border inner-radius tiny small-padding space-right tiny-text", content: `${label} ${escapeHtml(value)}${suffix}`})))});
     };
     const renderSharedThemes = () => {
         const list = document.getElementById("settings-themes-list");
@@ -656,12 +602,7 @@
             themeNode.addEventListener("click", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                themeNode.dispatchEvent(new MouseEvent("contextmenu", {
-                    bubbles: true,
-                    cancelable: true,
-                    clientX: event.clientX,
-                    clientY: event.clientY
-                }));
+                themeNode.dispatchEvent(new MouseEvent("contextmenu", {bubbles: true, cancelable: true, clientX: event.clientX, clientY: event.clientY}));
             });
         });
     };
@@ -709,10 +650,7 @@
         await saveSettings({successMessage: "Theme applied"});
     };
     const saveSharedTheme = () => {
-        inputDialogue({
-            title: "Save Theme",
-            placeholder: "Theme name",
-            confirmation: async (_, value) => {
+        inputDialogue({title: "Save Theme", placeholder: "Theme name", confirmation: async (_, value) => {
                 const name = `${value || ""}`.trim();
                 if (!name) {
                     modular.error("Theme name is required");
@@ -721,17 +659,7 @@
                 try {
                     const currentUserRecord = await getCurrentUserRecord();
                     const rawUserId = `${modular.user.id() || currentUserRecord?.userid || currentUserRecord?.id || ""}`.trim();
-                    const response = await fetch("/api/themes", {
-                        method: "POST",
-                        credentials: "same-origin",
-                        cache: "no-store",
-                        headers: {"Content-Type": "application/json"},
-                        body: JSON.stringify({
-                            name,
-                            user: rawUserId,
-                            data: cloneThemeData(ui_settings_options)
-                        })
-                    });
+                    const response = await fetch("/api/themes", {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json"}, body: JSON.stringify({name, user: rawUserId, data: cloneThemeData(ui_settings_options)})});
                     if (!response.ok) throw new Error(`Theme save failed (${response.status})`);
                     const payload = await response.json();
                     sharedThemes = Array.isArray(payload?.themes) ? payload.themes : [...sharedThemes, payload?.theme].filter(Boolean);
@@ -754,9 +682,7 @@
             if (kioskToggle) kioskToggle.checked = false;
             return false;
         }
-        const saved = await saveSettings({
-            successMessage: ui_settings_options.kiosk_mode ? "Kiosk mode enabled" : "Kiosk mode disabled"
-        });
+        const saved = await saveSettings({successMessage: ui_settings_options.kiosk_mode ? "Kiosk mode enabled" : "Kiosk mode disabled"});
         if (!saved) {
             ui_settings_options.kiosk_mode = !ui_settings_options.kiosk_mode;
             const kioskToggle = document.getElementById("kiosk-mode");
@@ -795,11 +721,7 @@
         if (!sessionUserId) return null;
         try {
             const allUsersResponse = await CLI.send("[user]");
-            const allUsers = Array.isArray(allUsersResponse?.user)
-                ? allUsersResponse.user
-                : Array.isArray(allUsersResponse)
-                    ? allUsersResponse
-                    : [];
+            const allUsers = Array.isArray(allUsersResponse?.user) ? allUsersResponse.user : Array.isArray(allUsersResponse) ? allUsersResponse : [];
             return allUsers.find(userRecord => `${userRecord?.userid || ""}`.trim() === sessionUserId) || null;
         } catch (_) {
             return null;
@@ -831,21 +753,9 @@
         const previousMetadata = await loadBackgroundImageMetadata();
         const previousFormat = sanitizeBackgroundImageFormat(previousMetadata?.format || "");
         const format = inferBackgroundImageFormat(file);
-        const metadata = {
-            format,
-            mimeType: `${file?.type || ""}`.trim() || `image/${format}`,
-            updatedAt: new Date().toISOString()
-        };
-        await window.StandardBrowserCache?.set?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_CACHE_KEY, file, {
-            format,
-            contentType: metadata.mimeType,
-            label: "Background image"
-        });
-        await window.StandardBrowserCache?.set?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_META_KEY, metadata, {
-            format: "json",
-            contentType: "application/json",
-            label: "Background image metadata"
-        });
+        const metadata = {format, mimeType: `${file?.type || ""}`.trim() || `image/${format}`, updatedAt: new Date().toISOString()};
+        await window.StandardBrowserCache?.set?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_CACHE_KEY, file, {format, contentType: metadata.mimeType, label: "Background image"});
+        await window.StandardBrowserCache?.set?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_META_KEY, metadata, {format: "json", contentType: "application/json", label: "Background image metadata"});
         if (previousFormat && previousFormat !== format) {
             try {
                 await window.StandardBrowserCache?.delete?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_CACHE_KEY, {format: previousFormat});
@@ -865,15 +775,11 @@
     const deleteBackgroundImageCache = async () => {
         const metadata = await loadBackgroundImageMetadata();
         const format = sanitizeBackgroundImageFormat(metadata?.format || "");
-        if (format) {
-            await window.StandardBrowserCache?.delete?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_CACHE_KEY, {format});
-        }
+        if (format) await window.StandardBrowserCache?.delete?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_CACHE_KEY, {format});
         await window.StandardBrowserCache?.delete?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_META_KEY, {format: "json"});
     };
     const getAppliedBackgroundImageUrl = () => {
-        if (typeof window.StandardUI?.getAppliedBackgroundImageUrl === "function") {
-            return window.StandardUI.getAppliedBackgroundImageUrl() || "";
-        }
+        if (typeof window.StandardUI?.getAppliedBackgroundImageUrl === "function") return window.StandardUI.getAppliedBackgroundImageUrl() || "";
         const targets = [document.body, document.documentElement];
         for (const target of targets) {
             if (!target) continue;
@@ -908,24 +814,16 @@
         image.style.objectFit = "cover";
         thumbnailButton.appendChild(image);
         thumbnailButton.onclick = () => {
-            confirmationDialogue({
-                title: "Remove Background Image",
-                content: "You're sure you want to remove the current background image?",
-                confirmation: async () => {
+            confirmationDialogue({title: "Remove Background Image", content: "You're sure you want to remove the current background image?", confirmation: async () => {
                     modular.message("Removing background image...");
                     try {
                         await deleteBackgroundImageCache();
                         ui_settings_options.background_image = false;
-                        if (window.StandardUI?.currentBackgroundImageSource?.startsWith?.("blob:")) {
-                            URL.revokeObjectURL(window.StandardUI.currentBackgroundImageSource);
-                        }
+                        if (window.StandardUI?.currentBackgroundImageSource?.startsWith?.("blob:")) URL.revokeObjectURL(window.StandardUI.currentBackgroundImageSource);
                         if (window.StandardUI) window.StandardUI.currentBackgroundImageSource = "";
                         refreshUITheme();
                         renderBackgroundImageThumbnail();
-                        await saveSettings({
-                            successMessage: "Background image removed",
-                            errorMessage: "Unable to save background image removal"
-                        });
+                        await saveSettings({successMessage: "Background image removed", errorMessage: "Unable to save background image removal"});
                     } catch (error) {
                         console.error("Failed to remove background image:", error);
                         modular.error("Unable to remove background image");
@@ -960,10 +858,7 @@
         const profileImageUrl = buildProfileImageUrl(recordId);
         if (!profileImageUrl) return false;
         try {
-            const response = await fetch(profileImageUrl, {
-                credentials: "same-origin",
-                cache: "no-store"
-            });
+            const response = await fetch(profileImageUrl, {credentials: "same-origin", cache: "no-store"});
             return response.ok;
         } catch (_) {
             return false;
@@ -981,22 +876,11 @@
             return false;
         }
         try {
-            const uploadResponse = typeof window.StandardUploads?.uploadFile === "function"
-                ? await window.StandardUploads.uploadFile(file, `/api/upload/temp/${encodeURIComponent(userRecordId)}`, {
-                    label: `Uploading ${file.name || "profile photo"}`
-                })
-                : await fetch(`/api/upload/temp/${encodeURIComponent(userRecordId)}`, {
-                    method: "POST",
-                    body: (() => {
-                        const formData = new FormData();
-                        formData.append("file", file, file.name || "profile-photo");
-                        return formData;
-                    })()
-                }).then(async response => ({
-                    ok: response.ok,
-                    status: response.status,
-                    responseText: await response.text()
-                }));
+            const uploadResponse = typeof window.StandardUploads?.uploadFile === "function" ? await window.StandardUploads.uploadFile(file, `/api/upload/temp/${encodeURIComponent(userRecordId)}`, {label: `Uploading ${file.name || "profile photo"}`}) : await fetch(`/api/upload/temp/${encodeURIComponent(userRecordId)}`, {method: "POST", body: (() => {
+                const formData = new FormData();
+                formData.append("file", file, file.name || "profile-photo");
+                return formData;
+            })()}).then(async response => ({ok: response.ok, status: response.status, responseText: await response.text()}));
             if (!uploadResponse.ok) {
                 modular.error(`Profile image upload failed (${uploadResponse.status})`);
                 return false;
@@ -1061,9 +945,7 @@
             fileInput.value = "";
             fileInput.remove();
             if (peopleProfileFileInput === fileInput) peopleProfileFileInput = null;
-            if (didUpload) {
-                renderPeopleRoute();
-            }
+            if (didUpload) renderPeopleRoute();
         };
     };
     const pickBackgroundImage = () => {
@@ -1109,9 +991,7 @@
                     text: "People",
                     icon: `<svg class="text-foreground small-icon" width="24px" height="24px" stroke-width="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 20V19C5 15.134 8.13401 12 12 12V12C15.866 12 19 15.134 19 19V20" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M12 12C14.2091 12 16 10.2091 16 8C16 5.79086 14.2091 4 12 4C9.79086 4 8 5.79086 8 8C8 10.2091 9.79086 12 12 12Z" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>`,
                     route: () => div({id: "settings-people-route", content: div({style: "faded padded", content: "Loading user..."})}),
-                    afterRender: () => {
-                        renderPeopleRoute();
-                    }
+                    afterRender: () => renderPeopleRoute()
                 }, {
                     text: "Notifications",
                     icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" /></svg>`,
@@ -1283,68 +1163,26 @@
                                 const network = deviceInfo?.network || {};
                                 return children([
                                     div({style: "secondary-bordered radius padded", content: children([
-                                            div({style: "float-left space-right",
-                                                content: `<svg class="text-green small-icon" width="24px" height="24px" stroke-width="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19.51L12.01 19.4989" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M2 8C8 3.5 16 3.5 22 8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5 12C9 9 15 9 19 12" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8.5 15.5C10.7504 14.1 13.2498 14.0996 15.5001 15.5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>`
-                                            }),
+                                            div({style: "float-left space-right", content: `<svg class="text-green small-icon" width="24px" height="24px" stroke-width="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19.51L12.01 19.4989" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M2 8C8 3.5 16 3.5 22 8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5 12C9 9 15 9 19 12" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8.5 15.5C10.7504 14.1 13.2498 14.0996 15.5001 15.5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>`}),
                                             div({style: "", content: "WiFi"}),
                                             div({style: "faded", content: network.active_interface || "Unavailable"}),
                                         ])
                                     }),
                                     div({style: "spacer"}),
                                     div({style: "secondary-bordered radius padded", content: children([
-                                            div({style: "float-left space-right",
-                                                content: `<svg class="text-blue small-icon" width="24px" height="24px" stroke-width="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.75 8L17.25 16.5L11.75 22V2L17.25 7.5L6.75 16" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>`
-                                            }),
-                                            div({style: "", content: "Bluetooth"}),
-                                            div({style: "faded", content: "Unknown"}),
-                                        ])
-                                    }),
+                                        div({style: "float-left space-right", content: `<svg class="text-blue small-icon" width="24px" height="24px" stroke-width="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.75 8L17.25 16.5L11.75 22V2L17.25 7.5L6.75 16" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>`}),
+                                        div({style: "", content: "Bluetooth"}), div({style: "faded", content: "Unknown"})
+                                    ])}),
                                     div({style: "spacer"}),
-                                    div({style: "border radius", content: children([
-                                            strong({style: "inline space-right", content: "Device ID"}),
-                                            div({style: "inline", content: deviceInfo.serial || "Unknown"}),
-                                        ])
-                                    }),
-                                    div({style: "border radius spaced", content: children([
-                                            strong({style: "inline space-right", content: "Manufactured"}),
-                                            div({style: "inline", content: config.name || "Unknown"}),
-                                        ])
-                                    }),
-                                    div({style: "border radius spaced", content: children([
-                                            strong({style: "inline space-right", content: "Software Version"}),
-                                            div({style: "inline", content: config.version || "Unknown"}),
-                                        ])
-                                    }),
-                                    div({style: "border radius spaced", content: children([
-                                            strong({style: "inline space-right", content: "Master"}),
-                                            div({style: "inline", content: `${config.master}`}),
-                                        ])
-                                    }),
-                                    div({style: "border radius spaced", content: children([
-                                            strong({style: "inline space-right", content: "Device Mode"}),
-                                            div({style: "inline", content: config.mode || "Unknown"}),
-                                        ])
-                                    }),
-                                    div({style: "border radius spaced", content: children([
-                                            strong({style: "inline space-right", content: "Relay"}),
-                                            div({style: "inline", content: config.relay || "Unknown"}),
-                                        ])
-                                    }),
-                                    div({style: "border radius spaced", content: children([
-                                            strong({style: "inline space-right", content: "Local Port"}),
-                                            div({style: "inline", content: `${config.server_port || "Unknown"}`}),
-                                        ])
-                                    }),
-                                    div({style: "border radius spaced", content: children([
-                                            strong({style: "inline space-right", content: "Web Port"}),
-                                            div({style: "inline", content: `${config.gui_host || "Unknown"}`}),
-                                        ])
-                                    }),
-                                    div({style: "border radius spaced", content: children([
-                                            button({style: "tiny inner-radius inline space-right", content: "Download", onclick: () => downloadDeviceInfo()}),
-                                            button({style: "tiny inner-radius inline", content: "Get Support"}),
-                                        ])
-                                    })
+                                    div({style: "border radius", content: children([strong({style: "inline space-right", content: "Device ID"}), div({style: "inline", content: deviceInfo.serial || "Unknown"})])}),
+                                    div({style: "border radius spaced", content: children([strong({style: "inline space-right", content: "Manufactured"}), div({style: "inline", content: config.name || "Unknown"})])}),
+                                    div({style: "border radius spaced", content: children([strong({style: "inline space-right", content: "Software Version"}), div({style: "inline", content: config.version || "Unknown"})])}),
+                                    div({style: "border radius spaced", content: children([strong({style: "inline space-right", content: "Master"}), div({style: "inline", content: `${config.master}`})])}),
+                                    div({style: "border radius spaced", content: children([strong({style: "inline space-right", content: "Device Mode"}), div({style: "inline", content: config.mode || "Unknown"})])}),
+                                    div({style: "border radius spaced", content: children([strong({style: "inline space-right", content: "Relay"}), div({style: "inline", content: config.relay || "Unknown"})])}),
+                                    div({style: "border radius spaced", content: children([strong({style: "inline space-right", content: "Local Port"}), div({style: "inline", content: `${config.server_port || "Unknown"}`})])}),
+                                    div({style: "border radius spaced", content: children([strong({style: "inline space-right", content: "Web Port"}), div({style: "inline", content: `${config.gui_host || "Unknown"}`})])}),
+                                    div({style: "border radius spaced", content: children([button({style: "tiny inner-radius inline space-right", content: "Download", onclick: () => downloadDeviceInfo()}), button({style: "tiny inner-radius inline", content: "Get Support"})])})
                                 ]);
                             });
                         }
@@ -1355,10 +1193,7 @@
                     route: () => {
                         const interfaces = (modular.running || []).map((service) => {
                             const shortcut = service?.interfaceShortcut?.();
-                            return {
-                                label: shortcut?.title ?? "",
-                                value: shortcut ? service?.name?.() ?? "" : ""
-                            };
+                            return {label: shortcut?.title ?? "", value: shortcut ? service?.name?.() ?? "" : ""};
                         }).filter((option) => option.label && option.value);
                         return div({style: "small-padding", content: children([
                             div({style: "margin-bottom", content: children([

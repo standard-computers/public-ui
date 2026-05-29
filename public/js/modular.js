@@ -152,17 +152,30 @@ let modular = {
         if (widget instanceof Widget) {
             if (!Array.isArray(modular.widgets)) modular.widgets = [];
             modular.widgets.push(widget);
+            if (typeof modular.refreshWidgetTools === "function") modular.refreshWidgetTools();
             return widget;
         }
     },
-
+    widgetsForPortal: (serviceId, portalIndex = 0) => {
+        const normalizedServiceId = `${serviceId || ""}`.trim();
+        if (!normalizedServiceId) return [];
+        return (modular.widgets || []).filter(widget => {
+            const widgetPortal = widget?.portal?.();
+            const portalId = typeof widgetPortal === "object" && widgetPortal !== null ? widgetPortal.serviceId : widgetPortal;
+            if (`${portalId || ""}`.trim() !== normalizedServiceId) return false;
+            const tiedPortalIndex = typeof widgetPortal === "object" && widgetPortal !== null ? widgetPortal.portalIndex : widget?.portalIndex?.();
+            return tiedPortalIndex === null || tiedPortalIndex === undefined || tiedPortalIndex === "" || Number(tiedPortalIndex) === Number(portalIndex || 0);
+        });
+    },
+    refreshWidgetTools: () => {
+        document.querySelectorAll(".draggable-window:not(.widget-window)").forEach((windowNode) => {
+            windowNode?.portal?.refreshWidgetTools?.();
+        });
+    },
     renderInterfaceShortcuts: () => {
         const container = document.getElementById("interface-shortcuts");
         if (!container) return;
-        const services = (modular.running || [])
-            .filter(service => !window.StandardPlatformInterfaces || window.StandardPlatformInterfaces.isEnabled(service?.name?.()))
-            .map(service => service?.interfaceShortcut?.())
-            .filter(shortcut => shortcut?.serviceId && shortcut?.icon);
+        const services = (modular.running || []).filter(service => !window.StandardPlatformInterfaces || window.StandardPlatformInterfaces.isEnabled(service?.name?.())).map(service => service?.interfaceShortcut?.()).filter(shortcut => shortcut?.serviceId && shortcut?.icon);
         container.innerHTML = "";
         services.forEach(shortcut => {
             const icon = document.createElement("div");
@@ -193,9 +206,7 @@ let modular = {
         if (sId !== null) {
             for (let i = 0; i < modular.running.length; i++) {
                 const ls = modular.running[i];
-                if (ls.is(sId)) {
-                    ls.refresh();
-                }
+                if (ls.is(sId)) ls.refresh();
             }
         } else {
             console.error("modular.refresh() expects argument as Service ID. None provided");
@@ -205,9 +216,7 @@ let modular = {
         if (sId !== null) {
             for (let i = 0; i < modular.running.length; i++) {
                 const ls = modular.running[i];
-                if (ls.is(sId)) {
-                    ls.hide();
-                }
+                if (ls.is(sId)) ls.hide();
             }
         } else {
             console.error("modular.hide() expects argument as Service ID. None provided");
@@ -216,17 +225,13 @@ let modular = {
     showWidget: (wId, index = 0) => {
         if (!wId) return;
         (modular.widgets || []).forEach(widget => {
-            if (widget?.is?.(wId) && widget.index() === (index ?? 0)) {
-                widget.show();
-            }
+            if (widget?.is?.(wId) && widget.index() === (index ?? 0)) widget.show();
         });
     },
     hideWidget: (wId) => {
         if (!wId) return;
         (modular.widgets || []).forEach(widget => {
-            if (widget?.is?.(wId)) {
-                widget.hide();
-            }
+            if (widget?.is?.(wId)) widget.hide();
         });
     },
     exit: (sId) => {
@@ -269,12 +274,8 @@ let modular = {
             else if (typeof payload === "object" && !Array.isArray(payload)) record = payload;
             if (!record || typeof record !== "object" || Array.isArray(record)) return null;
             const normalized = {...record};
-            if ((normalized.settings === undefined || normalized.settings === null || normalized.settings === "") && normalized.theme !== undefined) {
-                normalized.settings = normalized.theme;
-            }
-            if ((normalized.theme === undefined || normalized.theme === null || normalized.theme === "") && normalized.settings !== undefined) {
-                normalized.theme = normalized.settings;
-            }
+            if ((normalized.settings === undefined || normalized.settings === null || normalized.settings === "") && normalized.theme !== undefined) normalized.settings = normalized.theme;
+            if ((normalized.theme === undefined || normalized.theme === null || normalized.theme === "") && normalized.settings !== undefined) normalized.theme = normalized.settings;
             return normalized;
         },
         hasUsableSettings: (userRecord) => {
@@ -329,9 +330,7 @@ let modular = {
         },
         data: async () => {
             const cachedRecord = modular.user.readCachedUserRecord();
-            if (cachedRecord && typeof cachedRecord === "object" && modular.user.hasUsableSettings(cachedRecord)) {
-                return cachedRecord;
-            }
+            if (cachedRecord && typeof cachedRecord === "object" && modular.user.hasUsableSettings(cachedRecord)) return cachedRecord;
             const themePayload = await modular.user.fetchThemePayload();
             const themedUserRecord = modular.user.normalizeRecord(themePayload?.user || themePayload);
             if (themedUserRecord && typeof themedUserRecord === "object") {
@@ -344,26 +343,18 @@ let modular = {
                 return null;
             }
             const userRecord = modular.user.normalizeRecord(await res.json());
-            if (userRecord && typeof userRecord === "object" && modular.user.hasUsableSettings(userRecord)) {
-                modular.user.cacheUserRecord(userRecord);
-            }
+            if (userRecord && typeof userRecord === "object" && modular.user.hasUsableSettings(userRecord)) modular.user.cacheUserRecord(userRecord);
             return userRecord;
         },
         theme: async () => {
             const cachedRecord = modular.user.readCachedUserRecord();
             const cachedSettings = modular.user.parseSettings(cachedRecord?.settings) || modular.user.parseSettings(cachedRecord?.theme);
-            if (cachedSettings && typeof cachedSettings === "object") {
-                return cachedSettings;
-            }
+            if (cachedSettings && typeof cachedSettings === "object") return cachedSettings;
             const themePayload = await modular.user.fetchThemePayload();
             const payloadTheme = modular.user.parseSettings(themePayload?.theme);
             const themedUserRecord = modular.user.normalizeRecord(themePayload?.user || themePayload);
-            if (themedUserRecord && typeof themedUserRecord === "object") {
-                modular.user.cacheUserRecord(themedUserRecord);
-            }
-            if (payloadTheme && typeof payloadTheme === "object") {
-                return payloadTheme;
-            }
+            if (themedUserRecord && typeof themedUserRecord === "object") modular.user.cacheUserRecord(themedUserRecord);
+            if (payloadTheme && typeof payloadTheme === "object") return payloadTheme;
             const userRecord = await modular.user.data();
             const parsedSettings = modular.user.parseSettings(userRecord?.settings) || modular.user.parseSettings(userRecord?.theme);
             if (parsedSettings && typeof parsedSettings === "object") {
@@ -381,9 +372,7 @@ let modular = {
         const allowed = ["top-left", "top-right", "bottom-left", "bottom-right"];
         if (!allowed.includes(position)) return modular.widgetDockPosition;
         modular.widgetDockPosition = position;
-        if (!options.skipPersist && typeof windowStateManager?.saveState === "function") {
-            windowStateManager.saveState("__widget-config__", 0, {dockPosition: position, type: "widget-config", open: false}, "widget-config");
-        }
+        if (!options.skipPersist && typeof windowStateManager?.saveState === "function") windowStateManager.saveState("__widget-config__", 0, {dockPosition: position, type: "widget-config", open: false}, "widget-config");
         modular.dockWidgets();
         return modular.widgetDockPosition;
     },
@@ -409,17 +398,11 @@ let modular = {
         const text = `${message ?? ""}`.trim();
         pushMessage(type, message);
         if (!text || typeof document === "undefined") return;
-        if (modular.titleMessageOriginal === null) {
-            modular.titleMessageOriginal = document.title;
-        }
+        if (modular.titleMessageOriginal === null) modular.titleMessageOriginal = document.title;
         document.title = text;
-        if (modular.titleMessageRestoreTimer) {
-            clearTimeout(modular.titleMessageRestoreTimer);
-        }
+        if (modular.titleMessageRestoreTimer) clearTimeout(modular.titleMessageRestoreTimer);
         modular.titleMessageRestoreTimer = setTimeout(() => {
-            if (modular.titleMessageOriginal !== null) {
-                document.title = modular.titleMessageOriginal;
-            }
+            if (modular.titleMessageOriginal !== null) document.title = modular.titleMessageOriginal;
             modular.titleMessageOriginal = null;
             modular.titleMessageRestoreTimer = null;
         }, 15000);
@@ -445,9 +428,7 @@ let modular = {
         element.style.zIndex = `${modular.highestZ}`;
     }
 }
-if (typeof window !== "undefined") {
-    window.addEventListener("resize", () => modular.dockWidgets());
-}
+if (typeof window !== "undefined") window.addEventListener("resize", () => modular.dockWidgets());
 document.addEventListener("click", (event) => {
     const trigger = event.target.closest(".segue[service]");
     if (!trigger) return;

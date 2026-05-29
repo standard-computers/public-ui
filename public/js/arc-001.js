@@ -4,27 +4,15 @@ const CLI = {
     },
     buildFilesCommand(action, ...paths) {
         const normalizedAction = String(action || "").trim();
-        const normalizedPaths = paths
-            .map((value) => CLI.quotePathSegment(value))
-            .join(" ");
+        const normalizedPaths = paths.map((value) => CLI.quotePathSegment(value)).join(" ");
         return normalizedPaths ? `files ${normalizedAction} ${normalizedPaths}` : `files ${normalizedAction}`;
     },
-    /**
-     * Send a CLI request to /api/cli.
-     * Automatically uses POST for larger payloads so data URLs and other long commands can be saved.
-     * @param {string} query - The CLI command or query string.
-     * @param {boolean} [parseJson=true] - If true, parses response as JSON, else returns plain text.
-     * @returns {Promise<any>} - Resolves to parsed JSON or text.
-     */
     send(query, parseJson = true) {
         if (!query || typeof query !== "string") {
             return Promise.reject(new Error("CLI.send: query must be a non-empty string"));
         }
-
         const usePost = query.length > 1500;
-        const url = usePost
-            ? `/api/cli?_=${Date.now()}`
-            : `/api/cli?query=${encodeURIComponent(query)}&_=${Date.now()}`;
+        const url = usePost ? `/api/cli?_=${Date.now()}` : `/api/cli?query=${encodeURIComponent(query)}&_=${Date.now()}`;
         const options = {
             method: usePost ? "POST" : "GET",
             cache: "no-store",
@@ -34,12 +22,10 @@ const CLI = {
                 "Expires": "0"
             }
         };
-
         if (usePost) {
             options.headers["Content-Type"] = "application/json";
             options.body = JSON.stringify({query});
         }
-
         return fetch(url, options).then(async (response) => {
             if (!response.ok) {
                 const errorText = await response.text().catch(() => "");
@@ -60,6 +46,4 @@ const CLI = {
         });
     }
 };
-if (typeof window !== "undefined") {
-    window.CLI = CLI;
-}
+if (typeof window !== "undefined") window.CLI = CLI;

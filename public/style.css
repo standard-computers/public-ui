@@ -84,6 +84,17 @@ li {list-style:none}
 .editor-text-menu-stats-grid div {display:flex;flex-direction:column;gap:2px;min-width:0}
 .editor-text-menu-stats-grid strong {font-size:calc(var(--fs) + 1px);font-weight:700;line-height:1.1;overflow:hidden;text-overflow:ellipsis}
 .editor-text-menu-stats-grid span {font-size:calc(var(--fs) - 3px);opacity:0.68;white-space:nowrap}
+.editor-text-menu-page-dimensions {display:block;min-width:220px;cursor:default}
+.editor-text-menu-page-dimensions:hover {transform:none;box-shadow:none;background-color:transparent}
+.editor-text-page-dimensions {display:flex;flex-direction:column;gap:8px}
+.editor-text-page-dimension-inputs {display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.editor-text-page-dimension-inputs label {display:flex;align-items:center;gap:5px;min-width:0;font-size:calc(var(--fs) - 2px);font-weight:700}
+.editor-text-page-dimension-input {box-sizing:border-box;width:56px;padding:5px 6px;font-size:calc(var(--fs) - 2px)}
+.editor-text-page-dimension-inputs em {font-style:normal;font-size:calc(var(--fs) - 4px);font-weight:700;opacity:0.62;text-transform:uppercase}
+.editor-text-page-dimension-uom {box-sizing:border-box;width:100%}
+.editor-text-page-resize-action {max-height:0;opacity:0;overflow:hidden;transform:translateY(-4px);transition:max-height 160ms ease, opacity 160ms ease, transform 160ms ease}
+.editor-text-page-resize-action.is-visible {max-height:42px;opacity:1;transform:translateY(0)}
+.editor-text-page-resize-button {box-sizing:border-box;width:100%;margin-top:2px}
 #editor-text-stage {position:relative;overflow:visible}
 #editor-text-page-measure {display:none;width:100%;height:0}
 #editor-text-page-backdrop {display:none;position:relative;width:100%;pointer-events:none}
@@ -105,6 +116,7 @@ li {list-style:none}
 .editor-text-ruler-label {position:absolute;display:block;color:#475569;user-select:none}
 .editor-text-ruler-label-horizontal {top:9px;transform:translateX(3px)}
 .editor-text-ruler-label-vertical {left:7px;transform:translateY(4px)}
+.editor-text-ruler-indent-marker {position:absolute;top:2px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid var(--blue);filter:drop-shadow(0 1px 1px rgba(15,23,42,0.2));transform:translateX(-5px)}
 .editor-text-footer-dialogue-body {display:flex;flex-direction:column;gap:10px;margin:12px 0 14px}
 .editor-text-footer-option {display:flex;align-items:center;gap:8px;font-size:calc(var(--fs));font-weight:600}
 .editor-text-footer-page-numbers {display:inline-block !important;position:static !important;width:16px;height:16px;margin:0;accent-color:var(--fg)}

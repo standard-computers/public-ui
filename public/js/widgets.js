@@ -12,37 +12,46 @@ class Widget {
     #isPinned = false;
     #widgetId;
     #widgetIndex = 0;
-
+    #portalId = "";
+    #portalIndex = null;
     constructor(data) {
         this.#struct = data || {};
         this.#widgetId = data?.id;
         this.#widgetIndex = data?.index ?? 0;
+        this.#portalId = data?.portal ?? "";
+        this.#portalIndex = data?.portalIndex ?? null;
         this.#container = document.body;
         this.#build();
     }
-
     setContext(widgetId, widgetIndex = 0) {
         this.#widgetId = widgetId;
         this.#widgetIndex = widgetIndex;
         this.#struct = {...this.#struct, id: widgetId, index: widgetIndex};
     }
-
     id() {
         return this.#widgetId;
     }
-
     index() {
         return this.#widgetIndex;
     }
-
+    portal() {
+        return this.#portalId;
+    }
+    portalIndex() {
+        return this.#portalIndex;
+    }
+    title() {
+        return this.#struct?.title || this.#widgetId || "Widget";
+    }
+    icon() {
+        return this.#struct?.icon || this.#struct?.svg_icon || "";
+    }
     is(widgetId) {
         return this.#widgetId === widgetId;
     }
-
     isOpen() {
         return Boolean(this.#widgetDiv?.parentElement);
     }
-
     #syncDescendantDimensions(root) {
         if (!root) return;
         const excludedTags = new Set(['IMG', 'SVG', 'PATH', 'BUTTON', 'INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'LABEL', 'SPAN', 'A', 'CANVAS']);
@@ -55,11 +64,9 @@ class Widget {
             this.#syncDescendantDimensions(child);
         });
     }
-
     element() {
         return this.#widgetDiv;
     }
-
     #build() {
         const {
             title,
@@ -231,7 +238,6 @@ class Widget {
         });
         this.#widgetDiv.appendChild(resizer);
     }
-
     #makeDraggable(element, handle) {
         const dragState = {
             offsetX: 0, offsetY: 0, isDragging: false, disableSelection: (e) => {
@@ -249,7 +255,6 @@ class Widget {
         const isInteractiveTarget = (target) => {
             return target?.closest('button, .closer, .resizer, [data-no-drag], a, input, textarea, select, option');
         };
-
         const startDrag = (e) => {
             if (this.#isPinned || isInteractiveTarget(e.target)) return;
             const {x, y} = getClientPosition(e);
@@ -288,7 +293,6 @@ class Widget {
             element, handle, ...dragState, onMouseDown: startDrag, onMouseMove: moveDrag, onMouseUp: endDrag
         };
     }
-
     #togglePinned() {
         this.#setPinnedState(!this.#isPinned);
         if (!this.#dragState) return;
@@ -297,11 +301,11 @@ class Widget {
         document.removeEventListener('selectstart', this.#dragState.disableSelection);
         this.#persistWindowState();
     }
-
     show() {
         if (!this.#widgetDiv) {
             this.#build();
         }
+        this.#container = document.body;
         if (typeof windowStateManager?.applyToWidget === "function") {
             windowStateManager.applyToWidget(this).then(() => this.#persistWindowState({open: true}));
         }
@@ -317,7 +321,6 @@ class Widget {
         }
         this.#persistWindowState({open: true});
     }
-
     hide() {
         if (this.#widgetDiv?.parentElement) {
             this.#persistWindowState({open: false});
@@ -327,14 +330,12 @@ class Widget {
             }
         }
     }
-
     setPosition(left, top, dockPosition) {
         if (!this.#widgetDiv) return;
         this.#widgetDiv.style.left = `${left}px`;
         this.#widgetDiv.style.top = `${top}px`;
         this.#persistWindowState({open: true, dockPosition: dockPosition || modular?.widgetDockPosition});
     }
-
     applyWindowState(state = {}) {
         if (!this.#widgetDiv) return;
         if (state.width) this.#widgetDiv.style.width = state.width;
@@ -351,12 +352,10 @@ class Widget {
             modular.setWidgetDockPosition(state.dockPosition, {skipPersist: true});
         }
     }
-
     getDimensions() {
         const rect = this.#widgetDiv?.getBoundingClientRect();
         return {width: rect?.width || 0, height: rect?.height || 0};
     }
-
     #renderRouteContent(routeContent, afterRender) {
         const resolvedRoute = typeof routeContent === "function" ? routeContent() : routeContent;
         const runAfterRender = () => {
@@ -376,7 +375,6 @@ class Widget {
             applyContent(resolvedRoute);
         }
     }
-
     #setPinnedState(isPinned) {
         this.#isPinned = Boolean(isPinned);
         if (this.#dragState?.handle) {
@@ -387,7 +385,6 @@ class Widget {
             this.#unpinIcon.style.display = this.#isPinned ? 'block' : 'none';
         }
     }
-
     #captureWindowState(extra = {}) {
         if (!this.#widgetDiv) return null;
         const rect = this.#widgetDiv.getBoundingClientRect();
@@ -407,7 +404,6 @@ class Widget {
             open: this.#widgetDiv.parentElement !== null, ...extra
         };
     }
-
     #persistWindowState(extra = {}) {
         const snapshot = this.#captureWindowState(extra);
         if (!snapshot) return;

@@ -1,6 +1,5 @@
 (() => {
     const SERVICE_ID = "com.standard.integrator";
-
     modular.register(new Service(SERVICE_ID, [new Portal({
         title: "Integrator",
         hints: ["integrator", "integration"],

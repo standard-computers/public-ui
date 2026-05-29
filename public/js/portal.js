@@ -29,23 +29,18 @@ function showInterfaces() {
         });
     }
 }
-
 function prefersSvgSearchIcons() {
     return window.StandardUI?.prefersSvgIcons?.() !== false;
 }
-
 function getSearchResultIconMarkup(portal = {}) {
     const primaryRecordMatch = Array.isArray(portal?.recordMatches) ? portal.recordMatches[0] : null;
     if (primaryRecordMatch?.command === "files") {
         const fileIconPath = window.StandardFiles?.getFileTypeIconPath?.(primaryRecordMatch.record);
         if (fileIconPath) return fileIconPath;
     }
-    if (prefersSvgSearchIcons()) {
-        return portal.svg_icon || portal.icon || "";
-    }
+    if (prefersSvgSearchIcons()) return portal.svg_icon || portal.icon || "";
     return portal.icon || portal.svg_icon || "";
 }
-
 function buildSearchResultIcon(portal = {}) {
     const iconMarkup = `${getSearchResultIconMarkup(portal) || ""}`.trim();
     if (!iconMarkup) return null;
@@ -66,7 +61,6 @@ function buildSearchResultIcon(portal = {}) {
     }
     return wrapper;
 }
-
 window.StandardRecordSearch = window.StandardRecordSearch || (() => {
     const NOTE_CONTENT_PREFIX = "__STD_NOTE_B64__:";
     const CACHE_INTERFACE = "com.standard.settings";
@@ -82,22 +76,14 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
     ];
     let cacheState = {updatedAt: "", records: {}};
     let cacheLoaded = false;
-
     const readCache = async () => {
         return window.StandardBrowserCache?.get?.(CACHE_INTERFACE, CACHE_KEY, {format: "json"}) || null;
     };
     const writeCache = async (payload) => {
-        return window.StandardBrowserCache?.set?.(CACHE_INTERFACE, CACHE_KEY, payload ?? {}, {
-            format: "json",
-            contentType: "application/json",
-            label: "Search records"
-        });
+        return window.StandardBrowserCache?.set?.(CACHE_INTERFACE, CACHE_KEY, payload ?? {}, {format: "json", contentType: "application/json", label: "Search records"});
     };
     const setCacheState = (nextState = {}) => {
-        cacheState = {
-            updatedAt: nextState?.updatedAt || "",
-            records: nextState?.records && typeof nextState.records === "object" ? nextState.records : {}
-        };
+        cacheState = {updatedAt: nextState?.updatedAt || "", records: nextState?.records && typeof nextState.records === "object" ? nextState.records : {}};
         cacheLoaded = true;
         document.dispatchEvent(new CustomEvent("standard-record-cache-updated", {detail: cacheState}));
         return cacheState;
@@ -129,12 +115,7 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
         return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
     };
     const mergeRecordsById = (existingRecords = [], nextRecords = []) => {
-        const existingById = new Map(
-            (Array.isArray(existingRecords) ? existingRecords : [])
-                .map(normalizeRecord)
-                .filter(Boolean)
-                .map(record => [`${record.id}`, record])
-        );
+        const existingById = new Map((Array.isArray(existingRecords) ? existingRecords : []).map(normalizeRecord).filter(Boolean).map(record => [`${record.id}`, record]));
         const merged = [];
         (Array.isArray(nextRecords) ? nextRecords : []).forEach((rawRecord) => {
             const normalizedRecord = normalizeRecord(rawRecord);
@@ -180,11 +161,7 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
     };
     const buildRecordLabel = (record = {}) => {
         const preferredKeys = ["name", "title", "firstname", "lastname", "displayName", "username", "timestamp", "created", "path", "email", "phone"];
-        const parts = preferredKeys
-            .map(key => record?.[key])
-            .filter(value => value !== undefined && value !== null && `${value}`.trim() !== "")
-            .slice(0, 3)
-            .map(value => `${value}`.trim());
+        const parts = preferredKeys.map(key => record?.[key]).filter(value => value !== undefined && value !== null && `${value}`.trim() !== "").slice(0, 3).map(value => `${value}`.trim());
         if (parts.length) return parts.join(" ");
         const firstValue = collectSearchableValues(record).find(Boolean);
         return firstValue || `Record ${record?.id ?? ""}`.trim();
@@ -211,16 +188,7 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
             const decodedContent = truncatePreview(stripMarkupToPreview(decodeNoteContent(record.content)));
             if (decodedContent && decodedContent !== primaryLabel) return decodedContent;
         }
-        const candidates = [
-            record?.path,
-            record?.email,
-            record?.phone,
-            record?.timestamp,
-            record?.created,
-            record?.username,
-            record?.content,
-            record?.description
-        ];
+        const candidates = [record?.path, record?.email, record?.phone, record?.timestamp, record?.created, record?.username, record?.content, record?.description];
         for (const candidate of candidates) {
             const value = `${candidate || ""}`.replace(/\s+/g, " ").trim();
             if (value && value !== primaryLabel) return value;
@@ -239,14 +207,9 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
         const response = await CLI.send(config.command);
         const resolvedRecords = resolveResponseRecords(config, response);
         if (Array.isArray(resolvedRecords)) {
-            nextCacheRecords[config.key] = merge
-                ? mergeRecordsById(nextCacheRecords[config.key], resolvedRecords)
-                : resolvedRecords.map(normalizeRecord).filter(Boolean);
+            nextCacheRecords[config.key] = merge ? mergeRecordsById(nextCacheRecords[config.key], resolvedRecords) : resolvedRecords.map(normalizeRecord).filter(Boolean);
         }
-        const nextState = setCacheState({
-            updatedAt: new Date().toISOString(),
-            records: nextCacheRecords
-        });
+        const nextState = setCacheState({updatedAt: new Date().toISOString(), records: nextCacheRecords});
         try {
             await writeCache(nextState);
         } catch (error) {
@@ -254,7 +217,6 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
         }
         return nextState;
     };
-
     return {
         configs: COMMAND_CONFIGS,
         async loadCache({force = false} = {}) {
@@ -281,19 +243,12 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
                 try {
                     const response = await CLI.send(config.command);
                     const resolvedRecords = resolveResponseRecords(config, response);
-                    if (Array.isArray(resolvedRecords)) {
-                        nextCacheRecords[config.key] = config.replaceOnRefresh
-                            ? resolvedRecords.map(normalizeRecord).filter(Boolean)
-                            : mergeRecordsById(nextCacheRecords[config.key], resolvedRecords);
-                    }
+                    if (Array.isArray(resolvedRecords)) nextCacheRecords[config.key] = config.replaceOnRefresh ? resolvedRecords.map(normalizeRecord).filter(Boolean) : mergeRecordsById(nextCacheRecords[config.key], resolvedRecords);
                 } catch (error) {
                     console.error(`Failed to refresh ${config.command}:`, error);
                 }
             }
-            const nextState = setCacheState({
-                updatedAt: new Date().toISOString(),
-                records: nextCacheRecords
-            });
+            const nextState = setCacheState({updatedAt: new Date().toISOString(), records: nextCacheRecords});
             try {
                 await writeCache(nextState);
             } catch (error) {
@@ -322,19 +277,10 @@ window.StandardRecordSearch = window.StandardRecordSearch || (() => {
             getPortalConfigs(portal).forEach((config) => {
                 getCommandRecords(config.key).forEach((record) => {
                     const matchingValues = [...new Set(
-                        collectSearchableValues(record)
-                            .filter(value => value.toLowerCase().includes(normalizedQuery))
+                        collectSearchableValues(record).filter(value => value.toLowerCase().includes(normalizedQuery))
                     )];
                     if (!matchingValues.length) return;
-                    matches.push({
-                        command: config.key,
-                        id: record?.id,
-                        label: buildRecordLabel(record),
-                        primaryLabel: buildRecordPrimaryLabel(record),
-                        secondaryLabel: buildRecordSecondaryLabel(record, buildRecordPrimaryLabel(record)),
-                        values: matchingValues.slice(0, 3),
-                        record
-                    });
+                    matches.push({command: config.key, id: record?.id, label: buildRecordLabel(record), primaryLabel: buildRecordPrimaryLabel(record), secondaryLabel: buildRecordSecondaryLabel(record, buildRecordPrimaryLabel(record)), values: matchingValues.slice(0, 3), record});
                 });
             });
             return matches.slice(0, 3);
@@ -350,31 +296,15 @@ window.StandardFilesRefreshCache = () => {
         return null;
     });
 };
-
 function searchablePortals() {
     const servicePortals = (modular.running || []).flatMap((service) => {
-        if (typeof service?.searchablePortals !== "function") {
-            return [];
-        }
-        return service.searchablePortals().map((portal) => ({
-            ...portal,
-            hints: Array.isArray(portal?.hints) ? portal.hints : []
-        }));
+        if (typeof service?.searchablePortals !== "function") return [];
+        return service.searchablePortals().map((portal) => ({...portal, hints: Array.isArray(portal?.hints) ? portal.hints : []}));
     }).filter((portal) => {
         return portal.hints.length > 0 || window.StandardRecordSearch?.hasPortalConfig?.(portal);
     });
-
-    return [...servicePortals, {
-        serviceId: "interfaces",
-        portalIndex: 0,
-        title: "Interfaces",
-        hints: ["interfaces", "interface"],
-        icon: "/icons/interfaces/settings.png",
-        svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>`,
-        action: showInterfaces
-    }];
+    return [...servicePortals, {serviceId: "interfaces", portalIndex: 0, title: "Interfaces", hints: ["interfaces", "interface"], icon: "/icons/interfaces/settings.png", svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>`, action: showInterfaces}];
 }
-
 let activeSearchResultIndex = -1;
 let articleSearchRequestVersion = 0;
 let activeArticleSearchController = null;
@@ -382,59 +312,40 @@ let clientContextPromise = null;
 let searchFilterMode = "";
 let searchFilterAnimating = false;
 const SEARCH_DESCRIPTION_PREFIX = "description:";
-
 function abortActiveArticleSearchController() {
     if (!activeArticleSearchController) return;
     const controller = activeArticleSearchController;
     activeArticleSearchController = null;
-    if (!controller.signal?.aborted) {
-        controller.abort();
-    }
+    if (!controller.signal?.aborted) controller.abort();
 }
-
 function cancelActiveArticleSearch({clearLoading = false} = {}) {
     articleSearchRequestVersion++;
     abortActiveArticleSearchController();
-    if (clearLoading) {
-        document.getElementById("search-status")?.isLoading?.(false);
-    }
+    if (clearLoading) document.getElementById("search-status")?.isLoading?.(false);
 }
-
 function beginArticleSearchRequest() {
     abortActiveArticleSearchController();
     if (typeof AbortController !== "function") return null;
     activeArticleSearchController = new AbortController();
     return activeArticleSearchController;
 }
-
 function finishArticleSearchRequest(controller) {
-    if (controller && activeArticleSearchController === controller) {
-        activeArticleSearchController = null;
-    }
+    if (controller && activeArticleSearchController === controller) activeArticleSearchController = null;
 }
-
 function isAbortError(error) {
     return error?.name === "AbortError";
 }
-
 function getClientContext() {
-    if (!clientContextPromise) {
-        clientContextPromise = fetch("/api/client-context", {cache: "no-store"})
-            .then(response => response.ok ? response.json() : {})
-            .catch(() => ({}));
-    }
+    if (!clientContextPromise) clientContextPromise = fetch("/api/client-context", {cache: "no-store"}).then(response => response.ok ? response.json() : {}).catch(() => ({}));
     return clientContextPromise;
 }
-
 function articleImageUrl(articleId = "") {
     const normalizedId = `${articleId || ""}`.trim();
     return normalizedId ? `/api/records/images/${encodeURIComponent(normalizedId)}?cb=${encodeURIComponent(`${normalizedId}-${Date.now()}`)}` : "";
 }
-
 function getSearchResultElements() {
     return Array.from(document.querySelectorAll("#search-results .search-result"));
 }
-
 function syncActiveSearchResult({scrollIntoView = false} = {}) {
     const results = getSearchResultElements();
     results.forEach((element, index) => {
@@ -444,17 +355,13 @@ function syncActiveSearchResult({scrollIntoView = false} = {}) {
         element.style.backgroundColor = isActive ? "var(--secondary-bg)" : "";
         element.style.boxShadow = isActive ? "var(--shadow)" : "";
         element.style.transform = isActive ? "scale(1.02)" : "";
-        if (isActive && scrollIntoView) {
-            element.scrollIntoView({block: "nearest"});
-        }
+        if (isActive && scrollIntoView) element.scrollIntoView({block: "nearest"});
     });
 }
-
 function resetActiveSearchResult() {
     activeSearchResultIndex = -1;
     syncActiveSearchResult();
 }
-
 function setActiveSearchResult(index, options = {}) {
     const results = getSearchResultElements();
     if (!results.length) {
@@ -465,7 +372,6 @@ function setActiveSearchResult(index, options = {}) {
     activeSearchResultIndex = Math.max(0, Math.min(index, maxIndex));
     syncActiveSearchResult(options);
 }
-
 function moveActiveSearchResult(delta = 1) {
     const results = getSearchResultElements();
     if (!results.length) return;
@@ -476,7 +382,6 @@ function moveActiveSearchResult(delta = 1) {
     const nextIndex = (activeSearchResultIndex + delta + results.length) % results.length;
     setActiveSearchResult(nextIndex, {scrollIntoView: true});
 }
-
 function activateActiveSearchResult() {
     const results = getSearchResultElements();
     const activeElement = results[activeSearchResultIndex];
@@ -486,20 +391,17 @@ function activateActiveSearchResult() {
     }
     return false;
 }
-
 function formatCalculatorResult(value) {
     if (!Number.isFinite(value)) return "";
     const normalized = Object.is(value, -0) ? 0 : value;
     if (Number.isInteger(normalized)) return `${normalized}`;
     return `${Number.parseFloat(normalized.toFixed(12))}`;
 }
-
 function evaluateCalculatorExpression(rawQuery = "") {
     const expression = `${rawQuery || ""}`.trim();
     if (expression.length < 3 || expression.length > 120) return null;
     if (!/[0-9]/.test(expression) || !/[+\-*/%^()]/.test(expression)) return null;
     if (!/^[0-9+\-*/%^().\s]+$/.test(expression)) return null;
-
     const tokens = [];
     let index = 0;
     while (index < expression.length) {
@@ -528,7 +430,6 @@ function evaluateCalculatorExpression(rawQuery = "") {
         return null;
     }
     if (!tokens.length) return null;
-
     let cursor = 0;
     const peek = () => tokens[cursor] || null;
     const take = (value) => {
@@ -592,17 +493,12 @@ function evaluateCalculatorExpression(rawQuery = "") {
         }
         return value;
     }
-
     const result = parseExpression();
     if (result === null || cursor !== tokens.length) return null;
     const formattedResult = formatCalculatorResult(result);
     if (!formattedResult) return null;
-    return {
-        expression,
-        result: formattedResult
-    };
+    return {expression, result: formattedResult};
 }
-
 function renderCalculatorSearchResult(calculation) {
     if (!calculation) return;
     renderSearchResult({
@@ -613,66 +509,46 @@ function renderCalculatorSearchResult(calculation) {
         }
     }, `${calculation.expression} = ${calculation.result}`);
 }
-
 function escapeArticleSearchValue(value = "") {
     return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').trim();
 }
-
 function getArticleSearchTerms(rawQuery = "") {
     const normalizedQuery = String(rawQuery || "").replace(/\s+/g, " ").trim();
     if (!normalizedQuery) return [];
-    const terms = normalizedQuery
-        .split(" ")
-        .map(term => term.trim())
-        .filter(Boolean);
+    const terms = normalizedQuery.split(" ").map(term => term.trim()).filter(Boolean);
     if (terms.length > 1) terms.push(normalizedQuery);
     return [...new Set(terms)];
 }
-
 function getSearchInputState(rawValue = "") {
     const value = String(rawValue || "");
-    if (searchFilterMode === "description") {
-        return {query: value, articleField: "description", filtered: true};
-    }
-    if (value.toLowerCase().startsWith(SEARCH_DESCRIPTION_PREFIX)) {
-        return {query: value.slice(SEARCH_DESCRIPTION_PREFIX.length), articleField: "description", filtered: true};
-    }
+    if (searchFilterMode === "description") return {query: value, articleField: "description", filtered: true};
+    if (value.toLowerCase().startsWith(SEARCH_DESCRIPTION_PREFIX)) return {query: value.slice(SEARCH_DESCRIPTION_PREFIX.length), articleField: "description", filtered: true};
     return {query: value, articleField: "title", filtered: false};
 }
-
 function buildArticleSearchCommand(rawQuery = "", field = "title") {
     const terms = getArticleSearchTerms(rawQuery);
     if (!terms.length) return "";
     const articleField = field === "description" ? "description" : "title";
-    const articleCondition = terms
-        .map((term, index) => `${index === 0 ? `${articleField} ` : ""}CONTAINS "${escapeArticleSearchValue(term)}" IGNORE CASE`)
-        .join(" OR ");
+    const articleCondition = terms.map((term, index) => `${index === 0 ? `${articleField} ` : ""}CONTAINS "${escapeArticleSearchValue(term)}" IGNORE CASE`).join(" OR ");
     return `[articles] <${articleCondition}, LIMIT 10>`;
 }
-
 function levenshteinDistance(left = "", right = "") {
     const a = String(left || "").toLowerCase();
     const b = String(right || "").toLowerCase();
     if (a === b) return 0;
     if (!a.length) return b.length;
     if (!b.length) return a.length;
-
     let previous = Array.from({length: b.length + 1}, (_, index) => index);
     for (let i = 1; i <= a.length; i += 1) {
         const current = [i];
         for (let j = 1; j <= b.length; j += 1) {
             const substitutionCost = a[i - 1] === b[j - 1] ? 0 : 1;
-            current[j] = Math.min(
-                previous[j] + 1,
-                current[j - 1] + 1,
-                previous[j - 1] + substitutionCost
-            );
+            current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + substitutionCost);
         }
         previous = current;
     }
     return previous[b.length];
 }
-
 function resolveArticleRecords(response) {
     if (Array.isArray(response)) return response;
     if (!response || typeof response !== "object") return [];
@@ -680,26 +556,13 @@ function resolveArticleRecords(response) {
     const firstArrayEntry = Object.values(response).find(Array.isArray);
     return Array.isArray(firstArrayEntry) ? firstArrayEntry : [];
 }
-
 async function sendArticleCliCommand(command = "", {signal = null} = {}) {
     const normalizedCommand = String(command || "").trim();
     if (!normalizedCommand) return "";
     const usePost = normalizedCommand.length > 1500;
-    const url = usePost
-        ? `/api/cli?_=${Date.now()}`
-        : `/api/cli?query=${encodeURIComponent(normalizedCommand)}&_=${Date.now()}`;
-    const options = {
-        method: usePost ? "POST" : "GET",
-        cache: "no-store",
-        headers: {
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0"
-        }
-    };
-    if (signal) {
-        options.signal = signal;
-    }
+    const url = usePost ? `/api/cli?_=${Date.now()}` : `/api/cli?query=${encodeURIComponent(normalizedCommand)}&_=${Date.now()}`;
+    const options = {method: usePost ? "POST" : "GET", cache: "no-store", headers: {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}};
+    if (signal) options.signal = signal;
     if (usePost) {
         options.headers["Content-Type"] = "application/json";
         options.body = JSON.stringify({query: normalizedCommand});
@@ -718,22 +581,10 @@ async function sendArticleCliCommand(command = "", {signal = null} = {}) {
         return responseText;
     }
 }
-
 function buildArticlePortal(article = {}) {
     const title = `${article?.title || ""}`.trim() || "Untitled Article";
-    return {
-        title,
-        svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25A8.966 8.966 0 0 1 18 3.75c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>`,
-        recordMatches: [{
-            command: "articles",
-            id: article?.id,
-            primaryLabel: title,
-            secondaryLabel: `${article?.description || article?.link || article?.source || ""}`.trim(),
-            record: article
-        }]
-    };
+    return {title, svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25A8.966 8.966 0 0 1 18 3.75c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>`, recordMatches: [{command: "articles", id: article?.id, primaryLabel: title, secondaryLabel: `${article?.description || article?.link || article?.source || ""}`.trim(), record: article}]};
 }
-
 function enhanceArticleSearchResultIcon(result, article = {}, requestVersion = 0) {
     const articleId = `${article?.id || ""}`.trim();
     if (!result || !articleId) return;
@@ -756,7 +607,6 @@ function enhanceArticleSearchResultIcon(result, article = {}, requestVersion = 0
         probe.src = nextIconUrl;
     });
 }
-
 async function appendArticleSearchResults(rawQuery = "", requestVersion = 0, articleField = "title", {signal = null} = {}) {
     const command = buildArticleSearchCommand(rawQuery, articleField);
     if (!command) return [];
@@ -765,14 +615,12 @@ async function appendArticleSearchResults(rawQuery = "", requestVersion = 0, art
         if (requestVersion !== articleSearchRequestVersion) return [];
         const normalizedQuery = String(rawQuery || "").replace(/\s+/g, " ").trim();
         const sortField = articleField === "description" ? "description" : "title";
-        const articles = resolveArticleRecords(response)
-            .filter(article => article && typeof article === "object")
-            .sort((left, right) => {
-                const leftDistance = levenshteinDistance(left?.[sortField] || "", normalizedQuery);
-                const rightDistance = levenshteinDistance(right?.[sortField] || "", normalizedQuery);
-                if (leftDistance !== rightDistance) return leftDistance - rightDistance;
-                return `${left?.title || ""}`.localeCompare(`${right?.title || ""}`);
-            });
+        const articles = resolveArticleRecords(response).filter(article => article && typeof article === "object").sort((left, right) => {
+            const leftDistance = levenshteinDistance(left?.[sortField] || "", normalizedQuery);
+            const rightDistance = levenshteinDistance(right?.[sortField] || "", normalizedQuery);
+            if (leftDistance !== rightDistance) return leftDistance - rightDistance;
+            return `${left?.title || ""}`.localeCompare(`${right?.title || ""}`);
+        });
         articles.forEach(article => {
             const result = renderSearchResult(buildArticlePortal(article));
             enhanceArticleSearchResultIcon(result, article, requestVersion);
@@ -780,13 +628,10 @@ async function appendArticleSearchResults(rawQuery = "", requestVersion = 0, art
         return articles;
     } catch (error) {
         if (isAbortError(error)) return [];
-        if (requestVersion === articleSearchRequestVersion) {
-            console.error("Failed to search articles:", error);
-        }
+        if (requestVersion === articleSearchRequestVersion) console.error("Failed to search articles:", error);
         return [];
     }
 }
-
 function renderCachedSearchResults(rawQuery = "") {
     const query = String(rawQuery || "").trim().toLowerCase();
     const matchingPortals = searchablePortals().map((portal) => {
@@ -800,7 +645,6 @@ function renderCachedSearchResults(rawQuery = "") {
             hasMatch: Boolean(matchingHint) || recordMatches.length > 0
         };
     }).filter(({hasMatch}) => Boolean(hasMatch));
-
     const calculation = evaluateCalculatorExpression(rawQuery);
     renderCalculatorSearchResult(calculation);
     matchingPortals.forEach(({portal, matchingHint}) => {
@@ -813,18 +657,14 @@ function renderCachedSearchResults(rawQuery = "") {
     }
     return {calculation, matchingPortals};
 }
-
 function renderArticleSearchResults(rawQuery = "", requestVersion = 0, cachedSearch = {}, articleField = "title", options = {}) {
     return appendArticleSearchResults(rawQuery, requestVersion, articleField, options).then((articles) => {
         if (requestVersion !== articleSearchRequestVersion) return [];
         const hasCachedResults = Boolean(cachedSearch?.calculation) || Boolean(cachedSearch?.matchingPortals?.length);
-        if (!hasCachedResults && articles.length) {
-            setActiveSearchResult(0);
-        }
+        if (!hasCachedResults && articles.length) setActiveSearchResult(0);
         return articles;
     });
 }
-
 function openPortal(portal) {
     const primaryRecordMatch = Array.isArray(portal?.recordMatches) ? portal.recordMatches[0] : null;
     if (primaryRecordMatch?.command === "articles") {
@@ -878,16 +718,13 @@ function openPortal(portal) {
         portal.action();
         return;
     }
-    if (!portal?.serviceId) {
-        return;
-    }
+    if (!portal?.serviceId) return;
     if ((portal.portalIndex || 0) === 0) {
         modular.start(portal.serviceId);
     } else {
         modular.show(portal.serviceId, portal.portalIndex);
     }
 }
-
 function renderSearchResult(portal, matchingHint) {
     const result = document.createElement("div");
     result.className = "search-result pointer medium-margin-bottom block bordered radius small-shadowed hover-zoom hover-shadowed background-background padded";
@@ -895,7 +732,6 @@ function renderSearchResult(portal, matchingHint) {
     result.setAttribute("aria-selected", "false");
     const recordMatches = Array.isArray(portal?.recordMatches) ? portal.recordMatches : [];
     const primaryRecordMatch = recordMatches[0] || null;
-
     const icon = buildSearchResultIcon(portal);
     if (icon) {
         const iconContainer = document.createElement("div");
@@ -903,14 +739,11 @@ function renderSearchResult(portal, matchingHint) {
         iconContainer.append(icon);
         result.append(iconContainer);
     }
-
     const body = document.createElement("div");
     body.className = "search-result-body";
-
     const title = document.createElement("div");
     title.textContent = primaryRecordMatch?.primaryLabel || portal.title || "";
     body.append(title);
-
     if (recordMatches.length) {
         const records = document.createElement("div");
         records.className = "search-result-records faded";
@@ -919,14 +752,12 @@ function renderSearchResult(portal, matchingHint) {
         if (primaryLine.textContent) records.append(primaryLine);
         body.append(records);
     }
-
     if (matchingHint && !recordMatches.length) {
         const hint = document.createElement("div");
         hint.className = "faded no-events";
         hint.textContent = `${matchingHint}`;
         body.append(hint);
     }
-
     result.append(body);
     result.onclick = () => {
         cancelActiveArticleSearch({clearLoading: true});
@@ -940,7 +771,6 @@ function renderSearchResult(portal, matchingHint) {
     document.getElementById("search-results").append(result);
     return result;
 }
-
 document.getElementById("search-box").addEventListener("keydown", event => {
     if (event.key === "Backspace" && searchFilterMode === "description" && event.target.value === "" && !searchFilterAnimating) {
         event.preventDefault();
@@ -958,9 +788,7 @@ document.getElementById("search-box").addEventListener("keydown", event => {
         return;
     }
     if (event.key === "Enter") {
-        if (activateActiveSearchResult()) {
-            event.preventDefault();
-        }
+        if (activateActiveSearchResult()) event.preventDefault();
         return;
     }
     if (event.key === "Escape") {
@@ -968,14 +796,12 @@ document.getElementById("search-box").addEventListener("keydown", event => {
         event.target.blur();
     }
 });
-
 function setSearchFilterPrefixVisible(visible) {
     const prefix = document.getElementById("search-filter-prefix");
     if (!prefix) return;
     prefix.classList.toggle("hidden", !visible);
     prefix.classList.remove("removing");
 }
-
 function activateSearchFilterPrefix() {
     const searchBox = document.getElementById("search-box");
     if (!searchBox || searchFilterMode === "description") return;
@@ -985,7 +811,6 @@ function activateSearchFilterPrefix() {
     searchBox.value = value.slice(SEARCH_DESCRIPTION_PREFIX.length);
     setSearchFilterPrefixVisible(true);
 }
-
 function removeSearchFilterPrefix() {
     const searchBox = document.getElementById("search-box");
     const prefix = document.getElementById("search-filter-prefix");
@@ -1003,14 +828,12 @@ function removeSearchFilterPrefix() {
         updateSearchResults();
     }, 140);
 }
-
 function clearSearchFilterPrefix() {
     searchFilterMode = "";
     searchFilterAnimating = false;
     setSearchFilterPrefixVisible(false);
     document.getElementById("search-box")?.classList.remove("search-filter-backspace");
 }
-
 function updateSearchResults() {
     const searchStatus = document.getElementById("search-status");
     const searchBox = document.getElementById("search-box");
@@ -1028,7 +851,6 @@ function updateSearchResults() {
         searchStatus.isLoading(false);
         return;
     }
-
     let cachedSearch = {calculation: null, matchingPortals: []};
     try {
         cachedSearch = searchState.filtered ? {calculation: null, matchingPortals: []} : renderCachedSearchResults(rawQuery);
@@ -1036,18 +858,14 @@ function updateSearchResults() {
         console.error("Failed to search cached records:", error);
         resetActiveSearchResult();
     }
-
     const articleSearchController = beginArticleSearchRequest();
     renderArticleSearchResults(rawQuery, currentArticleSearchVersion, cachedSearch, searchState.articleField, {
         signal: articleSearchController?.signal || null
     }).finally(() => {
         finishArticleSearchRequest(articleSearchController);
-        if (currentArticleSearchVersion === articleSearchRequestVersion) {
-            searchStatus.isLoading(false);
-        }
+        if (currentArticleSearchVersion === articleSearchRequestVersion) searchStatus.isLoading(false);
     });
 }
-
 document.getElementById("search-box").addEventListener("input", () => {
     updateSearchResults();
 });
@@ -1092,9 +910,7 @@ function initGlobalFileDrop(onFiles) {
         e.preventDefault();
         e.stopPropagation();
         const dt = e.dataTransfer;
-        if (dt && dt.files && dt.files.length) {
-            onFiles(Array.from(dt.files));
-        }
+        if (dt && dt.files && dt.files.length) onFiles(Array.from(dt.files));
         deactivate(e);
     });
     window.addEventListener("dragover", (e) => e.preventDefault());
@@ -1115,27 +931,13 @@ initGlobalFileDrop(async (files) => {
             return;
         }
         const defaultDirectory = String(modular?.working_directory || "Documents").trim().replace(/\\/g, "/").replace(/\/+$/, "").replace(/^\/+/, "") || "Documents";
-        const multiProgress = droppedFiles.length > 1 && typeof window.StandardUploads?.createMultiFileProgress === "function"
-            ? window.StandardUploads.createMultiFileProgress(droppedFiles)
-            : null;
+        const multiProgress = droppedFiles.length > 1 && typeof window.StandardUploads?.createMultiFileProgress === "function" ? window.StandardUploads.createMultiFileProgress(droppedFiles) : null;
         try {
             for (let index = 0; index < droppedFiles.length; index++) {
                 const file = droppedFiles[index];
                 const uploadUrl = `/api/upload?directory=${encodeURIComponent(defaultDirectory)}`;
                 if (typeof window.StandardUploads?.uploadFile === "function") {
-                    const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
-                        label: `Uploading ${file.name || "file"}`,
-                        suppressProgress: !!multiProgress,
-                        onProgress: multiProgress
-                            ? progress => multiProgress.update({
-                                currentIndex: index,
-                                file,
-                                loaded: progress?.loaded || 0,
-                                total: progress?.total || file.size || 0,
-                                indeterminate: !!progress?.indeterminate
-                            })
-                            : null
-                    });
+                    const response = await window.StandardUploads.uploadFile(file, uploadUrl, {label: `Uploading ${file.name || "file"}`, suppressProgress: !!multiProgress, onProgress: multiProgress ? progress => multiProgress.update({currentIndex: index, file, loaded: progress?.loaded || 0, total: progress?.total || file.size || 0, indeterminate: !!progress?.indeterminate}) : null});
                     if (!response?.ok) {
                         modular.error(`Upload failed (${response?.status || 0})`);
                         return;
@@ -1144,10 +946,7 @@ initGlobalFileDrop(async (files) => {
                     if (multiProgress) multiProgress.update({currentIndex: index, file, loaded: 0, total: file.size || 0, indeterminate: true});
                     const formData = new FormData();
                     formData.append("file", file);
-                    const res = await fetch(uploadUrl, {
-                        method: "POST",
-                        body: formData
-                    });
+                    const res = await fetch(uploadUrl, {method: "POST", body: formData});
                     if (!res.ok) {
                         modular.error(`Upload failed (${res.status})`);
                         return;
@@ -1170,9 +969,7 @@ function getSearchFocusProtectedRect() {
         document.querySelector("#search-box-container .search-box-field"),
         document.getElementById("interface-shortcuts")
     ].filter(node => node && window.getComputedStyle(node).display !== "none");
-    const rects = nodes
-        .map(node => node.getBoundingClientRect())
-        .filter(rect => rect.width > 0 && rect.height > 0);
+    const rects = nodes.map(node => node.getBoundingClientRect()).filter(rect => rect.width > 0 && rect.height > 0);
     if (!rects.length) return null;
     const margin = 24;
     return {
@@ -1195,12 +992,8 @@ function getParkedServiceWindowPosition(win, index, lanes, protectedRect, margin
     const left = side === "left" ? margin : Math.max(margin, window.innerWidth - win.offsetWidth - margin);
     let top = lane.top;
     const visualLeft = left + ((win.offsetWidth - visualWidth) / 2);
-    if (rectsOverlap(visualLeft, top + ((win.offsetHeight - visualHeight) / 2), visualWidth, visualHeight, protectedRect)) {
-        top = protectedRect.bottom + margin - ((win.offsetHeight - visualHeight) / 2);
-    }
-    if (top + visualHeight > window.innerHeight - margin) {
-        top = Math.max(margin, (protectedRect?.top ?? window.innerHeight) - visualHeight - margin);
-    }
+    if (rectsOverlap(visualLeft, top + ((win.offsetHeight - visualHeight) / 2), visualWidth, visualHeight, protectedRect)) top = protectedRect.bottom + margin - ((win.offsetHeight - visualHeight) / 2);
+    if (top + visualHeight > window.innerHeight - margin) top = Math.max(margin, (protectedRect?.top ?? window.innerHeight) - visualHeight - margin);
     lane.top = top + visualHeight + margin;
     return {left, top};
 }
@@ -1210,17 +1003,12 @@ function parkServiceWindows() {
     if (!serviceWindowCache.length) {
         serviceWindowCache = windows.map(win => {
             const rect = win.getBoundingClientRect();
-            return {
-                element: win, left: win.style.left || `${rect.left}px`, top: win.style.top || `${rect.top}px`
-            };
+            return {element: win, left: win.style.left || `${rect.left}px`, top: win.style.top || `${rect.top}px`};
         });
     }
     const margin = 16;
     const protectedRect = getSearchFocusProtectedRect();
-    const lanes = {
-        left: {top: margin},
-        right: {top: margin}
-    };
+    const lanes = {left: {top: margin}, right: {top: margin}};
     windows.forEach((win, index) => {
         win.classList.add('service-window-parked');
         const target = getParkedServiceWindowPosition(win, index, lanes, protectedRect, margin);
@@ -1228,9 +1016,7 @@ function parkServiceWindows() {
         const targetLeft = target.left;
         win.style.top = `${targetTop}px`;
         win.style.left = `${targetLeft}px`;
-        if (win.portal && typeof win.portal.minimize === "function") {
-            win.portal.minimize({left: win.style.left, top: win.style.top});
-        }
+        if (win.portal && typeof win.portal.minimize === "function") win.portal.minimize({left: win.style.left, top: win.style.top});
     });
 }
 function restoreServiceWindows() {
@@ -1319,7 +1105,6 @@ document.addEventListener("keydown", function (e) {
     const activeElement = document.activeElement;
     const interactiveSelector = "input, textarea, button, select, [contenteditable='true'], [role='textbox']";
     const interactiveFocused = activeElement?.matches?.(interactiveSelector);
-
     if (e.ctrlKey && !e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "s") {
         const saveTool = getFocusedPortalSaveTool();
         e.preventDefault();
@@ -1330,7 +1115,6 @@ document.addEventListener("keydown", function (e) {
         }
         return;
     }
-
     if (e.ctrlKey && !e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "m") {
         const editTool = getFocusedPortalEditTool();
         e.preventDefault();
@@ -1341,7 +1125,6 @@ document.addEventListener("keydown", function (e) {
         }
         return;
     }
-
     if (e.ctrlKey && !e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "g") {
         const searchTool = getFocusedPortalSearchTool();
         e.preventDefault();
@@ -1352,11 +1135,7 @@ document.addEventListener("keydown", function (e) {
         }
         return;
     }
-
-    if (tileFocusedPortalFromShortcut(e)) {
-        return;
-    }
-
+    if (tileFocusedPortalFromShortcut(e)) return;
     if (e.altKey && e.key.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey && !e.shiftKey && !interactiveFocused) {
         const focusedWindow = getFocusedPortalWindow();
         if (focusedWindow?.portal && typeof focusedWindow.portal.hide === "function") {
@@ -1365,7 +1144,6 @@ document.addEventListener("keydown", function (e) {
             return;
         }
     }
-
     if (e.altKey && e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.shiftKey && !interactiveFocused) {
         const openPortalWindows = getOpenPortalWindows();
         if (openPortalWindows.length) {
@@ -1379,7 +1157,6 @@ document.addEventListener("keydown", function (e) {
             }
         }
     }
-
     if (e.ctrlKey && !e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "f") {
         const searchBox = focusSearchBoxForTyping();
         if (searchBox) {
@@ -1387,7 +1164,6 @@ document.addEventListener("keydown", function (e) {
         }
         return;
     }
-
 }, true);
 document.addEventListener("keyup", function (e) {
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown" && e.key !== "Up" && e.key !== "Down") return;

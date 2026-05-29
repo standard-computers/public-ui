@@ -56,10 +56,7 @@
         field.oninput = () => field.value = formatContactBirthday(field.value);
     };
     const contactPreviewContacts = new Map();
-    const renderNoContactsState = () => div({style: "contacts-empty-state", content: children([
-        img({src: contactServiceIcon, style: "contacts-empty-icon"}),
-        div({style: "contacts-empty-label", content: "No contacts"})
-    ])});
+    const renderNoContactsState = () => div({style: "contacts-empty-state", content: children([img({src: contactServiceIcon, style: "contacts-empty-icon"}), div({style: "contacts-empty-label", content: "No contacts"})])});
     const renderNoContactsStateInto = (container) => {
         if (!container) return;
         const emptyStateMarkup = renderNoContactsState();
@@ -79,16 +76,12 @@
         contactTile.remove();
         contactPreviewContacts.delete(contactIdText);
         if (contactPreview.activeTile === contactTile) hideContactPreview();
-        if (listContainer && !listContainer.querySelector(".contact.tile")) {
-            renderNoContactsStateInto(listContainer);
-        }
+        if (listContainer && !listContainer.querySelector(".contact.tile")) renderNoContactsStateInto(listContainer);
     };
     const removeContactFromVisibleLists = (contactId) => {
         const contactIdText = String(contactId || "");
         document.querySelectorAll(".contact.tile").forEach((contactTile) => {
-            if (contactTile.getAttribute("data") === contactIdText) {
-                removeContactTile(contactTile);
-            }
+            if (contactTile.getAttribute("data") === contactIdText) removeContactTile(contactTile);
         });
         contactPreviewContacts.delete(contactIdText);
         if (contactPreview.activeTile?.getAttribute("data") === contactIdText) hideContactPreview();
@@ -114,101 +107,38 @@
     const buildContactPreview = () => {
         const preview = document.createElement("div");
         preview.className = "contacts-hover-preview";
-        Object.assign(preview.style, {
-            position: "fixed",
-            display: "none",
-            zIndex: "91100",
-            width: "240px",
-            maxWidth: "calc(100vw - 24px)",
-            boxSizing: "border-box",
-            padding: "10px",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius)",
-            background: "var(--secondary-bg)",
-            color: "var(--fg)",
-            boxShadow: "var(--shadow)",
-            pointerEvents: "none"
-        });
-
+        Object.assign(preview.style, {position: "fixed", display: "none", zIndex: "91100", width: "240px", maxWidth: "calc(100vw - 24px)", boxSizing: "border-box", padding: "10px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--secondary-bg)", color: "var(--fg)", boxShadow: "var(--shadow)", pointerEvents: "none"});
         const header = document.createElement("div");
-        Object.assign(header.style, {
-            display: "grid",
-            gridTemplateColumns: "44px minmax(0, 1fr)",
-            gap: "10px",
-            alignItems: "center",
-            marginBottom: "8px"
-        });
-
+        Object.assign(header.style, {display: "grid", gridTemplateColumns: "44px minmax(0, 1fr)", gap: "10px", alignItems: "center", marginBottom: "8px"});
         const photo = document.createElement("img");
         photo.className = "contacts-hover-preview-photo contact-image";
-        Object.assign(photo.style, {
-            width: "44px",
-            height: "44px",
-            borderRadius: "999px",
-            objectFit: "cover",
-            background: "var(--bg)"
-        });
-
+        Object.assign(photo.style, {width: "44px", height: "44px", borderRadius: "999px", objectFit: "cover", background: "var(--bg)"});
         const nameWrap = document.createElement("div");
         nameWrap.style.minWidth = "0";
-
         const name = document.createElement("div");
         name.className = "contacts-hover-preview-name";
-        Object.assign(name.style, {
-            fontWeight: "700",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis"
-        });
-
+        Object.assign(name.style, {fontWeight: "700", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"});
         const birthday = document.createElement("div");
         birthday.className = "contacts-hover-preview-birthday";
-        Object.assign(birthday.style, {
-            opacity: "0.7",
-            fontSize: "calc(var(--fs) - 3px)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis"
-        });
-
+        Object.assign(birthday.style, {opacity: "0.7", fontSize: "calc(var(--fs) - 3px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"});
         nameWrap.append(name, birthday);
         header.append(photo, nameWrap);
-
         const details = document.createElement("div");
         details.className = "contacts-hover-preview-details";
-        Object.assign(details.style, {
-            display: "grid",
-            gap: "4px",
-            fontSize: "calc(var(--fs) - 2px)"
-        });
-
+        Object.assign(details.style, {display: "grid", gap: "4px", fontSize: "calc(var(--fs) - 2px)"});
         ["company", "phone", "email", "address"].forEach(field => {
             const row = document.createElement("div");
             row.className = `contacts-hover-preview-${field}`;
-            Object.assign(row.style, {
-                opacity: "0.82",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: field === "address" ? "normal" : "nowrap",
-                overflowWrap: "anywhere"
-            });
+            Object.assign(row.style, {opacity: "0.82", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: field === "address" ? "normal" : "nowrap", overflowWrap: "anywhere"});
             details.appendChild(row);
         });
-
         preview.append(header, details);
         document.body.appendChild(preview);
         return preview;
     };
-    const contactPreview = {
-        element: null,
-        activeTile: null,
-        pendingEvent: null,
-        frame: null
-    };
+    const contactPreview = {element: null, activeTile: null, pendingEvent: null, frame: null};
     const ensureContactPreview = () => {
-        if (!contactPreview.element || !document.body.contains(contactPreview.element)) {
-            contactPreview.element = buildContactPreview();
-        }
+        if (!contactPreview.element || !document.body.contains(contactPreview.element)) contactPreview.element = buildContactPreview();
         return contactPreview.element;
     };
     const formatContactName = (contact = {}) => [contact.firstname, contact.middlename, contact.lastname].filter(Boolean).join(" ").trim() || "Unnamed Contact";

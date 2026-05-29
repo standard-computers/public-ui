@@ -3,22 +3,13 @@
     let draining = false;
     const NOTIFICATION_RETRY_LIMIT = 25;
     const NOTIFICATION_RETRY_DELAY = 200;
-
     window.StandardNotifications = window.StandardNotifications || {};
     const notificationHandlers = window.StandardNotifications.handlers || {};
     window.StandardNotifications.handlers = notificationHandlers;
     let notificationSequence = 0;
-
     function escapeHtml(value = "") {
-        return String(value ?? "").replace(/[&<>"']/g, char => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            "\"": "&quot;",
-            "'": "&#039;"
-        })[char]);
+        return String(value ?? "").replace(/[&<>"']/g, char => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;"})[char]);
     }
-
     function ensureNotificationTray() {
         let tray = document.getElementById("standard-notification-tray");
         if (tray) return tray;
@@ -29,17 +20,14 @@
         document.body.appendChild(tray);
         return tray;
     }
-
     function normalizeDetails(details) {
         if (!details) return [];
         if (Array.isArray(details)) return details.map(item => `${item ?? ""}`.trim()).filter(Boolean);
         return [`${details}`.trim()].filter(Boolean);
     }
-
     function normalizeClassToken(value = "") {
         return String(value || "default").trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-") || "default";
     }
-
     window.StandardNotifications.show = (notification = {}) => {
         const tray = ensureNotificationTray();
         const details = normalizeDetails(notification.details);
@@ -101,7 +89,6 @@
         }
         return node;
     };
-
     window.StandardNotifications.register = (type, handler) => {
         const normalizedType = `${type || ""}`.trim().toLowerCase();
         if (!normalizedType || typeof handler !== "function") return;
@@ -111,38 +98,24 @@
         const notificationType = `${message?.notificationType || message?.type || ""}`.trim().toLowerCase();
         const handler = notificationHandlers[notificationType];
         if (typeof handler === "function") {
-            const result = handler({
-                type: notificationType,
-                data: Array.isArray(message?.notificationData) ? message.notificationData : [],
-                raw: message
-            });
-            if (result && typeof result.catch === "function") {
-                result.catch(err => console.error("Notification handler failed", err));
-            }
+            const result = handler({type: notificationType, data: Array.isArray(message?.notificationData) ? message.notificationData : [], raw: message});
+            if (result && typeof result.catch === "function") result.catch(err => console.error("Notification handler failed", err));
             return;
         }
         if (attempt < NOTIFICATION_RETRY_LIMIT) {
             setTimeout(() => window.StandardNotifications.notify(message, attempt + 1), NOTIFICATION_RETRY_DELAY);
             return;
         }
-        window.StandardNotifications.show({
-            title: "Notification",
-            message: "Notification received",
-            type: notificationType || "default"
-        });
+        window.StandardNotifications.show({title: "Notification", message: "Notification received", type: notificationType || "default"});
     };
-
     function runStartCommand(serviceId, attempt = 0) {
         if (!serviceId || typeof modular === "undefined" || typeof modular.start !== "function") {
             if (attempt < 25) setTimeout(() => runStartCommand(serviceId, attempt + 1), 200);
             return;
         }
         const portal = modular.start(serviceId);
-        if (!portal && attempt < 25) {
-            setTimeout(() => runStartCommand(serviceId, attempt + 1), 200);
-        }
+        if (!portal && attempt < 25) setTimeout(() => runStartCommand(serviceId, attempt + 1), 200);
     }
-
     function drainCommands() {
         if (draining) return;
         draining = true;
@@ -156,13 +129,11 @@
         }
         draining = false;
     }
-
     function enqueueCommand(message) {
         if (!message || message.command === "ready") return;
         pendingCommands.push(message);
         drainCommands();
     }
-
     document.addEventListener("DOMContentLoaded", () => {
         const source = new EventSource("/events/push");
         source.onmessage = event => {

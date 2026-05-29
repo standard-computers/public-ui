@@ -3,10 +3,12 @@
         const renderWidgetMarkup = () => div({
             style: "weather-widget",
             content: children([
-                div({style: "weather-widget-icon hidden", content: ""}),
                 div({style: "weather-widget-location", content: "Weather"}),
-                div({style: "weather-widget-temp", content: "--\u00B0F"}),
-                div({style: "weather-widget-summary", content: "Loading..."}),
+                div({style: "weather-widget-current", content: children([
+                    div({style: "weather-widget-icon hidden", content: ""}),
+                    div({style: "weather-widget-temp", content: "--\u00B0F"}),
+                    div({style: "weather-widget-summary", content: "Loading..."})
+                ])}),
             ])
         });
         const bindWidget = widgetNode => {
@@ -21,15 +23,21 @@
             }
             widgetNode.__weatherWidgetUnsub = window.standardWeather.subscribe(snapshot => {
                 const weather = snapshot?.data;
+                locationNode.textContent = weather?.location?.name || snapshot?.locationLabel || "Weather";
                 if (snapshot?.loading && !weather) {
+                    tempNode.textContent = "--\u00B0F";
                     summaryNode.textContent = "Loading...";
+                    iconNode.innerHTML = "";
+                    iconNode.style.display = "none";
                     return;
                 }
                 if (snapshot?.error && !weather) {
+                    tempNode.textContent = "--\u00B0F";
                     summaryNode.textContent = "Weather unavailable";
+                    iconNode.innerHTML = "";
+                    iconNode.style.display = "none";
                     return;
                 }
-                locationNode.textContent = weather?.location?.name || snapshot?.locationLabel || "Weather";
                 tempNode.textContent = Number.isFinite(weather?.current?.temperature)
                     ? `${Math.round(weather.current.temperature)}\u00B0F`
                     : "--\u00B0F";
@@ -45,7 +53,9 @@
         };
         modular.registerWidget(new Widget({
             id: "com.standard.widgets.weather",
+            portal: "com.standard.weather",
             title: "Weather",
+            icon: "/icons/interfaces/weather.png",
             dimensions: [260, 110],
             navigation: false,
             show_title: false,

@@ -25,11 +25,7 @@
     const sheetRowHeights = {};
     const sheetCharts = [];
     const sheetImages = [];
-    const sheetFilters = {
-        range: null,
-        criteria: {},
-        sort: null
-    };
+    const sheetFilters = {range: null, criteria: {}, sort: null};
     let sheetRows = DEFAULT_SHEET_ROWS;
     let sheetColumns = DEFAULT_SHEET_COLUMNS;
     let activeSheetCell = "A1";
@@ -103,10 +99,7 @@
         {label: "Number", value: "number"},
         {label: "Date", value: "date"}
     ];
-
-    const findSheetWindow = () => [...Array.from(document.querySelectorAll(".draggable-window"))]
-        .reverse()
-        .find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID) || null;
+    const findSheetWindow = () => [...Array.from(document.querySelectorAll(".draggable-window"))].reverse().find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID) || null;
     const findSheetPortal = () => findSheetWindow()?.portal;
     const prioritizePortalDomForLegacyLookups = (portal = null) => {
         const windowNode = portal?.window?.();
@@ -117,10 +110,7 @@
     };
     const isSheetWindowShown = () => {
         const sheetWindow = findSheetWindow();
-        return !!(sheetWindow
-            && sheetWindow.parentElement
-            && !sheetWindow.classList.contains("minimized")
-            && sheetWindow.classList.contains("window-focused"));
+        return !!(sheetWindow && sheetWindow.parentElement && !sheetWindow.classList.contains("minimized") && sheetWindow.classList.contains("window-focused"));
     };
     const normalizeSheetFilePath = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
     const getSheetFileName = (rawPath = "") => String(rawPath || "").split("/").pop() || "";
@@ -196,42 +186,20 @@
         const id = String(rawChart.id || `sheet-chart-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
         const data = (Array.isArray(rawChart.data) ? rawChart.data : []).map((item, index) => {
             const value = Number(item?.value);
-            return {
-                label: String(item?.label ?? item?.name ?? `Item ${index + 1}`),
-                value: Number.isFinite(value) ? value : 0
-            };
+            return {label: String(item?.label ?? item?.name ?? `Item ${index + 1}`), value: Number.isFinite(value) ? value : 0};
         });
         const x = Math.max(0, Math.round(Number(rawChart.x) || 0));
         const y = Math.max(0, Math.round(Number(rawChart.y) || 0));
         const width = Math.max(SHEET_CHART_MIN_WIDTH, Math.round(Number(rawChart.width) || SHEET_CHART_DEFAULT_WIDTH));
         const height = Math.max(SHEET_CHART_MIN_HEIGHT, Math.round(Number(rawChart.height) || SHEET_CHART_DEFAULT_HEIGHT));
-        return {
-            id,
-            type,
-            range: String(rawChart.range || "").toUpperCase(),
-            title: String(rawChart.title || "Chart"),
-            x,
-            y,
-            width,
-            height,
-            labelValues: rawChart.labelValues === true || rawChart.showValueLabels === true,
-            data
-        };
+        return {id, type, range: String(rawChart.range || "").toUpperCase(), title: String(rawChart.title || "Chart"), x, y, width, height, labelValues: rawChart.labelValues === true || rawChart.showValueLabels === true, data};
     };
     const normalizeSheetImage = (rawImage = {}) => {
         if (!rawImage || typeof rawImage !== "object" || Array.isArray(rawImage)) return null;
         const src = String(rawImage.src || rawImage.content || rawImage.url || "").trim();
         if (!src) return null;
         const id = String(rawImage.id || `sheet-image-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
-        return {
-            id,
-            src,
-            alt: String(rawImage.alt || ""),
-            x: Math.max(0, Math.round(Number(rawImage.x) || 0)),
-            y: Math.max(0, Math.round(Number(rawImage.y) || 0)),
-            width: Math.max(SHEET_IMAGE_MIN_WIDTH, Math.round(Number(rawImage.width) || SHEET_IMAGE_DEFAULT_WIDTH)),
-            height: Math.max(SHEET_IMAGE_MIN_HEIGHT, Math.round(Number(rawImage.height) || SHEET_IMAGE_DEFAULT_HEIGHT))
-        };
+        return {id, src, alt: String(rawImage.alt || ""), x: Math.max(0, Math.round(Number(rawImage.x) || 0)), y: Math.max(0, Math.round(Number(rawImage.y) || 0)), width: Math.max(SHEET_IMAGE_MIN_WIDTH, Math.round(Number(rawImage.width) || SHEET_IMAGE_DEFAULT_WIDTH)), height: Math.max(SHEET_IMAGE_MIN_HEIGHT, Math.round(Number(rawImage.height) || SHEET_IMAGE_DEFAULT_HEIGHT))};
     };
     const normalizeSheetCellStyle = (rawStyle = {}) => {
         if (!rawStyle || typeof rawStyle !== "object" || Array.isArray(rawStyle)) return {};
@@ -252,14 +220,10 @@
         if (backgroundColor && backgroundColor !== "transparent") normalizedStyle.backgroundColor = backgroundColor;
         const rawFontSize = rawStyle.fontSize || rawStyle.s || "";
         const numericFontSize = Number(String(rawFontSize).replace(/px$/i, ""));
-        if (Number.isFinite(numericFontSize) && numericFontSize >= 1 && numericFontSize <= 400) {
-            normalizedStyle.fontSize = `${Math.round(numericFontSize * 10) / 10}px`;
-        }
+        if (Number.isFinite(numericFontSize) && numericFontSize >= 1 && numericFontSize <= 400) normalizedStyle.fontSize = `${Math.round(numericFontSize * 10) / 10}px`;
         const rawDecimalPlaces = rawStyle.decimalPlaces ?? rawStyle.d;
         const decimalPlaces = Math.trunc(Number(rawDecimalPlaces));
-        if (Number.isFinite(decimalPlaces) && decimalPlaces >= 0 && decimalPlaces <= 12) {
-            normalizedStyle.decimalPlaces = decimalPlaces;
-        }
+        if (Number.isFinite(decimalPlaces) && decimalPlaces >= 0 && decimalPlaces <= 12) normalizedStyle.decimalPlaces = decimalPlaces;
         return normalizedStyle;
     };
     const encodeSheetCellStyle = (rawStyle = {}) => {
@@ -341,22 +305,8 @@
             const maxRow = Math.trunc(Number(rawRange.maxRow));
             const minColumn = Math.trunc(Number(rawRange.minColumn));
             const maxColumn = Math.trunc(Number(rawRange.maxColumn));
-            if (
-                Number.isInteger(minRow)
-                && Number.isInteger(maxRow)
-                && Number.isInteger(minColumn)
-                && Number.isInteger(maxColumn)
-                && minRow >= 0
-                && minColumn >= 0
-                && maxRow >= minRow
-                && maxColumn >= minColumn
-            ) {
-                range = {
-                    minRow: Math.min(minRow, Math.max(sheetRows - 1, 0)),
-                    maxRow: Math.min(maxRow, Math.max(sheetRows - 1, 0)),
-                    minColumn: Math.min(minColumn, Math.max(sheetColumns - 1, 0)),
-                    maxColumn: Math.min(maxColumn, Math.max(sheetColumns - 1, 0))
-                };
+            if (Number.isInteger(minRow) && Number.isInteger(maxRow) && Number.isInteger(minColumn) && Number.isInteger(maxColumn) && minRow >= 0 && minColumn >= 0 && maxRow >= minRow && maxColumn >= minColumn) {
+                range = {minRow: Math.min(minRow, Math.max(sheetRows - 1, 0)), maxRow: Math.min(maxRow, Math.max(sheetRows - 1, 0)), minColumn: Math.min(minColumn, Math.max(sheetColumns - 1, 0)), maxColumn: Math.min(maxColumn, Math.max(sheetColumns - 1, 0))};
             }
         }
         const criteria = {};
@@ -364,9 +314,7 @@
             Object.entries(rawFilters.criteria).forEach(([rawColumnIndex, rawCriterion]) => {
                 const columnIndex = Math.trunc(Number(rawColumnIndex));
                 if (!Number.isInteger(columnIndex) || columnIndex < range.minColumn || columnIndex > range.maxColumn) return;
-                const values = Array.isArray(rawCriterion?.values)
-                    ? rawCriterion.values.map((value) => String(value ?? ""))
-                    : [];
+                const values = Array.isArray(rawCriterion?.values) ? rawCriterion.values.map((value) => String(value ?? "")) : [];
                 const query = String(rawCriterion?.query ?? "").trim();
                 if (values.length || query) criteria[String(columnIndex)] = {values: [...new Set(values)], query};
             });
@@ -376,9 +324,7 @@
         if (range && rawSort && typeof rawSort === "object" && !Array.isArray(rawSort)) {
             const columnIndex = Math.trunc(Number(rawSort.columnIndex));
             const direction = String(rawSort.direction || "").toLowerCase() === "desc" ? "desc" : "asc";
-            if (Number.isInteger(columnIndex) && columnIndex >= range.minColumn && columnIndex <= range.maxColumn) {
-                sort = {columnIndex, direction};
-            }
+            if (Number.isInteger(columnIndex) && columnIndex >= range.minColumn && columnIndex <= range.maxColumn) sort = {columnIndex, direction};
         }
         return {range, criteria, sort};
     };
@@ -404,17 +350,8 @@
     const getDefaultSheetColumnWidth = () => {
         const gridWrap = document.getElementById("editor-sheet-grid-wrap");
         const gridPanel = document.querySelector(".editor-sheet-grid-panel");
-        const availableGridWidth = Math.max(
-            Math.floor(gridWrap?.clientWidth || gridPanel?.getBoundingClientRect?.().width || 0),
-            SHEET_ROW_HEADER_WIDTH
-        );
-        return Math.max(
-            SHEET_MIN_CELL_WIDTH,
-            Math.min(
-                SHEET_DEFAULT_MAX_CELL_WIDTH,
-                Math.floor((availableGridWidth - SHEET_ROW_HEADER_WIDTH) / Math.max(sheetColumns, 1))
-            )
-        );
+        const availableGridWidth = Math.max(Math.floor(gridWrap?.clientWidth || gridPanel?.getBoundingClientRect?.().width || 0), SHEET_ROW_HEADER_WIDTH);
+        return Math.max(SHEET_MIN_CELL_WIDTH, Math.min(SHEET_DEFAULT_MAX_CELL_WIDTH, Math.floor((availableGridWidth - SHEET_ROW_HEADER_WIDTH) / Math.max(sheetColumns, 1))));
     };
     const buildSheetPayload = () => ({
         format: "std.sheet.v1",
@@ -505,9 +442,7 @@
         }
     };
     const updateSheetPortalTitle = (sheetPortal = findSheetPortal()) => {
-        if (sheetPortal?.setTitle) {
-            sheetPortal.setTitle(activeSheetFilePath ? getSheetFileName(activeSheetFilePath) : (activeSheetDisplayTitle || "Sheet"));
-        }
+        if (sheetPortal?.setTitle) sheetPortal.setTitle(activeSheetFilePath ? getSheetFileName(activeSheetFilePath) : (activeSheetDisplayTitle || "Sheet"));
     };
     const saveSheetPortalState = (portal = findSheetPortal()) => {
         if (!portal || typeof portal.setWindowState !== "function") return;
@@ -574,9 +509,7 @@
         const sheetFile = new File([bytes], fileName, {type: "application/octet-stream"});
         let saved = false;
         if (typeof window.StandardUploads?.uploadFile === "function") {
-            const response = await window.StandardUploads.uploadFile(sheetFile, uploadPath, {
-                label: `Saving ${fileName}`
-            });
+            const response = await window.StandardUploads.uploadFile(sheetFile, uploadPath, {label: `Saving ${fileName}`});
             saved = !!response?.ok;
         } else {
             const formData = new FormData();
@@ -596,18 +529,13 @@
         modular.success(`Saved ${normalizedPath} (${bytes.length} bytes)`);
         return true;
     };
-    const saveNewSheetToDocuments = () => {
-        inputDialogue({
-            title: "File name",
-            placeholder: "spreadsheet.sprdshts",
-            value: "spreadsheet.sprdshts",
-            confirmation: async (_, inputFileName) => {
-                if (!modular.validateFileName(inputFileName)) return;
-                const safeFileName = sanitizeSheetFileName(inputFileName) || "spreadsheet.sprdshts";
-                await saveSheetToPath(`Documents/${safeFileName}`);
-            }
-        });
-    };
+    const saveNewSheetToDocuments = () => inputDialogue({title: "File name", placeholder: "spreadsheet.sprdshts", value: "spreadsheet.sprdshts",
+        confirmation: async (_, inputFileName) => {
+            if (!modular.validateFileName(inputFileName)) return;
+            const safeFileName = sanitizeSheetFileName(inputFileName) || "spreadsheet.sprdshts";
+            await saveSheetToPath(`Documents/${safeFileName}`);
+        }
+    });
     const saveLoadedSheet = async () => {
         if (!activeSheetFilePath) {
             saveNewSheetToDocuments();
@@ -833,20 +761,8 @@
             if (locked) setSheetCellLocked(cellReference, true);
         });
     };
-    const getSheetColumnWidth = (columnIndex = 0) => Math.min(
-        SHEET_MAX_CELL_WIDTH,
-        Math.max(
-            SHEET_MIN_CELL_WIDTH,
-            Number(sheetColumnWidths[columnIndex]) || getDefaultSheetColumnWidth()
-        )
-    );
-    const getSheetRowHeight = (rowIndex = 0) => Math.min(
-        SHEET_MAX_ROW_HEIGHT,
-        Math.max(
-            SHEET_MIN_ROW_HEIGHT,
-            Number(sheetRowHeights[rowIndex]) || SHEET_DEFAULT_ROW_HEIGHT
-        )
-    );
+    const getSheetColumnWidth = (columnIndex = 0) => Math.min(SHEET_MAX_CELL_WIDTH, Math.max(SHEET_MIN_CELL_WIDTH, Number(sheetColumnWidths[columnIndex]) || getDefaultSheetColumnWidth()));
+    const getSheetRowHeight = (rowIndex = 0) => Math.min(SHEET_MAX_ROW_HEIGHT, Math.max(SHEET_MIN_ROW_HEIGHT, Number(sheetRowHeights[rowIndex]) || SHEET_DEFAULT_ROW_HEIGHT));
     const buildSheetGridTemplate = () => [
         `${SHEET_ROW_HEADER_WIDTH}px`,
         ...Array.from({length: sheetColumns}, (_, columnIndex) => `${getSheetColumnWidth(columnIndex)}px`)
@@ -903,11 +819,7 @@
         refreshSheetCells();
         saveSheetPortalState();
     };
-    const createSheetResizeHandle = (axis = "column", index = 0) => div({
-        id: `editor-sheet-${axis}-resize-${index}`,
-        style: `editor-sheet-resize-handle editor-sheet-resize-handle-${axis}`,
-        content: ""
-    });
+    const createSheetResizeHandle = (axis = "column", index = 0) => div({id: `editor-sheet-${axis}-resize-${index}`, style: `editor-sheet-resize-handle editor-sheet-resize-handle-${axis}`, content: ""});
     const buildSheetGridRows = () => {
         const tableRows = [];
         const headerRow = [div({style: "editor-sheet-cell-header editor-sheet-row-header editor-sheet-corner-cell", content: ""})];
@@ -980,10 +892,7 @@
         setActiveSheetRange(anchorReference, nextReference);
     };
     const getSheetUsedRangeBounds = () => {
-        const usedPositions = Object.entries(sheetCellValues)
-            .filter(([, value]) => String(value ?? "").trim())
-            .map(([cellReference]) => parseSheetCellReference(cellReference))
-            .filter((position) => position.rowIndex >= 0 && position.rowIndex < sheetRows && position.columnIndex >= 0 && position.columnIndex < sheetColumns);
+        const usedPositions = Object.entries(sheetCellValues).filter(([, value]) => String(value ?? "").trim()).map(([cellReference]) => parseSheetCellReference(cellReference)).filter((position) => position.rowIndex >= 0 && position.rowIndex < sheetRows && position.columnIndex >= 0 && position.columnIndex < sheetColumns);
         if (!usedPositions.length) return null;
         return usedPositions.reduce((bounds, position) => ({
             minRow: Math.min(bounds.minRow, position.rowIndex),
@@ -1018,32 +927,19 @@
         updateSheetSelectionStyles();
         saveSheetPortalState();
     };
-    const isCellInActiveSheetRange = (cellReference = "") => isSheetRangeSelectionActive()
-        && getSheetRangeReferences(activeSheetRangeStart, activeSheetRangeEnd).includes(String(cellReference || "").toUpperCase());
+    const isCellInActiveSheetRange = (cellReference = "") => isSheetRangeSelectionActive() && getSheetRangeReferences(activeSheetRangeStart, activeSheetRangeEnd).includes(String(cellReference || "").toUpperCase());
     const getSheetSelectionLabel = () => {
-        if (isSheetRangeSelectionActive()) {
-            return activeSheetRangeStart === activeSheetRangeEnd
-                ? activeSheetRangeStart
-                : `${activeSheetRangeStart}:${activeSheetRangeEnd}`;
-        }
+        if (isSheetRangeSelectionActive()) return activeSheetRangeStart === activeSheetRangeEnd ? activeSheetRangeStart : `${activeSheetRangeStart}:${activeSheetRangeEnd}`;
         return activeSheetCell;
     };
     const getActiveSheetCellReferences = () => {
-        if (Number.isInteger(activeSheetColumn)) {
-            return Array.from({length: sheetRows}, (_, rowIndex) => getSheetCellReference(rowIndex, activeSheetColumn));
-        }
-        if (Number.isInteger(activeSheetRow)) {
-            return Array.from({length: sheetColumns}, (_, columnIndex) => getSheetCellReference(activeSheetRow, columnIndex));
-        }
-        if (isSheetRangeSelectionActive()) {
-            return getSheetRangeReferences(activeSheetRangeStart, activeSheetRangeEnd);
-        }
+        if (Number.isInteger(activeSheetColumn)) return Array.from({length: sheetRows}, (_, rowIndex) => getSheetCellReference(rowIndex, activeSheetColumn));
+        if (Number.isInteger(activeSheetRow)) return Array.from({length: sheetColumns}, (_, columnIndex) => getSheetCellReference(activeSheetRow, columnIndex));
+        if (isSheetRangeSelectionActive()) return getSheetRangeReferences(activeSheetRangeStart, activeSheetRangeEnd);
         return activeSheetCell ? [activeSheetCell] : [];
     };
     const getSheetReferenceBounds = (cellReferences = []) => {
-        const positions = cellReferences
-            .map((cellReference) => parseSheetCellReference(cellReference))
-            .filter((position) => position.rowIndex >= 0 && position.columnIndex >= 0);
+        const positions = cellReferences.map((cellReference) => parseSheetCellReference(cellReference)).filter((position) => position.rowIndex >= 0 && position.columnIndex >= 0);
         if (!positions.length) return null;
         return positions.reduce((bounds, position) => ({
             minRow: Math.min(bounds.minRow, position.rowIndex),
@@ -1108,9 +1004,7 @@
         if (!payload || typeof payload !== "object" || payload.format !== "standard-sheet-cells") return null;
         const rows = Math.max(1, Math.trunc(Number(payload.rows)) || 1);
         const columns = Math.max(1, Math.trunc(Number(payload.columns)) || 1);
-        const cutReferences = Array.isArray(payload.cutReferences)
-            ? payload.cutReferences.map((cellReference) => String(cellReference || "").toUpperCase()).filter((cellReference) => /^[A-Z]+\d+$/.test(cellReference))
-            : [];
+        const cutReferences = Array.isArray(payload.cutReferences) ? payload.cutReferences.map((cellReference) => String(cellReference || "").toUpperCase()).filter((cellReference) => /^[A-Z]+\d+$/.test(cellReference)) : [];
         const cells = (Array.isArray(payload.cells) ? payload.cells : []).flatMap((cell) => {
             const rowOffset = Math.trunc(Number(cell?.rowOffset));
             const columnOffset = Math.trunc(Number(cell?.columnOffset));
@@ -1195,10 +1089,7 @@
         const tsv = buildSheetClipboardTsv(sheetClipboardPayload);
         try {
             if (navigator.clipboard?.write && typeof ClipboardItem === "function") {
-                await navigator.clipboard.write([new ClipboardItem({
-                    [SHEET_CLIPBOARD_MIME]: new Blob([json], {type: SHEET_CLIPBOARD_MIME}),
-                    "text/plain": new Blob([tsv], {type: "text/plain"})
-                })]);
+                await navigator.clipboard.write([new ClipboardItem({[SHEET_CLIPBOARD_MIME]: new Blob([json], {type: SHEET_CLIPBOARD_MIME}), "text/plain": new Blob([tsv], {type: "text/plain"})})]);
                 return true;
             }
         } catch (_) {}
@@ -1316,8 +1207,7 @@
         });
         if (!didPasteCell) return false;
         if (payload.cut) {
-            const sourceReferences = (movedSourceReferences.size ? [...movedSourceReferences] : payload.cutReferences)
-                .filter((cellReference) => !pastedTargetReferences.has(cellReference));
+            const sourceReferences = (movedSourceReferences.size ? [...movedSourceReferences] : payload.cutReferences).filter((cellReference) => !pastedTargetReferences.has(cellReference));
             clearSheetCellsByReference(sourceReferences, {refresh: false});
             await writeSheetClipboardPayload({...payload, cut: false, cutReferences: []});
         }
@@ -1389,9 +1279,7 @@
         if (!selectedReferences.length) return;
         selectedReferences.forEach((cellReference) => {
             const currentStyle = getSheetCellStyle(cellReference);
-            const nextStyle = typeof updater === "function"
-                ? updater({...currentStyle}, cellReference)
-                : {...currentStyle, ...(updater || {})};
+            const nextStyle = typeof updater === "function" ? updater({...currentStyle}, cellReference) : {...currentStyle, ...(updater || {})};
             setSheetCellStyle(cellReference, nextStyle);
             applySheetCellStyle(cellReference);
         });
@@ -1401,18 +1289,14 @@
     const applySheetTypeToSelection = (nextType = "") => {
         const selectedReferences = getActiveSheetCellReferences();
         if (!selectedReferences.length) return;
-        selectedReferences.forEach((cellReference) => {
-            setSheetCellType(cellReference, nextType);
-        });
+        selectedReferences.forEach((cellReference) => setSheetCellType(cellReference, nextType));
         refreshSheetCells();
         saveSheetPortalState();
     };
     const getSheetNumberDecimalCount = (cellReference = "") => {
         const style = getSheetCellStyle(cellReference);
         if (Number.isInteger(style.decimalPlaces)) return style.decimalPlaces;
-        const displayValue = String(sheetCellValues[cellReference] ?? "").startsWith("=")
-            ? evaluateSheetCell(cellReference)
-            : sheetCellValues[cellReference];
+        const displayValue = String(sheetCellValues[cellReference] ?? "").startsWith("=") ? evaluateSheetCell(cellReference) : sheetCellValues[cellReference];
         const textValue = String(displayValue ?? "");
         if (/e/i.test(textValue)) return 0;
         const decimalText = textValue.split(".")[1] || "";
@@ -1430,10 +1314,7 @@
         selectedReferences.forEach((cellReference) => {
             const currentStyle = getSheetCellStyle(cellReference);
             const currentPlaces = getSheetNumberDecimalCount(cellReference);
-            setSheetCellStyle(cellReference, {
-                ...currentStyle,
-                decimalPlaces: Math.min(12, Math.max(0, currentPlaces + delta))
-            });
+            setSheetCellStyle(cellReference, {...currentStyle, decimalPlaces: Math.min(12, Math.max(0, currentPlaces + delta))});
             setSheetCellType(cellReference, "number");
             applySheetCellStyle(cellReference);
         });
@@ -1453,11 +1334,7 @@
             modular.error("Selected cells cannot all be converted to numbers");
             return;
         }
-        confirmationDialogue({
-            title: "Convert to Number",
-            content: "Some selected cells are not number cells. Convert them to number type and adjust decimal rounding?",
-            confirmation: () => applySheetDecimalAdjustmentToSelection(delta)
-        });
+        confirmationDialogue({title: "Convert to Number", content: "Some selected cells are not number cells. Convert them to number type and adjust decimal rounding?", confirmation: () => applySheetDecimalAdjustmentToSelection(delta)});
     };
     const applySheetLinkToSelection = (rawUrl = "") => {
         const selectedReferences = getActiveSheetCellReferences();
@@ -1594,14 +1471,7 @@
     };
     const showSheetHyperlinkDialogue = (cellReference = activeSheetCell) => {
         if (cellReference && !isCellInActiveSheetRange(cellReference)) setActiveSheetCell(cellReference);
-        inputDialogue({
-            title: "Hyperlink",
-            placeholder: "Link",
-            value: getSheetCellLink(cellReference),
-            confirmation: (_, linkValue) => {
-                applySheetLinkToSelection(linkValue);
-            }
-        });
+        inputDialogue({title: "Hyperlink", placeholder: "Link", value: getSheetCellLink(cellReference), confirmation: (_, linkValue) => applySheetLinkToSelection(linkValue)});
         return true;
     };
     const parseSheetFormulaArguments = (text = "") => {
@@ -1662,15 +1532,9 @@
     const formatSheetDateValue = (value) => {
         const textValue = String(value ?? "").trim();
         if (!textValue) return "";
-        const dateValue = /^\d{4}-\d{2}-\d{2}$/.test(textValue)
-            ? new Date(`${textValue}T00:00:00`)
-            : new Date(textValue);
+        const dateValue = /^\d{4}-\d{2}-\d{2}$/.test(textValue) ? new Date(`${textValue}T00:00:00`) : new Date(textValue);
         if (Number.isNaN(dateValue.getTime())) return textValue;
-        return dateValue.toLocaleDateString(undefined, {
-            year: "numeric",
-            month: "short",
-            day: "numeric"
-        });
+        return dateValue.toLocaleDateString(undefined, {year: "numeric", month: "short", day: "numeric"});
     };
     const getSheetRangeReferences = (startReference = "", endReference = "") => {
         const start = parseSheetCellReference(String(startReference || "").toUpperCase());
@@ -1962,10 +1826,7 @@
             maxColumn: Math.max(...headerColumns)
         };
     };
-    const isSheetFilterHeaderCell = (rowIndex = 0, columnIndex = 0) => !!(sheetFilters.range
-        && rowIndex === sheetFilters.range.minRow
-        && columnIndex >= sheetFilters.range.minColumn
-        && columnIndex <= sheetFilters.range.maxColumn);
+    const isSheetFilterHeaderCell = (rowIndex = 0, columnIndex = 0) => !!(sheetFilters.range && rowIndex === sheetFilters.range.minRow && columnIndex >= sheetFilters.range.minColumn && columnIndex <= sheetFilters.range.maxColumn);
     const getSheetFilterUniqueValues = (columnIndex = 0) => {
         if (!sheetFilters.range) return [];
         const values = [];
@@ -2073,19 +1934,9 @@
             const cells = [];
             for (let nextColumnIndex = range.minColumn; nextColumnIndex <= range.maxColumn; nextColumnIndex += 1) {
                 const cellReference = getSheetCellReference(rowIndex, nextColumnIndex);
-                cells.push({
-                    value: sheetCellValues[cellReference] ?? "",
-                    style: getSheetCellStyle(cellReference),
-                    type: getSheetCellType(cellReference),
-                    link: getSheetCellLink(cellReference),
-                    locked: isSheetCellLocked(cellReference)
-                });
+                cells.push({value: sheetCellValues[cellReference] ?? "", style: getSheetCellStyle(cellReference), type: getSheetCellType(cellReference), link: getSheetCellLink(cellReference), locked: isSheetCellLocked(cellReference)});
             }
-            rows.push({
-                originalRowIndex: rowIndex,
-                sortValue: getSheetFilterValue(getSheetCellReference(rowIndex, columnIndex)),
-                cells
-            });
+            rows.push({originalRowIndex: rowIndex, sortValue: getSheetFilterValue(getSheetCellReference(rowIndex, columnIndex)), cells});
         }
         rows.sort((left, right) => compareSheetSortValues(left.sortValue, right.sortValue, direction)
             || (left.originalRowIndex - right.originalRowIndex));
@@ -2216,33 +2067,25 @@
         captureActiveSheetInput();
         const needle = String(query || "").trim().toLowerCase();
         if (!needle) return [];
-        return collectSheetCells()
-            .filter(({cellReference, value}) => {
-                const rawValue = String(value ?? "");
-                const displayValue = getSheetCellDisplayValue(cellReference);
-                return rawValue.toLowerCase().includes(needle)
-                    || String(displayValue ?? "").toLowerCase().includes(needle);
-            })
-            .sort((first, second) => {
-                const firstPosition = parseSheetCellReference(first.cellReference);
-                const secondPosition = parseSheetCellReference(second.cellReference);
-                return (firstPosition.rowIndex - secondPosition.rowIndex)
-                    || (firstPosition.columnIndex - secondPosition.columnIndex);
-            })
-            .slice(0, 50)
-            .map(({cellReference, value}) => {
-                const displayValue = getSheetCellDisplayValue(cellReference);
-                const rawValue = String(value ?? "");
-                const visibleValue = String(displayValue || rawValue || "");
-                const detail = rawValue && rawValue !== visibleValue
-                    ? `${visibleValue} (${rawValue})`
-                    : visibleValue;
-                return {
-                    cellReference,
-                    label: cellReference,
-                    detail
-                };
-            });
+        return collectSheetCells().filter(({cellReference, value}) => {
+            const rawValue = String(value ?? "");
+            const displayValue = getSheetCellDisplayValue(cellReference);
+            return rawValue.toLowerCase().includes(needle) || String(displayValue ?? "").toLowerCase().includes(needle);
+        }).sort((first, second) => {
+            const firstPosition = parseSheetCellReference(first.cellReference);
+            const secondPosition = parseSheetCellReference(second.cellReference);
+            return (firstPosition.rowIndex - secondPosition.rowIndex) || (firstPosition.columnIndex - secondPosition.columnIndex);
+        }).slice(0, 50).map(({cellReference, value}) => {
+            const displayValue = getSheetCellDisplayValue(cellReference);
+            const rawValue = String(value ?? "");
+            const visibleValue = String(displayValue || rawValue || "");
+            const detail = rawValue && rawValue !== visibleValue ? `${visibleValue} (${rawValue})` : visibleValue;
+            return {
+                cellReference,
+                label: cellReference,
+                detail
+            };
+        });
     };
     const scrollToSheetSearchMatch = (match = null) => {
         const cellReference = String(match?.cellReference || "").toUpperCase();
@@ -2278,10 +2121,7 @@
             });
             return true;
         }
-        inputDialogue({
-            title: "Search",
-            placeholder: "Find cell value",
-            confirmation: (_, query) => {
+        inputDialogue({title: "Search", placeholder: "Find cell value", confirmation: (_, query) => {
                 const match = createSheetSearchMatches(query)[0];
                 if (!scrollToSheetSearchMatch(match)) modular.error("No matches found");
             }
@@ -2323,10 +2163,7 @@
                 };
             }).filter((item) => item.label || item.value);
         }
-        return positions.sort((a, b) => a.rowIndex - b.rowIndex || a.columnIndex - b.columnIndex).map(({reference}) => ({
-            label: reference,
-            value: Number(evaluateSheetCell(reference)) || 0
-        }));
+        return positions.sort((a, b) => a.rowIndex - b.rowIndex || a.columnIndex - b.columnIndex).map(({reference}) => ({label: reference, value: Number(evaluateSheetCell(reference)) || 0}));
     };
     const getChartDataFromRange = (rangeText = "") => {
         const range = parseSheetRangeToken(normalizeSheetRangeInput(rangeText));
@@ -2390,9 +2227,7 @@
         const targetDirectory = getSheetFileDirectory(activeSheetFilePath) || "Documents";
         const uploadUrl = targetDirectory ? `/api/upload?directory=${encodeURIComponent(targetDirectory)}` : "/api/upload";
         if (typeof window.StandardUploads?.uploadFile === "function") {
-            const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
-                label: `Uploading ${file.name || "image"}`
-            });
+            const response = await window.StandardUploads.uploadFile(file, uploadUrl, {label: `Uploading ${file.name || "image"}`});
             if (!response?.ok) throw new Error(`Upload failed (${response?.status || 0})`);
         } else {
             const formData = new FormData();
@@ -2567,18 +2402,7 @@
             return false;
         }
         const anchorPosition = getSheetCellPosition(getSheetSelectionAnchorCell());
-        const chartItem = normalizeSheetChart({
-            id: `sheet-chart-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            type,
-            range,
-            title,
-            x: anchorPosition.x,
-            y: anchorPosition.y,
-            width: SHEET_CHART_DEFAULT_WIDTH,
-            height: SHEET_CHART_DEFAULT_HEIGHT,
-            labelValues,
-            data: sourceData
-        });
+        const chartItem = normalizeSheetChart({id: `sheet-chart-${Date.now()}-${Math.floor(Math.random() * 1000)}`, type, range, title, x: anchorPosition.x, y: anchorPosition.y, width: SHEET_CHART_DEFAULT_WIDTH, height: SHEET_CHART_DEFAULT_HEIGHT, labelValues, data: sourceData});
         if (!chartItem) return false;
         sheetCharts.push(chartItem);
         activeSheetChartId = chartItem.id;
@@ -2656,13 +2480,7 @@
                     const rangeValue = windowNode.querySelector("#editor-sheet-chart-range")?.value || chartSource.range;
                     const titleValue = windowNode.querySelector("#editor-sheet-chart-title")?.value || "Chart";
                     const labelValues = windowNode.querySelector("#editor-sheet-chart-label-values")?.checked === true;
-                    const inserted = insertSheetChart({
-                        type: selectedType,
-                        range: normalizeSheetRangeInput(rangeValue),
-                        data: chartSource.hasSelectionData ? chartSource.data : [],
-                        title: titleValue,
-                        labelValues
-                    });
+                    const inserted = insertSheetChart({type: selectedType, range: normalizeSheetRangeInput(rangeValue), data: chartSource.hasSelectionData ? chartSource.data : [], title: titleValue, labelValues});
                     if (inserted) routeContext?.portal?.close?.();
                     else {
                         hasSubmittedChart = false;
@@ -2758,9 +2576,7 @@
         const cellLabel = document.getElementById("editor-sheet-active-cell");
         const formulaInput = document.getElementById("editor-sheet-formula");
         if (cellLabel) cellLabel.textContent = getSheetSelectionLabel();
-        if (formulaInput && document.activeElement !== formulaInput) {
-            formulaInput.value = sheetCellValues[activeSheetCell] ?? "";
-        }
+        if (formulaInput && document.activeElement !== formulaInput) formulaInput.value = sheetCellValues[activeSheetCell] ?? "";
         if (formulaInput) {
             const isLocked = isSheetCellLocked(activeSheetCell);
             formulaInput.readOnly = isLocked;
@@ -2863,14 +2679,7 @@
         const shiftedCells = collectSheetCells().map(({cellReference, value, style, type, link, locked}) => {
             const position = parseSheetCellReference(cellReference);
             const targetRowIndex = position.rowIndex >= nextRowIndex ? position.rowIndex + 1 : position.rowIndex;
-            return {
-                cellReference: getSheetCellReference(targetRowIndex, position.columnIndex),
-                value,
-                style,
-                type,
-                link,
-                locked
-            };
+            return {cellReference: getSheetCellReference(targetRowIndex, position.columnIndex), value, style, type, link, locked};
         });
         sheetRows += 1;
         shiftSheetDimensionMap(sheetRowHeights, nextRowIndex, 1, sheetRows);
@@ -2888,14 +2697,7 @@
             const position = parseSheetCellReference(cellReference);
             if (position.rowIndex === nextRowIndex) return [];
             const targetRowIndex = position.rowIndex > nextRowIndex ? position.rowIndex - 1 : position.rowIndex;
-            return [{
-                cellReference: getSheetCellReference(targetRowIndex, position.columnIndex),
-                value,
-                style,
-                type,
-                link,
-                locked
-            }];
+            return [{cellReference: getSheetCellReference(targetRowIndex, position.columnIndex), value, style, type, link, locked}];
         });
         sheetRows = Math.max(1, sheetRows - 1);
         delete sheetRowHeights[nextRowIndex];
@@ -2912,14 +2714,7 @@
         const shiftedCells = collectSheetCells().map(({cellReference, value, style, type, link, locked}) => {
             const position = parseSheetCellReference(cellReference);
             const targetColumnIndex = position.columnIndex >= nextColumnIndex ? position.columnIndex + 1 : position.columnIndex;
-            return {
-                cellReference: getSheetCellReference(position.rowIndex, targetColumnIndex),
-                value,
-                style,
-                type,
-                link,
-                locked
-            };
+            return {cellReference: getSheetCellReference(position.rowIndex, targetColumnIndex), value, style, type, link, locked};
         });
         sheetColumns += 1;
         shiftSheetDimensionMap(sheetColumnWidths, nextColumnIndex, 1, sheetColumns);
@@ -2937,14 +2732,7 @@
             const position = parseSheetCellReference(cellReference);
             if (position.columnIndex === nextColumnIndex) return [];
             const targetColumnIndex = position.columnIndex > nextColumnIndex ? position.columnIndex - 1 : position.columnIndex;
-            return [{
-                cellReference: getSheetCellReference(position.rowIndex, targetColumnIndex),
-                value,
-                style,
-                type,
-                link,
-                locked
-            }];
+            return [{cellReference: getSheetCellReference(position.rowIndex, targetColumnIndex), value, style, type, link, locked}];
         });
         sheetColumns = Math.max(1, sheetColumns - 1);
         delete sheetColumnWidths[nextColumnIndex];
@@ -3061,21 +2849,9 @@
         if (alignmentButton && alignmentButton.dataset.bound !== "1") {
             alignmentButton.dataset.bound = "1";
             alignmentButton.popoutmenu([
-                {
-                    label: "Align Left",
-                    icon: SHEET_ALIGN_ICONS.left,
-                    action: () => applySheetStyleToSelection((style) => ({...style, textAlign: "left"}))
-                },
-                {
-                    label: "Align Center",
-                    icon: SHEET_ALIGN_ICONS.center,
-                    action: () => applySheetStyleToSelection((style) => ({...style, textAlign: "center"}))
-                },
-                {
-                    label: "Align Right",
-                    icon: SHEET_ALIGN_ICONS.right,
-                    action: () => applySheetStyleToSelection((style) => ({...style, textAlign: "right"}))
-                }
+                {label: "Align Left", icon: SHEET_ALIGN_ICONS.left, action: () => applySheetStyleToSelection((style) => ({...style, textAlign: "left"}))},
+                {label: "Align Center", icon: SHEET_ALIGN_ICONS.center, action: () => applySheetStyleToSelection((style) => ({...style, textAlign: "center"}))},
+                {label: "Align Right", icon: SHEET_ALIGN_ICONS.right, action: () => applySheetStyleToSelection((style) => ({...style, textAlign: "right"}))}
             ]);
         }
         if (linkButton && linkButton.dataset.bound !== "1") {
@@ -3333,20 +3109,14 @@
             if (!isSheetWindowShown()) return;
             if (isSheetShortcutBlockedByDialogue()) return;
             if ((!event.ctrlKey && !event.metaKey) || event.altKey || event.repeat) return;
-            const buttonIdByKey = {
-                b: "editor-sheet-style-bold",
-                i: "editor-sheet-style-italic",
-                u: "editor-sheet-style-underline"
-            };
+            const buttonIdByKey = {b: "editor-sheet-style-bold", i: "editor-sheet-style-italic", u: "editor-sheet-style-underline"};
             const buttonId = buttonIdByKey[String(event.key || "").toLowerCase()];
             if (!buttonId) return;
             const activeElement = document.activeElement;
             const activeElementId = String(activeElement?.id || "");
             const isSheetCellInput = activeElementId.startsWith("sheet-cell-");
             const isSheetFormulaInput = activeElementId === "editor-sheet-formula";
-            const isEditingOutsideSheetCell = activeElement
-                && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable)
-                && !isSheetCellInput;
+            const isEditingOutsideSheetCell = activeElement && ((activeElement.tagName === "INPUT") || (activeElement.tagName === "TEXTAREA") || activeElement.isContentEditable) && !isSheetCellInput;
             if (isSheetFormulaInput || isEditingOutsideSheetCell) return;
             const buttonNode = document.getElementById(buttonId);
             if (!buttonNode) return;
@@ -3461,9 +3231,7 @@
             document.addEventListener("mousemove", (event) => {
                 if (!activeSheetResize) return;
                 event.preventDefault();
-                const nextSize = activeSheetResize.startSize + (activeSheetResize.axis === "column"
-                    ? event.clientX - activeSheetResize.startPointer
-                    : event.clientY - activeSheetResize.startPointer);
+                const nextSize = activeSheetResize.startSize + (activeSheetResize.axis === "column" ? event.clientX - activeSheetResize.startPointer : event.clientY - activeSheetResize.startPointer);
                 if (activeSheetResize.axis === "column") {
                     sheetColumnWidths[activeSheetResize.index] = Math.min(SHEET_MAX_CELL_WIDTH, Math.max(SHEET_MIN_CELL_WIDTH, Math.round(nextSize)));
                 } else {
@@ -3509,27 +3277,10 @@
                     cellInput.blur();
                 });
                 cellInput.contextmenu([
-                    {
-                        label: "Hyperlink",
-                        icon: SHEET_LINK_ICON,
-                        action: () => showSheetHyperlinkDialogue(cellReference)
-                    },
-                    {
-                        label: "Lock Cell",
-                        icon: SHEET_LOCK_ICON,
-                        visible: () => !isSheetCellLocked(cellReference),
-                        action: () => toggleSheetCellLock(cellReference, true)
-                    },
-                    {
-                        label: "Unlock Cell",
-                        icon: SHEET_UNLOCK_ICON,
-                        visible: () => isSheetCellLocked(cellReference),
-                        action: () => toggleSheetCellLock(cellReference, false)
-                    },
-                    {
-                        label: "Style",
-                        action: (_, event) => openSheetCellStyleEditor(cellReference, event)
-                    }
+                    {label: "Hyperlink", icon: SHEET_LINK_ICON, action: () => showSheetHyperlinkDialogue(cellReference)},
+                    {label: "Lock Cell", icon: SHEET_LOCK_ICON, visible: () => !isSheetCellLocked(cellReference), action: () => toggleSheetCellLock(cellReference, true)},
+                    {label: "Unlock Cell", icon: SHEET_UNLOCK_ICON, visible: () => isSheetCellLocked(cellReference), action: () => toggleSheetCellLock(cellReference, false)},
+                    {label: "Style", action: (_, event) => openSheetCellStyleEditor(cellReference, event)}
                 ]);
                 cellInput.addEventListener("blur", () => {
                     if (isSheetCellLocked(cellReference)) {
@@ -3586,30 +3337,12 @@
                 rowHeader.addEventListener("click", () => setActiveSheetRow(rowIndex));
                 rowHeader.addEventListener("contextmenu", () => setActiveSheetRow(rowIndex));
                 rowHeader.contextmenu([
-                    {
-                        label: "Insert Row Above",
-                        action: () => insertSheetRowAt(rowIndex)
-                    },
-                    {
-                        label: "Insert Row Below",
-                        action: () => insertSheetRowAt(rowIndex + 1)
-                    },
-                    {
-                        label: "Freeze Row",
-                        visible: () => rowIndex === 0 && !isFirstSheetRowFrozen,
-                        action: () => toggleFirstSheetRowFreeze()
-                    },
-                    {
-                        label: "Unfreeze Row",
-                        visible: () => rowIndex === 0 && isFirstSheetRowFrozen,
-                        action: () => toggleFirstSheetRowFreeze()
-                    },
+                    {label: "Insert Row Above", action: () => insertSheetRowAt(rowIndex)},
+                    {label: "Insert Row Below", action: () => insertSheetRowAt(rowIndex + 1)},
+                    {label: "Freeze Row", visible: () => rowIndex === 0 && !isFirstSheetRowFrozen, action: () => toggleFirstSheetRowFreeze()},
+                    {label: "Unfreeze Row", visible: () => rowIndex === 0 && isFirstSheetRowFrozen, action: () => toggleFirstSheetRowFreeze()},
                     "separator",
-                    {
-                        label: "Delete Row",
-                        destructive: true,
-                        action: () => deleteSheetRowAt(rowIndex)
-                    }
+                    {label: "Delete Row", destructive: true, action: () => deleteSheetRowAt(rowIndex)}
                 ]);
             }
             const rowResizeHandle = document.getElementById(`editor-sheet-row-resize-${rowIndex}`);
@@ -3618,12 +3351,7 @@
                 rowResizeHandle.addEventListener("mousedown", (event) => {
                     event.preventDefault();
                     event.stopPropagation();
-                    activeSheetResize = {
-                        axis: "row",
-                        index: rowIndex,
-                        startPointer: event.clientY,
-                        startSize: getSheetRowHeight(rowIndex)
-                    };
+                    activeSheetResize = {axis: "row", index: rowIndex, startPointer: event.clientY, startSize: getSheetRowHeight(rowIndex)};
                     document.body.classList.add("editor-sheet-resizing-rows");
                 });
                 rowResizeHandle.addEventListener("dblclick", (event) => {
@@ -3640,20 +3368,10 @@
                 columnHeader.addEventListener("click", () => setActiveSheetColumn(columnIndex));
                 columnHeader.addEventListener("contextmenu", () => setActiveSheetColumn(columnIndex));
                 columnHeader.contextmenu([
-                    {
-                        label: "Insert Column Left",
-                        action: () => insertSheetColumnAt(columnIndex)
-                    },
-                    {
-                        label: "Insert Column Right",
-                        action: () => insertSheetColumnAt(columnIndex + 1)
-                    },
+                    {label: "Insert Column Left", action: () => insertSheetColumnAt(columnIndex)},
+                    {label: "Insert Column Right", action: () => insertSheetColumnAt(columnIndex + 1)},
                     "separator",
-                    {
-                        label: "Delete Column",
-                        destructive: true,
-                        action: () => deleteSheetColumnAt(columnIndex)
-                    }
+                    {label: "Delete Column", destructive: true, action: () => deleteSheetColumnAt(columnIndex)}
                 ]);
             }
             const columnResizeHandle = document.getElementById(`editor-sheet-column-resize-${columnIndex}`);
@@ -3662,12 +3380,7 @@
                 columnResizeHandle.addEventListener("mousedown", (event) => {
                     event.preventDefault();
                     event.stopPropagation();
-                    activeSheetResize = {
-                        axis: "column",
-                        index: columnIndex,
-                        startPointer: event.clientX,
-                        startSize: getSheetColumnWidth(columnIndex)
-                    };
+                    activeSheetResize = {axis: "column", index: columnIndex, startPointer: event.clientX, startSize: getSheetColumnWidth(columnIndex)};
                     document.body.classList.add("editor-sheet-resizing-columns");
                 });
                 columnResizeHandle.addEventListener("dblclick", (event) => {
@@ -3687,9 +3400,7 @@
                 }
                 sheetCellValues[activeSheetCell] = formulaInput.value;
                 const activeInput = getSheetCellInput(activeSheetCell);
-                if (activeInput && document.activeElement === activeInput) {
-                    activeInput.value = formulaInput.value;
-                }
+                if (activeInput && document.activeElement === activeInput) activeInput.value = formulaInput.value;
                 saveSheetPortalState();
             });
             formulaInput.addEventListener("keydown", (event) => {
@@ -3724,9 +3435,7 @@
             tools: [{
                 title: "Save",
                 icon: modular.icons.save,
-                onclick: () => {
-                    saveLoadedSheet();
-                }
+                onclick: () => saveLoadedSheet()
             }, {
                 title: "Search",
                 icon: modular.icons.search,

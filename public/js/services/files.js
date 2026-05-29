@@ -72,20 +72,12 @@
     const openNoteImage = async source => {
         const imageSource = String(source || "").trim();
         if (!imageSource) return false;
-        if (typeof window.StandardInternals?.openImageSource === "function") {
-            return window.StandardInternals.openImageSource(imageSource, {title: "Note Image"});
-        }
-        if (typeof window.StandardInternals?.openImageFilePath === "function" && !imageSource.startsWith("data:image/")) {
-            return window.StandardInternals.openImageFilePath(imageSource);
-        }
+        if (typeof window.StandardInternals?.openImageSource === "function") return window.StandardInternals.openImageSource(imageSource, {title: "Note Image"});
+        if (typeof window.StandardInternals?.openImageFilePath === "function" && !imageSource.startsWith("data:image/")) return window.StandardInternals.openImageFilePath(imageSource);
         if (typeof modular?.start === "function") modular.start("com.standard.internals");
         for (let attempt = 0; attempt < 20; attempt++) {
-            if (typeof window.StandardInternals?.openImageSource === "function") {
-                return window.StandardInternals.openImageSource(imageSource, {title: "Note Image"});
-            }
-            if (typeof window.StandardInternals?.openImageFilePath === "function" && !imageSource.startsWith("data:image/")) {
-                return window.StandardInternals.openImageFilePath(imageSource);
-            }
+            if (typeof window.StandardInternals?.openImageSource === "function") return window.StandardInternals.openImageSource(imageSource, {title: "Note Image"});
+            if (typeof window.StandardInternals?.openImageFilePath === "function" && !imageSource.startsWith("data:image/")) return window.StandardInternals.openImageFilePath(imageSource);
             await new Promise(resolve => setTimeout(resolve, 50));
         }
         return false;
@@ -112,9 +104,7 @@
         if (normalizedPath.startsWith("/home/standard-system/")) return normalizedPath.replace(/^\/home\/standard-system\//, "") || "Documents";
         return normalizedPath.replace(/^\/+/, "") || "Documents";
     };
-    const syncUploadDirectory = () => {
-        window.StandardFilesUploadDirectory = normalizeUploadDirectory(active_upload_directory);
-    };
+    const syncUploadDirectory = () => window.StandardFilesUploadDirectory = normalizeUploadDirectory(active_upload_directory);
     const setActiveUploadDirectory = directoryPath => {
         active_upload_directory = directoryPath;
         syncUploadDirectory();
@@ -162,15 +152,7 @@
         const needle = String(query || "").trim().toLowerCase();
         if (!needle) return [];
         const root = getFilesSearchRoot(portal);
-        return Array.from(root.querySelectorAll(".file-folder"))
-            .map((tile, index) => ({
-                tile,
-                index,
-                label: getFileTileSearchLabel(tile),
-                detail: getFileTileSearchDetail(tile)
-            }))
-            .filter(match => `${match.label} ${match.detail}`.toLowerCase().includes(needle))
-            .slice(0, 50);
+        return Array.from(root.querySelectorAll(".file-folder")).map((tile, index) => ({tile, index, label: getFileTileSearchLabel(tile), detail: getFileTileSearchDetail(tile)})).filter(match => `${match.label} ${match.detail}`.toLowerCase().includes(needle)).slice(0, 50);
     };
     const previewFilesSearchMatch = (match = null) => {
         const tile = match?.tile;
@@ -199,21 +181,14 @@
                 preview: (_, match) => previewFilesSearchMatch(match),
                 confirmation: (query, match, matches) => {
                     const selectedMatch = match || matches?.[0] || createFilesSearchMatches(query, portal)[0];
-                    if (!previewFilesSearchMatch(selectedMatch)) {
-                        modular.error("No matches found");
-                    }
+                    if (!previewFilesSearchMatch(selectedMatch)) modular.error("No matches found");
                 }
             });
             return true;
         }
-        inputDialogue({
-            title: "Search",
-            placeholder: "Find files",
-            confirmation: (_, query) => {
+        inputDialogue({title: "Search", placeholder: "Find files", confirmation: (_,query) => {
                 const match = createFilesSearchMatches(query, portal)[0];
-                if (!previewFilesSearchMatch(match)) {
-                    modular.error("No matches found");
-                }
+                if (!previewFilesSearchMatch(match)) modular.error("No matches found");
             }
         });
         return true;
@@ -233,12 +208,7 @@
             refreshFileListRoot(rootId, options);
         }
     }));
-    const fileSortButton = id => button({
-        id,
-        style: "small naked float-right hover-zoom",
-        icon: FILE_SORT_ICON,
-        title: "Sort"
-    });
+    const fileSortButton = id => button({id, style: "small naked float-right hover-zoom", icon: FILE_SORT_ICON, title: "Sort"});
     const bindFileSortButton = (id, rootId, options = {}) => {
         const sortButton = document.getElementById(id);
         if (sortButton?.dataset.sortMenuBound === "1") return;
@@ -250,9 +220,7 @@
     const getFileTypeIconPath = (fileLike = {}) => {
         const rawPath = typeof fileLike === "string" ? fileLike : (fileLike?.path || fileLike?.name || "");
         let icon = "folder";
-        if (rawPath && rawPath.split("/").pop().includes(".")) {
-            icon = rawPath.split(".").pop().toLowerCase();
-        }
+        if (rawPath && rawPath.split("/").pop().includes(".")) icon = rawPath.split(".").pop().toLowerCase();
         return `/icons/${icon}.png`;
     };
     const triggerFileDownload = (rawPath = "") => {
@@ -290,10 +258,7 @@
     const deleteNoteFromNotesSection = (noteId, note = {}) => {
         if (!noteId) return;
         const noteLabel = String(note?.created || "note").trim() || "note";
-        confirmationDialogue({
-            title: "Delete note",
-            content: `Are you sure you want to delete ${noteLabel}?`,
-            confirmation: () => {
+        confirmationDialogue({title: "Delete note", content: `Are you sure you want to delete ${noteLabel}?`, confirmation: () => {
                 CLI.send(`[notes] - <id ${noteId}>`).then(response => {
                     if (response === 1) {
                         modular.refresh("com.standard.notes");
@@ -311,17 +276,9 @@
     const getNoteFromTile = root => {
         const noteTile = root?.closest?.(".note-tile");
         if (!noteTile) return null;
-        return {
-            id: noteTile.getAttribute("directive"),
-            created: noteTile.querySelector("em")?.innerText || "View Note",
-            content: noteTile.querySelector(".note-tile-content")?.innerHTML || "",
-            color: noteTile.style.background || window.getComputedStyle(noteTile).getPropertyValue("background-color")
-        };
+        return {id: noteTile.getAttribute("directive"), created: noteTile.querySelector("em")?.innerText || "View Note", content: noteTile.querySelector(".note-tile-content")?.innerHTML || "", color: noteTile.style.background || window.getComputedStyle(noteTile).getPropertyValue("background-color")};
     };
-    const renderNoNotesState = () => div({style: "notes-empty-state", content: children([
-        img({src: "/icons/interfaces/notes.png", style: "notes-empty-icon"}),
-        div({style: "notes-empty-label", content: "No notes"})
-    ])});
+    const renderNoNotesState = () => div({style: "notes-empty-state", content: children([img({src: "/icons/interfaces/notes.png", style: "notes-empty-icon"}), div({style: "notes-empty-label", content: "No notes"})])});
     const isWhiteboardFilePath = (rawPath = "") => /\.wtb$/i.test(String(rawPath || ""));
     const isSlidesFilePath = (rawPath = "") => /\.slds$/i.test(String(rawPath || ""));
     const isSpreadsheetFilePath = (rawPath = "") => /\.sprdshts$/i.test(String(rawPath || ""));
@@ -350,36 +307,19 @@
         if (!files.length) return;
         const targetDirectory = getDefaultUploadDirectory();
         setActiveUploadDirectory(targetDirectory);
-        const multiProgress = options?.multiFileProgress && files.length > 1 && typeof window.StandardUploads?.createMultiFileProgress === "function"
-            ? window.StandardUploads.createMultiFileProgress(files)
-            : null;
+        const multiProgress = options?.multiFileProgress && files.length > 1 && typeof window.StandardUploads?.createMultiFileProgress === "function" ? window.StandardUploads.createMultiFileProgress(files) : null;
         try {
             for (let index = 0; index < files.length; index++) {
                 const file = files[index];
                 const uploadUrl = `/api/upload?directory=${encodeURIComponent(targetDirectory)}`;
                 if (typeof window.StandardUploads?.uploadFile === "function") {
-                    const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
-                        label: `Uploading ${file.name || "file"}`,
-                        suppressProgress: !!multiProgress,
-                        onProgress: multiProgress
-                            ? progress => multiProgress.update({
-                                currentIndex: index,
-                                file,
-                                loaded: progress?.loaded || 0,
-                                total: progress?.total || file.size || 0,
-                                indeterminate: !!progress?.indeterminate
-                            })
-                            : null
-                    });
+                    const response = await window.StandardUploads.uploadFile(file, uploadUrl, {label: `Uploading ${file.name || "file"}`, suppressProgress: !!multiProgress, onProgress: multiProgress ? progress => multiProgress.update({currentIndex: index, file, loaded: progress?.loaded || 0, total: progress?.total || file.size || 0, indeterminate: !!progress?.indeterminate}) : null});
                     if (!response?.ok) throw new Error(`Upload failed (${response?.status || 0})`);
                 } else {
                     if (multiProgress) multiProgress.update({currentIndex: index, file, loaded: 0, total: file.size || 0, indeterminate: true});
                     const formData = new FormData();
                     formData.append("file", file);
-                    const response = await fetch(uploadUrl, {
-                        method: "POST",
-                        body: formData
-                    });
+                    const response = await fetch(uploadUrl, {method: "POST", body: formData});
                     if (!response.ok) throw new Error(`Upload failed (${response.status})`);
                     if (multiProgress) multiProgress.update({currentIndex: index, file, loaded: file.size || 1, total: file.size || 1});
                 }
@@ -412,30 +352,13 @@
         if (isImageFilePath(download.path)) {
             if (!openImageSource) return false;
             if (isSvgFilePath(download.path)) {
-                return openImageSource(await download.blob.text(), {
-                    path: download.path,
-                    title: download.fileName,
-                    isObjectUrl: false,
-                    revokePrevious: true,
-                    sourceNode
-                });
+                return openImageSource(await download.blob.text(), {path: download.path, title: download.fileName, isObjectUrl: false, revokePrevious: true, sourceNode});
             }
-            return openImageSource(URL.createObjectURL(download.blob), {
-                path: download.path,
-                title: download.fileName,
-                isObjectUrl: true,
-                revokePrevious: true,
-                sourceNode
-            });
+            return openImageSource(URL.createObjectURL(download.blob), {path: download.path, title: download.fileName, isObjectUrl: true, revokePrevious: true, sourceNode});
         }
         if (isVideoFilePath(download.path)) {
             if (!openVideoSource) return false;
-            return openVideoSource(download.path, URL.createObjectURL(download.blob), {
-                title: download.fileName,
-                isObjectUrl: true,
-                revokePrevious: true,
-                sourceNode
-            });
+            return openVideoSource(download.path, URL.createObjectURL(download.blob), {title: download.fileName, isObjectUrl: true, revokePrevious: true, sourceNode});
         }
         if (!openTextContent) return false;
         return openTextContent(download.path, await download.blob.text(), {readOnly: false, sourceNode});
@@ -464,30 +387,14 @@
         return openPdfFilePath(rawPath, sourceNode);
     };
     const openFilePath = async (rawPath = "", sourceNode = null) => {
-        if (isWhiteboardFilePath(rawPath)) {
-            return openWhiteboardInBoardsApp(rawPath, sourceNode);
-        }
-        if (isSlidesFilePath(rawPath)) {
-            return openSlidesInSlidesApp(rawPath, sourceNode);
-        }
-        if (isSpreadsheetFilePath(rawPath)) {
-            return openSheetInSheetsApp(rawPath, sourceNode);
-        }
-        if (isCodeFilePath(rawPath)) {
-            return openCodeFileInCodeEditor(rawPath, sourceNode);
-        }
-        if (isTextFilePath(rawPath)) {
-            return openFileInInternalsApp(rawPath, sourceNode);
-        }
-        if (isImageFilePath(rawPath)) {
-            return openFileInInternalsApp(rawPath, sourceNode);
-        }
-        if (isVideoFilePath(rawPath)) {
-            return openFileInInternalsApp(rawPath, sourceNode);
-        }
-        if (isPdfFilePath(rawPath)) {
-            return openPdfInInternalsApp(rawPath, sourceNode);
-        }
+        if (isWhiteboardFilePath(rawPath)) return openWhiteboardInBoardsApp(rawPath, sourceNode);
+        if (isSlidesFilePath(rawPath)) return openSlidesInSlidesApp(rawPath, sourceNode);
+        if (isSpreadsheetFilePath(rawPath)) return openSheetInSheetsApp(rawPath, sourceNode);
+        if (isCodeFilePath(rawPath)) return openCodeFileInCodeEditor(rawPath, sourceNode);
+        if (isTextFilePath(rawPath)) return openFileInInternalsApp(rawPath, sourceNode);
+        if (isImageFilePath(rawPath)) return openFileInInternalsApp(rawPath, sourceNode);
+        if (isVideoFilePath(rawPath)) return openFileInInternalsApp(rawPath, sourceNode);
+        if (isPdfFilePath(rawPath)) return openPdfInInternalsApp(rawPath, sourceNode);
         return openFileInInternalsApp(rawPath, sourceNode);
     };
     window.StandardFiles = window.StandardFiles || {};
@@ -529,16 +436,10 @@
         const normalizedSource = getFilePathForRemoveCommand(originalPath);
         if (!normalizedSource) return;
         const currentName = normalizedSource.split("/").pop() || "";
-        inputDialogue({
-            title: "Rename file",
-            placeholder: "File name",
-            value: currentName,
-            confirmation: async (_, renamed) => {
+        inputDialogue({title: "Rename file", placeholder: "File name", value: currentName, confirmation: async (_, renamed) => {
                 const trimmedName = String(renamed || "").trim();
                 if (!trimmedName || trimmedName === currentName) return;
-                const targetPath = normalizedSource.includes("/")
-                    ? `${normalizedSource.substring(0, normalizedSource.lastIndexOf("/"))}/${trimmedName}`
-                    : trimmedName;
+                const targetPath = normalizedSource.includes("/") ? `${normalizedSource.substring(0, normalizedSource.lastIndexOf("/"))}/${trimmedName}` : trimmedName;
                 await CLI.send(CLI.buildFilesCommand("move", normalizedSource, targetPath));
                 await refreshFilesAfterMutation();
             }
@@ -546,15 +447,10 @@
     };
     const createFolderInCurrentDocumentsDirectory = () => {
         const baseDirectory = getFilePathForRemoveCommand(current_documents_directory);
-        inputDialogue({
-            title: "New folder",
-            placeholder: "Folder name",
-            confirmation: async (_, folderName) => {
+        inputDialogue({title: "New folder", placeholder: "Folder name", confirmation: async (_, folderName) => {
                 const trimmedName = String(folderName || "").trim();
                 if (!trimmedName) return;
-                const targetPath = baseDirectory
-                    ? `${String(baseDirectory).replace(/\/+$/, "")}/${trimmedName}`
-                    : trimmedName;
+                const targetPath = baseDirectory ? `${String(baseDirectory).replace(/\/+$/, "")}/${trimmedName}` : trimmedName;
                 await CLI.send(CLI.buildFilesCommand("folders", targetPath));
                 await refreshFilesAfterMutation();
             }
@@ -570,16 +466,12 @@
     const collectFolderPathsFromTree = (node, folders = new Set()) => {
         if (!node || typeof node !== "object") return folders;
         if (isFolderPath(node.path)) folders.add(getFilePathForRemoveCommand(node.path).replace(/\/+$/, ""));
-        if (Array.isArray(node.children)) {
-            node.children.forEach(child => collectFolderPathsFromTree(child, folders));
-        }
+        if (Array.isArray(node.children)) node.children.forEach(child => collectFolderPathsFromTree(child, folders));
         return folders;
     };
     const listMoveDestinationFolders = async () => {
         const tree = await CLI.send("tree");
-        return Array.from(collectFolderPathsFromTree(tree))
-            .filter(Boolean)
-            .sort((left, right) => left.localeCompare(right));
+        return Array.from(collectFolderPathsFromTree(tree)).filter(Boolean).sort((left, right) => left.localeCompare(right));
     };
     const getMoveTargetPath = (sourcePath, destinationPath) => {
         const normalizedSource = getFilePathForRemoveCommand(sourcePath);
@@ -816,13 +708,7 @@
         const openRenderedPhoto = () => {
             const renderedSource = getImageSourceFromTile(sourceNode);
             if (!renderedSource || typeof window.StandardInternals?.openImageSource !== "function") return false;
-            return window.StandardInternals.openImageSource(renderedSource, {
-                path: getFilePathForRemoveCommand(rawPath),
-                title: String(rawPath || "").split("/").pop() || "Photo",
-                isObjectUrl: renderedSource.startsWith("blob:"),
-                revokePrevious: false,
-                sourceNode
-            });
+            return window.StandardInternals.openImageSource(renderedSource, {path: getFilePathForRemoveCommand(rawPath), title: String(rawPath || "").split("/").pop() || "Photo", isObjectUrl: renderedSource.startsWith("blob:"), revokePrevious: false, sourceNode});
         };
         if (openRenderedPhoto()) return true;
         if (typeof modular?.start === "function") modular.start("com.standard.internals");
@@ -830,9 +716,7 @@
             if (openRenderedPhoto()) return true;
             await new Promise(resolve => setTimeout(resolve, 50));
         }
-        if (typeof window.StandardInternals?.openImageFilePath === "function") {
-            return window.StandardInternals.openImageFilePath(rawPath, sourceNode);
-        }
+        if (typeof window.StandardInternals?.openImageFilePath === "function") return window.StandardInternals.openImageFilePath(rawPath, sourceNode);
         return false;
     };
     const revokePhotoObjectUrls = () => {
@@ -1038,14 +922,10 @@
             return "";
         }
     };    const openVideoInVideoViewer = async (rawPath = "", sourceNode = null) => {
-        if (typeof window.StandardInternals?.openVideoFilePath === "function") {
-            return window.StandardInternals.openVideoFilePath(rawPath, sourceNode);
-        }
+        if (typeof window.StandardInternals?.openVideoFilePath === "function") return window.StandardInternals.openVideoFilePath(rawPath, sourceNode);
         if (typeof modular?.start === "function") modular.start("com.standard.internals");
         for (let attempt = 0; attempt < 20; attempt++) {
-            if (typeof window.StandardInternals?.openVideoFilePath === "function") {
-                return window.StandardInternals.openVideoFilePath(rawPath, sourceNode);
-            }
+            if (typeof window.StandardInternals?.openVideoFilePath === "function") return window.StandardInternals.openVideoFilePath(rawPath, sourceNode);
             await new Promise(resolve => setTimeout(resolve, 50));
         }
         return false;
@@ -1091,12 +971,7 @@
             as.push(div({
                 style: "padded secondary-tile brick list-item hidden file-folder",
                 directive: file.path,
-                content: children([img({style: "margined-icon float-left no-events", src: getFileTypeIconPath(file)}), div({
-                    content: children([div({
-                        style: "no-events",
-                        content: file.name
-                    }), em({style: "faded no-wrap hidden", content: file.path.replace("/home/standard-system/", "")})])
-                })]),
+                content: children([img({style: "margined-icon float-left no-events", src: getFileTypeIconPath(file)}), div({content: children([div({style: "no-events", content: file.name}), em({style: "faded no-wrap hidden", content: file.path.replace("/home/standard-system/", "")})])})]),
                 onclick: () => {
                     if (!isDirectory(file) || !openDirectories) {
                         openFilePath(file.path);
@@ -1143,19 +1018,11 @@
             route: (_, view) => div({content: children([
                     div({content: children([
                             div({style: "float-left margin-right", content: children([
-                                    button({
-                                        id: "documents-nav-back",
-                                        style: "small naked hover-zoom",
-                                        disabled: true,
-                                        icon: `<svg class="smaller-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>`
-                                    }), button({
-                                        id: "documents-nav-forward",
-                                        style: "small naked hover-zoom",
-                                        disabled: true,
-                                        icon: `<svg class="smaller-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>`
-                                    })
+                                    button({id: "documents-nav-back", style: "small naked hover-zoom", disabled: true, icon: `<svg class="smaller-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>`}),
+                                    button({id: "documents-nav-forward", style: "small naked hover-zoom", disabled: true, icon: `<svg class="smaller-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>`})
                                 ])
-                            }), fileSortButton("documents-sort", "documents"), button({
+                            }),
+                            fileSortButton("documents-sort", "documents"), button({
                                 id: "documents-create-folder",
                                 style: "small naked float-right hover-zoom",
                                 icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
@@ -1191,9 +1058,7 @@
                 }
                 const createFolderButton = document.getElementById("documents-create-folder");
                 if (createFolderButton) {
-                    createFolderButton.onclick = () => {
-                        createFolderInCurrentDocumentsDirectory();
-                    };
+                    createFolderButton.onclick = () => createFolderInCurrentDocumentsDirectory();
                 }
                 bindFileSortButton("documents-sort", "documents");
                 updateDocumentsHeader();
@@ -1228,7 +1093,7 @@
                                     }), div({style: "note-tile-content", content: sanitizeNoteMarkup(normalizeNoteContent(notes[i].content))}), em({
                                         style: "smaller faded no-wrap",
                                         content: notes[i].created
-                                    }),])
+                                    })])
                                 }))
                             }
                             return children(as);
@@ -1294,9 +1159,7 @@
                                     style: "hover-zoom hover-shadow shadowed hidden file-folder pointer",
                                     directive: photo.path,
                                     onclick: event => openPhotoInImageViewer(photo.path, event?.target),
-                                    content: children([
-                                        div({style: "radius", content: img({style: "fill radius pointer no-events brick covered", src: photoSource})}),
-                                    ])
+                                    content: children([div({style: "radius", content: img({style: "fill radius pointer no-events brick covered", src: photoSource})})])
                                 });
                             }));
                             return children(photoTiles);
@@ -1376,15 +1239,10 @@
                         content: () => CLI.send("tree Videos").then(async videos => {
                             const videoFiles = (videos?.children || []).filter(file => !isDirectory(file) && isVideoFilePath(file?.path));
                             const videoTiles = await Promise.all(videoFiles.map(async video => {
-                                const [thumbnailSource, progressRecord] = await Promise.all([
-                                    resolveVideoThumbnailSource(video, context?.cache),
-                                    readVideoProgressRecord(video?.path || "", context?.cache)
-                                ]);
+                                const [thumbnailSource, progressRecord] = await Promise.all([resolveVideoThumbnailSource(video, context?.cache), readVideoProgressRecord(video?.path || "", context?.cache)]);
                                 const progressPercent = getVideoProgressPercent(progressRecord);
                                 const videoLabel = video.name || (video.path || "").split("/").pop();
-                                const thumbnailContent = thumbnailSource
-                                    ? img({style: "fill radius pointer no-events brick covered", src: thumbnailSource, alt: videoLabel || "Video thumbnail"})
-                                    : div({style: "files-video-fallback", content: img({style: "no-events", src: "/icons/avi.png", alt: "Video"})});
+                                const thumbnailContent = thumbnailSource ? img({style: "fill radius pointer no-events brick covered", src: thumbnailSource, alt: videoLabel || "Video thumbnail"}) : div({style: "files-video-fallback", content: img({style: "no-events", src: "/icons/avi.png", alt: "Video"})});
                                 return div({
                                     style: "hover-zoom hover-shadow hidden file-folder pointer",
                                     directive: video.path,
