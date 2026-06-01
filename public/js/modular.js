@@ -416,6 +416,17 @@ let modular = {
         modular.error(modular.invalidFileNameMessage);
         return false;
     },
+    raisePinnedWidgets: (preferredElement = null) => {
+        const pinnedWindows = Array.from(document.querySelectorAll('.widget-window.widget-pinned'));
+        if (preferredElement?.classList?.contains('widget-pinned')) {
+            const preferredIndex = pinnedWindows.indexOf(preferredElement);
+            if (preferredIndex >= 0) pinnedWindows.splice(preferredIndex, 1);
+            pinnedWindows.push(preferredElement);
+        }
+        pinnedWindows.forEach((widgetWindow, index) => {
+            widgetWindow.style.zIndex = `${2147483000 + index}`;
+        });
+    },
     bringToFront: (element) => {
         if (!element) return;
         document.querySelectorAll('.draggable-window.window-focused').forEach(windowDiv => {
@@ -426,6 +437,7 @@ let modular = {
         element.classList.add('window-focused');
         modular.highestZ += 1;
         element.style.zIndex = `${modular.highestZ}`;
+        modular.raisePinnedWidgets(element);
     }
 }
 if (typeof window !== "undefined") window.addEventListener("resize", () => modular.dockWidgets());

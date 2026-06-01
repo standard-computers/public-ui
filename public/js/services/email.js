@@ -2,7 +2,11 @@
     const EMAIL_SERVICE_ID = "com.standard.email";
     const EMAIL_DRAG_MIME = "application/x-standard-email";
     const escapeEmailCommandValue = value => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
-    const buildFolderCommand = folder => folder === "everything" ? "[email]" : `[email] <folder "${escapeEmailCommandValue(folder || "inbox")}">`;
+    const buildFolderCommand = folder => {
+        const meta = EMAIL_FOLDERS.find(item => item.folder === folder);
+        if (meta?.query) return meta.query;
+        return folder === "everything" ? "[email]" : `[email] <folder "${escapeEmailCommandValue(folder || "inbox")}">`;
+    };
     const buildReadStateCommand = (recordId, read) => `[email] read ${read ? "true" : "false"} <id "${escapeEmailCommandValue(recordId)}">`;
     const buildStarredStateCommand = (recordId, starred) => `[email] starred ${starred ? "true" : "false"} <id "${escapeEmailCommandValue(recordId)}">`;
     const buildCategoryCommand = (recordId, category) => `[email] category ${category ? normalizeCategoryRecordId(category) : "\"\""} <id ${normalizeCategoryRecordId(recordId)}>`;
@@ -11,6 +15,7 @@
     const EMAIL_FOLDERS = [
         {folder: "inbox", title: "Inbox", icon: "inbox"},
         {folder: "sent", title: "Sent", icon: "sent"},
+        {folder: "drafts", title: "Drafts", icon: "modify", query: "[email] <direction 2>"},
         {folder: "everything", title: "Everything", icon: "everything"},
         {folder: "archived", title: "Archive", icon: "archive"},
         {folder: "spam", title: "Spam", icon: "spam"},
@@ -21,6 +26,7 @@
     const MAIL_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>`;
     const INBOX_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3" /></svg>`;
     const SENT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg>`;
+    const MODIFY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>`;
     const EVERYTHING_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m7.875 14.25 1.214 1.942a2.25 2.25 0 0 0 1.908 1.058h2.006c.776 0 1.497-.4 1.908-1.058l1.214-1.942M2.41 9h4.636a2.25 2.25 0 0 1 1.872 1.002l.164.246a2.25 2.25 0 0 0 1.872 1.002h2.092a2.25 2.25 0 0 0 1.872-1.002l.164-.246A2.25 2.25 0 0 1 16.954 9h4.636M2.41 9a2.25 2.25 0 0 0-.16.832V12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 12V9.832c0-.287-.055-.57-.16-.832M2.41 9a2.25 2.25 0 0 1 .382-.632l3.285-3.832a2.25 2.25 0 0 1 1.708-.786h8.43c.657 0 1.281.287 1.709.786l3.284 3.832c.163.19.291.404.382.632M4.5 20.25h15A2.25 2.25 0 0 0 21.75 18v-2.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125V18a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`;
     const ARCHIVE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>`;
     const SPAM_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>`;
@@ -80,6 +86,11 @@
         return fallback;
     };
     const EMAIL_THREAD_KEYS = ["thread", "TR", "threadId", "thread_id", "conversation", "conversationId", "conversation_id"];
+    const EMAIL_MESSAGE_ID_KEYS = ["messageId", "message_id", "message-id", "Message-ID"];
+    const EMAIL_IN_REPLY_TO_KEYS = ["inReplyTo", "in_reply_to", "in-reply-to", "In-Reply-To", "parentMessageId", "parent_message_id", "replyToMessageId", "reply_to_message_id", "originalMessageId", "original_message_id"];
+    const EMAIL_REFERENCES_KEYS = ["references", "References"];
+    const EMAIL_THREAD_TOPIC_KEYS = ["threadTopic", "thread_topic", "thread-topic", "Thread-Topic", "TT"];
+    const EMAIL_THREAD_INDEX_KEYS = ["threadIndex", "thread_index", "thread-index", "Thread-Index", "TI"];
     const stripMarkup = value => {
         const raw = String(value ?? "");
         if (!/<[a-z][\s\S]*>/i.test(raw)) return raw;
@@ -497,13 +508,52 @@
         const raw = message?.raw || message || {};
         return message?.from || formatAddress(firstValueLoose(raw, ["from", "sender", "author", "from_email", "fromEmail", "fromAddress", "from_address", "senderEmail", "sender_email", "senderAddress", "sender_address", "mailFrom", "mail_from"])) || String(context?.item?.querySelector?.(".email-message-sender")?.textContent || "").trim()
     };
+    const messageIdsFromValue = value => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value.flatMap(messageIdsFromValue);
+        const text = String(value);
+        const bracketed = [...text.matchAll(/<([^<>\s]+@[^<>\s]+)>/g)].map(match => match[1]);
+        if (bracketed.length) return bracketed;
+        return text.split(/[;,\s]+/).map(item => item.replace(/[<>]/g, "").trim()).filter(item => /^[^<>\s]+@[^<>\s]+$/.test(item));
+    };
+    const uniqueMessageIds = values => values.filter((value, index, list) => value && list.indexOf(value) === index);
+    const getEmailMessageIdValue = message => {
+        const raw = message?.raw || message || {};
+        return messageIdsFromValue(firstValueLoose(raw, EMAIL_MESSAGE_ID_KEYS))[0] || "";
+    };
+    const getEmailReplyReferencesValue = message => {
+        const raw = message?.raw || message || {};
+        return uniqueMessageIds([
+            ...messageIdsFromValue(firstValueLoose(raw, EMAIL_REFERENCES_KEYS)),
+            ...messageIdsFromValue(firstValueLoose(raw, EMAIL_IN_REPLY_TO_KEYS)),
+            getEmailMessageIdValue(message)
+        ]).join(" ");
+    };
+    const getEmailThreadTopicValue = message => {
+        const raw = message?.raw || message || {};
+        return firstValueLoose(raw, EMAIL_THREAD_TOPIC_KEYS, String(message?.subject || raw.subject || "").replace(/^((re|fw|fwd)\s*:\s*)+/i, ""));
+    };
+    const getEmailThreadIndexValue = message => {
+        const raw = message?.raw || message || {};
+        return firstValueLoose(raw, EMAIL_THREAD_INDEX_KEYS, "");
+    };
     const getEmailThreadValue = message => {
         const raw = message?.raw || message || {};
-        return message?.thread || firstValueLoose(raw, EMAIL_THREAD_KEYS, message?.recordId || message?.id || "");
+        const rfcThread = [
+            ...messageIdsFromValue(firstValueLoose(raw, EMAIL_REFERENCES_KEYS)),
+            ...messageIdsFromValue(firstValueLoose(raw, EMAIL_IN_REPLY_TO_KEYS)),
+            ...messageIdsFromValue(firstValueLoose(raw, EMAIL_MESSAGE_ID_KEYS))
+        ].filter((value, index, values) => value && values.indexOf(value) === index).join(" ");
+        return rfcThread || message?.thread || firstValueLoose(raw, EMAIL_THREAD_KEYS, message?.recordId || message?.id || "");
     };
     const buildStandardEmailAddress = username => {
         const normalizedUsername = String(username || "").trim().replace(/@.*$/, "").replace(/[^a-zA-Z0-9._-]/g, "");
         return normalizedUsername ? `${normalizedUsername}@standardemail.net` : "";
+    };
+    const buildOutboundMessageId = from => {
+        const domain = String(from || "").split("@").pop()?.replace(/[^a-zA-Z0-9.-]/g, "") || "standardemail.net";
+        const id = window.crypto?.randomUUID?.() || `${Date.now()}.${Math.random().toString(36).slice(2)}`;
+        return `${id}@${domain}`;
     };
     const getCurrentUserEmailAddress = async () => {
         const cachedUser = typeof modular?.user?.readCachedUserRecord === "function" ? modular.user.readCachedUserRecord() : null;
@@ -549,6 +599,7 @@
         }
         const message = context.message;
         const recipient = getReplyRecipient(message, context);
+        const parentMessageId = getEmailMessageIdValue(message);
         return openEmailComposer({
             mode: "reply",
             to: recipient,
@@ -558,6 +609,10 @@
                 id: message.id,
                 recordId: recordIdForContext(context),
                 thread: getEmailThreadValue(message),
+                inReplyTo: parentMessageId,
+                references: getEmailReplyReferencesValue(message),
+                threadTopic: getEmailThreadTopicValue(message),
+                threadIndex: getEmailThreadIndexValue(message),
                 from: message.from || "",
                 to: message.to || "",
                 subject: message.subject || "(No subject)",
@@ -672,8 +727,13 @@
     };
     const buildEmailCreateCommand = async (payload = {}, state = {}) => {
         const thread = state.replyTo?.thread || state.replyTo?.recordId || state.replyTo?.id || `email-${Date.now()}`;
+        const inReplyTo = state.replyTo?.inReplyTo || "";
+        const references = state.replyTo?.references || "";
+        const threadTopic = state.replyTo?.threadTopic || String(payload.subject || "").replace(/^((re|fw|fwd)\s*:\s*)+/i, "");
+        const threadIndex = state.replyTo?.threadIndex || "";
         const from = await getCurrentUserEmailAddress();
-        return `[email] + ("${escapeCliQuotedValue(thread)}", false, "${escapeCliQuotedValue(from)}", "${escapeCliQuotedValue(payload.to)}", "", "", "${escapeCliQuotedValue(payload.subject)}", "${escapeCliQuotedValue(payload.body)}", "${escapeCliQuotedValue(payload.html)}", "sent", @, true, false, 0, 1, "$now", @)`;
+        const messageId = buildOutboundMessageId(from);
+        return `[email] + ("${escapeCliQuotedValue(thread)}", "${escapeCliQuotedValue(messageId)}", "${escapeCliQuotedValue(inReplyTo)}", "${escapeCliQuotedValue(references)}", "${escapeCliQuotedValue(threadTopic)}", "${escapeCliQuotedValue(threadIndex)}", false, "${escapeCliQuotedValue(from)}", "${escapeCliQuotedValue(payload.to)}", "", "", "${escapeCliQuotedValue(payload.subject)}", "${escapeCliQuotedValue(payload.body)}", "${escapeCliQuotedValue(payload.html)}", "sent", @, true, false, 0, 1, "$now", @)`;
     };
     const sendComposedEmail = async (portal = null) => {
         const state = getComposerStateFromPortal(portal);
@@ -1485,6 +1545,10 @@
             text: "Sent",
             icon: SENT_ICON,
             route: () => loadMailboxFolder("sent", "Sent")
+        }, {
+            text: "Drafts",
+            icon: MODIFY_ICON,
+            route: () => loadMailboxFolder("drafts", "Drafts")
         }, {
             text: "Everything",
             icon: EVERYTHING_ICON,

@@ -1091,9 +1091,6 @@ function tileFocusedPortalFromShortcut(e) {
         e.preventDefault();
         return true;
     }
-    const activeElement = document.activeElement;
-    const interactiveSelector = "input, textarea, button, select, [contenteditable='true'], [role='textbox']";
-    if (activeElement?.matches?.(interactiveSelector)) return false;
     const focusedWindow = getFocusedPortalWindow();
     if (!focusedWindow?.portal || typeof focusedWindow.portal.tile !== "function") return false;
     e.preventDefault();
@@ -1102,9 +1099,6 @@ function tileFocusedPortalFromShortcut(e) {
     return true;
 }
 document.addEventListener("keydown", function (e) {
-    const activeElement = document.activeElement;
-    const interactiveSelector = "input, textarea, button, select, [contenteditable='true'], [role='textbox']";
-    const interactiveFocused = activeElement?.matches?.(interactiveSelector);
     if (e.ctrlKey && !e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "s") {
         const saveTool = getFocusedPortalSaveTool();
         e.preventDefault();
@@ -1136,7 +1130,7 @@ document.addEventListener("keydown", function (e) {
         return;
     }
     if (tileFocusedPortalFromShortcut(e)) return;
-    if (e.altKey && e.key.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey && !e.shiftKey && !interactiveFocused) {
+    if (e.altKey && e.key.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         const focusedWindow = getFocusedPortalWindow();
         if (focusedWindow?.portal && typeof focusedWindow.portal.hide === "function") {
             e.preventDefault();
@@ -1144,7 +1138,7 @@ document.addEventListener("keydown", function (e) {
             return;
         }
     }
-    if (e.altKey && e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.shiftKey && !interactiveFocused) {
+    if (e.altKey && e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         const openPortalWindows = getOpenPortalWindows();
         if (openPortalWindows.length) {
             const focusedWindow = getFocusedPortalWindow();

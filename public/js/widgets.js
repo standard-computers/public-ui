@@ -110,6 +110,8 @@ class Widget {
         }
         this.#pinButton = document.createElement('div');
         this.#pinButton.classList.add('closer', 'pin-button');
+        this.#pinButton.setAttribute("role", "button");
+        this.#pinButton.tabIndex = 0;
         this.#pinIcon = new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 16v5M8 5.292c0-.271 0-.407.013-.52a2 2 0 0 1 1.758-1.759c.114-.013.25-.013.52-.013h3.417c.271 0 .407 0 .52.013a2 2 0 0 1 1.759 1.758c.013.114.013.25.013.52c0 .088 0 .131-.003.172a1 1 0 0 1-.48.774c-.034.021-.073.04-.15.08l-.262.13c-.403.202-.605.303-.737.459a1 1 0 0 0-.216.442c-.042.2.002.422.09.864L15 12h.333c.62 0 .93 0 1.185.068a2 2 0 0 1 1.414 1.414c.068.255.068.565.068 1.185c0 .31 0 .465-.034.592a1 1 0 0 1-.707.707c-.127.034-.282.034-.592.034H7.333c-.31 0-.465 0-.592-.034a1 1 0 0 1-.707-.707C6 15.132 6 14.977 6 14.667c0-.62 0-.93.068-1.185a2 2 0 0 1 1.414-1.414C7.737 12 8.047 12 8.667 12H9l.758-3.788c.088-.442.132-.663.09-.864a1 1 0 0 0-.216-.442c-.132-.156-.334-.257-.737-.459l-.262-.13a2 2 0 0 1-.15-.08a1 1 0 0 1-.48-.774C8 5.423 8 5.379 8 5.292"/></svg>`, "image/svg+xml").documentElement;
         this.#unpinIcon = new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m3 21l5-5m5.259 2.871c-3.744-.85-7.28-4.386-8.13-8.13c-.135-.592-.202-.888-.007-1.369c.194-.48.433-.63.909-.927c1.076-.672 2.242-.886 3.451-.78c1.697.151 2.546.226 2.97.005c.423-.22.71-.736 1.286-1.767l.728-1.307c.48-.86.72-1.291 1.285-1.494s.905-.08 1.585.166a5.63 5.63 0 0 1 3.396 3.396c.246.68.369 1.02.166 1.585c-.203.564-.633.804-1.494 1.285l-1.337.745c-1.03.574-1.544.862-1.765 1.289c-.22.428-.14 1.258.02 2.918c.118 1.22-.085 2.394-.766 3.484c-.298.476-.447.714-.928.909c-.48.194-.777.127-1.37-.008" color="currentColor"/></svg>`, "image/svg+xml").documentElement;
         if (accent) {
@@ -118,11 +120,17 @@ class Widget {
         }
         this.#pinButton.appendChild(this.#pinIcon);
         this.#pinButton.appendChild(this.#unpinIcon);
-        this.#pinButton.addEventListener('click', () => this.#togglePinned());
+        this.#pinButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.#togglePinned();
+        });
         header.prepend(this.#pinButton);
         this.#setPinnedState(this.#isPinned);
         const exiter = document.createElement("div");
         exiter.classList.add('closer');
+        exiter.title = "Close widget";
+        exiter.setAttribute("aria-label", "Close widget");
         exiter.addEventListener("click", () => this.hide());
         const closeIcon = new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>`, "image/svg+xml").documentElement;
         if (accent) closeIcon.style.stroke = accent;
@@ -257,11 +265,13 @@ class Widget {
         };
         const startDrag = (e) => {
             if (this.#isPinned || isInteractiveTarget(e.target)) return;
+            if (typeof modular?.bringToFront === "function") modular.bringToFront(element);
             const {x, y} = getClientPosition(e);
             dragState.offsetX = x - element.offsetLeft;
             dragState.offsetY = y - element.offsetTop;
             dragState.isDragging = true;
             handle.style.cursor = 'grabbing';
+            element.style.cursor = 'grabbing';
             document.addEventListener('selectstart', dragState.disableSelection);
             if (e.cancelable) e.preventDefault();
         };
@@ -276,19 +286,21 @@ class Widget {
         const endDrag = () => {
             if (dragState.isDragging) {
                 dragState.isDragging = false;
-                handle.style.cursor = this.#isPinned ? 'default' : 'grab';
+                handle.style.cursor = 'grab';
+                element.style.cursor = 'grab';
                 document.removeEventListener('selectstart', dragState.disableSelection);
                 this.#persistWindowState({open: true});
             }
         };
-        handle.addEventListener('mousedown', startDrag);
-        handle.addEventListener('touchstart', startDrag, {passive: false});
+        element.addEventListener('mousedown', startDrag);
+        element.addEventListener('touchstart', startDrag, {passive: false});
         document.addEventListener('mousemove', moveDrag);
         document.addEventListener('touchmove', moveDrag, {passive: false});
         document.addEventListener('mouseup', endDrag);
         document.addEventListener('touchend', endDrag);
         document.addEventListener('touchcancel', endDrag);
         handle.style.cursor = 'grab';
+        element.style.cursor = 'grab';
         this.#dragState = {
             element, handle, ...dragState, onMouseDown: startDrag, onMouseMove: moveDrag, onMouseUp: endDrag
         };
@@ -377,12 +389,27 @@ class Widget {
     }
     #setPinnedState(isPinned) {
         this.#isPinned = Boolean(isPinned);
+        this.#widgetDiv?.classList?.toggle('widget-pinned', this.#isPinned);
+        if (this.#pinButton) {
+            const label = this.#isPinned ? "Unpin widget" : "Pin widget";
+            this.#pinButton.title = label;
+            this.#pinButton.setAttribute("aria-label", label);
+            this.#pinButton.setAttribute("aria-pressed", this.#isPinned ? "true" : "false");
+        }
         if (this.#dragState?.handle) {
             this.#dragState.handle.style.cursor = this.#isPinned ? 'default' : 'grab';
+        }
+        if (this.#widgetDiv) {
+            this.#widgetDiv.style.cursor = this.#isPinned ? 'default' : 'grab';
         }
         if (this.#pinIcon && this.#unpinIcon) {
             this.#pinIcon.style.display = this.#isPinned ? 'none' : 'block';
             this.#unpinIcon.style.display = this.#isPinned ? 'block' : 'none';
+        }
+        if (this.#isPinned && this.#widgetDiv?.parentElement && typeof modular?.bringToFront === "function") {
+            modular.bringToFront(this.#widgetDiv);
+        } else if (typeof modular?.raisePinnedWidgets === "function") {
+            modular.raisePinnedWidgets();
         }
     }
     #captureWindowState(extra = {}) {

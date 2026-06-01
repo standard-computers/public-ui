@@ -902,11 +902,6 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
         showOverlays();
     }
 
-    function shouldIgnoreEventTarget(target) {
-        if (!(target instanceof Element)) return false;
-        return Boolean(target.closest("input, textarea, select, [contenteditable]:not([contenteditable=\"false\"])"));
-    }
-
     function findTargetForKey(key = "") {
         const normalizedKey = normalizeKey(key);
         if (!normalizedKey) return null;
@@ -921,7 +916,6 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
 
     function handleKeydown(event) {
         if (event.defaultPrevented) return;
-        if (shouldIgnoreEventTarget(event.target)) return;
         if (event.key === "Alt") {
             if (event.repeat) return;
             if (active) deactivate();

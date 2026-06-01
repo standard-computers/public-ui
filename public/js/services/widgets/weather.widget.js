@@ -8,7 +8,7 @@
                     div({style: "weather-widget-icon hidden", content: ""}),
                     div({style: "weather-widget-temp", content: "--\u00B0F"}),
                     div({style: "weather-widget-summary", content: "Loading..."})
-                ])}),
+                ])})
             ])
         });
         const bindWidget = widgetNode => {
@@ -18,9 +18,7 @@
             const summaryNode = widgetNode.querySelector(".weather-widget-summary");
             const iconNode = widgetNode.querySelector(".weather-widget-icon");
             if (!locationNode || !tempNode || !summaryNode || !iconNode) return;
-            if (typeof widgetNode.__weatherWidgetUnsub === "function") {
-                widgetNode.__weatherWidgetUnsub();
-            }
+            if (typeof widgetNode.__weatherWidgetUnsub === "function") widgetNode.__weatherWidgetUnsub();
             widgetNode.__weatherWidgetUnsub = window.standardWeather.subscribe(snapshot => {
                 const weather = snapshot?.data;
                 locationNode.textContent = weather?.location?.name || snapshot?.locationLabel || "Weather";
@@ -38,13 +36,9 @@
                     iconNode.style.display = "none";
                     return;
                 }
-                tempNode.textContent = Number.isFinite(weather?.current?.temperature)
-                    ? `${Math.round(weather.current.temperature)}\u00B0F`
-                    : "--\u00B0F";
+                tempNode.textContent = Number.isFinite(weather?.current?.temperature) ? `${Math.round(weather.current.temperature)}\u00B0F` : "--\u00B0F";
                 summaryNode.textContent = weather?.current?.description || "Unavailable";
-                iconNode.innerHTML = weather?.current?.icon
-                    ? img({src: weather.current.icon, style: "small-icon contained float-left small-space-right"})
-                    : "";
+                iconNode.innerHTML = weather?.current?.icon ? img({src: weather.current.icon, style: "medium-icon contained float-left small-space-right"}) : "";
                 iconNode.style.display = weather?.current?.icon ? "" : "none";
             });
             widgetNode.onclick = () => modular.start("com.standard.weather");
@@ -65,11 +59,7 @@
         console.info("[weather] widget registered");
     };
     const waitForWidgetDependencies = (attempt = 0) => {
-        const ready = typeof modular !== "undefined"
-            && typeof Widget !== "undefined"
-            && typeof div === "function"
-            && typeof children === "function"
-            && typeof window.standardWeather !== "undefined";
+        const ready = typeof modular !== "undefined" && typeof Widget !== "undefined" && typeof div === "function" && typeof children === "function" && typeof window.standardWeather !== "undefined";
         if (ready) {
             registerWeatherWidget();
             return;
