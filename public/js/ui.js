@@ -799,6 +799,9 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
     let initialized = false;
     let overlayLayer = null;
     let overlayEntries = [];
+    let activeSequence = "";
+    let pendingExactTimer = null;
+    const PENDING_EXACT_DELAY = 700;
 
     function getFocusedInterfaceWindow() {
         const focusedWindow = document.querySelector(".draggable-window.window-focused");
@@ -856,10 +859,17 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
     }
 
     function normalizeKey(value = "") {
-        return String(value || "").trim().charAt(0).toUpperCase();
+        return String(value || "").trim().toUpperCase();
+    }
+
+    function clearPendingExact() {
+        if (!pendingExactTimer) return;
+        window.clearTimeout(pendingExactTimer);
+        pendingExactTimer = null;
     }
 
     function clearOverlays() {
+        clearPendingExact();
         overlayEntries.forEach(({overlay}) => overlay.remove());
         overlayEntries = [];
         if (overlayLayer) {
@@ -894,24 +904,41 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
 
     function deactivate() {
         active = false;
+        activeSequence = "";
         clearOverlays();
     }
 
     function activate() {
         active = true;
+        activeSequence = "";
         showOverlays();
     }
 
-    function findTargetForKey(key = "") {
-        const normalizedKey = normalizeKey(key);
-        if (!normalizedKey) return null;
-        return getTargets().find(target => normalizeKey(target.getAttribute(ATTRIBUTE_NAME)) === normalizedKey) || null;
+    function getMatchesForSequence(sequence = "") {
+        const normalizedSequence = normalizeKey(sequence);
+        if (!normalizedSequence) return {exact: null, hasLongerPrefix: false};
+        return getTargets().reduce((matches, target) => {
+            const targetKey = normalizeKey(target.getAttribute(ATTRIBUTE_NAME));
+            if (targetKey === normalizedSequence && !matches.exact) matches.exact = target;
+            if (targetKey.length > normalizedSequence.length && targetKey.startsWith(normalizedSequence)) matches.hasLongerPrefix = true;
+            return matches;
+        }, {exact: null, hasLongerPrefix: false});
     }
 
     function triggerTarget(target) {
         if (!target) return;
         target.scrollIntoView({behavior: "smooth", block: "center", inline: "center"});
-        target.click();
+        const rect = target.getBoundingClientRect();
+        const clientX = rect.left + (rect.width / 2);
+        const clientY = rect.top + (rect.height / 2);
+        const modularState = typeof modular !== "undefined" ? modular : window.modular;
+        if (modularState) {
+            modularState.lastClickPosition = {x: clientX, y: clientY};
+            modularState.lastPointerPosition = {x: clientX, y: clientY};
+        }
+        target.dispatchEvent(new MouseEvent("mousedown", {bubbles: true, cancelable: true, clientX, clientY}));
+        target.dispatchEvent(new MouseEvent("mouseup", {bubbles: true, cancelable: true, clientX, clientY}));
+        target.dispatchEvent(new MouseEvent("click", {bubbles: true, cancelable: true, clientX, clientY}));
     }
 
     function handleKeydown(event) {
@@ -930,11 +957,32 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
             return;
         }
         if (event.key.length !== 1) return;
-        const target = findTargetForKey(event.key);
-        if (!target) return;
+        clearPendingExact();
+        activeSequence = normalizeKey(`${activeSequence}${event.key}`);
+        let matches = getMatchesForSequence(activeSequence);
+        if (!matches.exact && !matches.hasLongerPrefix && activeSequence.length > 1) {
+            activeSequence = normalizeKey(event.key);
+            matches = getMatchesForSequence(activeSequence);
+        }
+        if (!matches.exact && !matches.hasLongerPrefix) {
+            activeSequence = "";
+            return;
+        }
         event.preventDefault();
-        deactivate();
-        triggerTarget(target);
+        if (matches.exact && !matches.hasLongerPrefix) {
+            deactivate();
+            triggerTarget(matches.exact);
+            return;
+        }
+        if (matches.exact) {
+            const pendingTarget = matches.exact;
+            pendingExactTimer = window.setTimeout(() => {
+                pendingExactTimer = null;
+                if (!active || activeSequence !== normalizeKey(pendingTarget.getAttribute(ATTRIBUTE_NAME))) return;
+                deactivate();
+                triggerTarget(pendingTarget);
+            }, PENDING_EXACT_DELAY);
+        }
     }
 
     function handlePointerdown(event) {

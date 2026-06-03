@@ -308,6 +308,7 @@ function searchablePortals() {
 let activeSearchResultIndex = -1;
 let articleSearchRequestVersion = 0;
 let activeArticleSearchController = null;
+let activeArticleSearchTimer = null;
 let clientContextPromise = null;
 let searchFilterMode = "";
 let searchFilterAnimating = false;
@@ -318,8 +319,14 @@ function abortActiveArticleSearchController() {
     activeArticleSearchController = null;
     if (!controller.signal?.aborted) controller.abort();
 }
+function clearActiveArticleSearchTimer() {
+    if (!activeArticleSearchTimer) return;
+    clearTimeout(activeArticleSearchTimer);
+    activeArticleSearchTimer = null;
+}
 function cancelActiveArticleSearch({clearLoading = false} = {}) {
     articleSearchRequestVersion++;
+    clearActiveArticleSearchTimer();
     abortActiveArticleSearchController();
     if (clearLoading) document.getElementById("search-status")?.isLoading?.(false);
 }
@@ -665,7 +672,14 @@ function renderArticleSearchResults(rawQuery = "", requestVersion = 0, cachedSea
         return articles;
     });
 }
-function openPortal(portal) {
+function cachedSearchHasFileResult(cachedSearch = {}) {
+    return Array.isArray(cachedSearch?.matchingPortals)
+        && cachedSearch.matchingPortals.some(({portal}) => {
+            return Array.isArray(portal?.recordMatches)
+                && portal.recordMatches.some(match => match?.command === "files");
+        });
+}
+async function openPortal(portal, sourceNode = null) {
     const primaryRecordMatch = Array.isArray(portal?.recordMatches) ? portal.recordMatches[0] : null;
     if (primaryRecordMatch?.command === "articles") {
         const article = primaryRecordMatch?.record || {};
@@ -708,14 +722,21 @@ function openPortal(portal) {
         }
     }
     if (primaryRecordMatch?.command === "files") {
-        const filePath = `${primaryRecordMatch?.record?.path || ""}`.trim();
+        const fileRecord = primaryRecordMatch?.record || {};
+        const filePath = `${fileRecord.path || fileRecord.file || fileRecord.filepath || fileRecord.filePath || fileRecord.fullpath || fileRecord.fullPath || ""}`.trim();
+        if (filePath && window.StandardFiles?.isDirectoryRecord?.(fileRecord) && typeof window.StandardFiles?.openDirectoryPath === "function") {
+            const opened = await window.StandardFiles.openDirectoryPath(filePath);
+            if (opened === false) throw new Error("Unable to open folder");
+            return;
+        }
         if (filePath && typeof window.StandardFiles?.openFilePath === "function") {
-            window.StandardFiles.openFilePath(filePath);
+            const opened = await window.StandardFiles.openFilePath(filePath, sourceNode);
+            if (opened === false) throw new Error("Unable to open file");
             return;
         }
     }
     if (typeof portal?.action === "function") {
-        portal.action();
+        await portal.action();
         return;
     }
     if (!portal?.serviceId) return;
@@ -759,14 +780,19 @@ function renderSearchResult(portal, matchingHint) {
         body.append(hint);
     }
     result.append(body);
-    result.onclick = () => {
+    result.onclick = async () => {
         cancelActiveArticleSearch({clearLoading: true});
-        openPortal(portal);
-        document.getElementById("search-box").value = "";
-        clearSearchFilterPrefix();
-        document.getElementById("search-results").empty();
-        resetActiveSearchResult();
-        document.getElementById("search-box").blur();
+        try {
+            await openPortal(portal, result);
+            document.getElementById("search-box").value = "";
+            clearSearchFilterPrefix();
+            document.getElementById("search-results").empty();
+            resetActiveSearchResult();
+            document.getElementById("search-box").blur();
+        } catch (error) {
+            console.error("Failed to open search result:", error);
+            modular.error(error?.message || "Failed to open search result");
+        }
     };
     document.getElementById("search-results").append(result);
     return result;
@@ -858,13 +884,21 @@ function updateSearchResults() {
         console.error("Failed to search cached records:", error);
         resetActiveSearchResult();
     }
-    const articleSearchController = beginArticleSearchRequest();
-    renderArticleSearchResults(rawQuery, currentArticleSearchVersion, cachedSearch, searchState.articleField, {
-        signal: articleSearchController?.signal || null
-    }).finally(() => {
-        finishArticleSearchRequest(articleSearchController);
-        if (currentArticleSearchVersion === articleSearchRequestVersion) searchStatus.isLoading(false);
-    });
+    if (!searchState.filtered && cachedSearchHasFileResult(cachedSearch)) {
+        searchStatus.isLoading(false);
+        return;
+    }
+    activeArticleSearchTimer = setTimeout(() => {
+        activeArticleSearchTimer = null;
+        if (currentArticleSearchVersion !== articleSearchRequestVersion) return;
+        const articleSearchController = beginArticleSearchRequest();
+        renderArticleSearchResults(rawQuery, currentArticleSearchVersion, cachedSearch, searchState.articleField, {
+            signal: articleSearchController?.signal || null
+        }).finally(() => {
+            finishArticleSearchRequest(articleSearchController);
+            if (currentArticleSearchVersion === articleSearchRequestVersion) searchStatus.isLoading(false);
+        });
+    }, 250);
 }
 document.getElementById("search-box").addEventListener("input", () => {
     updateSearchResults();
@@ -916,6 +950,32 @@ function initGlobalFileDrop(onFiles) {
     window.addEventListener("dragover", (e) => e.preventDefault());
     window.addEventListener("drop", (e) => e.preventDefault());
 }
+const STANDARD_AUTO_UPLOAD_FOLDERS_BY_EXTENSION = {
+    Music: new Set(["aac", "aif", "aiff", "alac", "flac", "m4a", "mid", "midi", "mp3", "oga", "ogg", "opus", "wav", "weba", "wma"]),
+    Photos: new Set(["avif", "bmp", "gif", "heic", "heif", "ico", "jpeg", "jpg", "png", "svg", "tif", "tiff", "webp"]),
+    Videos: new Set(["3gp", "avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ogv", "webm", "wmv"])
+};
+const STANDARD_AUTO_UPLOAD_FOLDERS_BY_MIME_PREFIX = {
+    "audio/": "Music",
+    "image/": "Photos",
+    "video/": "Videos"
+};
+function normalizeStandardUploadDirectory(directoryPath = "") {
+    const normalizedPath = String(directoryPath || "").trim().replace(/\\/g, "/").replace(/\/+$/, "");
+    if (!normalizedPath) return "Documents";
+    if (normalizedPath.startsWith("/home/standard-system/")) return normalizedPath.replace(/^\/home\/standard-system\//, "") || "Documents";
+    return normalizedPath.replace(/^\/+/, "") || "Documents";
+}
+function inferStandardUploadDirectory(file = {}, fallbackDirectory = "") {
+    if (typeof window.StandardFiles?.inferUploadDirectory === "function") return window.StandardFiles.inferUploadDirectory(file, fallbackDirectory);
+    const mimeType = String(file?.type || "").toLowerCase();
+    for (const [prefix, folder] of Object.entries(STANDARD_AUTO_UPLOAD_FOLDERS_BY_MIME_PREFIX)) {
+        if (mimeType.startsWith(prefix)) return folder;
+    }
+    const fileName = String(file?.name || "");
+    const extension = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+    return Object.entries(STANDARD_AUTO_UPLOAD_FOLDERS_BY_EXTENSION).find(([, extensions]) => extensions.has(extension))?.[0] || normalizeStandardUploadDirectory(fallbackDirectory);
+}
 let globalDropUploadInFlight = false;
 initGlobalFileDrop(async (files) => {
     if (globalDropUploadInFlight) {
@@ -935,7 +995,8 @@ initGlobalFileDrop(async (files) => {
         try {
             for (let index = 0; index < droppedFiles.length; index++) {
                 const file = droppedFiles[index];
-                const uploadUrl = `/api/upload?directory=${encodeURIComponent(defaultDirectory)}`;
+                const uploadDirectory = inferStandardUploadDirectory(file, defaultDirectory);
+                const uploadUrl = `/api/upload?directory=${encodeURIComponent(uploadDirectory)}`;
                 if (typeof window.StandardUploads?.uploadFile === "function") {
                     const response = await window.StandardUploads.uploadFile(file, uploadUrl, {label: `Uploading ${file.name || "file"}`, suppressProgress: !!multiProgress, onProgress: multiProgress ? progress => multiProgress.update({currentIndex: index, file, loaded: progress?.loaded || 0, total: progress?.total || file.size || 0, indeterminate: !!progress?.indeterminate}) : null});
                     if (!response?.ok) {

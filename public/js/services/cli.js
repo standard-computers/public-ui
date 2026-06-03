@@ -62,6 +62,12 @@
         }
     };
     const moveCaretToEnd = input => input.selectionStart = input.selectionEnd = input.value.length;
+    const isEditableElement = element => {
+        if (!element) return false;
+        if (element.isContentEditable) return true;
+        const tagName = `${element.tagName || ""}`.toLowerCase();
+        return tagName === "input" || tagName === "textarea" || tagName === "select";
+    };
     const showHistoryEntry = (cmdr, i) => {
         cmdr.value = cmdHist[i] || "";
         moveCaretToEnd(cmdr);
@@ -107,7 +113,11 @@
         afterRender: async (_, context) => {
             await loadHistory(context.cache);
             const cmdr = document.getElementById("cli-commander");
-            cmdr.focus();
+            const focusCommandInput = () => {
+                cmdr.focus();
+                moveCaretToEnd(cmdr);
+            };
+            focusCommandInput();
             cmdr.onkeydown = e => {
                 if (e.key === "ArrowUp") {
                     if (!cmdHist.length) return;
@@ -147,6 +157,17 @@
                     cmdr.value = "";
                 }
             };
+            const handleCliShortcut = event => {
+                if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+                if (document.activeElement === cmdr || isEditableElement(document.activeElement)) return;
+                const portalWindow = cmdr.closest(".draggable-window");
+                if (!portalWindow?.classList?.contains("window-focused")) return;
+                event.preventDefault();
+                focusCommandInput();
+            };
+            if (window.standardCliCommandFocusShortcut) document.removeEventListener("keydown", window.standardCliCommandFocusShortcut);
+            window.standardCliCommandFocusShortcut = handleCliShortcut;
+            document.addEventListener("keydown", window.standardCliCommandFocusShortcut);
         }
     })]))
 })();

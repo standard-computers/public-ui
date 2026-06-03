@@ -39,7 +39,7 @@ const WS_URL = resolveWsUrl();
 const STANDARD_CHIT = (process.env.STANDARD_CHIT || "").trim();
 const SETUP_COOKIE_NAME = "setup";
 const SETUP_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 365;
-const REQUIRED_RELAY_COOKIES = ["relay_chit", "relay_device", "sid", "uid", "user"];
+const REQUIRED_RELAY_COOKIES = ["relay_chit", "relay_device", "sid", "uid"];
 const RELAY_CONNECTION_EXEMPT_PATHS = ["/bad-connection", "/api/login", "/api/status", "/api/device/status", "/api/keys/push"];
 const RELAY_COOKIE_DOMAIN = process.env.RELAY_COOKIE_DOMAIN || process.env.COOKIE_DOMAIN || "";
 const RELAY_COOKIE_SECRET = process.env.RELAY_COOKIE_SECRET || process.env.COOKIE_SECRET || process.env.SESSION_SECRET || "";
@@ -79,6 +79,16 @@ const knownUsernames = new Map();
 const knownUserFolders = new Map();
 let fileDownloadQueue = Promise.resolve();
 let fileUploadQueue = Promise.resolve();
+const AUTO_UPLOAD_FOLDERS_BY_EXTENSION = {
+    Music: new Set(["aac", "aif", "aiff", "alac", "flac", "m4a", "mid", "midi", "mp3", "oga", "ogg", "opus", "wav", "weba", "wma"]),
+    Photos: new Set(["avif", "bmp", "gif", "heic", "heif", "ico", "jpeg", "jpg", "png", "svg", "tif", "tiff", "webp"]),
+    Videos: new Set(["3gp", "avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ogv", "webm", "wmv"])
+};
+const AUTO_UPLOAD_FOLDERS_BY_MIME_PREFIX = {
+    "audio/": "Music",
+    "image/": "Photos",
+    "video/": "Videos"
+};
 let recordImageQueue = Promise.resolve();
 let bonjour = null;
 let bonjourService = null;
@@ -331,8 +341,8 @@ function buildRelayCommand(command, relayContext, {allowMissingContext = false} 
     const lowered = trimmed.toLowerCase();
     const relayPrefixed = lowered.startsWith("relay");
     const relayParts = trimmed.split("~").map(part => part.trim()).filter(Boolean);
-    const hasInlineRelayContext = relayPrefixed && relayParts.length >= 4;
-    if (relayPrefixed && hasInlineRelayContext) {
+    const hasExplicitRelayTarget = relayPrefixed && trimmed.includes("~") && relayParts.length >= 2;
+    if (hasExplicitRelayTarget) {
         return command;
     }
     if (!relayContext || !relayContext.deviceSerial || !relayContext.chit) {
@@ -457,8 +467,29 @@ function sessionMiddleware(req, res, next) {
             req.session = session;
             req.sessionToken = token;
         }
+    } else if (isRelayMode && token) {
+        const userId = sanitizeUserId(cookies.uid || "");
+        const relayContext = readRelayCookies(req);
+        if (userId && relayContext) {
+            const now = Date.now();
+            const session = {
+                userId,
+                userFolder: userId,
+                createdAt: now,
+                lastSeenAt: now,
+                relayContext
+            };
+            userSessions.set(token, session);
+            req.session = session;
+            req.sessionToken = token;
+        }
     }
     next();
+}
+
+function isRelayFailureResponse(value = "") {
+    const normalized = String(value || "").trim().toUpperCase();
+    return normalized.startsWith("RELAY ") || normalized.includes(" RELAY ");
 }
 
 async function ensureUserDataRoot() {
@@ -599,6 +630,33 @@ function createWsError(code, message) {
     return error;
 }
 
+function parseRelayControlPayload(data, isBinary = false) {
+    if (!isRelayMode || isBinary) return null;
+    const raw = Buffer.isBuffer(data) ? data.toString("utf8") : String(data ?? "");
+    if (!raw || raw[0] !== "{") return null;
+    try {
+        const payload = JSON.parse(raw);
+        if (!payload || payload.standard_relay !== 1 || typeof payload.kind !== "string") return null;
+        return payload;
+    } catch (_) {
+        return null;
+    }
+}
+
+function bindRelayRequestId(entry, requestId) {
+    const normalized = String(requestId || "").trim();
+    if (!entry || !normalized) return true;
+    if (!entry.relayRequestId) {
+        entry.relayRequestId = normalized;
+        return true;
+    }
+    return entry.relayRequestId === normalized;
+}
+
+function relayProtocolError(entry, message) {
+    failWsRequest(entry, createWsError("WS_RELAY_PROTOCOL", message));
+}
+
 function logWsRequestEvent(entry, stage, extra = {}) {
     const payload = {
         id: entry?.id,
@@ -658,6 +716,11 @@ function failWsRequest(entry, error) {
 }
 
 function completeWsRequest(entry, value) {
+    if (entry?.awaitRelayDone && entry.relayProtocolActive && !entry.relayDoneSeen) {
+        entry.relayCompletionValue = value;
+        entry.relayPayloadCompleted = true;
+        return;
+    }
     settleWsRequest(entry, {value});
 }
 
@@ -742,6 +805,7 @@ function enqueueWsRequest({
     onMessage,
     onError,
     onSuccess,
+    onRelayDone,
     onSettled
 } = {}) {
     return new Promise((resolve, reject) => {
@@ -755,12 +819,23 @@ function enqueueWsRequest({
             onMessage,
             onError,
             onSuccess,
+            onRelayDone,
             onSettled,
             resolve,
             reject,
             settled: false,
             timeoutHandle: null,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            awaitRelayDone: isRelayMode,
+            relayProtocolActive: false,
+            relayRequestId: null,
+            relayBinaryActive: false,
+            relayBinaryStarted: false,
+            relayBinaryRemaining: 0,
+            relayTextChunks: [],
+            relayPayloadCompleted: false,
+            relayCompletionValue: undefined,
+            relayDoneSeen: false
         };
         if (response) {
             entry._responseCloseHandler = () => cancelWsRequest(entry);
@@ -781,6 +856,98 @@ function dispatchWsMessage(data, isBinary = false) {
             size: isBinary ? Buffer.from(data).length : String(data ?? "").length
         });
         return;
+    }
+    if (isRelayMode) {
+        if (isBinary) {
+            if (!activeWsRequest.relayProtocolActive) {
+                try {
+                    activeWsRequest.onMessage(data, true, activeWsRequest);
+                } catch (err) {
+                    failWsRequest(activeWsRequest, err);
+                }
+                return;
+            }
+            if (!activeWsRequest.relayBinaryActive) {
+                relayProtocolError(activeWsRequest, "Unexpected relay binary frame");
+                return;
+            }
+            const chunk = Buffer.from(data);
+            if (chunk.length > activeWsRequest.relayBinaryRemaining) {
+                relayProtocolError(activeWsRequest, "Relay binary byte count mismatch");
+                return;
+            }
+            activeWsRequest.relayBinaryRemaining -= chunk.length;
+            try {
+                activeWsRequest.onMessage(chunk, true, activeWsRequest);
+            } catch (err) {
+                failWsRequest(activeWsRequest, err);
+            }
+            return;
+        }
+
+        const relayControl = parseRelayControlPayload(data, false);
+        if (relayControl) {
+            activeWsRequest.relayProtocolActive = true;
+            const requestId = relayControl.request_id;
+            if (!bindRelayRequestId(activeWsRequest, requestId)) {
+                relayProtocolError(activeWsRequest, "Relay response request id mismatch");
+                return;
+            }
+
+            if (relayControl.kind === "exec.text") {
+                activeWsRequest.relayTextChunks.push(Buffer.from(String(relayControl.text ?? ""), "utf8"));
+                return;
+            }
+
+            if (relayControl.kind === "exec.error") {
+                failWsRequest(activeWsRequest, createWsError("WS_RELAY_ERROR", String(relayControl.error || "Relay execution failed")));
+                return;
+            }
+
+            if (relayControl.kind === "exec.binary.start") {
+                const byteCount = Number(relayControl.bytes);
+                if (!Number.isSafeInteger(byteCount) || byteCount < 0) {
+                    relayProtocolError(activeWsRequest, "Invalid relay binary byte count");
+                    return;
+                }
+                activeWsRequest.relayBinaryStarted = true;
+                activeWsRequest.relayBinaryActive = true;
+                activeWsRequest.relayBinaryRemaining = byteCount;
+                return;
+            }
+
+            if (relayControl.kind === "exec.done") {
+                const completedRequest = activeWsRequest;
+                if (completedRequest.relayBinaryActive && completedRequest.relayBinaryRemaining !== 0) {
+                    relayProtocolError(completedRequest, "Relay binary response ended before all bytes arrived");
+                    return;
+                }
+                completedRequest.relayBinaryActive = false;
+                completedRequest.relayBinaryRemaining = 0;
+                completedRequest.relayDoneSeen = true;
+                if (!completedRequest.relayBinaryStarted && completedRequest.relayTextChunks.length) {
+                    try {
+                        completedRequest.onMessage(Buffer.concat(completedRequest.relayTextChunks), false, completedRequest);
+                    } catch (err) {
+                        failWsRequest(completedRequest, err);
+                    }
+                    if (completedRequest.settled) {
+                        return;
+                    }
+                }
+                try {
+                    completedRequest.onRelayDone?.(completedRequest);
+                } catch (err) {
+                    failWsRequest(completedRequest, err);
+                    return;
+                }
+                completeWsRequest(completedRequest, completedRequest.relayCompletionValue);
+                return;
+            }
+
+            relayProtocolError(activeWsRequest, `Unsupported relay control kind: ${relayControl.kind}`);
+            return;
+        }
     }
     try {
         activeWsRequest.onMessage(data, isBinary, activeWsRequest);
@@ -1007,6 +1174,34 @@ function uploadSingleFile(req, res, next) {
         }
         next(err);
     });
+}
+
+function normalizeUploadDirectoryPath(rawDirectory = "") {
+    return String(rawDirectory || "")
+        .trim()
+        .replace(/\\/g, "/")
+        .replace(/\/+$/, "")
+        .replace(/^\/home\/standard-system\//, "")
+        .replace(/^home\/standard-system\//, "")
+        .replace(/^\/+/, "");
+}
+
+function getFileExtension(fileName = "") {
+    const baseName = path.basename(String(fileName || ""));
+    return baseName.includes(".") ? baseName.split(".").pop().toLowerCase() : "";
+}
+
+function inferUploadFolderForFile(file = {}) {
+    const mimeType = String(file.mimetype || "").toLowerCase();
+    for (const [prefix, folder] of Object.entries(AUTO_UPLOAD_FOLDERS_BY_MIME_PREFIX)) {
+        if (mimeType.startsWith(prefix)) return folder;
+    }
+    const extension = getFileExtension(file.originalname);
+    return Object.entries(AUTO_UPLOAD_FOLDERS_BY_EXTENSION).find(([, extensions]) => extensions.has(extension))?.[0] || "";
+}
+
+function resolveUploadDirectoryForFile(file = {}, rawDirectory = "") {
+    return inferUploadFolderForFile(file) || normalizeUploadDirectoryPath(rawDirectory);
 }
 
 function requireLogin(req, res, next) {
@@ -1244,8 +1439,8 @@ function withWsResponse(res, sendFn, onMessage, {timeoutMessage = "Timeout waiti
         name: requestName,
         response: res,
         timeoutMessage,
-        start: () => {
-            const result = sendFn();
+        start: entry => {
+            const result = sendFn(entry);
             if (result === false && !res.headersSent) {
                 throw createWsError("WS_REQUEST_ABORTED", "Failed to send command");
             }
@@ -1424,7 +1619,8 @@ app.post("/login", async (req, res) => {
             const userRecord = await fetchUserRecordById(userId);
             setCachedUserRecord(req.session, userRecord);
             writeUserDataCookie(res, userRecord);
-        } catch (_) {
+        } catch (err) {
+            console.error("Login user record lookup failed:", err.message);
             writeUserDataCookie(res, null);
         }
         if (wantsLoginJson(req)) return res.json({redirect: "/"});
@@ -1464,11 +1660,11 @@ app.post("/api/login", async (req, res) => {
     try {
         const command = `relay ~ ${deviceSerial} ~ relay chit ${userId}`;
         const response = await sendWsMessage(command, {
-            relayContext: resolveRelayContext(req),
+            relayContext: null,
             allowMissingRelayContext: true
         });
         const token = response.toString().trim();
-        if (!token) {
+        if (!token || isRelayFailureResponse(token)) {
             return res.status(502).json({error: "Failed to obtain relay token"});
         }
         const relayContext = {deviceSerial, chit: token};
@@ -1484,7 +1680,8 @@ app.post("/api/login", async (req, res) => {
             const userRecord = await fetchUserRecordById(userId, {relayContext, allowMissingRelayContext: false});
             setCachedUserRecord(req.session, userRecord);
             writeUserDataCookie(res, userRecord);
-        } catch (_) {
+        } catch (err) {
+            console.error("Relay login user record lookup failed:", err.message);
             writeUserDataCookie(res, null);
         }
         return res.json({token, userId});
@@ -1500,9 +1697,9 @@ app.post("/api/keys/push", async (req, res) => {
     if (!deviceSerial) return res.status(401).json({error: "deviceUid is are required"});
     try {
         const command = `relay chit ${deviceSerial}`;
-        const response = await sendWsMessage(command, { relayContext: resolveRelayContext(req), allowMissingRelayContext: true });
+        const response = await sendWsMessage(command, { relayContext: null, allowMissingRelayContext: true });
         const token = response.toString().trim();
-        if (!token) return res.status(502).json({error: "Failed to obtain relay token"});
+        if (!token || isRelayFailureResponse(token)) return res.status(502).json({error: "Failed to obtain relay token"});
         return res.json({token});
     } catch (err) {
         console.error("Relay login failed:", err.message);
@@ -1643,7 +1840,7 @@ app.get("/events/push", (req, res) => {
 app.post("/api/status", (req, res) => {
     const deviceId = req.body?.d?.device_uid;
     if (!deviceId) return res.status(400).json({error: "device_uid is required"});
-    withWsResponse(res, () => wsClient.send(`relay ping ${deviceId}`), data => {
+    withWsResponse(res, entry => sendQueuedWsPayload(entry, `relay ping ${deviceId}`), data => {
         const isConnected = data.toString().trim() === "true";
         const status = isConnected ? 200 : 404;
         res.status(status).json({connected: isConnected});
@@ -1651,25 +1848,33 @@ app.post("/api/status", (req, res) => {
 });
 
 app.get("/api/stds", (req, res) => {
-    withWsResponse(res, () => wsClient.send("stds"), data => {
+    const command = prepareCommandForRequest(req, res, "stds");
+    if (!command) return;
+    withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
         res.send(data.toString());
     });
 });
 
 app.get("/api/stds/:standard", (req, res) => {
-    withWsResponse(res, () => wsClient.send(`stds ${req.params.standard}`), data => {
+    const command = prepareCommandForRequest(req, res, `stds ${req.params.standard}`);
+    if (!command) return;
+    withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
         res.send(data.toString());
     });
 });
 
 app.get("/api/stds/:standard/json", (req, res) => {
-    withWsResponse(res, () => wsClient.send(`stds ${req.params.standard} json`), data => {
+    const command = prepareCommandForRequest(req, res, `stds ${req.params.standard} json`);
+    if (!command) return;
+    withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
         res.json(JSON.parse(data.toString()));
     });
 });
 
 app.get("/api/records/:standard", (req, res) => {
-    withWsResponse(res, () => wsClient.send(`[${req.params.standard}]`), data => {
+    const command = prepareCommandForRequest(req, res, `[${req.params.standard}]`);
+    if (!command) return;
+    withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
         if (data !== "NO RECORDS FOUND") {
             res.json(JSON.parse(data.toString()));
         }
@@ -1677,7 +1882,9 @@ app.get("/api/records/:standard", (req, res) => {
 });
 
 app.get("/api/tree", (req, res) => {
-    withWsResponse(res, () => wsClient.send("tree"), data => {
+    const command = prepareCommandForRequest(req, res, "tree");
+    if (!command) return;
+    withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
         res.json(JSON.parse(data.toString()));
     });
 });
@@ -1692,7 +1899,7 @@ app.get("/api/user/by-email/:useremail", (req, res) => {
     if (!command) {
         return;
     }
-    withWsResponse(res, () => wsClient.send(command), data => {
+    withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
         res.json(JSON.parse(data.toString()));
     });
 });
@@ -1782,9 +1989,7 @@ app.get("/api/rcs/:tempID/:recordID", (req, res) => {
     if (!command) {
         return;
     }
-    withWsResponse(res, () => {
-        wsClient.send(command);
-    }, data => {
+    withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
         res.send(data.toString());
     }, {timeoutMessage: "Timeout waiting for rcs response"});
 });
@@ -1847,9 +2052,7 @@ app.post("/api/upload/temp/:recordID", uploadSingleFile, async (req, res) => {
         });
         const command = prepareCommandForRequest(req, res, `rcs ${recordID} * @${tempRef}`);
         if (!command) return;
-        withWsResponse(res, () => {
-            wsClient.send(command);
-        }, data => {
+        withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
             const rcsResponse = data.toString();
             res.json({tempId: tempRef, response: rcsResponse, rcsResponse, tempMessages});
         }, {timeoutMessage: "Timeout waiting for rcs response"});
@@ -1866,9 +2069,7 @@ app.post("/api/upload/temp", uploadSingleFile, async (req, res) => {
     try {
         const fileName = req.file.originalname;
         const tempPayload = buildBinaryCommandPayload("temp", fileName, req.file.buffer, resolveRelayContext(req));
-        withWsResponse(res, () => {
-            sendWsPayload(tempPayload);
-        }, data => {
+        withWsResponse(res, entry => sendQueuedWsPayload(entry, tempPayload), data => {
             res.type("text/plain").send(data.toString());
         }, {timeoutMessage: "Timeout waiting for upload confirmation"});
     } catch (err) {
@@ -1889,7 +2090,7 @@ app.post("/api/upload", uploadSingleFile, async (req, res) => {
             try {
                 const fileName = req.file.originalname;
                 const rawUploadDirectory = typeof req.query.directory === "string" ? req.query.directory.trim() : "";
-                const uploadDirectory = rawUploadDirectory.replace(/\\/g, "/").replace(/\/+$/, "").replace(/^\/home\/standard-system\//, "").replace(/^home\/standard-system\//, "").replace(/^\/+/, "");
+                const uploadDirectory = resolveUploadDirectoryForFile(req.file, rawUploadDirectory);
                 const importPath = uploadDirectory ? `${uploadDirectory}/${fileName}` : fileName;
                 const importPayload = buildBinaryCommandPayload("import", importPath, req.file.buffer, resolveRelayContext(req));
                 if (isRelayMode) {
@@ -1899,9 +2100,7 @@ app.post("/api/upload", uploadSingleFile, async (req, res) => {
                     });
                     return;
                 }
-                withWsResponse(res, () => {
-                    sendWsPayload(importPayload);
-                }, data => {
+                withWsResponse(res, entry => sendQueuedWsPayload(entry, importPayload), data => {
                     res.send(data.toString());
                 }, {
                     timeoutMessage: "Timeout waiting for upload confirmation",
@@ -1947,6 +2146,8 @@ app.get("/api/files/download", (req, res) => {
             let settleTimeout = null;
             let messageCount = 0;
             let finalized = false;
+            let downloadEntry = null;
+            let payloadFrameReceived = false;
             const payloadSink = createTempPayloadSink("application/octet-stream");
             const finalizePayload = () => {
                 if (finalized) return;
@@ -1983,14 +2184,18 @@ app.get("/api/files/download", (req, res) => {
                 res.once("finish", cleanupTempFile);
                 res.once("close", cleanupTempFile);
                 readStream.pipe(res);
+                if (downloadEntry && !downloadEntry.settled) {
+                    completeWsRequest(downloadEntry);
+                }
             };
             const queuePayloadChunk = (chunk, isBinary = true) => {
+                payloadFrameReceived = true;
                 payloadSink.add(chunk, isBinary);
                 if (settleTimeout) clearTimeout(settleTimeout);
                 settleTimeout = setTimeout(finalizePayload, WS_BINARY_SETTLE_MS);
             };
             const onRequestTimeout = () => {
-                if (payloadSink.hasData()) {
+                if (payloadSink.hasData() || payloadFrameReceived) {
                     console.log("[/api/files/download] timeout after payload", {
                         path: filePath,
                         messageCount
@@ -2012,7 +2217,7 @@ app.get("/api/files/download", (req, res) => {
                     onRequestTimeout();
                     return;
                 }
-                if (payloadSink.hasData()) {
+                if (payloadSink.hasData() || payloadFrameReceived) {
                     console.log("[/api/files/download] websocket closed after payload", {
                         path: filePath,
                         messageCount
@@ -2027,6 +2232,10 @@ app.get("/api/files/download", (req, res) => {
                 cleanup();
                 if (!res.headersSent) {
                     if (err.code === "WS_REQUEST_CANCELED") {
+                        return;
+                    }
+                    if (err.code === "WS_RELAY_ERROR" || err.code === "WS_RELAY_PROTOCOL") {
+                        res.status(502).send(err.message || "Relay response failed");
                         return;
                     }
                     res.status(503).send("WebSocket disconnected");
@@ -2088,9 +2297,19 @@ app.get("/api/files/download", (req, res) => {
                 name: "file-download",
                 response: res,
                 timeoutMessage: "Timeout waiting for file download",
-                start: entry => sendQueuedWsPayload(entry, command),
+                start: entry => {
+                    downloadEntry = entry;
+                    sendQueuedWsPayload(entry, command);
+                },
                 onMessage,
                 onError: onRequestError,
+                onRelayDone: entry => {
+                    if (payloadSink.hasData() || payloadFrameReceived || entry.relayBinaryStarted) {
+                        finalizePayload();
+                    } else if (!res.headersSent) {
+                        res.status(502).send("No file payload received");
+                    }
+                },
                 onSettled: cleanup,
                 onSuccess: () => null
             }).catch(() => null);
@@ -2119,6 +2338,8 @@ app.get("/api/records/images/:recordId", (req, res) => {
             let receivedStatus = false;
             let settleTimeout = null;
             let finalized = false;
+            let imageEntry = null;
+            let payloadFrameReceived = false;
             const payloadSink = createTempPayloadSink("image/*");
             const finalizePayload = () => {
                 if (finalized) return;
@@ -2147,14 +2368,18 @@ app.get("/api/records/images/:recordId", (req, res) => {
                 res.once("finish", cleanupTempFile);
                 res.once("close", cleanupTempFile);
                 readStream.pipe(res);
+                if (imageEntry && !imageEntry.settled) {
+                    completeWsRequest(imageEntry);
+                }
             };
             const queuePayloadChunk = (chunk, isBinary = true) => {
+                payloadFrameReceived = true;
                 payloadSink.add(chunk, isBinary);
                 if (settleTimeout) clearTimeout(settleTimeout);
                 settleTimeout = setTimeout(finalizePayload, WS_BINARY_SETTLE_MS);
             };
             const onRequestTimeout = () => {
-                if (payloadSink.hasData()) {
+                if (payloadSink.hasData() || payloadFrameReceived) {
                     finalizePayload();
                     return;
                 }
@@ -2168,13 +2393,17 @@ app.get("/api/records/images/:recordId", (req, res) => {
                     onRequestTimeout();
                     return;
                 }
-                if (payloadSink.hasData()) {
+                if (payloadSink.hasData() || payloadFrameReceived) {
                     finalizePayload();
                     return;
                 }
                 cleanup();
                 if (!res.headersSent) {
                     if (err.code === "WS_REQUEST_CANCELED") return;
+                    if (err.code === "WS_RELAY_ERROR" || err.code === "WS_RELAY_PROTOCOL") {
+                        res.status(502).send(err.message || "Relay response failed");
+                        return;
+                    }
                     res.status(503).send("WebSocket disconnected");
                 }
             };
@@ -2210,9 +2439,19 @@ app.get("/api/records/images/:recordId", (req, res) => {
                 name: "record-image",
                 response: res,
                 timeoutMessage: "Timeout waiting for record image",
-                start: entry => sendQueuedWsPayload(entry, command),
+                start: entry => {
+                    imageEntry = entry;
+                    sendQueuedWsPayload(entry, command);
+                },
                 onMessage,
                 onError: onRequestError,
+                onRelayDone: entry => {
+                    if (payloadSink.hasData() || payloadFrameReceived || entry.relayBinaryStarted) {
+                        finalizePayload();
+                    } else if (!res.headersSent) {
+                        res.status(502).send("No record image payload received");
+                    }
+                },
                 onSettled: cleanup,
                 onSuccess: () => null
             }).catch(() => null);
@@ -2234,9 +2473,7 @@ function handleCliRequest(req, res, command) {
         "Expires": "0",
         "Surrogate-Control": "no-store"
     });
-    withWsResponse(res, () => {
-        sendQueuedWsPayload(activeWsRequest, preparedCommand);
-    }, data => {
+    withWsResponse(res, entry => sendQueuedWsPayload(entry, preparedCommand), data => {
         res.send(data.toString());
     }, {timeoutMessage: "Timeout waiting for response", requestName: "cli"});
 }
@@ -2384,6 +2621,15 @@ function parseWsJsonResponse(responseBuffer, label = "response") {
         return JSON.parse(raw);
     } catch (err) {
         const preview = `${raw}`.trim().slice(0, 200);
+        const trimmed = `${raw}`.trim();
+        console.error("Invalid WebSocket JSON response", {
+            label,
+            bytes: Buffer.byteLength(raw),
+            chars: raw.length,
+            startsWith: trimmed.slice(0, 40),
+            endsWith: trimmed.slice(-120),
+            parseError: err.message
+        });
         const error = new Error(`Invalid JSON for ${label}${preview ? `: ${preview}` : ""}`);
         error.code = "INVALID_WS_JSON";
         throw error;

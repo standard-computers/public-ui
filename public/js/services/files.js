@@ -104,12 +104,39 @@
         if (normalizedPath.startsWith("/home/standard-system/")) return normalizedPath.replace(/^\/home\/standard-system\//, "") || "Documents";
         return normalizedPath.replace(/^\/+/, "") || "Documents";
     };
+    const AUTO_UPLOAD_FOLDERS_BY_EXTENSION = {
+        Music: new Set(["aac", "aif", "aiff", "alac", "flac", "m4a", "mid", "midi", "mp3", "oga", "ogg", "opus", "wav", "weba", "wma"]),
+        Photos: new Set(["avif", "bmp", "gif", "heic", "heif", "ico", "jpeg", "jpg", "png", "svg", "tif", "tiff", "webp"]),
+        Videos: new Set(["3gp", "avi", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ogv", "webm", "wmv"])
+    };
+    const AUTO_UPLOAD_FOLDERS_BY_MIME_PREFIX = {
+        "audio/": "Music",
+        "image/": "Photos",
+        "video/": "Videos"
+    };
+    const getUploadFileExtension = (file = {}) => {
+        const fileName = String(file?.name || "");
+        return fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+    };
+    const inferUploadFolderForFile = (file = {}) => {
+        const mimeType = String(file?.type || "").toLowerCase();
+        for (const [prefix, folder] of Object.entries(AUTO_UPLOAD_FOLDERS_BY_MIME_PREFIX)) {
+            if (mimeType.startsWith(prefix)) return folder;
+        }
+        const extension = getUploadFileExtension(file);
+        return Object.entries(AUTO_UPLOAD_FOLDERS_BY_EXTENSION).find(([, extensions]) => extensions.has(extension))?.[0] || "";
+    };
+    const getUploadDirectoryForFile = (file = {}, fallbackDirectory = "") => inferUploadFolderForFile(file) || normalizeUploadDirectory(fallbackDirectory);
     const syncUploadDirectory = () => window.StandardFilesUploadDirectory = normalizeUploadDirectory(active_upload_directory);
     const setActiveUploadDirectory = directoryPath => {
         active_upload_directory = directoryPath;
         syncUploadDirectory();
     };
-    const isDirectory = (file = {}) => Array.isArray(file.children);
+    const isDirectory = (file = {}) => {
+        if (Array.isArray(file.children)) return true;
+        const type = String(file?.type || file?.kind || file?.entryType || "").trim().toLowerCase();
+        return type === "directory" || type === "folder" || type === "dir";
+    };
     let fileSortMode = "name-asc";
     const FILE_SORT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" /></svg>`;
     const getFileName = (file = {}) => String(file.name || file.path?.split?.("/")?.pop?.() || "").toLowerCase();
@@ -311,7 +338,8 @@
         try {
             for (let index = 0; index < files.length; index++) {
                 const file = files[index];
-                const uploadUrl = `/api/upload?directory=${encodeURIComponent(targetDirectory)}`;
+                const uploadDirectory = getUploadDirectoryForFile(file, targetDirectory);
+                const uploadUrl = `/api/upload?directory=${encodeURIComponent(uploadDirectory)}`;
                 if (typeof window.StandardUploads?.uploadFile === "function") {
                     const response = await window.StandardUploads.uploadFile(file, uploadUrl, {label: `Uploading ${file.name || "file"}`, suppressProgress: !!multiProgress, onProgress: multiProgress ? progress => multiProgress.update({currentIndex: index, file, loaded: progress?.loaded || 0, total: progress?.total || file.size || 0, indeterminate: !!progress?.indeterminate}) : null});
                     if (!response?.ok) throw new Error(`Upload failed (${response?.status || 0})`);
@@ -335,6 +363,8 @@
         modular.success(files.length === 1 ? `Uploaded ${files[0]?.name || "file"}` : `Uploaded ${files.length} files`);
     };
     window.StandardFilesUploadSelectedFiles = uploadSelectedFiles;
+    window.StandardFiles = window.StandardFiles || {};
+    window.StandardFiles.inferUploadDirectory = (file = {}, fallbackDirectory = "") => getUploadDirectoryForFile(file, fallbackDirectory);
     const openWhiteboardInBoardsApp = async (rawPath = "", sourceNode = null) => {
         if (!isWhiteboardFilePath(rawPath)) return false;
         const openBoardData = await waitForServiceMethod(() => window.StandardBoards?.openBoardData, "com.standard.boards");
@@ -962,6 +992,16 @@
         }
         return loadDocumentsDirectory(directoryPath);
     };
+    const openDirectoryPath = async (rawPath = "") => {
+        const directoryPath = String(rawPath || "").trim();
+        if (!directoryPath) return false;
+        if (typeof modular?.show === "function") modular.show("com.standard.files", 1);
+        await navigateDocumentsDirectory(directoryPath);
+        return true;
+    };
+    window.StandardFiles = window.StandardFiles || {};
+    window.StandardFiles.openDirectoryPath = (rawPath = "") => openDirectoryPath(rawPath);
+    window.StandardFiles.isDirectoryRecord = (file = {}) => isDirectory(file);
     syncUploadDirectory();
     function renderFiles({openDirectories = true} = {}) {
         let as = []
