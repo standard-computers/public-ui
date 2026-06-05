@@ -25,7 +25,124 @@
         "/js/services/widgets/weather.widget.js"
     ];
     const serviceScripts = platformInterfaces.map(({script}) => script);
+    const SERVICE_SCRIPT_CACHE_INTERFACE = "service-loader";
+    const SERVICE_SCRIPT_CACHE_VERSION = "v1";
     const ENABLED_APPS_CACHE_KEY = "enabled-apps";
+    const buildServiceScriptCacheKey = (url = "") => `${SERVICE_SCRIPT_CACHE_VERSION}:${url}`;
+    const supportsServiceScriptCache = () => {
+        try {
+            return typeof window.StandardBrowserCache?.available === "function" && window.StandardBrowserCache.available();
+        } catch (_) {
+            return false;
+        }
+    };
+    const getCachedServiceScriptSource = async (url) => {
+        if (!supportsServiceScriptCache()) return null;
+        try {
+            const cached = await window.StandardBrowserCache.get(SERVICE_SCRIPT_CACHE_INTERFACE, buildServiceScriptCacheKey(url), {format: "js"});
+            return typeof cached === "string" && cached.trim() ? cached : null;
+        } catch (error) {
+            console.warn(`Failed to read cached service script ${url}`, error);
+            return null;
+        }
+    };
+    const cacheServiceScriptSource = async (url, source) => {
+        if (!supportsServiceScriptCache() || typeof source !== "string") return false;
+        try {
+            await window.StandardBrowserCache.set(SERVICE_SCRIPT_CACHE_INTERFACE, buildServiceScriptCacheKey(url), source, {
+                format: "js",
+                contentType: "text/javascript; charset=utf-8",
+                label: url,
+                source: "service-loader"
+            });
+            return true;
+        } catch (error) {
+            console.warn(`Failed to cache service script ${url}`, error);
+            return false;
+        }
+    };
+    const deleteCachedServiceScriptSource = async (url) => {
+        if (!supportsServiceScriptCache()) return false;
+        try {
+            return await window.StandardBrowserCache.delete(SERVICE_SCRIPT_CACHE_INTERFACE, buildServiceScriptCacheKey(url), {format: "js"});
+        } catch (_) {
+            return false;
+        }
+    };
+    const isLikelyJavaScript = (source = "", contentType = "") => {
+        const type = `${contentType || ""}`.toLowerCase();
+        const trimmed = `${source || ""}`.trimStart();
+        if (type.includes("text/html") || trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) return false;
+        return true;
+    };
+    const fetchServiceScriptSource = async (url) => {
+        const response = await fetch(url, {credentials: "same-origin", cache: "no-cache"});
+        const source = await response.text().catch(() => "");
+        if (!response.ok) throw new Error(`Failed to load ${url}: HTTP ${response.status}${source ? ` - ${source.slice(0, 120)}` : ""}`);
+        if (!isLikelyJavaScript(source, response.headers.get("content-type") || "")) throw new Error(`Failed to load ${url}: response was not JavaScript`);
+        await cacheServiceScriptSource(url, source);
+        return source;
+    };
+    const warmServiceScriptCache = async (url) => {
+        if (!supportsServiceScriptCache()) return;
+        try {
+            await fetchServiceScriptSource(url);
+        } catch (error) {
+            console.warn(`Failed to warm service script cache for ${url}`, error);
+        }
+    };
+    const loadNetworkServiceScript = (url) => new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = url;
+        script.async = false;
+        script.onload = () => {
+            void warmServiceScriptCache(url);
+            resolve(true);
+        };
+        script.onerror = () => reject(new Error(`Failed to load ${url}`));
+        document.head.appendChild(script);
+    });
+    const executeServiceScriptSource = (url, source) => new Promise((resolve, reject) => {
+        if (typeof source !== "string" || !source.trim() || !isLikelyJavaScript(source)) {
+            reject(new Error(`Cached script ${url} is empty`));
+            return;
+        }
+        const blobUrl = URL.createObjectURL(new Blob([source], {type: "text/javascript"}));
+        const script = document.createElement("script");
+        script.async = false;
+        script.src = blobUrl;
+        script.dataset.serviceScriptSrc = url;
+        script.onload = () => {
+            URL.revokeObjectURL(blobUrl);
+            resolve(true);
+        };
+        script.onerror = () => {
+            URL.revokeObjectURL(blobUrl);
+            reject(new Error(`Failed to execute cached script ${url}`));
+        };
+        document.head.appendChild(script);
+    });
+    const isServiceScriptLoaded = (script) => Array.from(document.scripts || []).some((node) => node.dataset?.serviceScriptSrc === script || node.getAttribute("src") === script || node.src.endsWith(script));
+    const serviceScriptLoadPromises = new Map();
+    const loadCachedServiceScript = (url) => {
+        if (!url) return Promise.resolve(false);
+        if (isServiceScriptLoaded(url)) return Promise.resolve(true);
+        if (serviceScriptLoadPromises.has(url)) return serviceScriptLoadPromises.get(url);
+        const promise = (async () => {
+            const source = await getCachedServiceScriptSource(url);
+            if (!source) return loadNetworkServiceScript(url);
+            return executeServiceScriptSource(url, source);
+        })().catch(async (error) => {
+            if (supportsServiceScriptCache()) {
+                console.warn(`Cached service script load failed for ${url}; refreshing from server`, error);
+                await deleteCachedServiceScriptSource(url);
+                return loadNetworkServiceScript(url);
+            }
+            throw error;
+        });
+        serviceScriptLoadPromises.set(url, promise);
+        return promise;
+    };
     const normalizeEnabledAppsRecord = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const serializeEnabledAppsRecord = (value) => JSON.stringify(JSON.stringify(normalizeEnabledAppsRecord(value)));
     const sanitizeRecordId = (value = "") => `${value || ""}`.trim().replace(/[^a-zA-Z0-9_-]/g, "");
@@ -99,23 +216,10 @@
         let hasExistingRecord = false;
         let loadPromise = null;
         let saveQueue = Promise.resolve();
-        const scriptLoadPromises = new Map();
         const defaultState = () => Object.fromEntries(platformInterfaces.map(({serviceId}) => [serviceId, true]));
-        const isScriptLoaded = (script) => Array.from(document.scripts || []).some((node) => node.getAttribute("src") === script || node.src.endsWith(script));
         const loadInterfaceScript = (app) => {
             if (!app?.script) return Promise.resolve(false);
-            if (isScriptLoaded(app.script)) return Promise.resolve(true);
-            if (scriptLoadPromises.has(app.script)) return scriptLoadPromises.get(app.script);
-            const promise = new Promise((resolve, reject) => {
-                const script = document.createElement("script");
-                script.src = app.script;
-                script.async = false;
-                script.onload = () => resolve(true);
-                script.onerror = () => reject(new Error(`Failed to load ${app.script}`));
-                document.head.appendChild(script);
-            });
-            scriptLoadPromises.set(app.script, promise);
-            return promise;
+            return loadCachedServiceScript(app.script);
         };
         const buildFetchCommand = (userRecordId) => `[cache] <user "${userRecordId}", key "${ENABLED_APPS_CACHE_KEY}">`;
         const buildCreateCommand = (userRecordId, value) => `[cache] + (@${userRecordId}, "${ENABLED_APPS_CACHE_KEY}", ${serializeEnabledAppsRecord(value)})`;
@@ -298,14 +402,7 @@
                 text.textContent = `Loading ${currentUrl}`;
             }
         };
-        const loadScript = (url) => new Promise((resolve, reject) => {
-            const script = document.createElement("script");
-            script.src = url;
-            script.async = false;
-            script.onload = resolve;
-            script.onerror = () => reject(new Error(`Failed to load ${url}`));
-            document.head.appendChild(script);
-        });
+        const loadScript = (url) => loadCachedServiceScript(url);
         const waitForCondition = async (predicate, {timeoutMs = 10000, intervalMs = 50} = {}) => {
             const start = Date.now();
             while (Date.now() - start <= timeoutMs) {

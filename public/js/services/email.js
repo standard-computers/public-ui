@@ -508,6 +508,14 @@
         const raw = message?.raw || message || {};
         return message?.from || formatAddress(firstValueLoose(raw, ["from", "sender", "author", "from_email", "fromEmail", "fromAddress", "from_address", "senderEmail", "sender_email", "senderAddress", "sender_address", "mailFrom", "mail_from"])) || String(context?.item?.querySelector?.(".email-message-sender")?.textContent || "").trim()
     };
+    const getReplyBody = message => {
+        const originalBody = String(message?.body || message?.snippet || "").trim();
+        if (!originalBody) return "";
+        const author = message?.from || "Original sender";
+        const sentAt = message?.date ? ` on ${formatDate(message.date)}` : "";
+        const quotedBody = escapeMarkup(originalBody).replace(/\r\n|\r|\n/g, "<br>");
+        return `<br><br><div class="email-reply-quote-header">On ${escapeMarkup(author)}${escapeMarkup(sentAt)} wrote:</div><blockquote class="email-reply-quote">${quotedBody}</blockquote>`;
+    };
     const messageIdsFromValue = value => {
         if (!value) return [];
         if (Array.isArray(value)) return value.flatMap(messageIdsFromValue);
@@ -604,7 +612,7 @@
             mode: "reply",
             to: recipient,
             subject: getReplySubject(message),
-            body: "",
+            body: getReplyBody(message),
             replyTo: {
                 id: message.id,
                 recordId: recordIdForContext(context),

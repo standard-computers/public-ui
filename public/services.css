@@ -629,6 +629,8 @@ body.editor-sheet-resizing-rows {cursor:row-resize}
 .email-reply-context-snippet {max-height:58px;overflow:hidden;white-space:pre-wrap;font-size:calc(var(--fs) - 2px);line-height:1.4;opacity:0.72}
 .email-composer-editor {flex:1;min-height:180px;overflow:auto;padding:16px 18px;border:1px solid var(--border);border-radius:calc(var(--radius) - 2px);background:var(--bg);line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;outline:none}
 .email-composer-editor:focus {box-shadow:inset 0 0 0 2px var(--primary)}
+.email-reply-quote-header {margin-top:12px;color:var(--faded);font-size:calc(var(--fs) - 1px)}
+.email-reply-quote {margin:8px 0 0 0;padding:0 0 0 12px;border-left:3px solid var(--border);color:var(--faded);white-space:pre-wrap;overflow-wrap:anywhere}
 
 @media (max-width: 720px) {
     .email-shell {grid-template-columns:1fr;grid-template-rows:minmax(180px, 42%) minmax(0, 1fr)}

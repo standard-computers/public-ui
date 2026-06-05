@@ -1014,8 +1014,11 @@ function buildBinaryCommandPayload(commandName, filePath, fileBuffer, relayConte
     const normalizedFilePath = String(filePath || "").replace(/\\/g, "/").trim();
     const binaryBuffer = Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer || []);
     let commandHeader = `${commandName} ${quoteCliPath(normalizedFilePath)} ${binaryBuffer.length}`;
-    if (relayContext) {
-        commandHeader = buildRelayCommand(commandHeader, relayContext);
+    if (isRelayMode) {
+        if (!relayContext || !relayContext.deviceSerial || !relayContext.chit) {
+            throw new Error("Missing relay context for binary upload");
+        }
+        commandHeader = `relay ${relayContext.deviceSerial} ~ ${relayContext.chit} ~ ${commandHeader}`;
     }
     return Buffer.concat([
         Buffer.from(`${commandHeader}\n`, "utf8"),
@@ -1469,12 +1472,6 @@ function withWsResponse(res, sendFn, onMessage, {timeoutMessage = "Timeout waiti
 
 function withRelayBinaryUploadResponse(res, payload, {onSettled = null, requestName = "relay-binary-upload"} = {}) {
     if (!ensureWsOpen(res)) return;
-    let fallbackHandle = null;
-    const clearFallback = () => {
-        if (!fallbackHandle) return;
-        clearTimeout(fallbackHandle);
-        fallbackHandle = null;
-    };
     enqueueWsRequest({
         name: requestName,
         response: res,
@@ -1482,29 +1479,30 @@ function withRelayBinaryUploadResponse(res, payload, {onSettled = null, requestN
         start: entry => {
             sendWsPayload(payload, err => {
                 if (err) {
-                    clearFallback();
                     failWsRequest(entry, err);
-                    return;
                 }
-                fallbackHandle = setTimeout(() => {
-                    fallbackHandle = null;
-                    if (!res.headersSent) {
-                        res.send("Upload queued");
-                    }
-                    completeWsRequest(entry);
-                }, WS_BINARY_SETTLE_MS);
             });
         },
         onMessage: (data, _isBinary, entry) => {
-            clearFallback();
+            const responseText = data.toString();
+            if (isRelayFailureResponse(responseText) || /\bbinary import failed\b/i.test(responseText)) {
+                if (!res.headersSent) {
+                    res.status(502).send(responseText);
+                }
+                completeWsRequest(entry);
+                return;
+            }
             if (!res.headersSent) {
-                res.send(data.toString());
+                res.send(responseText);
             }
             completeWsRequest(entry);
         },
         onError: err => {
-            clearFallback();
             if (res.headersSent || err.code === "WS_REQUEST_CANCELED") return;
+            if (err.code === "WS_TIMEOUT") {
+                res.status(504).send("Timeout waiting for upload confirmation");
+                return;
+            }
             if (err.code === "WS_NOT_CONNECTED") {
                 res.status(503).send("WebSocket not connected");
                 return;
@@ -1512,7 +1510,6 @@ function withRelayBinaryUploadResponse(res, payload, {onSettled = null, requestN
             res.status(500).send(err.message || "Upload failed");
         },
         onSettled: () => {
-            clearFallback();
             if (typeof onSettled === "function") onSettled();
         }
     }).catch(() => null);

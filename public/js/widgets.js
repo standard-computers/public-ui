@@ -10,6 +10,7 @@ class Widget {
     #pinIcon;
     #unpinIcon;
     #isPinned = false;
+    #suppressNextClick = false;
     #widgetId;
     #widgetIndex = 0;
     #portalId = "";
@@ -131,7 +132,11 @@ class Widget {
         exiter.classList.add('closer');
         exiter.title = "Close widget";
         exiter.setAttribute("aria-label", "Close widget");
-        exiter.addEventListener("click", () => this.hide());
+        exiter.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.hide();
+        });
         const closeIcon = new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>`, "image/svg+xml").documentElement;
         if (accent) closeIcon.style.stroke = accent;
         exiter.appendChild(closeIcon);
@@ -248,7 +253,7 @@ class Widget {
     }
     #makeDraggable(element, handle) {
         const dragState = {
-            offsetX: 0, offsetY: 0, isDragging: false, disableSelection: (e) => {
+            offsetX: 0, offsetY: 0, isDragging: false, dragMoved: false, startX: 0, startY: 0, disableSelection: (e) => {
                 if (!(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
                     e.preventDefault();
                 }
@@ -267,6 +272,9 @@ class Widget {
             if (this.#isPinned || isInteractiveTarget(e.target)) return;
             if (typeof modular?.bringToFront === "function") modular.bringToFront(element);
             const {x, y} = getClientPosition(e);
+            dragState.startX = x;
+            dragState.startY = y;
+            dragState.dragMoved = false;
             dragState.offsetX = x - element.offsetLeft;
             dragState.offsetY = y - element.offsetTop;
             dragState.isDragging = true;
@@ -278,6 +286,9 @@ class Widget {
         const moveDrag = (e) => {
             if (dragState.isDragging && !this.#isPinned) {
                 const {x, y} = getClientPosition(e);
+                if (Math.abs(x - dragState.startX) > 3 || Math.abs(y - dragState.startY) > 3) {
+                    dragState.dragMoved = true;
+                }
                 element.style.left = `${x - dragState.offsetX}px`;
                 element.style.top = `${y - dragState.offsetY}px`;
                 if (e.cancelable) e.preventDefault();
@@ -289,9 +300,22 @@ class Widget {
                 handle.style.cursor = 'grab';
                 element.style.cursor = 'grab';
                 document.removeEventListener('selectstart', dragState.disableSelection);
+                if (dragState.dragMoved) {
+                    this.#suppressNextClick = true;
+                    setTimeout(() => {
+                        this.#suppressNextClick = false;
+                    }, 0);
+                }
                 this.#persistWindowState({open: true});
             }
         };
+        element.addEventListener('click', (event) => {
+            const headerClick = event.target?.closest?.('.window-header') && !event.target?.closest?.('.closer, .window-tool-button');
+            if (!this.#suppressNextClick && !headerClick) return;
+            this.#suppressNextClick = false;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        });
         element.addEventListener('mousedown', startDrag);
         element.addEventListener('touchstart', startDrag, {passive: false});
         document.addEventListener('mousemove', moveDrag);
