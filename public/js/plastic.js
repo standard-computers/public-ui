@@ -1,7 +1,3 @@
-if (document.getElementById("launch-interfaces")) document.getElementById("launch-interfaces").addEventListener("click", () => {
-    document.getElementById("search-box").value = "interfaces";
-    document.getElementById("interface-shortcuts").in();
-});
 function applyCommonAttributes(el, n) {
     if (!n) return;
     const altSync = n.altSync ?? n.altsync ?? n.alt_sync ?? n["alt-sync"];

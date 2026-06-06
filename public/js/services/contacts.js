@@ -287,6 +287,119 @@
         photoEl[bindingKey] = binding;
         return binding;
     };
+    const createContact = async () => {
+        const fname = document.getElementById("first-name").value.trim();
+        const mname = document.getElementById("middle-name").value.trim();
+        const lname = document.getElementById("last-name").value.trim();
+        const bday = document.getElementById("birthday").value.trim();
+        const address = document.getElementById("address").value.trim();
+        const phone = document.getElementById("phone").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const company = document.getElementById("company").value.trim();
+        try {
+            const response = await CLI.send(`[contacts] + ("${fname}", "${mname}", "${lname}", "${bday}", "${address}", "${phone}", "${email}", "${company}")`, false);
+            const createdContactId = response;
+            if (!createdContactId) modular.error("Contact was created but no record ID was parsed; image upload skipped");
+            if (addContactImageFile && createdContactId) {
+                const formData = new FormData();
+                formData.append("file", addContactImageFile);
+                const uploadResponse = typeof window.StandardUploads?.uploadFile === "function"
+                    ? await window.StandardUploads.uploadFile(addContactImageFile, `/api/upload/temp/${createdContactId}`, {
+                        label: `Uploading ${addContactImageFile.name || "contact photo"}`
+                    })
+                    : await fetch(`/api/upload/temp/${createdContactId}`, {
+                        method: "POST",
+                        body: formData
+                    }).then(async response => ({
+                        ok: response.ok,
+                        status: response.status,
+                        responseText: await response.text()
+                    }));
+                if (!uploadResponse.ok) {
+                    modular.error(`Image upload failed (${uploadResponse.status})`);
+                } else {
+                    bumpContactImageCacheKey(createdContactId);
+                    modular.success("Image uploaded and linked to contact");
+                }
+            } else if (addContactImageFile && !createdContactId) {
+                //TODO
+                console.log("[contacts:create] Image file selected but upload skipped because contact id was not parsed");
+            } else {
+                //TODO
+                console.log("[contacts:create] No image selected for upload");
+            }
+            if ((response !== 0) || createdContactId) {
+                addContactImageFile = null;
+                closeCreateContactPortal();
+                modular.refresh("com.standard.contacts");
+                modular.success("Created contact");
+            } else {
+                modular.error("Failed to create contact");
+            }
+        } catch (error) {
+            modular.error("Failed to create contact or upload image");
+        }
+    };
+    const saveSelectedContact = async () => {
+        const contactId = selected_contact?.id;
+        if (!contactId) {
+            modular.error("No contact selected");
+            return;
+        }
+        const fname = document.getElementById("edit-first-name").value.trim();
+        const mname = document.getElementById("edit-middle-name").value.trim();
+        const lname = document.getElementById("edit-last-name").value.trim();
+        const bday = document.getElementById("edit-birthday").value.trim();
+        const address = document.getElementById("edit-address").value.trim();
+        const phone = document.getElementById("edit-phone").value.trim();
+        const email = document.getElementById("edit-email").value.trim();
+        const company = document.getElementById("edit-company").value.trim();
+        const escaped = value => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\\"');
+        try {
+            const updates = [
+                CLI.send(`[contacts] firstname "${escaped(fname)}" <id ${contactId}>`),
+                CLI.send(`[contacts] middlename "${escaped(mname)}" <id ${contactId}>`),
+                CLI.send(`[contacts] lastname "${escaped(lname)}" <id ${contactId}>`),
+                CLI.send(`[contacts] birthday "${escaped(bday)}" <id ${contactId}>`),
+                CLI.send(`[contacts] address "${escaped(address)}" <id ${contactId}>`),
+                CLI.send(`[contacts] phone "${escaped(phone)}" <id ${contactId}>`),
+                CLI.send(`[contacts] email "${escaped(email)}" <id ${contactId}>`),
+                CLI.send(`[contacts] company "${escaped(company)}" <id ${contactId}>`)
+            ];
+            const updateResponses = await Promise.all(updates);
+            const hadUpdateFailure = updateResponses.some(response => response === 0);
+            if (hadUpdateFailure) {
+                modular.error("Failed to update one or more fields");
+                return;
+            }
+            if (editContactImageChanged && editContactImageFile) {
+                const formData = new FormData();
+                formData.append("file", editContactImageFile);
+                const uploadResponse = typeof window.StandardUploads?.uploadFile === "function" ? await window.StandardUploads.uploadFile(editContactImageFile, `/api/upload/temp/${contactId}`, {label: `Uploading ${editContactImageFile.name || "contact photo"}`}) : await fetch(`/api/upload/temp/${contactId}`, {method: "POST", body: formData}).then(response => ({ok: response.ok, status: response.status}));
+                if (!uploadResponse.ok) {
+                    modular.error(`Image upload failed (${uploadResponse.status})`);
+                    return;
+                }
+                bumpContactImageCacheKey(contactId);
+            }
+        } catch (error) {
+            modular.error("Failed to save contact");
+            return;
+        }
+        selected_contact = {...selected_contact, id: contactId, firstname: fname, middlename: mname, lastname: lname, birthday: bday, address, phone, email, company};
+        try {
+            editContactImageFile = null;
+            editContactImageChanged = false;
+            closeEditContactPortal();
+            modular.refresh("com.standard.contacts");
+            openContact(selected_contact);
+            modular.success("Saved contact");
+        } catch (error) {
+            console.error("[contacts:save] Contact saved but portal transition failed", error);
+            modular.refresh("com.standard.contacts");
+            modular.success("Saved contact");
+        }
+    };
     const openContact = (contact = {}) => {
         const fullName = [contact.firstname, contact.middlename, contact.lastname].filter(Boolean).join(" ").trim() || "View Contact";
         const contactValue = (value) => String(value || "").trim();
@@ -379,6 +492,11 @@
             afterRender: () => {}
     });
     const addContactPortal = new Portal({title: "Add Contact", hints: ["create contact", "add contact", "add new contact", "create new contact"], dimensions: [350, 450], navigation: false, resizable: false,
+            tools: [{
+                title: "Save",
+                icon: modular.icons.save,
+                onclick: createContact
+            }],
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25" /></svg>`,
             route: () => div({content: children([
                     div({style: "center medium-margin-top margin-bottom", content: children([
@@ -425,64 +543,6 @@
                             div({style: "padded", content: input({id: "company", style: "undecorated no-padding", placeholder: "Standard Computers LLC"})})
                         ])
                     }),
-                    div({style: "spacer"}),
-                    button({style: "fill fat primary float-right",
-                        content: "Create",
-                        onclick: async () => {
-                            const fname = document.getElementById("first-name").value.trim();
-                            const mname = document.getElementById("middle-name").value.trim();
-                            const lname = document.getElementById("last-name").value.trim();
-                            const bday = document.getElementById("birthday").value.trim();
-                            const address = document.getElementById("address").value.trim();
-                            const phone = document.getElementById("phone").value.trim();
-                            const email = document.getElementById("email").value.trim();
-                            const company = document.getElementById("company").value.trim();
-                            try {
-                                const response = await CLI.send(`[contacts] + ("${fname}", "${mname}", "${lname}", "${bday}", "${address}", "${phone}", "${email}", "${company}")`, false);
-                                const createdContactId = response;
-                                if (!createdContactId) modular.error("Contact was created but no record ID was parsed; image upload skipped");
-                                if (addContactImageFile && createdContactId) {
-                                    const formData = new FormData();
-                                    formData.append("file", addContactImageFile);
-                                    const uploadResponse = typeof window.StandardUploads?.uploadFile === "function"
-                                        ? await window.StandardUploads.uploadFile(addContactImageFile, `/api/upload/temp/${createdContactId}`, {
-                                            label: `Uploading ${addContactImageFile.name || "contact photo"}`
-                                        })
-                                        : await fetch(`/api/upload/temp/${createdContactId}`, {
-                                            method: "POST",
-                                            body: formData
-                                        }).then(async response => ({
-                                            ok: response.ok,
-                                            status: response.status,
-                                            responseText: await response.text()
-                                        }));
-                                    const uploadResponseText = uploadResponse.responseText || "";
-                                    if (!uploadResponse.ok) {
-                                        modular.error(`Image upload failed (${uploadResponse.status})`);
-                                    } else {
-                                        bumpContactImageCacheKey(createdContactId);
-                                        modular.success("Image uploaded and linked to contact");
-                                    }
-                                } else if (addContactImageFile && !createdContactId) {
-                                    //TODO
-                                    console.log("[contacts:create] Image file selected but upload skipped because contact id was not parsed");
-                                } else {
-                                    //TODO
-                                    console.log("[contacts:create] No image selected for upload");
-                                }
-                                if ((response !== 0) || createdContactId) {
-                                    addContactImageFile = null;
-                                    closeCreateContactPortal();
-                                    modular.refresh("com.standard.contacts");
-                                    modular.success("Created contact");
-                                } else {
-                                    modular.error("Failed to create contact");
-                                }
-                            } catch (error) {
-                                modular.error("Failed to create contact or upload image");
-                            }
-                        }
-                    }),
                     div({style: "spacer"})
                 ])
             }),
@@ -527,6 +587,10 @@
                         closeEditContactPortal();
                     });
                 }
+            }, {
+                title: "Save",
+                icon: modular.icons.save,
+                onclick: saveSelectedContact
             }],
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25" /></svg>`,
             route: () => div({content: children([
@@ -574,67 +638,6 @@
                             div({style: "padded", content: input({id: "edit-company", style: "undecorated no-padding", placeholder: ""})})
                         ])
                     }),
-                    div({style: "spacer"}),
-                    button({style: "fill fat primary float-right", content: "Save", onclick: async () => {
-                            const contactId = selected_contact?.id;
-                            if (!contactId) {
-                                modular.error("No contact selected");
-                                return;
-                            }
-                            const fname = document.getElementById("edit-first-name").value.trim();
-                            const mname = document.getElementById("edit-middle-name").value.trim();
-                            const lname = document.getElementById("edit-last-name").value.trim();
-                            const bday = document.getElementById("edit-birthday").value.trim();
-                            const address = document.getElementById("edit-address").value.trim();
-                            const phone = document.getElementById("edit-phone").value.trim();
-                            const email = document.getElementById("edit-email").value.trim();
-                            const company = document.getElementById("edit-company").value.trim();
-                            const escaped = value => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\\"');
-                            try {
-                                const updates = [
-                                    CLI.send(`[contacts] firstname "${escaped(fname)}" <id ${contactId}>`),
-                                    CLI.send(`[contacts] middlename "${escaped(mname)}" <id ${contactId}>`),
-                                    CLI.send(`[contacts] lastname "${escaped(lname)}" <id ${contactId}>`),
-                                    CLI.send(`[contacts] birthday "${escaped(bday)}" <id ${contactId}>`),
-                                    CLI.send(`[contacts] address "${escaped(address)}" <id ${contactId}>`),
-                                    CLI.send(`[contacts] phone "${escaped(phone)}" <id ${contactId}>`),
-                                    CLI.send(`[contacts] email "${escaped(email)}" <id ${contactId}>`),
-                                    CLI.send(`[contacts] company "${escaped(company)}" <id ${contactId}>`)
-                                ];
-                                const updateResponses = await Promise.all(updates);
-                                const hadUpdateFailure = updateResponses.some(response => response === 0);
-                                if (hadUpdateFailure) {
-                                    modular.error("Failed to update one or more fields");
-                                    return;
-                                }
-                                if (editContactImageChanged && editContactImageFile) {
-                                    const formData = new FormData();
-                                    formData.append("file", editContactImageFile);
-                                    const uploadResponse = typeof window.StandardUploads?.uploadFile === "function" ? await window.StandardUploads.uploadFile(editContactImageFile, `/api/upload/temp/${contactId}`, {label: `Uploading ${editContactImageFile.name || "contact photo"}`}) : await fetch(`/api/upload/temp/${contactId}`, {method: "POST", body: formData}).then(response => ({ok: response.ok, status: response.status}));
-                                    if (!uploadResponse.ok) {
-                                        modular.error(`Image upload failed (${uploadResponse.status})`);
-                                        return;
-                                    }
-                                    bumpContactImageCacheKey(contactId);
-                                }
-                            } catch (error) {
-                                modular.error("Failed to save contact");
-                                return;
-                            }
-                            selected_contact = {...selected_contact, id: contactId, firstname: fname, middlename: mname, lastname: lname, birthday: bday, address, phone, email, company};
-                            try {
-                                editContactImageFile = null;
-                                editContactImageChanged = false;
-                                closeEditContactPortal();
-                                modular.refresh("com.standard.contacts");
-                                openContact(selected_contact);
-                                modular.success("Saved contact");
-                            } catch (error) {
-                                console.error("[contacts:save] Contact saved but portal transition failed", error);
-                                modular.refresh("com.standard.contacts");
-                                modular.success("Saved contact");
-                            }
-                        }}),
                     div({style: "spacer"})
                 ])
             }),

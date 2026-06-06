@@ -97,8 +97,13 @@
         {label: "Auto", value: ""},
         {label: "Text", value: "text"},
         {label: "Number", value: "number"},
+        {label: "Currency", value: "currency"},
+        {label: "Percentage", value: "percentage"},
+        {label: "Fraction", value: "fraction"},
+        {label: "Scientific", value: "scientific"},
         {label: "Date", value: "date"}
     ];
+    const SHEET_NUMERIC_CELL_TYPES = ["number", "currency", "percentage", "fraction", "scientific"];
     const findSheetWindow = () => [...Array.from(document.querySelectorAll(".draggable-window"))].reverse().find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID) || null;
     const findSheetPortal = () => findSheetWindow()?.portal;
     const prioritizePortalDomForLegacyLookups = (portal = null) => {
@@ -242,8 +247,9 @@
     };
     const normalizeSheetCellType = (rawType = "") => {
         const normalizedType = String(rawType?.type || rawType || "").trim().toLowerCase();
-        return ["text", "number", "date"].includes(normalizedType) ? normalizedType : "";
+        return ["text", "number", "currency", "percentage", "fraction", "scientific", "date"].includes(normalizedType) ? normalizedType : "";
     };
+    const isSheetNumericCellType = (cellType = "") => SHEET_NUMERIC_CELL_TYPES.includes(normalizeSheetCellType(cellType));
     const normalizeSheetHyperlinkUrl = (rawUrl = "") => {
         const trimmedUrl = String(rawUrl || "").trim();
         if (!trimmedUrl) return "";
@@ -1287,9 +1293,17 @@
         saveSheetPortalState();
     };
     const applySheetTypeToSelection = (nextType = "") => {
+        captureActiveSheetInput();
+        const normalizedType = normalizeSheetCellType(nextType);
         const selectedReferences = getActiveSheetCellReferences();
         if (!selectedReferences.length) return;
-        selectedReferences.forEach((cellReference) => setSheetCellType(cellReference, nextType));
+        selectedReferences.forEach((cellReference) => {
+            setSheetCellType(cellReference, normalizedType);
+            if (["currency", "percentage", "scientific"].includes(normalizedType)) {
+                const currentStyle = getSheetCellStyle(cellReference);
+                if (!Number.isInteger(currentStyle.decimalPlaces)) setSheetCellStyle(cellReference, {...currentStyle, decimalPlaces: 2});
+            }
+        });
         refreshSheetCells();
         saveSheetPortalState();
     };
@@ -1306,7 +1320,7 @@
         const rawValue = String(sheetCellValues[cellReference] ?? "").trim();
         if (!rawValue) return true;
         const evaluatedValue = evaluateSheetCell(cellReference);
-        return Number.isFinite(Number(rawValue.startsWith("=") ? evaluatedValue : rawValue));
+        return Number.isFinite(parseSheetNumericValue(rawValue.startsWith("=") ? evaluatedValue : rawValue, getSheetCellType(cellReference)));
     };
     const applySheetDecimalAdjustmentToSelection = (delta = 0) => {
         const selectedReferences = getActiveSheetCellReferences();
@@ -1315,7 +1329,8 @@
             const currentStyle = getSheetCellStyle(cellReference);
             const currentPlaces = getSheetNumberDecimalCount(cellReference);
             setSheetCellStyle(cellReference, {...currentStyle, decimalPlaces: Math.min(12, Math.max(0, currentPlaces + delta))});
-            setSheetCellType(cellReference, "number");
+            const currentType = getSheetCellType(cellReference);
+            setSheetCellType(cellReference, isSheetNumericCellType(currentType) ? currentType : "number");
             applySheetCellStyle(cellReference);
         });
         refreshSheetCells();
@@ -1325,7 +1340,7 @@
         captureActiveSheetInput();
         const selectedReferences = getActiveSheetCellReferences();
         if (!selectedReferences.length) return;
-        const nonNumberReferences = selectedReferences.filter((cellReference) => getSheetCellType(cellReference) !== "number");
+        const nonNumberReferences = selectedReferences.filter((cellReference) => !isSheetNumericCellType(getSheetCellType(cellReference)));
         if (!nonNumberReferences.length) {
             applySheetDecimalAdjustmentToSelection(delta);
             return;
@@ -1494,7 +1509,7 @@
         return result;
     };
     const toSheetNumericValue = (value) => {
-        const numericValue = Number(value);
+        const numericValue = parseSheetNumericValue(value);
         return Number.isFinite(numericValue) ? numericValue : null;
     };
     const toSheetAggregateNumericValue = (value) => {
@@ -1529,12 +1544,90 @@
         if (value === null || typeof value === "undefined") return "";
         return String(value);
     };
+    const parseSheetFractionValue = (value = "") => {
+        const textValue = String(value ?? "").trim();
+        if (!textValue) return null;
+        const match = /^([+-])?(?:(\d+)\s+)?(\d+)\/(\d+)$/.exec(textValue);
+        if (!match) return null;
+        const whole = Number(match[2] || 0);
+        const numerator = Number(match[3]);
+        const denominator = Number(match[4]);
+        if (!Number.isFinite(whole) || !Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) return null;
+        const sign = match[1] === "-" ? -1 : 1;
+        return sign * (whole + (numerator / denominator));
+    };
+    const parseSheetNumericValue = (value, cellType = "") => {
+        if (typeof value === "number") return Number.isFinite(value) ? value : null;
+        const normalizedType = normalizeSheetCellType(cellType);
+        let textValue = String(value ?? "").trim();
+        if (!textValue) return null;
+        const fractionValue = parseSheetFractionValue(textValue);
+        if (fractionValue !== null) return fractionValue;
+        let isNegativeAccounting = false;
+        if (/^\(.+\)$/.test(textValue)) {
+            isNegativeAccounting = true;
+            textValue = textValue.slice(1, -1);
+        }
+        const isPercentInput = /%$/.test(textValue);
+        textValue = textValue.replace(/[$,\s]/g, "").replace(/%$/, "");
+        const numericValue = Number(textValue);
+        if (!Number.isFinite(numericValue)) return null;
+        const signedValue = isNegativeAccounting ? -numericValue : numericValue;
+        return isPercentInput && normalizedType === "percentage" ? signedValue / 100 : signedValue;
+    };
     const formatSheetDateValue = (value) => {
         const textValue = String(value ?? "").trim();
         if (!textValue) return "";
         const dateValue = /^\d{4}-\d{2}-\d{2}$/.test(textValue) ? new Date(`${textValue}T00:00:00`) : new Date(textValue);
         if (Number.isNaN(dateValue.getTime())) return textValue;
         return dateValue.toLocaleDateString(undefined, {year: "numeric", month: "short", day: "numeric"});
+    };
+    const formatSheetFractionValue = (value) => {
+        const numericValue = Number(value);
+        if (!Number.isFinite(numericValue)) return String(value ?? "");
+        if (numericValue === 0) return "0";
+        const sign = numericValue < 0 ? "-" : "";
+        const absoluteValue = Math.abs(numericValue);
+        const whole = Math.floor(absoluteValue);
+        const fractional = absoluteValue - whole;
+        if (fractional < 1e-10) return `${sign}${whole}`;
+        const maxDenominator = 64;
+        let bestNumerator = 0;
+        let bestDenominator = 1;
+        let bestError = Number.POSITIVE_INFINITY;
+        for (let denominator = 1; denominator <= maxDenominator; denominator += 1) {
+            const numerator = Math.round(fractional * denominator);
+            const error = Math.abs(fractional - (numerator / denominator));
+            if (error < bestError) {
+                bestNumerator = numerator;
+                bestDenominator = denominator;
+                bestError = error;
+            }
+        }
+        if (bestNumerator === 0) return `${sign}${whole}`;
+        if (bestNumerator === bestDenominator) return `${sign}${whole + 1}`;
+        const divisor = (left, right) => right ? divisor(right, left % right) : left;
+        const commonDivisor = divisor(bestNumerator, bestDenominator);
+        const numerator = bestNumerator / commonDivisor;
+        const denominator = bestDenominator / commonDivisor;
+        return `${sign}${whole ? `${whole} ` : ""}${numerator}/${denominator}`;
+    };
+    const formatSheetNumericDisplayValue = (value, cellReference = "", cellType = "number") => {
+        const numericValue = Number(value);
+        if (!Number.isFinite(numericValue)) return String(value ?? "");
+        const decimalPlaces = getSheetCellStyle(cellReference).decimalPlaces;
+        const normalizedType = normalizeSheetCellType(cellType);
+        if (normalizedType === "currency") {
+            const digits = Number.isInteger(decimalPlaces) ? decimalPlaces : 2;
+            return numericValue.toLocaleString(undefined, {style: "currency", currency: "USD", minimumFractionDigits: digits, maximumFractionDigits: digits});
+        }
+        if (normalizedType === "percentage") {
+            const digits = Number.isInteger(decimalPlaces) ? decimalPlaces : 2;
+            return `${(numericValue * 100).toLocaleString(undefined, {minimumFractionDigits: digits, maximumFractionDigits: digits})}%`;
+        }
+        if (normalizedType === "fraction") return formatSheetFractionValue(numericValue);
+        if (normalizedType === "scientific") return numericValue.toExponential(Number.isInteger(decimalPlaces) ? decimalPlaces : 2).replace("e", "E");
+        return Number.isInteger(decimalPlaces) ? numericValue.toFixed(decimalPlaces) : String(numericValue);
     };
     const getSheetRangeReferences = (startReference = "", endReference = "") => {
         const start = parseSheetCellReference(String(startReference || "").toUpperCase());
@@ -1759,13 +1852,13 @@
         if (!rawValue.startsWith("=")) {
             if (rawValue === "") return "";
             if (cellType === "text" || cellType === "date") return rawValue;
-            const numericValue = Number(rawValue);
+            const numericValue = parseSheetNumericValue(rawValue, cellType);
             return Number.isFinite(numericValue) ? numericValue : rawValue;
         }
         if (cellType === "text") return rawValue;
         const evaluatedValue = evaluateSheetExpressionValue(rawValue.slice(1), new Set(visited));
-        if (cellType === "number") {
-            const numericValue = Number(evaluatedValue);
+        if (isSheetNumericCellType(cellType)) {
+            const numericValue = parseSheetNumericValue(evaluatedValue, cellType);
             return Number.isFinite(numericValue) ? numericValue : evaluatedValue;
         }
         return evaluatedValue;
@@ -1775,11 +1868,10 @@
         const cellType = getSheetCellType(cellReference);
         const evaluatedValue = evaluateSheetCell(cellReference);
         if (cellType === "text") return rawValue;
-        if (cellType === "number") {
-            const numericValue = Number(rawValue.startsWith("=") ? evaluatedValue : rawValue);
+        if (isSheetNumericCellType(cellType)) {
+            const numericValue = parseSheetNumericValue(rawValue.startsWith("=") ? evaluatedValue : rawValue, cellType);
             if (!Number.isFinite(numericValue)) return String(rawValue.startsWith("=") ? evaluatedValue : rawValue);
-            const decimalPlaces = getSheetCellStyle(cellReference).decimalPlaces;
-            return Number.isInteger(decimalPlaces) ? numericValue.toFixed(decimalPlaces) : String(numericValue);
+            return formatSheetNumericDisplayValue(numericValue, cellReference, cellType);
         }
         if (cellType === "date") return formatSheetDateValue(rawValue.startsWith("=") ? evaluatedValue : rawValue);
         return String(evaluatedValue);
@@ -3448,8 +3540,8 @@
                 return div({style: "large-padding-top editor-portal-shell", content: children([
                         div({style: "editor-sheet-shell", content: children([
                                 div({id: "editor-text-toolbar", style: "bordered shadowed radius small-padding", content: div({style: "faded", content: children([
-                                            searchComboBox({id: "editor-sheet-font-family", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: SHEET_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
-                                            searchComboBox({id: "editor-sheet-font-size", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: SHEET_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
+                                            searchComboBox({id: "editor-sheet-font-family", altsync: "FF", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: SHEET_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
+                                            searchComboBox({id: "editor-sheet-font-size", altsync: "FS", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: SHEET_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
                                             button({id: "editor-sheet-style-bold", altsync: "B", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`}),
                                             button({id: "editor-sheet-style-italic", altsync: "I", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.255859 22.003906 L 14.005859 22.003906 L 14.005859 20.503906 L 13.255859 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`}),
                                             button({id: "editor-sheet-style-underline", altsync: "U", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 6.0058594 2 L 6.0058594 2.75 L 6.0058594 12.585938 C 6.0058594 15.618894 8.7446099 18.001953 12.003906 18.001953 C 15.263203 18.001953 18.003906 15.618893 18.003906 12.585938 L 18.003906 2.75 L 18.003906 2 L 16.503906 2 L 16.503906 2.75 L 16.503906 12.585938 C 16.503906 14.706981 14.54261 16.501953 12.003906 16.501953 C 9.4652032 16.501953 7.5058594 14.70698 7.5058594 12.585938 L 7.5058594 2.75 L 7.5058594 2 L 6.0058594 2 z M 4.9980469 20.003906 L 4.9980469 21.503906 L 5.7480469 21.503906 L 18.251953 21.503906 L 19.001953 21.503906 L 19.001953 20.003906 L 18.251953 20.003906 L 5.7480469 20.003906 L 4.9980469 20.003906 z"/></svg>`}),
@@ -3467,10 +3559,10 @@
                                                     ...SHEET_CELL_TYPES
                                                 ]
                                             }),
-                                            button({id: "editor-sheet-decimal-decrease", style: "naked align-bottom small-margin-right inner-radius", title: "Decrease Decimal Count", icon: SHEET_DECIMAL_DECREASE_ICON}),
-                                            button({id: "editor-sheet-decimal-increase", style: "naked align-bottom small-margin-right inner-radius", title: "Increase Decimal Count", icon: SHEET_DECIMAL_INCREASE_ICON}),
-                                            button({id: "editor-sheet-add-image", style: "naked align-bottom small-margin-right inner-radius", title: "Add image", icon: SHEET_IMAGE_ICON}),
-                                            button({id: "editor-sheet-make-chart", style: "naked align-bottom small-margin-right inner-radius", title: "Chart", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" /></svg>`}),
+                                            button({id: "editor-sheet-decimal-decrease", altsync: "DC", style: "naked align-bottom small-margin-right inner-radius", title: "Decrease Decimal Count", icon: SHEET_DECIMAL_DECREASE_ICON}),
+                                            button({id: "editor-sheet-decimal-increase", altsync: "IC", style: "naked align-bottom small-margin-right inner-radius", title: "Increase Decimal Count", icon: SHEET_DECIMAL_INCREASE_ICON}),
+                                            button({id: "editor-sheet-add-image", altsync: "IM", style: "naked align-bottom small-margin-right inner-radius", title: "Add image", icon: SHEET_IMAGE_ICON}),
+                                            button({id: "editor-sheet-make-chart", altsync: "C", style: "naked align-bottom small-margin-right inner-radius", title: "Chart", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" /></svg>`}),
                                         ])})
                                 }),
                                 div({style: "padding-left padding-right padding-bottom editor-sheet-workspace", content: children([

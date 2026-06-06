@@ -1126,8 +1126,14 @@ function getFocusedPortalSaveTool() {
 function getFocusedPortalEditTool() {
     return getFocusedPortalToolByTitle("Edit");
 }
+function getFocusedPortalDeleteTool() {
+    return getFocusedPortalToolByTitle("Delete");
+}
 function getFocusedPortalSearchTool() {
     return getFocusedPortalToolByTitle("Search");
+}
+function isEditableShortcutTarget(element = document.activeElement) {
+    return !!element && (element.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(element.tagName));
 }
 function getFocusedPortalWindow() {
     return document.querySelector(".draggable-window.window-focused:not(.widget-window)");
@@ -1177,6 +1183,14 @@ document.addEventListener("keydown", function (e) {
             editTool.click();
         } else {
             modular.error("No edit in this app");
+        }
+        return;
+    }
+    if (e.ctrlKey && !e.shiftKey && !e.metaKey && !e.altKey && (e.key === "Delete" || e.key === "Del") && !isEditableShortcutTarget()) {
+        const deleteTool = getFocusedPortalDeleteTool();
+        if (deleteTool) {
+            e.preventDefault();
+            deleteTool.click();
         }
         return;
     }

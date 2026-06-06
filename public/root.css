@@ -60,6 +60,8 @@
 .background-indigo {background-color:var(--indigo) !important}
 .background-violet {background-color:var(--violet) !important}
 .background-pink {background-color:var(--pink) !important}
+.background-black {background-color:#000 !important}
+.background-white {background-color:#fff !important}
 .background-background {background-color:var(--bg) !important}
 .background-primary {background-color:var(--primary) !important}
 .background-secondary {background-color:var(--secondary-bg) !important}

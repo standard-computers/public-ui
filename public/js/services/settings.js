@@ -18,6 +18,7 @@
         use_svg_icons: true,
         hide_shortcuts: false,
         kiosk_mode: false,
+        disable_bar: false,
         media_widget: true,
         video_widget: true,
     }
@@ -1108,6 +1109,9 @@
                             label({style: "faded", content: "Kiosk Mode"}),
                             em({style: "faded", content: "Make browser full screen"}),
                             div({style: "big-spacer"}),
+                            switcher({id: "disable-bar", checked: ui_settings_options.disable_bar === true}),
+                            label({style: "faded", content: "Disable Bar"}),
+                            div({style: "big-spacer"}),
                             switcher({id: "use-player-widget", checked: ui_settings_options.interface_state}),
                             label({style: "faded", content: "Use Player Widget"}),
                             em({style: "faded", content: "Widget to control active media"}),
@@ -1124,6 +1128,11 @@
                         });
                         document.getElementById("kiosk-mode").addEventListener("change", event => {
                             updateKioskMode(event.target?.checked === true);
+                        });
+                        document.getElementById("disable-bar").addEventListener("change", event => {
+                            ui_settings_options.disable_bar = event.target?.checked === true;
+                            window.StandardUI?.setDisableBar?.(ui_settings_options.disable_bar);
+                            saveSettings({successMessage: ui_settings_options.disable_bar ? "Bar disabled" : "Bar enabled"});
                         });
                     }
                 }, {

@@ -292,8 +292,8 @@
                 style: "padded radius pointer hidden board-file hover-background hover-shadowed center",
                 directive: board.path,
                 content: children([
-                    img({style: "large-icon no-events brick tiny-margin-left contained", src: "/icons/wtb.png"}),
-                    div({style: "brick margin-top", content: board.name})
+                    img({style: "large-icon no-events contained board-file-icon", src: "/icons/wtb.png"}),
+                    div({style: "board-file-name", content: board.name})
                 ])
             })));
         } catch (_) {
@@ -346,22 +346,25 @@
                                     return container;
                                 }}),
                             div({style: "absolute left bottomed bordered radius shadowed no-padding align-top small-padding-top small-padding-left small-padding-right center blurred", id: "boards-toolbar", content: children([
-                                    div({style: "color-block pointer hover-zoom cube inline background-red radius", content: div({style: ""})}),
-                                    div({style: "color-block pointer hover-zoom cube inline background-orange radius", content: div({style: ""})}),
-                                    div({style: "color-block pointer hover-zoom cube inline background-yellow radius", content: div({style: ""})}),
-                                    div({style: "color-block pointer hover-zoom cube inline background-green radius", content: div({style: ""})}),
-                                    div({style: "color-block pointer hover-zoom cube inline background-blue radius", content: div({style: ""})}),
-                                    div({style: "color-block pointer hover-zoom cube inline background-indigo radius", content: div({style: ""})}),
-                                    div({style: "color-block pointer hover-zoom cube inline background-violet radius", content: div({style: ""})}),
-                                    div({style: "color-block pointer hover-zoom cube inline background-pink radius", content: div({style: ""})}),
-                                    button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top", data: "action-clear", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`}),
-                                    button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top", data: "action-shapes", icon: shapeIcon}),
-                                    button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top", data: "action-attach", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>`}),
-                                    button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", data: "tool-select", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg"  viewBox="0 0 50 50"><path d="M 14.78125 5 C 14.75 5.007813 14.71875 5.019531 14.6875 5.03125 C 14.644531 5.050781 14.601563 5.070313 14.5625 5.09375 C 14.550781 5.09375 14.542969 5.09375 14.53125 5.09375 C 14.511719 5.101563 14.488281 5.113281 14.46875 5.125 C 14.457031 5.136719 14.449219 5.144531 14.4375 5.15625 C 14.425781 5.167969 14.417969 5.175781 14.40625 5.1875 C 14.375 5.207031 14.34375 5.226563 14.3125 5.25 C 14.289063 5.269531 14.269531 5.289063 14.25 5.3125 C 14.238281 5.332031 14.226563 5.355469 14.21875 5.375 C 14.183594 5.414063 14.152344 5.457031 14.125 5.5 C 14.113281 5.511719 14.105469 5.519531 14.09375 5.53125 C 14.09375 5.542969 14.09375 5.550781 14.09375 5.5625 C 14.082031 5.582031 14.070313 5.605469 14.0625 5.625 C 14.050781 5.636719 14.042969 5.644531 14.03125 5.65625 C 14.03125 5.675781 14.03125 5.699219 14.03125 5.71875 C 14.019531 5.757813 14.007813 5.800781 14 5.84375 C 14 5.875 14 5.90625 14 5.9375 C 14 5.949219 14 5.957031 14 5.96875 C 14 5.980469 14 5.988281 14 6 C 13.996094 6.050781 13.996094 6.105469 14 6.15625 L 14 39 C 14.003906 39.398438 14.242188 39.757813 14.609375 39.914063 C 14.972656 40.070313 15.398438 39.992188 15.6875 39.71875 L 22.9375 32.90625 L 28.78125 46.40625 C 28.890625 46.652344 29.09375 46.847656 29.347656 46.941406 C 29.601563 47.035156 29.882813 47.023438 30.125 46.90625 L 34.5 44.90625 C 34.996094 44.679688 35.21875 44.09375 35 43.59375 L 28.90625 30.28125 L 39.09375 29.40625 C 39.496094 29.378906 39.84375 29.113281 39.976563 28.730469 C 40.105469 28.347656 39.992188 27.921875 39.6875 27.65625 L 15.84375 5.4375 C 15.796875 5.378906 15.746094 5.328125 15.6875 5.28125 C 15.648438 5.234375 15.609375 5.195313 15.5625 5.15625 C 15.550781 5.15625 15.542969 5.15625 15.53125 5.15625 C 15.511719 5.132813 15.492188 5.113281 15.46875 5.09375 C 15.457031 5.09375 15.449219 5.09375 15.4375 5.09375 C 15.386719 5.070313 15.335938 5.046875 15.28125 5.03125 C 15.269531 5.03125 15.261719 5.03125 15.25 5.03125 C 15.230469 5.019531 15.207031 5.007813 15.1875 5 C 15.175781 5 15.167969 5 15.15625 5 C 15.136719 5 15.113281 5 15.09375 5 C 15.082031 5 15.074219 5 15.0625 5 C 15.042969 5 15.019531 5 15 5 C 14.988281 5 14.980469 5 14.96875 5 C 14.9375 5 14.90625 5 14.875 5 C 14.84375 5 14.8125 5 14.78125 5 Z M 16 8.28125 L 36.6875 27.59375 L 27.3125 28.40625 C 26.992188 28.4375 26.707031 28.621094 26.546875 28.902344 C 26.382813 29.179688 26.367188 29.519531 26.5 29.8125 L 32.78125 43.5 L 30.21875 44.65625 L 24.21875 30.8125 C 24.089844 30.515625 23.828125 30.296875 23.511719 30.230469 C 23.195313 30.160156 22.863281 30.25 22.625 30.46875 L 16 36.6875 Z"/></svg>`}),
-                                    button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", data: "tool-erase", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.72-7.72a2.25 2.25 0 0 1 3.18 0l2.57 2.57a2.25 2.25 0 0 1 0 3.18l-5.47 5.47H7.5l-3-3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="m9 11.25 5.25 5.25M12.5 19.25H20" /></svg>`}),
-                                    button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", data: "tool-draw", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" /></svg>`}),
-                                    button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", data: "tool-drag", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.05 4.575a1.575 1.575 0 1 0-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 0 1 3.15 0v1.5m-3.15 0 .075 5.925m3.075.75V4.575m0 0a1.575 1.575 0 0 1 3.15 0V15M6.9 7.575a1.575 1.575 0 1 0-3.15 0v8.175a6.75 6.75 0 0 0 6.75 6.75h2.018a5.25 5.25 0 0 0 3.712-1.538l1.732-1.732a5.25 5.25 0 0 0 1.538-3.712l.003-2.024a.668.668 0 0 1 .198-.471 1.575 1.575 0 1 0-2.228-2.228 3.818 3.818 0 0 0-1.12 2.687M6.9 7.575V12m6.27 4.318A4.49 4.49 0 0 1 16.35 15m.002 0h-.002" /></svg>`})
-                                ])})
+                                div({style: "color-block pointer hover-zoom cube inline background-black radius", altsync: "0", content: div({style: ""})}),
+                                div({style: "color-block pointer hover-zoom cube inline background-white radius", altsync: "1", content: div({style: ""})}),
+                                div({style: "color-block pointer hover-zoom cube inline background-red radius", altsync: "2", content: div({style: ""})}),
+                                div({style: "color-block pointer hover-zoom cube inline background-orange radius", altsync: "3", content: div({style: ""})}),
+                                div({style: "color-block pointer hover-zoom cube inline background-yellow radius", altsync: "4", content: div({style: ""})}),
+                                div({style: "color-block pointer hover-zoom cube inline background-green radius", altsync: "5", content: div({style: ""})}),
+                                div({style: "color-block pointer hover-zoom cube inline background-blue radius", altsync: "6", content: div({style: ""})}),
+                                div({style: "color-block pointer hover-zoom cube inline background-indigo radius", altsync: "7", content: div({style: ""})}),
+                                div({style: "color-block pointer hover-zoom cube inline background-violet radius", altsync: "8", content: div({style: ""})}),
+                                div({style: "color-block pointer hover-zoom cube inline background-pink radius", altsync: "9", content: div({style: ""})}),
+                                button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top", altsync: "D", data: "action-clear", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`}),
+                                button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top", altsync: "S", data: "action-shapes", icon: shapeIcon}),
+                                button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top", altsync: "A", data: "action-attach", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>`}),
+                                button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", altsync: "P", data: "tool-select", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg"  viewBox="0 0 50 50"><path d="M 14.78125 5 C 14.75 5.007813 14.71875 5.019531 14.6875 5.03125 C 14.644531 5.050781 14.601563 5.070313 14.5625 5.09375 C 14.550781 5.09375 14.542969 5.09375 14.53125 5.09375 C 14.511719 5.101563 14.488281 5.113281 14.46875 5.125 C 14.457031 5.136719 14.449219 5.144531 14.4375 5.15625 C 14.425781 5.167969 14.417969 5.175781 14.40625 5.1875 C 14.375 5.207031 14.34375 5.226563 14.3125 5.25 C 14.289063 5.269531 14.269531 5.289063 14.25 5.3125 C 14.238281 5.332031 14.226563 5.355469 14.21875 5.375 C 14.183594 5.414063 14.152344 5.457031 14.125 5.5 C 14.113281 5.511719 14.105469 5.519531 14.09375 5.53125 C 14.09375 5.542969 14.09375 5.550781 14.09375 5.5625 C 14.082031 5.582031 14.070313 5.605469 14.0625 5.625 C 14.050781 5.636719 14.042969 5.644531 14.03125 5.65625 C 14.03125 5.675781 14.03125 5.699219 14.03125 5.71875 C 14.019531 5.757813 14.007813 5.800781 14 5.84375 C 14 5.875 14 5.90625 14 5.9375 C 14 5.949219 14 5.957031 14 5.96875 C 14 5.980469 14 5.988281 14 6 C 13.996094 6.050781 13.996094 6.105469 14 6.15625 L 14 39 C 14.003906 39.398438 14.242188 39.757813 14.609375 39.914063 C 14.972656 40.070313 15.398438 39.992188 15.6875 39.71875 L 22.9375 32.90625 L 28.78125 46.40625 C 28.890625 46.652344 29.09375 46.847656 29.347656 46.941406 C 29.601563 47.035156 29.882813 47.023438 30.125 46.90625 L 34.5 44.90625 C 34.996094 44.679688 35.21875 44.09375 35 43.59375 L 28.90625 30.28125 L 39.09375 29.40625 C 39.496094 29.378906 39.84375 29.113281 39.976563 28.730469 C 40.105469 28.347656 39.992188 27.921875 39.6875 27.65625 L 15.84375 5.4375 C 15.796875 5.378906 15.746094 5.328125 15.6875 5.28125 C 15.648438 5.234375 15.609375 5.195313 15.5625 5.15625 C 15.550781 5.15625 15.542969 5.15625 15.53125 5.15625 C 15.511719 5.132813 15.492188 5.113281 15.46875 5.09375 C 15.457031 5.09375 15.449219 5.09375 15.4375 5.09375 C 15.386719 5.070313 15.335938 5.046875 15.28125 5.03125 C 15.269531 5.03125 15.261719 5.03125 15.25 5.03125 C 15.230469 5.019531 15.207031 5.007813 15.1875 5 C 15.175781 5 15.167969 5 15.15625 5 C 15.136719 5 15.113281 5 15.09375 5 C 15.082031 5 15.074219 5 15.0625 5 C 15.042969 5 15.019531 5 15 5 C 14.988281 5 14.980469 5 14.96875 5 C 14.9375 5 14.90625 5 14.875 5 C 14.84375 5 14.8125 5 14.78125 5 Z M 16 8.28125 L 36.6875 27.59375 L 27.3125 28.40625 C 26.992188 28.4375 26.707031 28.621094 26.546875 28.902344 C 26.382813 29.179688 26.367188 29.519531 26.5 29.8125 L 32.78125 43.5 L 30.21875 44.65625 L 24.21875 30.8125 C 24.089844 30.515625 23.828125 30.296875 23.511719 30.230469 C 23.195313 30.160156 22.863281 30.25 22.625 30.46875 L 16 36.6875 Z"/></svg>`}),
+                                button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", altsync: "E", data: "tool-erase", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.72-7.72a2.25 2.25 0 0 1 3.18 0l2.57 2.57a2.25 2.25 0 0 1 0 3.18l-5.47 5.47H7.5l-3-3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="m9 11.25 5.25 5.25M12.5 19.25H20" /></svg>`}),
+                                button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", altsync: "B", data: "tool-draw", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" /></svg>`}),
+                                button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", altsync: "L", data: "tool-line", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5 19.5 4.5" /></svg>`}),
+                                button({style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button", altsync: "H", data: "tool-drag", icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.05 4.575a1.575 1.575 0 1 0-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 0 1 3.15 0v1.5m-3.15 0 .075 5.925m3.075.75V4.575m0 0a1.575 1.575 0 0 1 3.15 0V15M6.9 7.575a1.575 1.575 0 1 0-3.15 0v8.175a6.75 6.75 0 0 0 6.75 6.75h2.018a5.25 5.25 0 0 0 3.712-1.538l1.732-1.732a5.25 5.25 0 0 0 1.538-3.712l.003-2.024a.668.668 0 0 1 .198-.471 1.575 1.575 0 1 0-2.228-2.228 3.818 3.818 0 0 0-1.12 2.687M6.9 7.575V12m6.27 4.318A4.49 4.49 0 0 1 16.35 15m.002 0h-.002" /></svg>`})
+                            ])})
                         ])}),
                     afterRender: (windowBody) => {
                         const canvas = windowBody.querySelector("#canvas");
@@ -397,7 +400,9 @@
                         let selectedOperationIndex = -1;
                         let contextShapeIndex = -1;
                         let selectionAction = null;
+                        let eraserCursorPosition = null;
                         const resizeHandleSize = 12;
+                        const eraserWidth = 20;
                         const canvasGrowthPadding = 512;
                         const readPixelValue = value => {
                             const parsed = Number.parseFloat(String(value ?? "0"));
@@ -538,6 +543,21 @@
                                 });
                                 ctx.restore();
                             }
+                            if (tool === "erase" && eraserCursorPosition) {
+                                const x = eraserCursorPosition.x - canvasOrigin.x;
+                                const y = eraserCursorPosition.y - canvasOrigin.y;
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.arc(x, y, eraserWidth / 2, 0, Math.PI * 2);
+                                ctx.setLineDash([4, 3]);
+                                ctx.lineWidth = 3;
+                                ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+                                ctx.stroke();
+                                ctx.lineWidth = 1.5;
+                                ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+                                ctx.stroke();
+                                ctx.restore();
+                            }
                         };
                         const syncStateAndRender = () => {
                             scale = boardViewport.scale || 1;
@@ -557,6 +577,13 @@
                             selectedOperationIndex = -1;
                             contextShapeIndex = -1;
                             renderOperations();
+                        };
+                        const confirmClearCanvas = () => {
+                            confirmationDialogue({
+                                title: "Clear board",
+                                content: "Clear all content from this board?",
+                                confirmation: clearCanvas
+                            });
                         };
                         const getPos = e => {
                             const rect = canvas.getBoundingClientRect();
@@ -646,6 +673,7 @@
                         };
                         const setTool = t => {
                             tool = t;
+                            if (tool !== "erase") eraserCursorPosition = null;
                             windowBody.querySelectorAll(".tool-button").forEach(btn => {
                                 btn.classList.remove("active");
                                 btn.style.color = "";
@@ -664,6 +692,7 @@
                                     node.style.stroke = "var(--primary)";
                                 });
                             }
+                            renderOperations();
                         };
                         const insertImage = file => {
                             if (!file || !file.type.startsWith("image/")) return;
@@ -742,6 +771,7 @@
                             return Number.isFinite(number) && number > 0 ? number : null;
                         };
                         const startDrawing = e => {
+                            if (tool === "erase") eraserCursorPosition = getPos(e);
                             if (tool === "drag") {
                                 isDragging = true;
                                 dragStart = {x: e.clientX, y: e.clientY};
@@ -768,11 +798,18 @@
                             }
                             drawing = true;
                             const pos = getPos(e);
-                            currentStroke = {type: tool === "erase" ? "erase" : "stroke", color: pickedColor, width: tool === "erase" ? 20 : 2, points: [pos]};
+                            currentStroke = {type: tool === "erase" ? "erase" : "stroke", color: pickedColor, width: tool === "erase" ? eraserWidth : 2, points: tool === "line" ? [pos, pos] : [pos]};
                             boardOperations.push(currentStroke);
                             renderOperations();
                         };
                         const draw = e => {
+                            if (tool === "erase") {
+                                eraserCursorPosition = getPos(e);
+                                if (!drawing || !currentStroke) {
+                                    renderOperations();
+                                    return;
+                                }
+                            }
                             if (tool === "drag") {
                                 if (!isDragging) return;
                                 const deltaX = e.clientX - dragStart.x;
@@ -830,7 +867,9 @@
                                 return;
                             }
                             if (!drawing || !currentStroke) return;
-                            currentStroke.points.push(getPos(e));
+                            const pos = getPos(e);
+                            if (tool === "line") currentStroke.points[1] = pos;
+                            else currentStroke.points.push(pos);
                             renderOperations();
                         };
                         const stopDrawing = () => {
@@ -844,7 +883,11 @@
                         canvas.addEventListener("mousedown", startDrawing);
                         canvas.addEventListener("mousemove", draw);
                         canvas.addEventListener("mouseup", stopDrawing);
-                        canvas.addEventListener("mouseleave", stopDrawing);
+                        canvas.addEventListener("mouseleave", () => {
+                            eraserCursorPosition = null;
+                            stopDrawing();
+                            renderOperations();
+                        });
                         canvas.addEventListener("wheel", e => {
                             if (!e.shiftKey) return;
                             e.preventDefault();
@@ -877,52 +920,26 @@
                             if (contextShapeIndex >= 0) selectedOperationIndex = contextShapeIndex;
                             renderOperations();
                         }, true);
-                        canvas.contextmenu([{
-                            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon space-right" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 7.5h15M4.5 12h9M4.5 16.5h15" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.25h3.75v3.75h-3.75z" /></svg>`,
-                            label: "On Top",
-                            visible: () => contextShapeIndex >= 0,
-                            action: bringContextShapeToFront
-                        }, {
-                            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z"/></svg>`,
-                            label: "Background Color",
-                            visible: () => contextShapeIndex >= 0,
-                            action: () => changeShapeProperty("fillColor", "Background color", "rgba(76, 139, 245, 0.18)")
-                        }, {
-                            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m9-9H3" /></svg>`,
-                            label: "Border Color",
-                            visible: () => contextShapeIndex >= 0,
-                            action: () => changeShapeProperty("borderColor", "Border color", "#1f2937")
-                        }, {
-                            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5h15M7 16 17 6" /></svg>`,
-                            label: "Border Width",
-                            visible: () => contextShapeIndex >= 0,
-                            action: () => changeShapeProperty("borderWidth", "Border width", "2", value => {
-                                const number = Math.round(Number.parseFloat(String(value || "")));
-                                return Number.isFinite(number) && number >= 0 ? number : null;
-                            })
-                        }, {
-                            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5M3.75 15h16.5" /></svg>`,
-                            label: "Width",
-                            visible: () => contextShapeIndex >= 0,
-                            action: () => changeShapeProperty("width", "Width", "170", parsePositivePixel)
-                        }, {
-                            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75v16.5M15 3.75v16.5" /></svg>`,
-                            label: "Height",
-                            visible: () => contextShapeIndex >= 0,
-                            action: () => changeShapeProperty("height", "Height", "110", parsePositivePixel)
-                        }, {
-                            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`,
-                            label: "Delete",
-                            destructive: true,
-                            visible: () => contextShapeIndex >= 0,
-                            action: deleteContextShape
-                        }]);
+                        canvas.contextmenu([
+                            {icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon space-right" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 7.5h15M4.5 12h9M4.5 16.5h15" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.25h3.75v3.75h-3.75z" /></svg>`, label: "On Top", visible: () => contextShapeIndex >= 0, action: bringContextShapeToFront},
+                            {icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z"/></svg>`, label: "Background Color", visible: () => contextShapeIndex >= 0, action: () => changeShapeProperty("fillColor", "Background color", "rgba(76, 139, 245, 0.18)")},
+                            {icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m9-9H3" /></svg>`, label: "Border Color", visible: () => contextShapeIndex >= 0, action: () => changeShapeProperty("borderColor", "Border color", "#1f2937")},
+                            {icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5h15M7 16 17 6" /></svg>`, label: "Border Width", visible: () => contextShapeIndex >= 0, action: () => changeShapeProperty("borderWidth", "Border width", "2", value => {
+                                    const nb = Math.round(Number.parseFloat(String(value || "")));
+                                    return Number.isFinite(nb) && nb >= 0 ? nb : null;
+                                })
+                            },
+                            {icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5M3.75 15h16.5" /></svg>`, label: "Width", visible: () => contextShapeIndex >= 0, action: () => changeShapeProperty("width", "Width", "170", parsePositivePixel)},
+                            {icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75v16.5M15 3.75v16.5" /></svg>`, label: "Height", visible: () => contextShapeIndex >= 0, action: () => changeShapeProperty("height", "Height", "110", parsePositivePixel)},
+                            {icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`, label: "Delete", destructive: true, visible: () => contextShapeIndex >= 0, action: deleteContextShape}
+                        ]);
                         windowBody.querySelector('button[data="tool-draw"]')?.addEventListener("click", () => setTool("draw"));
                         windowBody.querySelector('button[data="tool-erase"]')?.addEventListener("click", () => setTool("erase"));
                         windowBody.querySelector('button[data="tool-select"]')?.addEventListener("click", () => setTool("select"));
+                        windowBody.querySelector('button[data="tool-line"]')?.addEventListener("click", () => setTool("line"));
                         windowBody.querySelector('button[data="tool-drag"]')?.addEventListener("click", () => setTool("drag"));
                         windowBody.querySelector('button[data="action-attach"]')?.addEventListener("click", () => attachInput.click());
-                        windowBody.querySelector('button[data="action-clear"]')?.addEventListener("click", clearCanvas);
+                        windowBody.querySelector('button[data="action-clear"]')?.addEventListener("click", confirmClearCanvas);
                         if (typeof ResizeObserver !== "undefined") {
                             const resizeObserver = new ResizeObserver(() => {
                                 windowBody.__boardsSyncCanvasLayout?.();

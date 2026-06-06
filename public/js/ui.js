@@ -89,10 +89,11 @@ Element.prototype.contextmenu = function (items, selector = null) {
     let lastClickedTarget = null;
     let menu = document.createElement("div");
     menu.className = "custom-context-menu hidden";
+    const resolveItems = () => typeof items === "function" ? (items(ele, lastClickedTarget) || []) : (items || []);
     function buildMenu() {
         menu.innerHTML = "";
         let itemCount = 0;
-        items.forEach(item => {
+        resolveItems().forEach(item => {
             if (typeof item?.visible === "function" && !item.visible(ele, lastClickedTarget)) return;
             if (item?.visible === false) return;
             if (item === "separator") {
@@ -174,9 +175,10 @@ Element.prototype.popoutmenu = function (items, selector = null) {
     let lastClickedTarget = null;
     let menu = document.createElement("div");
     menu.className = "custom-context-menu hidden";
+    const resolveItems = () => typeof items === "function" ? (items(ele, lastClickedTarget) || []) : (items || []);
     function buildMenu() {
         menu.innerHTML = "";
-        items.forEach(item => {
+        resolveItems().forEach(item => {
             if (item === "separator") {
                 const hr = document.createElement("div");
                 hr.style.height = "1px";
@@ -246,6 +248,49 @@ Element.prototype.popoutmenu = function (items, selector = null) {
         if (!menu.contains(e.target)) hideMenu();
     });
 };
+function getLaunchInterfaceWindows() {
+    return Array.from(document.querySelectorAll(".draggable-window:not(.widget-window):not(.minimized)"))
+        .filter(element => document.body.contains(element))
+        .sort((a, b) => {
+            const aZ = Number.parseInt(window.getComputedStyle(a).zIndex, 10) || 0;
+            const bZ = Number.parseInt(window.getComputedStyle(b).zIndex, 10) || 0;
+            return bZ - aZ;
+        });
+}
+function getLaunchInterfaceWindowLabel(windowNode, index = 0) {
+    const title = `${windowNode?.portal?.title?.() || windowNode?.querySelector?.(".window-header .title")?.textContent || ""}`.trim();
+    return title || `Interface ${index + 1}`;
+}
+function buildLaunchInterfaceMenuItems() {
+    const windows = getLaunchInterfaceWindows();
+    if (!windows.length) {
+        return [{
+            label: "No open interface windows",
+            className: "faded",
+            action: () => {}
+        }];
+    }
+    return windows.map((windowNode, index) => ({
+        label: getLaunchInterfaceWindowLabel(windowNode, index),
+        action: () => {
+            if (!document.body.contains(windowNode)) return;
+            if (typeof modular?.bringToFront === "function") {
+                modular.bringToFront(windowNode);
+            }
+        }
+    }));
+}
+function setupLaunchInterfacesMenu() {
+    const launcher = document.getElementById("launch-interfaces");
+    if (!launcher || launcher.dataset.launchMenuReady === "true" || typeof launcher.popoutmenu !== "function") return;
+    launcher.dataset.launchMenuReady = "true";
+    launcher.popoutmenu(buildLaunchInterfaceMenuItems);
+}
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupLaunchInterfacesMenu, {once: true});
+} else {
+    setupLaunchInterfacesMenu();
+}
 Element.prototype.empty = function () {
     for (; this.firstChild;) this.removeChild(this.firstChild)
 };
@@ -346,12 +391,9 @@ function pushMessage(type, t) {
     setTimeout(() => message.classList.remove("show"), 1400);
     setTimeout(() => message.remove(), 1800);
 }
-
 (function () {
     let activeOpenProgressToken = 0;
-
     const normalizeDownloadPath = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
-
     function ensureOpenProgress() {
         let root = document.getElementById("file-open-progress");
         if (root) return root;
@@ -370,7 +412,6 @@ function pushMessage(type, t) {
         document.body.appendChild(root);
         return root;
     }
-
     function updateOpenProgress({label = "Opening file", loaded = 0, total = 0, indeterminate = false, token = 0} = {}) {
         if (token && token !== activeOpenProgressToken) return;
         const root = ensureOpenProgress();
@@ -384,14 +425,12 @@ function pushMessage(type, t) {
         if (barNode && !indeterminate) barNode.style.width = `${percent}%`;
         root.classList.add("show");
     }
-
     function hideOpenProgress(token = 0) {
         if (token && token !== activeOpenProgressToken) return;
         const root = document.getElementById("file-open-progress");
         if (!root) return;
         root.classList.remove("show");
     }
-
     function beginOpenProgress(label = "Opening file", options = {}) {
         const token = ++activeOpenProgressToken;
         updateOpenProgress({
@@ -403,7 +442,6 @@ function pushMessage(type, t) {
         });
         return token;
     }
-
     async function downloadForOpen(rawPath = "", options = {}) {
         const pathNormalizer = typeof options.pathNormalizer === "function" ? options.pathNormalizer : normalizeDownloadPath;
         const filePath = pathNormalizer(rawPath);
@@ -448,7 +486,6 @@ function pushMessage(type, t) {
             throw error;
         }
     }
-
     window.StandardDownloads = {
         ...(window.StandardDownloads || {}),
         normalizeDownloadPath,
@@ -458,7 +495,6 @@ function pushMessage(type, t) {
         downloadForOpen
     };
 })();
-
 window.StandardUI = window.StandardUI || {};
 window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
     "Inter",
@@ -480,11 +516,9 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
     "Trebuchet MS",
     "Verdana"
 ];
-
 (function () {
     const payloads = {};
     let comboIndex = 0;
-
     function escapeComboHtml(value) {
         return String(value ?? "")
             .replace(/&/g, "&amp;")
@@ -493,23 +527,19 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#39;");
     }
-
     function normalizeOption(option = {}) {
         const value = String(option?.value ?? option?.name ?? option?.label ?? "");
         const label = String(option?.label ?? option?.name ?? option?.value ?? value);
         return {label, value, disabled: option?.disabled === true};
     }
-
     function getPayload(input) {
         const comboId = input?.getAttribute?.("data-search-combobox-id") || "";
         return comboId && payloads[comboId] ? payloads[comboId] : null;
     }
-
     function getDropdown(input) {
         const comboId = input?.getAttribute?.("data-search-combobox-id") || "";
         return comboId ? document.getElementById(`search-combobox-options-${comboId}`) : null;
     }
-
     function getFilteredOptions(input) {
         const payload = getPayload(input);
         if (!payload) return [];
@@ -520,13 +550,11 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
             return option.label.toLowerCase().includes(query) || option.value.toLowerCase().includes(query);
         });
     }
-
     function canUseCustomValue(input) {
         const payload = getPayload(input);
         const value = String(input?.value || "").trim();
         return !!payload?.allowCustom && !!value;
     }
-
     function setActiveOption(input, index = 0) {
         const dropdown = getDropdown(input);
         if (!dropdown) return;
@@ -540,7 +568,6 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
             if (isActive) option.scrollIntoView({block: "nearest"});
         });
     }
-
     function renderOptions(input) {
         const dropdown = getDropdown(input);
         if (!dropdown) return;
@@ -558,13 +585,11 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
         input.setAttribute("aria-expanded", "true");
         setActiveOption(input, 0);
     }
-
     function hideOptions(input) {
         const dropdown = getDropdown(input);
         if (dropdown) dropdown.style.display = "none";
         input?.setAttribute?.("aria-expanded", "false");
     }
-
     function commitOption(input, option, {dispatch = true} = {}) {
         if (!input || !option) return false;
         input.value = option.label;
@@ -579,32 +604,27 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
         }
         return true;
     }
-
     function commitCustomValue(input, {dispatch = true} = {}) {
         const value = String(input?.value || "").trim();
         if (!input || !canUseCustomValue(input)) return false;
         return commitOption(input, {label: value, value}, {dispatch});
     }
-
     function findOptionByValue(input, value = "") {
         const payload = getPayload(input);
         const normalizedValue = String(value || "").trim().toLowerCase();
         if (!payload || !normalizedValue) return null;
         return payload.options.find((option) => option.value.toLowerCase() === normalizedValue || option.label.toLowerCase() === normalizedValue) || null;
     }
-
     function getActiveOption(input) {
         const options = getFilteredOptions(input);
         if (!options.length) return null;
         const activeIndex = Number(input?.dataset?.searchComboboxActiveIndex || 0);
         return options[Math.max(0, Math.min(activeIndex, options.length - 1))] || null;
     }
-
     function getInputForOption(optionNode) {
         const wrapper = optionNode?.closest?.(".search-combobox-wrapper");
         return wrapper?.querySelector?.("input[data-search-combobox-id]") || null;
     }
-
     function commitOptionNode(optionNode, event = null) {
         if (!optionNode) return false;
         event?.preventDefault?.();
@@ -626,12 +646,10 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
         if (didCommit) input?.focus?.();
         return didCommit;
     }
-
     window.StandardUI.getSearchComboBoxValue = (input) => {
         if (!input) return "";
         return input.dataset.searchComboboxSelectedValue || input.value || "";
     };
-
     window.StandardUI.setSearchComboBoxValue = (input, value = "", options = {}) => {
         const matchedOption = findOptionByValue(input, value);
         if (matchedOption) return commitOption(input, matchedOption, {dispatch: options.dispatch === true});
@@ -652,7 +670,6 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
         }
         return false;
     };
-
     window.searchComboBox = function (config = {}) {
         const comboId = `combo-${comboIndex++}`;
         const wrapper = document.createElement("div");
@@ -668,6 +685,7 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
         if (config.id) input.id = config.id;
         if (config.name) input.name = config.name;
         if (config.title) input.title = config.title;
+        applyAltSyncProperty(input, config);
         if (config.placeholder) input.placeholder = config.placeholder;
         if (config.style) input.className = config.style;
         if (config.value) input.value = config.value;
@@ -691,13 +709,11 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
         }
         return wrapper.outerHTML;
     };
-
     document.addEventListener("input", (event) => {
         const input = event.target?.closest?.("input[data-search-combobox-id]");
         if (!input) return;
         renderOptions(input);
     });
-
     document.addEventListener("change", (event) => {
         const input = event.target?.closest?.("input[data-search-combobox-id]");
         if (!input || input.dataset.searchComboboxCommitting === "1") return;
@@ -719,14 +735,12 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
         event.preventDefault();
         event.stopPropagation();
     }, true);
-
     document.addEventListener("focusin", (event) => {
         const input = event.target?.closest?.("input[data-search-combobox-id]");
         if (!input) return;
         renderOptions(input);
         input.select?.();
     });
-
     document.addEventListener("keydown", (event) => {
         const input = event.target?.closest?.("input[data-search-combobox-id]");
         if (!input) return;
@@ -752,25 +766,21 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
             commitOption(input, matchedOption);
         }
     });
-
     document.addEventListener("pointerdown", (event) => {
         const optionNode = event.target?.closest?.(".search-combobox-option");
         if (!optionNode) return;
         commitOptionNode(optionNode, event);
     });
-
     document.addEventListener("click", (event) => {
         const optionNode = event.target?.closest?.(".search-combobox-option");
         if (!optionNode) return;
         commitOptionNode(optionNode, event);
     });
-
     document.addEventListener("click", (event) => {
         document.querySelectorAll("input[data-search-combobox-id]").forEach((input) => {
             if (!input.closest(".search-combobox-wrapper")?.contains(event.target)) hideOptions(input);
         });
     });
-
     document.addEventListener("focusout", (event) => {
         const input = event.target?.closest?.("input[data-search-combobox-id]");
         if (!input) return;
@@ -779,7 +789,6 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
         }, 0);
     });
 })();
-
 window.StandardUI.altSync = window.StandardUI.altSync || (() => {
     const OVERLAY_CLASS = "alt-sync-overlay";
     const ATTRIBUTE_NAME = "alt-sync";
@@ -802,7 +811,6 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
     let activeSequence = "";
     let pendingExactTimer = null;
     const PENDING_EXACT_DELAY = 700;
-
     function getFocusedInterfaceWindow() {
         const focusedWindow = document.querySelector(".draggable-window.window-focused");
         if (focusedWindow) return focusedWindow;
@@ -813,35 +821,26 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
             return nodeZ > frontZ ? windowNode : frontWindow;
         }, null);
     }
-
     function getTargetInterfaceWindow(target) {
         const menu = target?.closest?.(".custom-context-menu");
         if (menu?.__altSyncOwnerWindow?.isConnected) return menu.__altSyncOwnerWindow;
         return target?.closest?.(".draggable-window") || null;
     }
-
     function isTargetInFocusedInterface(target) {
         const targetWindow = getTargetInterfaceWindow(target);
         if (!targetWindow) return true;
         return targetWindow === getFocusedInterfaceWindow();
     }
-
     function ensureOverlayLayer() {
         if (overlayLayer?.isConnected) return overlayLayer;
         if (!document.body) return null;
         overlayLayer = document.createElement("div");
         overlayLayer.className = "alt-sync-overlay-layer";
         overlayLayer.setAttribute("aria-hidden", "true");
-        Object.assign(overlayLayer.style, {
-            position: "fixed",
-            inset: "0",
-            pointerEvents: "none",
-            zIndex: "2147483647"
-        });
+        Object.assign(overlayLayer.style, {position: "fixed", inset: "0", pointerEvents: "none", zIndex: "2147483647"});
         document.body.appendChild(overlayLayer);
         return overlayLayer;
     }
-
     function getTargets() {
         const visibleTargets = Array.from(document.querySelectorAll(`[${ATTRIBUTE_NAME}]`)).filter(target => {
             const label = String(target.getAttribute(ATTRIBUTE_NAME) || "").trim();
@@ -849,25 +848,19 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
             if (!target.isConnected) return false;
             const rect = target.getBoundingClientRect();
             const style = getComputedStyle(target);
-            return rect.width > 0
-                && rect.height > 0
-                && style.visibility !== "hidden"
-                && style.display !== "none";
+            return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
         });
         const focusedTargets = visibleTargets.filter(isTargetInFocusedInterface).filter(target => getTargetInterfaceWindow(target));
         return focusedTargets.length ? focusedTargets : visibleTargets.filter(target => !getTargetInterfaceWindow(target));
     }
-
     function normalizeKey(value = "") {
         return String(value || "").trim().toUpperCase();
     }
-
     function clearPendingExact() {
         if (!pendingExactTimer) return;
         window.clearTimeout(pendingExactTimer);
         pendingExactTimer = null;
     }
-
     function clearOverlays() {
         clearPendingExact();
         overlayEntries.forEach(({overlay}) => overlay.remove());
@@ -877,16 +870,14 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
             overlayLayer = null;
         }
     }
-
     function positionOverlays() {
         overlayEntries = overlayEntries.filter(entry => entry.target?.isConnected && entry.overlay?.isConnected);
         overlayEntries.forEach(({target, overlay}) => {
             const rect = target.getBoundingClientRect();
-            overlay.style.left = `${Math.max(0, rect.left)}px`;
-            overlay.style.top = `${Math.max(0, rect.top)}px`;
+            overlay.style.left = `${Math.max(0, rect.left) - 3}px`;
+            overlay.style.top = `${Math.max(0, rect.top) - 3}px`;
         });
     }
-
     function showOverlays() {
         clearOverlays();
         const layer = ensureOverlayLayer();
@@ -901,19 +892,16 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
         });
         positionOverlays();
     }
-
     function deactivate() {
         active = false;
         activeSequence = "";
         clearOverlays();
     }
-
     function activate() {
         active = true;
         activeSequence = "";
         showOverlays();
     }
-
     function getMatchesForSequence(sequence = "") {
         const normalizedSequence = normalizeKey(sequence);
         if (!normalizedSequence) return {exact: null, hasLongerPrefix: false};
@@ -924,7 +912,6 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
             return matches;
         }, {exact: null, hasLongerPrefix: false});
     }
-
     function triggerTarget(target) {
         if (!target) return;
         target.scrollIntoView({behavior: "smooth", block: "center", inline: "center"});
@@ -936,11 +923,14 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
             modularState.lastClickPosition = {x: clientX, y: clientY};
             modularState.lastPointerPosition = {x: clientX, y: clientY};
         }
+        if (target.matches?.("input, textarea, select, [contenteditable='true'], [tabindex]")) {
+            target.focus?.({preventScroll: true});
+            if (target.matches?.("input[type='text'], input:not([type]), textarea")) target.select?.();
+        }
         target.dispatchEvent(new MouseEvent("mousedown", {bubbles: true, cancelable: true, clientX, clientY}));
         target.dispatchEvent(new MouseEvent("mouseup", {bubbles: true, cancelable: true, clientX, clientY}));
         target.dispatchEvent(new MouseEvent("click", {bubbles: true, cancelable: true, clientX, clientY}));
     }
-
     function handleKeydown(event) {
         if (event.defaultPrevented) return;
         if (event.key === "Alt") {
@@ -984,13 +974,11 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
             }, PENDING_EXACT_DELAY);
         }
     }
-
     function handlePointerdown(event) {
         if (!active) return;
         if (event.target?.closest?.(`.${OVERLAY_CLASS}, .alt-sync-overlay-layer`)) return;
         deactivate();
     }
-
     function init() {
         if (initialized) return;
         initialized = true;
@@ -1004,13 +992,7 @@ window.StandardUI.altSync = window.StandardUI.altSync || (() => {
             if (active) positionOverlays();
         }, true);
     }
-
-    return {
-        init,
-        activate,
-        deactivate,
-        isActive: () => active
-    };
+    return {init, activate, deactivate, isActive: () => active};
 })();
 let activeUploadProgressToken = 0;
 let activeMultiUploadProgressToken = 0;
@@ -1318,9 +1300,9 @@ async function applyThemeData(d) {
         modular.refreshPortalIcons();
     }
     window.StandardUI.setKioskMode?.(d.kiosk_mode === true);
+    window.StandardUI.setDisableBar?.(d.disable_bar === true);
     return true;
 }
-
 let themeRefreshInFlight = null;
 function readThemeCookieValue(name = "") {
     const escaped = String(name || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -1332,7 +1314,6 @@ function readThemeCookieValue(name = "") {
         return match[1];
     }
 }
-
 function decodeThemeUserCookie(value = "") {
     if (!value || typeof value !== "string") return null;
     try {
@@ -1343,7 +1324,6 @@ function decodeThemeUserCookie(value = "") {
         return null;
     }
 }
-
 function normalizeThemeUserRecord(payload) {
     if (!payload) return null;
     let record = null;
@@ -1361,7 +1341,6 @@ function normalizeThemeUserRecord(payload) {
     }
     return normalized;
 }
-
 function parseThemeSettingsValue(value) {
     let candidate = value;
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -1384,13 +1363,11 @@ function parseThemeSettingsValue(value) {
     }
     return (candidate && typeof candidate === "object" && !Array.isArray(candidate)) ? candidate : null;
 }
-
 function getThemeFromUserCookie() {
     const cookieValue = readThemeCookieValue("user");
     const userRecord = normalizeThemeUserRecord(decodeThemeUserCookie(cookieValue));
     return parseThemeSettingsValue(userRecord?.settings) || parseThemeSettingsValue(userRecord?.theme);
 }
-
 const defaultThemeData = {
     name: "Default",
     font_family: "",
@@ -1410,13 +1387,12 @@ const defaultThemeData = {
     use_svg_icons: true,
     hide_shortcuts: false,
     kiosk_mode: false,
+    disable_bar: false,
     media_widget: true,
     video_widget: true
 };
-
 window.StandardUI = window.StandardUI || {};
 window.StandardUI.defaultTheme = window.StandardUI.defaultTheme || {...defaultThemeData};
-applyThemeData({...window.StandardUI.defaultTheme});
 window.StandardUI.setKioskMode = async (enabled = false) => {
     const shouldEnable = enabled === true;
     let electronApplied = false;
@@ -1456,7 +1432,73 @@ window.StandardUI.setKioskMode = async (enabled = false) => {
     }
     return window.StandardElectron?.setKioskMode ? electronApplied : true;
 };
-
+window.StandardUI.setDisableBar = (() => {
+    const DOUBLE_ALT_DELAY = 520;
+    let disabled = false;
+    let visible = false;
+    let lastAltKeyupAt = 0;
+    let hideListenersBound = false;
+    function getBar() {
+        return document.querySelector("header");
+    }
+    function removeHideListeners() {
+        if (!hideListenersBound) return;
+        hideListenersBound = false;
+        document.removeEventListener("keydown", handleShownKeydown, true);
+        window.removeEventListener("blur", hideBar);
+    }
+    function syncClasses() {
+        const bar = getBar();
+        if (!bar) return;
+        document.body.classList.toggle("standard-bar-disabled", disabled);
+        bar.classList.toggle("standard-bar-hidden", disabled && !visible);
+        bar.classList.toggle("standard-bar-visible", disabled && visible);
+        bar.setAttribute("aria-hidden", disabled && !visible ? "true" : "false");
+    }
+    function hideBar() {
+        if (!disabled) return;
+        visible = false;
+        syncClasses();
+        removeHideListeners();
+    }
+    function showBar() {
+        if (!disabled) return;
+        visible = true;
+        syncClasses();
+        if (!hideListenersBound) {
+            hideListenersBound = true;
+            document.addEventListener("keydown", handleShownKeydown, true);
+            window.addEventListener("blur", hideBar);
+        }
+    }
+    function handleShownKeydown(event) {
+        if (!visible) return;
+        if (event.key !== "Alt" && event.key !== "Escape") return;
+        hideBar();
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    function handleRevealKeyup(event) {
+        if (!disabled || event.key !== "Alt" || event.repeat) return;
+        const now = Date.now();
+        if (now - lastAltKeyupAt <= DOUBLE_ALT_DELAY) {
+            lastAltKeyupAt = 0;
+            showBar();
+            return;
+        }
+        lastAltKeyupAt = now;
+    }
+    document.addEventListener("keyup", handleRevealKeyup, true);
+    return (enabled = false) => {
+        disabled = enabled === true;
+        visible = false;
+        lastAltKeyupAt = 0;
+        if (!disabled) removeHideListeners();
+        syncClasses();
+        return disabled;
+    };
+})();
+applyThemeData({...window.StandardUI.defaultTheme});
 async function loadAndApplyTheme({attempt = 0, maxAttempts = 2, retryDelayMs = 250} = {}) {
     try {
         const cookieTheme = getThemeFromUserCookie();
@@ -1474,7 +1516,6 @@ async function loadAndApplyTheme({attempt = 0, maxAttempts = 2, retryDelayMs = 2
     await new Promise(resolve => setTimeout(resolve, delay));
     return loadAndApplyTheme({attempt: attempt + 1, maxAttempts, retryDelayMs});
 }
-
 window.StandardUI.prefersSvgIcons = () => window.StandardUI?.currentTheme?.use_svg_icons !== false;
 window.StandardUI.applyResolvedBackgroundImage = applyResolvedThemeBackground;
 window.StandardUI.getAppliedBackgroundImageUrl = getAppliedThemeBackgroundImageUrl;
@@ -1486,10 +1527,8 @@ window.StandardUI.refreshTheme = ({maxAttempts = 2, retryDelayMs = 250, force = 
         });
     return themeRefreshInFlight;
 };
-
 window.StandardUI.refreshTheme();
 window.StandardUI.altSync.init();
-
 window.addEventListener("focus", () => {
     window.StandardUI.refreshTheme({maxAttempts: 0});
 });

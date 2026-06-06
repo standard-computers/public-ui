@@ -342,6 +342,36 @@
         editTool.setAttribute("aria-disabled", isReadOnly ? "true" : "false");
         editTool.title = isReadOnly ? "Read-only cache preview" : "Edit";
     };
+    const formatImageDimension = value => `${Math.max(0, Math.round(Number(value) || 0))}`;
+    const formatImageCoordinate = value => `${Math.max(0, Math.floor(Number(value) || 0))}`;
+    const updateImageStats = (imagePreview, portal = findInternalsWindow(1)?.portal) => {
+        const root = portal?.window?.() || document;
+        const statsLeft = root.querySelector("#internals-image-stats-dimensions");
+        if (!statsLeft || !imagePreview) return;
+        const rect = imagePreview.getBoundingClientRect();
+        const originalWidth = imagePreview?.naturalWidth || activeImageIntrinsicSize?.width || rect.width || 0;
+        const originalHeight = imagePreview?.naturalHeight || activeImageIntrinsicSize?.height || rect.height || 0;
+        statsLeft.textContent = `Current ${formatImageDimension(rect.width)} x ${formatImageDimension(rect.height)} | Original ${formatImageDimension(originalWidth)} x ${formatImageDimension(originalHeight)}`;
+    };
+    const bindImageStats = (imagePreview, portal = findInternalsWindow(1)?.portal) => {
+        const root = portal?.window?.() || document;
+        const statsCoords = root.querySelector("#internals-image-stats-coordinates");
+        if (!imagePreview || !statsCoords) return;
+        const updateCoordinates = (event) => {
+            const rect = imagePreview.getBoundingClientRect();
+            if (!(rect.width > 0) || !(rect.height > 0)) return;
+            const originalWidth = imagePreview?.naturalWidth || activeImageIntrinsicSize?.width || rect.width;
+            const originalHeight = imagePreview?.naturalHeight || activeImageIntrinsicSize?.height || rect.height;
+            const x = Math.max(0, Math.min(originalWidth - 1, (event.clientX - rect.left) * (originalWidth / rect.width)));
+            const y = Math.max(0, Math.min(originalHeight - 1, (event.clientY - rect.top) * (originalHeight / rect.height)));
+            statsCoords.textContent = `x ${formatImageCoordinate(x)}, y ${formatImageCoordinate(y)}`;
+        };
+        imagePreview.addEventListener("mousemove", updateCoordinates);
+        imagePreview.addEventListener("mouseleave", () => {
+            statsCoords.textContent = "x -, y -";
+        });
+        updateImageStats(imagePreview, portal);
+    };
     const updateImagePreview = ({autoSizeWindow = activeImageNeedsWindowAutosize, portal = findInternalsWindow(1)?.portal} = {}) => {
         const root = portal?.window?.() || document;
         const previewHost = root.querySelector("#internals-image-preview-host");
@@ -357,16 +387,23 @@
                 svgPreview.style.display = "block";
                 svgPreview.style.borderRadius = "inherit";
                 autoSizeImagePortalToImage(svgPreview, {resizeWindow: autoSizeWindow, portal});
+                bindImageStats(svgPreview, portal);
             }
         } else if (activeImageFileSource) {
             const imagePreview = document.createElement("img");
             imagePreview.className = "radius";
             imagePreview.style.display = "";
             imagePreview.alt = activeImageFilePath || "Image preview";
-            imagePreview.onload = () => autoSizeImagePortalToImage(imagePreview, {resizeWindow: autoSizeWindow, portal});
+            imagePreview.onload = () => {
+                autoSizeImagePortalToImage(imagePreview, {resizeWindow: autoSizeWindow, portal});
+                bindImageStats(imagePreview, portal);
+            };
             imagePreview.src = activeImageFileSource;
             previewHost.appendChild(imagePreview);
-            if (imagePreview.complete && imagePreview.naturalWidth > 0 && imagePreview.naturalHeight > 0) autoSizeImagePortalToImage(imagePreview, {resizeWindow: autoSizeWindow, portal});
+            if (imagePreview.complete && imagePreview.naturalWidth > 0 && imagePreview.naturalHeight > 0) {
+                autoSizeImagePortalToImage(imagePreview, {resizeWindow: autoSizeWindow, portal});
+                bindImageStats(imagePreview, portal);
+            }
         }
         const pathLabel = root.querySelector("#internals-image-preview-path");
         if (pathLabel) pathLabel.textContent = activeImageFilePath || "No file selected";
@@ -485,16 +522,18 @@
         const bodyPaddingY = (Number.parseFloat(bodyStyles.paddingTop) || 0) + (Number.parseFloat(bodyStyles.paddingBottom) || 0);
         const shellPaddingX = shellStyles ? (Number.parseFloat(shellStyles.paddingLeft) || 0) + (Number.parseFloat(shellStyles.paddingRight) || 0) : 0;
         const shellPaddingY = shellStyles ? (Number.parseFloat(shellStyles.paddingTop) || 0) + (Number.parseFloat(shellStyles.paddingBottom) || 0) : 0;
+        const statsHeight = routeShell?.querySelector?.("#internals-image-stats")?.offsetHeight || 0;
         const requiredBodyWidth = Math.ceil(targetImageWidth + shellPaddingX + bodyPaddingX);
-        const requiredBodyHeight = Math.ceil(targetImageHeight + shellPaddingY + bodyPaddingY);
+        const requiredBodyHeight = Math.ceil(targetImageHeight + statsHeight + shellPaddingY + bodyPaddingY);
         if (!resizeWindow) {
             const shellRect = routeShell?.getBoundingClientRect?.();
             const availableWidth = Math.max(1, (shellRect?.width || bodyNode.clientWidth) - shellPaddingX);
-            const availableHeight = Math.max(1, (shellRect?.height || bodyNode.clientHeight) - shellPaddingY);
+            const availableHeight = Math.max(1, (shellRect?.height || bodyNode.clientHeight) - statsHeight - shellPaddingY);
             const viewScale = Math.min(availableWidth / imageWidth, availableHeight / imageHeight);
             imagePreview.style.width = `${Math.max(1, Math.round(imageWidth * viewScale))}px`;
             imagePreview.style.height = `${Math.max(1, Math.round(imageHeight * viewScale))}px`;
             bodyNode.style.overflow = "hidden";
+            updateImageStats(imagePreview, portal);
             return;
         }
         bodyNode.style.width = "";
@@ -511,6 +550,7 @@
         bodyNode.style.minHeight = `${requiredBodyHeight}px`;
         bodyNode.style.maxHeight = `${requiredBodyHeight}px`;
         bodyNode.style.height = `${requiredBodyHeight}px`;
+        updateImageStats(imagePreview, portal);
     };
     const createStableCacheHash = (value = "") => {
         let hash = 2166136261;
@@ -1306,7 +1346,10 @@
             internal: true,
             dimensions: [720, 540],
             navigation: false,
-            route: () => div({id: "internals-image-preview-shell", style: "internals-image-viewer-shell large-padding-top fill", content: children([div({style: "internals-image-viewer-center", content: div({id: "internals-image-preview-host", style: "internals-image-preview-host radius"})})])}),
+            route: () => div({id: "internals-image-preview-shell", style: "large-padding-top fill", content: children([
+                `<div style="height:calc(100% - 24px);box-sizing:border-box;display:flex;align-items:center;justify-content:center;overflow:hidden"><div id="internals-image-preview-host" class="internals-image-preview-host radius"></div></div>`,
+                `<div id="internals-image-stats" style="height:24px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 2px 0;font-size:11px;line-height:16px;opacity:.72;white-space:nowrap"><span id="internals-image-stats-dimensions">Current - x - | Original - x -</span><span id="internals-image-stats-coordinates">x -, y -</span></div>`
+            ])}),
             afterRender: function () {
                 restoreImageStateFromPortal(this.portal);
                 updateImagePreview({portal: this.portal});

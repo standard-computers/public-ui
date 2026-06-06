@@ -1872,9 +1872,9 @@ app.get("/api/records/:standard", (req, res) => {
     const command = prepareCommandForRequest(req, res, `[${req.params.standard}]`);
     if (!command) return;
     withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
-        if (data !== "NO RECORDS FOUND") {
-            res.json(JSON.parse(data.toString()));
-        }
+        const responseText = data.toString().trim();
+        if (responseText === "NO RECORDS FOUND") return res.json([]);
+        res.json(JSON.parse(responseText));
     });
 });
 

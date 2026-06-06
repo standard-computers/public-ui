@@ -1,5 +1,8 @@
 body {font-family:"Inter", sans-serif;background-color:var(--bg);color:var(--fg);margin:0}
-header {padding:6px;border-radius:var(--radius)}
+header {max-height:72px;overflow:visible;padding:6px;position:relative;border-radius:var(--radius);transition:max-height 180ms ease,padding 180ms ease,transform 180ms ease,opacity 180ms ease}
+body.standard-bar-disabled header {overflow:hidden}
+header.standard-bar-hidden {max-height:0;opacity:0;padding-bottom:0;padding-top:0;pointer-events:none;transform:translateY(calc(-100% - 12px))}
+header.standard-bar-visible {max-height:72px;opacity:1;pointer-events:auto;transform:translateY(0)}
 header nav {border-radius:var(--radius);border:1px solid var(--secondary);padding:6px 8px 6px 8px;cursor:pointer}
 header nav:hover {background-color:var(--secondary);box-shadow:var(--shadow);border-color:var(--border)}
 nav {display:inline-block;position:relative}

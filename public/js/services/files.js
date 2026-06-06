@@ -235,7 +235,7 @@
             refreshFileListRoot(rootId, options);
         }
     }));
-    const fileSortButton = id => button({id, style: "small naked float-right hover-zoom", icon: FILE_SORT_ICON, title: "Sort"});
+    const fileSortButton = id => button({id, style: "small naked float-right hover-zoom", altsync: "F", icon: FILE_SORT_ICON, title: "Sort"});
     const bindFileSortButton = (id, rootId, options = {}) => {
         const sortButton = document.getElementById(id);
         if (sortButton?.dataset.sortMenuBound === "1") return;

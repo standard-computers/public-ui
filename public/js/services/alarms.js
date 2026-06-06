@@ -116,25 +116,15 @@
             const nextTimestamp = to12HourTimestamp(nextHour, nextMinute);
             handleAlarmMutation(CLI.send(`[alarms] timestamp "${nextTimestamp}" <id ${alarm.id}>`), "Updated alarm", "Couldn't update alarm");
         };
-        const alarmPortal = new Portal({title: alarm.name || "Alarm", dimensions: [340, 146], resizable: false, navigation: false, tools: [,{
-                title: "Save",
-                icon: modular.icons.save,
-                onclick: saveAlarm
-            },{
-                title: "Delete",
-                icon: modular.icons.delete,
-                onclick: () => handleAlarmMutation(CLI.send(`[alarms] - <id ${alarm.id}>`), "Deleted alarm", "Couldn't delete alarm")
-            }],
+        const alarmPortal = new Portal({title: alarm.name || "Alarm", dimensions: [340, 146], resizable: false, navigation: false, tools: [
+                {title: "Save", icon: modular.icons.save, onclick: saveAlarm},
+                {title: "Delete", icon: modular.icons.delete, onclick: () => handleAlarmMutation(CLI.send(`[alarms] - <id ${alarm.id}>`), "Deleted alarm", "Couldn't delete alarm")}
+            ],
             icon: "/icons/interfaces/alarms.png", route: () => div({style: "large-padding-top no-scrollbars", content: children([
                         div({style: "list padded", content: children([
                             em({style: "faded", content: `Currently set for ${alarm.timestamp}`}),
                             div({style: "spacer"}),
-                            div({style: "bi", content: children([
-                                div({content: children([
-                                    label({style: "faded", content: "Hour"}),
-                                    input({id: "alarm-edit-hour", type: "number", min: 0, max: 23, value: parsedTime.hour})
-                                ])
-                            }),
+                            div({style: "bi", content: children([div({content: children([label({style: "faded", content: "Hour"}), input({id: "alarm-edit-hour", type: "number", min: 0, max: 23, value: parsedTime.hour})])}),
                             div({content: children([label({style: "faded", content: "Minute"}), input({id: "alarm-edit-minute", type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: 2, value: padTimeUnit(parsedTime.minute)})])})])
                         })
                     ])
@@ -163,26 +153,16 @@
             } else {
                 modular.error("Couldn't delete alarm");
             }
-        }).catch(() => {
-            modular.error("Couldn't delete alarm");
-        });
+        }).catch(() => modular.error("Couldn't delete alarm"));
     };
     const bindAlarmListContextMenu = () => {
         const alarmsList = document.getElementById("alarms-list");
         if (!alarmsList || alarmsList.dataset.contextMenuBound === "1") return;
         alarmsList.dataset.contextMenuBound = "1";
-        alarmsList.contextmenu([{
-            icon: FILES_EDIT_ICON,
-            label: "Edit",
-            visible: (_root, target) => !!target?.closest?.(".alarm-tile"),
-            action: (_root, _event, tile) => openAlarmTileEditor(tile)
-        }, {
-            icon: FILES_DELETE_ICON,
-            label: "Delete",
-            destructive: true,
-            visible: (_root, target) => !!target?.closest?.(".alarm-tile"),
-            action: (_root, _event, tile) => deleteAlarmTile(tile)
-        }], ".alarm-tile");
+        alarmsList.contextmenu([
+            {icon: FILES_EDIT_ICON, label: "Edit", visible: (_root, target) => !!target?.closest?.(".alarm-tile"), action: (_root, _event, tile) => openAlarmTileEditor(tile)},
+            {icon: FILES_DELETE_ICON, label: "Delete", destructive: true, visible: (_root, target) => !!target?.closest?.(".alarm-tile"), action: (_root, _event, tile) => deleteAlarmTile(tile)}
+        ], ".alarm-tile");
     };
     window.StandardAlarms = window.StandardAlarms || {};
     window.StandardAlarms.openAlarm = alarm => openAlarmPortal(alarm);
@@ -207,13 +187,7 @@
         modular.refresh(ALARMS_SERVICE_ID);
     };
     window.StandardNotifications?.register?.("alarms", window.StandardAlarms.notifyAlarm);
-    modular.register(new Service(ALARMS_SERVICE_ID, [new Portal({
-        title: "Alarms",
-        hints: ["alarms"],
-        dimensions: [380, 500],
-        navigation: false,
-        resizable: false,
-        tools: [{
+    modular.register(new Service(ALARMS_SERVICE_ID, [new Portal({title: "Alarms", hints: ["alarms"], dimensions: [380, 500], navigation: false, resizable: false, tools: [{
             title: "New Alarm",
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
             onclick: async (_event, view) => {
@@ -243,25 +217,23 @@
         route: () => div({style: "large-padding-top", content: children([
                 div({id: "alarms-list", style: "list", content: () => {
                     return CLI.send("[alarms]").then(d => {
-                        const sortedAlarms = [...d.alarms].sort((a, b) => getAlarmSortKey(a) - getAlarmSortKey(b));
+                        const sorted = [...d.alarms].sort((a, b) => getAlarmSortKey(a) - getAlarmSortKey(b));
                         let as = [];
-                        for (let i = 0; i < sortedAlarms.length; i++) {
-                            const alarm = sortedAlarms[i];
+                        for (let i = 0; i < sorted.length; i++) {
+                            const alarm = sorted[i];
                             as.push(div({style: "alarm-tile padded secondary-tile brick line", data: alarm.id, onclick: () => openAlarmPortal(alarm), content: children([
-                                    div({onclick: event => event.stopPropagation(), content: switcher({style: "no-margin float-right large-adjust-top",
-                                            id: `alarm-enabled-${alarm.id}`, checked: alarm.enabled, onchange: event => {
-                                                event.stopPropagation();
-                                                const isActive = event.target.checked;
-                                                CLI.send(`[alarms] enabled ${isActive} <id ${alarm.id}>`).then(r => {
-                                                    if (r !== 0) {
-                                                        modular.success((isActive ? "Enabled" : "Disabled") + " " + (alarm.name || "Untitled"));
-                                                        modular.refresh("com.standard.alarms");
-                                                    } else {
-                                                        modular.error("Couldn't update alarm");
-                                                    }
-                                                });
-                                            }
-                                        })
+                                    div({onclick: event => event.stopPropagation(), content: switcher({style: "no-margin float-right large-adjust-top", id: `alarm-enabled-${alarm.id}`, checked: alarm.enabled, onchange: event => {
+                                            event.stopPropagation();
+                                            const isActive = event.target.checked;
+                                            CLI.send(`[alarms] enabled ${isActive} <id ${alarm.id}>`).then(r => {
+                                                if (r !== 0) {
+                                                    modular.success((isActive ? "Enabled" : "Disabled") + " " + (alarm.name || "Untitled"));
+                                                    modular.refresh("com.standard.alarms");
+                                                } else {
+                                                    modular.error("Couldn't update alarm");
+                                                }
+                                            });
+                                        }})
                                     }),
                                     h({level: 3, content: alarm.name}),
                                     em({content: alarm.timestamp})
