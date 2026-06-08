@@ -11,9 +11,9 @@
         return `${month.padStart(2, "0")}/${day.padStart(2, "0")}/${year} ${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}:00`;
     };
     const toDateTimeLocalValue = (v, h, m = 0) => {
-        const parsedDate = new Date(v);
-        if (Number.isNaN(parsedDate.getTime())) return "";
-        const localDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate(), h, m, 0, 0);
+        const d = new Date(v);
+        if (Number.isNaN(d.getTime())) return "";
+        const localDate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m, 0, 0);
         const pad = part => `${part}`.padStart(2, "0");
         return `${localDate.getFullYear()}-${pad(localDate.getMonth() + 1)}-${pad(localDate.getDate())}T${pad(localDate.getHours())}:${pad(localDate.getMinutes())}`;
     };
@@ -1205,11 +1205,7 @@
                                                     openCreateEventPortalForDateTime(slotDate, slotEndDate);
                                                 },
                                                 content: children([
-                                                    div({style: "line", content: children([
-                                                            div({style: "strong", content: slotDate.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})}),
-                                                            div({style: "float-right faded tiny-text", content: slotEntries.length === 0 ? "Open" : `${slotEntries.length} event${slotEntries.length === 1 ? "" : "s"}`})
-                                                        ])
-                                                    }),
+                                                    div({style: "line", content: children([div({style: "strong", content: slotDate.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})}), div({style: "float-right faded tiny-text", content: slotEntries.length === 0 ? "Open" : `${slotEntries.length} event${slotEntries.length === 1 ? "" : "s"}`})])}),
                                                     div({style: "small-padding-top", content: slotEntries.length === 0 ? div({style: "faded tiny-text", content: "Create event"}) : children(slotEntries.map(eventEntry => div({style: "calendar-day-event small-padding-bottom", content: renderCalendarEventChip(eventEntry, selectedDate)})))})
                                                 ])
                                             });
@@ -1227,11 +1223,7 @@
             dimensions: [300, 360],
             navigation: false,
             resizable: false,
-            tools: [{
-                title: "Create Category",
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
-                onclick: () => modular.show("com.standard.calendar", 2)
-            }],
+            tools: [{title: "Create Category", icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`, onclick: () => modular.show("com.standard.calendar", 2)}],
             icon: `<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><style>.s0{fill:none;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width: 1 } </style><path class="s0" d="m10 5h-3.29q-0.34 0-0.65 0.13-0.32 0.13-0.56 0.37-0.24 0.24-0.37 0.56-0.13 0.31-0.13 0.65v3.29c0 0.45 0.18 0.89 0.5 1.21l7.3 7.3c0.53 0.53 1.35 0.66 1.98 0.25q0.59-0.39 1.14-0.84 0.55-0.45 1.05-0.95 0.5-0.5 0.95-1.05 0.45-0.55 0.84-1.14c0.41-0.63 0.28-1.45-0.25-1.98l-7.3-7.3q-0.12-0.12-0.26-0.21-0.14-0.09-0.29-0.16-0.16-0.06-0.33-0.1-0.16-0.03-0.33-0.03z"/><path class="s0" d="m7.28 7.28h0.01v0.01h-0.01z"/></svg>`,
             route: () => div({style: "large-padding-top", content: children([
                     div({style: "notes-list", content: div({style: "padded", content: () => CLI.send("[cats]").then(d => {
@@ -1242,11 +1234,7 @@
                                     const categoryColor = category?.color || "transparent";
                                     return div({style: "padded secondary-tile brick line small-spaced hover-shadowed pointer", content: children([
                                             div({style: "inline round small-icon space-right float-left margin-right", content: "", background: categoryColor}),
-                                            div({content: children([
-                                                    div({style: "float-right faded tiny-text", content: categoryColor}),
-                                                    label({style: "inline", content: categoryName}),
-                                                ])
-                                            }),
+                                            div({content: children([div({style: "float-right faded tiny-text", content: categoryColor}), label({style: "inline", content: categoryName}),])}),
                                         ]), onclick: () => {
                                             selectedCategory = category;
                                             modular.show("com.standard.calendar", 3);
@@ -1331,15 +1319,7 @@
             dimensions: [360, 272],
             resizable: false,
             navigation: false,
-            tools: [{
-                title: "Delete",
-                icon: modular.icons.delete,
-                onclick: () => deleteSelectedCategory(3)
-            },{
-                title: "Save",
-                icon: modular.icons.save,
-                onclick: () => saveSelectedCategory(3)
-            }],
+            tools: [{title: "Delete", icon: modular.icons.delete, onclick: () => deleteSelectedCategory(3)},{title: "Save", icon: modular.icons.save, onclick: () => saveSelectedCategory(3)}],
             icon: `<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><style>.s0{fill:none;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width: 1 } </style><path class="s0" d="m10 5h-3.29q-0.34 0-0.65 0.13-0.32 0.13-0.56 0.37-0.24 0.24-0.37 0.56-0.13 0.31-0.13 0.65v3.29c0 0.45 0.18 0.89 0.5 1.21l7.3 7.3c0.53 0.53 1.35 0.66 1.98 0.25q0.59-0.39 1.14-0.84 0.55-0.45 1.05-0.95 0.5-0.5 0.95-1.05 0.45-0.55 0.84-1.14c0.41-0.63 0.28-1.45-0.25-1.98l-7.3-7.3q-0.12-0.12-0.26-0.21-0.14-0.09-0.29-0.16-0.16-0.06-0.33-0.1-0.16-0.03-0.33-0.03z"/><path class="s0" d="m7.28 7.28h0.01v0.01h-0.01z"/></svg>`,
             route: () => {
                 if (!selectedCategory) return div({style: "faded padded center", content: "Select a category first."});

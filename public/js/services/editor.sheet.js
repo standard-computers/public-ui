@@ -3550,15 +3550,7 @@
                                             button({id: "editor-sheet-style-align", altsync: "A", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: SHEET_ALIGN_ICONS.left}),
                                             button({id: "editor-sheet-style-link", altsync: "K", style: "naked align-bottom small-margin-right inner-radius", title: "Hyperlink", icon: SHEET_LINK_ICON}),
                                             div({style: "inline bordered-right small-margin-right small-margin-left", content: " "}),
-                                            select({
-                                                id: "editor-sheet-cell-type",
-                                                style: "small-margin-right inner-radius",
-                                                value: "",
-                                                options: [
-                                                    {label: "Mixed", value: "__mixed__", disabled: true},
-                                                    ...SHEET_CELL_TYPES
-                                                ]
-                                            }),
+                                            select({id: "editor-sheet-cell-type", style: "small-margin-right inner-radius", value: "", options: [{label: "Mixed", value: "__mixed__", disabled: true}, ...SHEET_CELL_TYPES]}),
                                             button({id: "editor-sheet-decimal-decrease", altsync: "DC", style: "naked align-bottom small-margin-right inner-radius", title: "Decrease Decimal Count", icon: SHEET_DECIMAL_DECREASE_ICON}),
                                             button({id: "editor-sheet-decimal-increase", altsync: "IC", style: "naked align-bottom small-margin-right inner-radius", title: "Increase Decimal Count", icon: SHEET_DECIMAL_INCREASE_ICON}),
                                             button({id: "editor-sheet-add-image", altsync: "IM", style: "naked align-bottom small-margin-right inner-radius", title: "Add image", icon: SHEET_IMAGE_ICON}),

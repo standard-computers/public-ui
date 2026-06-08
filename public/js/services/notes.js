@@ -169,16 +169,7 @@
         };
     };
     const renderNoNotesState = () => div({style: "notes-empty-state", content: children([img({src: "/icons/interfaces/notes.png", style: "notes-empty-icon"}), div({style: "notes-empty-label", content: "No notes"})])});
-    const noteColors = [
-        {name: "Red", color: "rgba(240, 173, 176, 0.5)", secondary: "rgba(240, 173, 176, 0.5)"},
-        {name: "Orange", color: "rgba(245, 194, 171, 0.5)", secondary: "rgba(245, 194, 171, 0.5)"},
-        {name: "Yellow", color: "rgba(250, 224, 173, 0.5)", secondary: "rgba(250, 224, 173, 0.5)"},
-        {name: "Green", color: "rgba(198, 215, 178, 0.5)", secondary: "rgba(198, 215, 178, 0.5)"},
-        {name: "Blue", color: "rgba(196, 222, 240, 0.5)", secondary: "rgba(196, 222, 240, 0.5)"},
-        {name: "Off", color: "rgba(237, 237, 237, 0.5)", secondary: "rgba(209, 209, 209, 0.5)"},
-        {name: "Normal", color: "rgba(255, 255, 255, 0.5)", secondary: "rgba(238, 238, 238, 0.5)"},
-        {name: "Dark Gray", color: "rgba(211, 211, 211, 0.5)", secondary: "rgba(211, 211, 211, 0.5)"},
-    ];
+    const noteColors = [{name: "Red", color: "rgba(240, 173, 176, 0.5)", secondary: "rgba(240, 173, 176, 0.5)"}, {name: "Orange", color: "rgba(245, 194, 171, 0.5)", secondary: "rgba(245, 194, 171, 0.5)"}, {name: "Yellow", color: "rgba(250, 224, 173, 0.5)", secondary: "rgba(250, 224, 173, 0.5)"}, {name: "Green", color: "rgba(198, 215, 178, 0.5)", secondary: "rgba(198, 215, 178, 0.5)"}, {name: "Blue", color: "rgba(196, 222, 240, 0.5)", secondary: "rgba(196, 222, 240, 0.5)"}, {name: "Off", color: "rgba(237, 237, 237, 0.5)", secondary: "rgba(209, 209, 209, 0.5)"}, {name: "Normal", color: "rgba(255, 255, 255, 0.5)", secondary: "rgba(238, 238, 238, 0.5)"}, {name: "Dark Gray", color: "rgba(211, 211, 211, 0.5)", secondary: "rgba(211, 211, 211, 0.5)"}];
     const deleteNote = (noteId, onSuccess = () => {}) => {
         if (!noteId) return;
         confirmationDialogue({title: "Delete Note", content: "You're sure you want to delete this note?",
@@ -201,22 +192,14 @@
         const noteContent = normalizeNoteContent(note.content || "");
         const noteColor = note.color || "";
         const noteCreated = note.created || "View Note";
-        const notePortal = new Portal({
-            title: noteCreated,
-            dimensions: [380, 270],
-            navigation: false,
-            tools: [{
-                title: "Edit",
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><g transform="scale(0.9) translate(1.333 1.333) translate(0.25 0.6)"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75a2.121 2.121 0 1 1 3 3L9 17.25 4.5 18.75 6 14.25 16.5 3.75Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 5.25l3 3" /></g></svg>`,
-                onclick: () => {
-                    notePortal.close();
-                    openNoteEditor(note);
-                }
-            },{
-                title: "Delete",
-                icon: modular.icons.delete,
-                onclick: () => deleteNote(note.id, () => notePortal.close())
-            }],
+        const notePortal = new Portal({title: noteCreated, dimensions: [380, 270], navigation: false, tools: [
+                {title: "Edit", icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><g transform="scale(0.9) translate(1.333 1.333) translate(0.25 0.6)"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75a2.121 2.121 0 1 1 3 3L9 17.25 4.5 18.75 6 14.25 16.5 3.75Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 5.25l3 3" /></g></svg>`, onclick: () => {
+                        notePortal.close();
+                        openNoteEditor(note);
+                    }
+                },
+                {title: "Delete", icon: modular.icons.delete, onclick: () => deleteNote(note.id, () => notePortal.close())}
+            ],
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>`,
             route: () => div({style : "padded large-padding-top", content : `<div class="note-view-content">${sanitizeNoteMarkup(noteContent)}</div>`}),
             afterRender: win => {
@@ -230,42 +213,28 @@
         const noteId = note.id;
         const noteContent = normalizeNoteContent(note.content || "");
         const noteColor = note.color || "";
-        const noteEditorPortal = new Portal({
-            title: "Edit Note",
-            dimensions: [380, 300],
-            navigation: false,
-            tools: [{
-                title: "Save",
-                icon: modular.icons.save,
-                onclick: (_, context) => {
-                    const updatedContent = getNoteMarkup(document.getElementById("edit-note-content"));
-                    const updatedColor = document.getElementById("edit-note-color").value;
-                    const escapedContent = serializeNoteContent(updatedContent);
-                    const escapedColor = escapeQuotedValue(updatedColor);
-                    Promise.all([
-                        CLI.send(`[notes] content "${escapedContent}" <id ${noteId}>`),
-                        CLI.send(`[notes] color "${escapedColor}" <id ${noteId}>`)
-                    ]).then(([contentResponse, colorResponse]) => {
-                        if (contentResponse !== 0 && colorResponse !== 0) {
-                            context?.portal?.close?.();
-                            refreshNotes();
-                        } else {
-                            modular.error("Failed to update note");
-                        }
-                    });
-                }
-            }, {
-                title: "Delete",
-                icon: modular.icons.delete,
-                onclick: () => deleteNote(noteId, () => noteEditorPortal.close())
-            }],
+        const noteEditorPortal = new Portal({title: "Edit Note", dimensions: [380, 300], navigation: false, tools: [{title: "Save", icon: modular.icons.save, onclick: (_, context) => {
+                        const updatedContent = getNoteMarkup(document.getElementById("edit-note-content"));
+                        const updatedColor = document.getElementById("edit-note-color").value;
+                        const escapedContent = serializeNoteContent(updatedContent);
+                        const escapedColor = escapeQuotedValue(updatedColor);
+                        Promise.all([
+                            CLI.send(`[notes] content "${escapedContent}" <id ${noteId}>`),
+                            CLI.send(`[notes] color "${escapedColor}" <id ${noteId}>`)
+                        ]).then(([contentResponse, colorResponse]) => {
+                            if (contentResponse !== 0 && colorResponse !== 0) {
+                                context?.portal?.close?.();
+                                refreshNotes();
+                            } else {
+                                modular.error("Failed to update note");
+                            }
+                        });
+                    }
+                },
+                {title: "Delete", icon: modular.icons.delete, onclick: () => deleteNote(noteId, () => noteEditorPortal.close())}
+            ],
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" /></svg>`,
-            route: () => div({style: "large-padding-top editor-portal-shell", content : children([
-                    input({type : "hidden", id : "edit-note-color"}),
-                    div({id : "edit-note-content", contenteditable: true, style : "undecorated fill padded", content: sanitizeNoteMarkup(noteContent)}),
-                    colorPicker({id: "edit-note-foreground", colors: noteColors})
-                ])
-            }),
+            route: () => div({style: "large-padding-top editor-portal-shell", content : children([input({type : "hidden", id : "edit-note-color"}), div({id : "edit-note-content", contenteditable: true, style : "undecorated fill padded", content: sanitizeNoteMarkup(noteContent)}), colorPicker({id: "edit-note-foreground", colors: noteColors})])}),
             afterRender: win => {
                 const editContent = document.getElementById("edit-note-content");
                 const editColor = document.getElementById("edit-note-color");
@@ -281,15 +250,7 @@
         noteEditorPortal.show();
     };
     window.StandardNotes = {openNote, openNoteEditor};
-    const createNotePortal = new Portal({
-        title: "Create Note",
-        hints: ["create note", "new note", "make a note"],
-        dimensions: [380, 300],
-        navigation: false,
-        tools: [{
-            title: "Save",
-            icon: modular.icons.save,
-            onclick: (_, context) => {
+    const createNotePortal = new Portal({title: "Create Note", hints: ["create note", "new note", "make a note"], dimensions: [380, 300], navigation: false, tools: [{title: "Save", icon: modular.icons.save, onclick: (_, context) => {
                 const userId = modular.user.id();
                 const content = getNoteMarkup(document.getElementById("new-note-content"));
                 const color = document.getElementById("new-note-color").value;
@@ -305,12 +266,7 @@
             }
         }],
         icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>`,
-        route: _ => div({style: "large-padding-top editor-portal-shell", content : children([
-                input({type : "hidden", id : "new-note-color"}),
-                div({style : "undecorated fill padded", id : "new-note-content", contenteditable: true, content: ""}),
-                colorPicker({id: "foreground", colors: noteColors})
-            ])
-        }),
+        route: _ => div({style: "large-padding-top editor-portal-shell", content : children([input({type : "hidden", id : "new-note-color"}), div({style : "undecorated fill padded", id : "new-note-content", contenteditable: true, content: ""}), colorPicker({id: "foreground", colors: noteColors})])}),
         afterRender: win => {
             const newNoteContent = document.getElementById("new-note-content");
             const newNoteColor = document.getElementById("new-note-color");
@@ -327,11 +283,7 @@
             dimensions: [380, 500],
             navigation: false,
             resizable: false,
-            tools: [{
-                title: "Create Note",
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
-                onclick: _ => modular.show("com.standard.notes", 1)
-            }],
+            tools: [{title: "Create Note", icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`, onclick: _ => modular.show("com.standard.notes", 1)}],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>`,
             icon: "/icons/interfaces/notes.png",
             route: () => div({style: "large-padding-top padding-right", content: children([
@@ -369,29 +321,21 @@
                 const notesList = document.querySelector(".notes-list");
                 bindNoteImageViewer(notesList);
                 notesList.contextmenu([
-                    {
-                        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776" /></svg>`,
-                        label: "Open",
-                        action: (b, e, el) => {
+                    {icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776" /></svg>`, label: "Open", action: (b, e, el) => {
                             const nt = el.closest(".note-tile");
                             const note = getNoteTileData(nt);
                             if (!note) return;
                             openNote(note);
                         }
-                    },{
-                        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" /></svg>`,
-                        label: "Edit",
-                        action: (b, e, el) => {
+                    },
+                    {icon: modular.icons.modify, label: "Edit", action: (b, e, el) => {
                             const nt = el.closest(".note-tile");
                             const note = getNoteTileData(nt);
                             if (!note) return;
                             openNoteEditor(note);
                         }
-                    },{
-                        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`,
-                        label: "Delete",
-                        destructive: true,
-                        action: (b, e, el) => {
+                    },
+                    {icon: modular.icons.delete, label: "Delete", destructive: true, action: (b, e, el) => {
                             const noteTile = el.closest(".note-tile");
                             deleteNote(noteTile?.getAttribute("data"));
                         }

@@ -116,21 +116,7 @@
             const nextTimestamp = to12HourTimestamp(nextHour, nextMinute);
             handleAlarmMutation(CLI.send(`[alarms] timestamp "${nextTimestamp}" <id ${alarm.id}>`), "Updated alarm", "Couldn't update alarm");
         };
-        const alarmPortal = new Portal({title: alarm.name || "Alarm", dimensions: [340, 146], resizable: false, navigation: false, tools: [
-                {title: "Save", icon: modular.icons.save, onclick: saveAlarm},
-                {title: "Delete", icon: modular.icons.delete, onclick: () => handleAlarmMutation(CLI.send(`[alarms] - <id ${alarm.id}>`), "Deleted alarm", "Couldn't delete alarm")}
-            ],
-            icon: "/icons/interfaces/alarms.png", route: () => div({style: "large-padding-top no-scrollbars", content: children([
-                        div({style: "list padded", content: children([
-                            em({style: "faded", content: `Currently set for ${alarm.timestamp}`}),
-                            div({style: "spacer"}),
-                            div({style: "bi", content: children([div({content: children([label({style: "faded", content: "Hour"}), input({id: "alarm-edit-hour", type: "number", min: 0, max: 23, value: parsedTime.hour})])}),
-                            div({content: children([label({style: "faded", content: "Minute"}), input({id: "alarm-edit-minute", type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: 2, value: padTimeUnit(parsedTime.minute)})])})])
-                        })
-                    ])
-                })])
-            })
-        });
+        const alarmPortal = new Portal({title: alarm.name || "Alarm", dimensions: [340, 146], resizable: false, navigation: false, tools: [{title: "Save", icon: modular.icons.save, onclick: saveAlarm}, {title: "Delete", icon: modular.icons.delete, onclick: () => handleAlarmMutation(CLI.send(`[alarms] - <id ${alarm.id}>`), "Deleted alarm", "Couldn't delete alarm")}], icon: "/icons/interfaces/alarms.png", route: () => div({style: "large-padding-top no-scrollbars", content: children([div({style: "list padded", content: children([em({style: "faded", content: `Currently set for ${alarm.timestamp}`}), div({style: "spacer"}), div({style: "bi", content: children([div({content: children([label({style: "faded", content: "Hour"}), input({id: "alarm-edit-hour", type: "number", min: 0, max: 23, value: parsedTime.hour})])}), div({content: children([label({style: "faded", content: "Minute"}), input({id: "alarm-edit-minute", type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: 2, value: padTimeUnit(parsedTime.minute)})])})])})])})])})});
         alarmPortal.show();
     };
     const getAlarmTileId = tile => `${tile?.getAttribute?.("data") || ""}`.trim();
@@ -159,10 +145,7 @@
         const alarmsList = document.getElementById("alarms-list");
         if (!alarmsList || alarmsList.dataset.contextMenuBound === "1") return;
         alarmsList.dataset.contextMenuBound = "1";
-        alarmsList.contextmenu([
-            {icon: FILES_EDIT_ICON, label: "Edit", visible: (_root, target) => !!target?.closest?.(".alarm-tile"), action: (_root, _event, tile) => openAlarmTileEditor(tile)},
-            {icon: FILES_DELETE_ICON, label: "Delete", destructive: true, visible: (_root, target) => !!target?.closest?.(".alarm-tile"), action: (_root, _event, tile) => deleteAlarmTile(tile)}
-        ], ".alarm-tile");
+        alarmsList.contextmenu([{icon: FILES_EDIT_ICON, label: "Edit", visible: (_root, target) => !!target?.closest?.(".alarm-tile"), action: (_root, _event, tile) => openAlarmTileEditor(tile)}, {icon: FILES_DELETE_ICON, label: "Delete", destructive: true, visible: (_root, target) => !!target?.closest?.(".alarm-tile"), action: (_root, _event, tile) => deleteAlarmTile(tile)}], ".alarm-tile");
     };
     window.StandardAlarms = window.StandardAlarms || {};
     window.StandardAlarms.openAlarm = alarm => openAlarmPortal(alarm);
@@ -178,12 +161,7 @@
         const alarmName = `${alarm?.name || ""}`.trim() || DEFAULT_ALARM_NAME;
         const alarmTime = `${alarm?.timestamp || ""}`.trim();
         const fallbackLabel = alarmId ? `Alarm ${alarmId}` : "Alarm";
-        window.StandardNotifications?.show?.({
-            type: "alarms",
-            title: alarm ? alarmName : fallbackLabel,
-            message: alarmTime ? `Alarm set for ${alarmTime}` : "Alarm triggered",
-            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>`
-        });
+        window.StandardNotifications?.show?.({type: "alarms", title: alarm ? alarmName : fallbackLabel, message: alarmTime ? `Alarm set for ${alarmTime}` : "Alarm triggered", icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>`});
         modular.refresh(ALARMS_SERVICE_ID);
     };
     window.StandardNotifications?.register?.("alarms", window.StandardAlarms.notifyAlarm);

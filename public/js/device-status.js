@@ -15,15 +15,11 @@
         toast.className = `status-toast status-${status}`;
         toast.textContent = message;
         container.appendChild(toast);
-        requestAnimationFrame(() => {
-            toast.classList.add("show");
-        });
+        requestAnimationFrame(() => toast.classList.add("show"));
         setTimeout(() => {
             toast.classList.remove("show");
             toast.classList.add("fade-out");
-            toast.addEventListener("transitionend", () => {
-                toast.remove();
-            }, {once: true});
+            toast.addEventListener("transitionend", () => toast.remove(), {once: true});
         }, 3200);
     }
     function applyStatus(status) {
@@ -63,8 +59,6 @@
                 console.error("Failed to parse status event", err);
             }
         };
-        source.onerror = () => {
-            setStatus("connecting");
-        };
+        source.onerror = () => setStatus("connecting");
     });
 })();

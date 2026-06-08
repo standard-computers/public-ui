@@ -1,7 +1,7 @@
 (async () => {
     let cmdHist = [];
     let histInd = -1;
-    let pendingCommand = "";
+    let pending = "";
     let histLoad = false;
     let pendRes = 0;
     const escapeHtml = (value = "") => `${value}`.replace(/[&<>"']/g, character => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[character] || character));
@@ -92,24 +92,7 @@
             scrollCliToBottom();
         }).finally(() => setCliLoading(false));
     };
-    modular.register(new Service("com.standard.cli", [new Portal({
-        title: "CLI",
-        hints: ["cli", "terminal"],
-        dimensions: [900, 625],
-        accent: "#08ac05",
-        background: "#1f1b1b",
-        navigation: false,
-        svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`,
-        icon: "/icons/interfaces/cli.png",
-        route: div({style: "cli-holder padded brick margin-top", content: div({content: children([
-                div({id: "append-cli-reciprocate", style: "brick large-padding-bottom"}),
-                div({id: "commander", style: "fixed bottomed fill cli-holder padded brick cli-command-row", content: children([
-                        div({style: "inline text-green cli-command-prompt", content: "$ <> "}),
-                        input({id: "cli-commander", style: "inline undecorated text-green monospaced cli-command-input", attributes: {autocomplete: "off"}}),
-                        div({id: "cli-status", style: "block-loader text-green cli-command-loader"})
-                    ])
-                })
-            ])})}),
+    modular.register(new Service("com.standard.cli", [new Portal({title: "CLI", hints: ["cli", "terminal"], dimensions: [900, 625], accent: "#08ac05", background: "#1f1b1b", navigation: false, svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>`, icon: "/icons/interfaces/cli.png", route: div({style: "cli-holder padded brick margin-top", content: div({content: children([div({id: "append-cli-reciprocate", style: "brick large-padding-bottom"}), div({id: "commander", style: "fixed bottomed fill cli-holder padded brick cli-command-row", content: children([div({style: "inline text-green cli-command-prompt", content: "$ <> "}), input({id: "cli-commander", style: "inline undecorated text-green monospaced cli-command-input", attributes: {autocomplete: "off"}}), div({id: "cli-status", style: "block-loader text-green cli-command-loader"})])})])})}),
         afterRender: async (_, context) => {
             await loadHistory(context.cache);
             const cmdr = document.getElementById("cli-commander");
@@ -123,7 +106,7 @@
                     if (!cmdHist.length) return;
                     e.preventDefault();
                     if (histInd === -1) {
-                        pendingCommand = cmdr.value;
+                        pending = cmdr.value;
                         histInd = cmdHist.length - 1;
                     } else {
                         histInd = Math.max(0, histInd - 1);
@@ -139,7 +122,7 @@
                         showHistoryEntry(cmdr, histInd);
                     } else {
                         histInd = -1;
-                        cmdr.value = pendingCommand;
+                        cmdr.value = pending;
                         moveCaretToEnd(cmdr);
                     }
                     return;
@@ -150,7 +133,7 @@
                     if (cliv) {
                         cmdHist.push(cliv);
                         histInd = -1;
-                        pendingCommand = "";
+                        pending = "";
                         saveHistory(context.cache);
                     }
                     if (cliv) executeCliValue(cliv, context);

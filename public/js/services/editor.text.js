@@ -79,10 +79,7 @@
     let activeTextFooterSettings = {text: "", pageNumbers: false};
     let textEditorDeferredSyncTimer = null;
     const resolvedTextColorCache = new Map();
-    const findTextPortal = () => [...Array.from(document.querySelectorAll(".draggable-window"))]
-        .reverse()
-        .find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID)
-        ?.portal;
+    const findTextPortal = () => [...Array.from(document.querySelectorAll(".draggable-window"))].reverse().find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID)?.portal;
     const findTextPortalNode = (portal = findTextPortal(), selector = "") => {
         return portal?.window?.()?.querySelector?.(selector) || document.querySelector(selector);
     };
@@ -3420,19 +3417,11 @@ a { color: #1d4ed8; text-decoration: underline; }
             dimensions: [900, 750],
             horizontal_nav: true,
             centered_nav: true,
-            tools: [{
-                title: "Save",
-                icon: modular.icons.save,
-                onclick: (_, context) => saveLoadedTextFile(context?.portal)
-            }, {
-                title: "Print",
-                icon: modular.icons.print,
-                onclick: (_, context) => printTextEditorDocument(context?.portal)
-            }, {
-                title: "Search",
-                icon: modular.icons.search,
-                onclick: (event, context) => showTextEditorSearchDialogue(context?.portal, event?.currentTarget)
-            }],
+            tools: [
+                {title: "Save", icon: modular.icons.save, onclick: (_, context) => saveLoadedTextFile(context?.portal)},
+                {title: "Print", icon: modular.icons.print, onclick: (_, context) => printTextEditorDocument(context?.portal)},
+                {title: "Search", icon: modular.icons.search,onclick: (event, context) => showTextEditorSearchDialogue(context?.portal, event?.currentTarget)}
+            ],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>`,
             icon: "/icons/interfaces/editor.png",
             route: () => div({style: "large-padding-top", content: children([

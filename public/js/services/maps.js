@@ -19,7 +19,7 @@
         new Portal({
             title: "Maps",
             hints: ["maps", "where am i"],
-            dimensions: [800, 450],
+            dimensions: [900, 600],
             horizontal_nav: true,
             centered_nav: true,
             icon: "/icons/interfaces/maps.png",
@@ -137,14 +137,7 @@
                 let pendingDirectionsRouteData = null;
                 let pendingDirectionsPointsData = null;
                 const formatCoordinate = (value) => Number(value).toFixed(6);
-                const buildActiveLocationFeature = (lng, lat, label = "Selected Location") => ({
-                    type: "Feature",
-                    geometry: {type: "Point", coordinates: [lng, lat]},
-                    properties: {
-                        label,
-                        coordinatesLabel: `${formatCoordinate(lat)}, ${formatCoordinate(lng)}`
-                    }
-                });
+                const buildActiveLocationFeature = (lng, lat, label = "Selected Location") => ({type: "Feature", geometry: {type: "Point", coordinates: [lng, lat]}, properties: {label, coordinatesLabel: `${formatCoordinate(lat)}, ${formatCoordinate(lng)}`}});
                 const buildActiveLocationData = (lng, lat, label = "Selected Location") => ({type: "FeatureCollection", features: [buildActiveLocationFeature(lng, lat, label)]});
                 const clearActiveLocationPopup = () => {
                     activeLocationPopup?.remove();

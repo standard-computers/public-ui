@@ -12,7 +12,6 @@
     const HTML_TEXT_VIEW_PATTERN = /\.(wrds|html)$/i;
     const TEXT_DOCUMENT_CONTENT_PREFIX = "__STD_TEXT_EDITOR_B64__:";
     const DEFAULT_ARTICLE_ICON = "/images/blank_contact.png";
-    const EDIT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><g transform="scale(0.9) translate(1.333 1.333) translate(0.25 0.6)"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75a2.121 2.121 0 1 1 3 3L9 17.25 4.5 18.75 6 14.25 16.5 3.75Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 5.25l3 3" /></g></svg>`;
     let activeTextFilePath = "";
     let activeTextFileContent = "Select a file to preview.";
     let activeTextReadOnly = false;
@@ -747,17 +746,11 @@
     };
     const escapeCliQuotedValue = (value = "") => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     const articleTextField = (id = "", labelText = "", value = "", {textareaField = false} = {}) => {
-        return div({content: children([
-            div({style: "bold small-padding", content: labelText}),
-            div({style: "padded", content: textareaField ? textarea({id, style: "undecorated no-padding internals-article-edit-textarea fill", value: String(value ?? "")}) : input({id, style: "undecorated no-padding fill", value: String(value ?? "")})})
-        ])});
+        return div({content: children([div({style: "bold small-padding", content: labelText}), div({style: "padded", content: textareaField ? textarea({id, style: "undecorated no-padding internals-article-edit-textarea fill", value: String(value ?? "")}) : input({id, style: "undecorated no-padding fill", value: String(value ?? "")})})])});
     };
     const getSettingsPortalState = (portal = findInternalsWindow(6)?.portal) => {
         const state = portal?.windowState?.() || {};
-        return {
-            serviceId: String(state.serviceId || ""),
-            title: String(state.title || state.serviceId || "App Settings")
-        };
+        return {serviceId: String(state.serviceId || ""), title: String(state.title || state.serviceId || "App Settings")};
     };
     const getSettingsFieldId = (name = "") => `internals-app-setting-${String(name || "").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
     const renderSettingControl = (name = "", setting = {}, value) => {
@@ -769,9 +762,7 @@
             const checked = normalizedValue === true || normalizedValue === "true" || normalizedValue === 1 || normalizedValue === "1";
             return `<input id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="boolean" type="checkbox" ${checked ? "checked" : ""}>`;
         }
-        if (restrictions.length) {
-            return `<select id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="${escapeHtml(type)}" class="undecorated no-padding fill">${restrictions.map(option => `<option value="${escapeHtml(option)}" ${String(option) === String(normalizedValue) ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>`;
-        }
+        if (restrictions.length) return `<select id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="${escapeHtml(type)}" class="undecorated no-padding fill">${restrictions.map(option => `<option value="${escapeHtml(option)}" ${String(option) === String(normalizedValue) ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>`;
         const inputType = type === "number" ? "number" : "text";
         return `<input id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="${escapeHtml(type)}" type="${inputType}" class="undecorated no-padding fill" value="${escapeHtml(normalizedValue)}">`;
     };
@@ -1330,11 +1321,7 @@
             internal: true,
             dimensions: [520, 460],
             navigation: false,
-            tools: [{
-                title: "Edit",
-                icon: EDIT_ICON,
-                onclick: (event) => openTextInEditorApp(event?.target)
-            }],
+            tools: [{title: "Edit", icon: modular.icons.modify, onclick: (event) => openTextInEditorApp(event?.target)}],
             route: () => div({style: "large-padding-top small-padding", content: children([div({id: "internals-text-preview", style: "padded", content: activeTextFileContent})])}),
             afterRender: function () {
                 restoreTextStateFromPortal(this.portal);
@@ -1348,7 +1335,7 @@
             navigation: false,
             route: () => div({id: "internals-image-preview-shell", style: "large-padding-top fill", content: children([
                 `<div style="height:calc(100% - 24px);box-sizing:border-box;display:flex;align-items:center;justify-content:center;overflow:hidden"><div id="internals-image-preview-host" class="internals-image-preview-host radius"></div></div>`,
-                `<div id="internals-image-stats" style="height:24px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 2px 0;font-size:11px;line-height:16px;opacity:.72;white-space:nowrap"><span id="internals-image-stats-dimensions">Current - x - | Original - x -</span><span id="internals-image-stats-coordinates">x -, y -</span></div>`
+                `<div id="internals-image-stats" style="height:22px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 5px 0 5px;bottom:0;font-size:11px;line-height:16px" class="no-wrap faded"><span id="internals-image-stats-dimensions">Current - x - | Original - x -</span><span id="internals-image-stats-coordinates">x -, y -</span></div>`
             ])}),
             afterRender: function () {
                 restoreImageStateFromPortal(this.portal);
@@ -1382,11 +1369,7 @@
             internal: true,
             dimensions: [680, 560],
             navigation: false,
-            tools: [{
-                title: "Edit",
-                icon: EDIT_ICON,
-                onclick: (event) => openModifyArticleFromView(event?.target)
-            }],
+            tools: [{title: "Edit", icon: modular.icons.modify, onclick: (event) => openModifyArticleFromView(event?.target)}],
             route: () => div({style: "large-padding-top small-padding", content: div({id: "internals-article-preview", style: "internals-article-preview"})}),
             afterRender: function () {
                 restoreArticleStateFromPortal(this.portal);
@@ -1398,15 +1381,7 @@
             internal: true,
             dimensions: [520, 620],
             navigation: false,
-            tools: [{
-                title: "Save",
-                icon: modular.icons.save,
-                onclick: saveModifiedArticle
-            }, {
-                title: "Delete",
-                icon: modular.icons.delete,
-                onclick: deleteModifiedArticle
-            }],
+            tools: [{title: "Save", icon: modular.icons.save, onclick: saveModifiedArticle}, {title: "Delete", icon: modular.icons.delete, onclick: deleteModifiedArticle}],
             route: () => div({style: "large-padding-top small-padding", content: children([
                 div({style: "internals-article-modify-header", content: children([
                     img({id: "modify-article-icon", style: "article-icon internals-article-modify-icon inline", src: articleIconSrc(activeArticleRecord, {preferPreview: true})}),
@@ -1425,15 +1400,7 @@
             internal: true,
             dimensions: [520, 500],
             navigation: false,
-            tools: [{
-                title: "Save",
-                icon: modular.icons.save,
-                onclick: saveAppSettingsFromPortal
-            }, {
-                title: "Delete",
-                icon: modular.icons.delete,
-                onclick: deleteAppSettingsFromPortal
-            }],
+            tools: [{title: "Save", icon: modular.icons.save, onclick: saveAppSettingsFromPortal}, {title: "Delete", icon: modular.icons.delete, onclick: deleteAppSettingsFromPortal}],
             route: () => div({style: "large-padding-top small-padding fill", content: div({id: "internals-app-settings-host", style: "internals-app-settings-host padded"})}),
             afterRender: function () {
                 void renderAppSettingsPortal(this.portal);
@@ -1444,11 +1411,7 @@
             internal: true,
             dimensions: [820, 640],
             navigation: false,
-            tools: [{
-                title: "Print",
-                icon: modular.icons.print,
-                onclick: (event, context) => printActivePdf(context?.portal || getPortalFromSource(event?.target, 7))
-            }],
+            tools: [{title: "Print", icon: modular.icons.print, onclick: (event, context) => printActivePdf(context?.portal || getPortalFromSource(event?.target, 7))}],
             route: () => div({style: "large-padding-top fill internals-pdf-viewer-shell", content: `<iframe id="internals-pdf-preview" class="internals-pdf-preview radius" src="${activePdfFileSource || "about:blank"}" title="${escapeHtml(activePdfFilePath || "PDF preview")}"></iframe>`}),
             afterRender: function () {
                 restorePdfStateFromPortal(this.portal);
