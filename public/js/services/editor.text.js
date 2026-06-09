@@ -30,6 +30,7 @@
     const TEXT_PAGE_VIEW_GAP_PX = 28;
     const TEXT_INPUT_SYNC_DEBOUNCE_MS = 120;
     const TEXT_INDENT_STEP_PX = 48;
+    const TEXT_OBJECT_SELECTION_SELECTOR = ".editor-text-image-frame, .editor-text-shape-frame, .editor-text-table";
     const TEXT_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" style="fill:none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path fill="none" style="fill:none" stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>`;
     const TEXT_TABLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75V5.25Zm0 4.5h16.5M3.75 14.25h16.5M9.25 5.25v13.5M14.75 5.25v13.5" /></svg>`;
     const TEXT_SHAPE_ICON = `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3.75" y="4.5" width="7.5" height="7.5" rx="1.25" /><circle cx="16.75" cy="8.25" r="3.75" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 19.5h12l-6-6-6 6Z" /></svg>`;
@@ -73,6 +74,7 @@
     let activeTextShapeMoveState = null;
     let activeTextTableResizeState = null;
     let activeTextTableResizeHandle = null;
+    let textEditorLayoutRefreshScheduled = false;
     let activeTextPageViewEnabled = false;
     let activeTextRulerEnabled = false;
     let activeTextPageDimensions = {...TEXT_PAGE_DEFAULT_DIMENSIONS};
@@ -363,6 +365,15 @@
             scrollTextEditorCaretIntoView(portal, savedTextSelectionRange);
         }));
     };
+    const scheduleTextEditorLayoutRefresh = (portal = findTextPortal()) => {
+        if (textEditorLayoutRefreshScheduled) return;
+        textEditorLayoutRefreshScheduled = true;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            textEditorLayoutRefreshScheduled = false;
+            const textArea = findTextEditorNode(portal);
+            if (textArea && activeTextPageViewEnabled) applyTextEditorPageView(true, textArea, portal);
+        }));
+    };
     const getTextEditorPageBreakSpacerHeight = (currentPageHeight = 0) => {
         const contentHeightPx = getTextPageContentHeightPx();
         const usedPageHeight = Math.max(0, Math.min(contentHeightPx, Number(currentPageHeight) || 0));
@@ -401,6 +412,7 @@
             }
             const cleanImageNode = imageNode.cloneNode(true);
             cleanImageNode.removeAttribute("data-editor-image-selected");
+            cleanImageNode.removeAttribute("data-editor-layout-bound");
             cleanImageNode.style.maxWidth = cleanImageNode.style.maxWidth || "100%";
             cleanImageNode.style.height = cleanImageNode.style.height || "auto";
             cleanImageNode.style.display = cleanImageNode.style.display || "block";
@@ -408,10 +420,15 @@
             frameNode.replaceWith(cleanImageNode);
         });
     };
+    const cleanTextEditorTransientSelectionState = (rootNode) => {
+        if (!rootNode?.querySelectorAll) return;
+        rootNode.querySelectorAll(".editor-text-object-selected").forEach((node) => node.classList.remove("editor-text-object-selected"));
+    };
     const serializeTextEditorRichContent = (textArea = findTextEditorNode()) => {
         if (!textArea) return activeTextEditorContent;
         const clone = textArea.cloneNode(true);
         clone.querySelectorAll(".editor-text-page-break-spacer").forEach((spacerNode) => spacerNode.remove());
+        cleanTextEditorTransientSelectionState(clone);
         unwrapTextEditorImageFrames(clone);
         clone.querySelectorAll(".editor-text-image-handle").forEach((handleNode) => handleNode.remove());
         clone.querySelectorAll(".editor-text-table-resize-handle").forEach((handleNode) => handleNode.remove());
@@ -431,6 +448,7 @@
     const cleanTextEditorPrintClone = (clone) => {
         if (!clone?.querySelectorAll) return clone;
         clone.querySelectorAll(".editor-text-page-break-spacer, .editor-text-image-handle, .editor-text-table-resize-handle, .editor-text-search-marker").forEach((node) => node.remove());
+        cleanTextEditorTransientSelectionState(clone);
         unwrapTextEditorImageFrames(clone);
         clone.querySelectorAll("script, iframe, object, embed").forEach((node) => node.remove());
         clone.querySelectorAll("*").forEach((node) => {
@@ -611,6 +629,58 @@ a { color: #1d4ed8; text-decoration: underline; }
         ["nw", "ne", "sw", "se"].forEach((position) => frameNode.appendChild(createTextEditorImageHandle(position)));
         updateTextToolbarState();
     };
+    const updateTextEditorObjectRangeSelection = (range = getActiveTextSelectionRange(), rootNode = findTextEditorNode()) => {
+        if (!rootNode?.querySelectorAll) return false;
+        let selectedCount = 0;
+        rootNode.querySelectorAll(TEXT_OBJECT_SELECTION_SELECTOR).forEach((node) => {
+            let isSelected = false;
+            if (range && !range.collapsed) {
+                try {
+                    isSelected = range.intersectsNode(node);
+                } catch (_) {
+                    isSelected = false;
+                }
+            }
+            node.classList.toggle("editor-text-object-selected", isSelected);
+            if (isSelected) selectedCount += 1;
+        });
+        return selectedCount > 0;
+    };
+    const normalizeTextEditorSelectionString = (value = "") => String(value || "").replace(/\r\n/g, "\n").trim();
+    const isTextEditorFullTextSelection = (range = getActiveTextSelectionRange(), rootNode = findTextEditorNode()) => {
+        if (!range || range.collapsed || !rootNode) return false;
+        return normalizeTextEditorSelectionString(range.toString())
+            === normalizeTextEditorSelectionString(rootNode.innerText || rootNode.textContent || "");
+    };
+    const isTextEditorFullContentRange = (range = getActiveTextSelectionRange(), rootNode = findTextEditorNode()) => {
+        return !!range
+            && !!rootNode
+            && range.startContainer === rootNode
+            && range.startOffset === 0
+            && range.endContainer === rootNode
+            && range.endOffset === rootNode.childNodes.length;
+    };
+    const selectAllTextEditorContents = (textArea = findTextEditorNode()) => {
+        const selection = window.getSelection();
+        if (!selection || !textArea) return false;
+        clearActiveTextImageSelection({skipSync: true});
+        clearActiveTextShapeSelection({skipSync: true});
+        const range = document.createRange();
+        range.selectNodeContents(textArea);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        savedTextSelectionRange = range.cloneRange();
+        updateTextEditorObjectRangeSelection(range, textArea);
+        updateTextToolbarState();
+        return true;
+    };
+    const syncTextEditorRangeSelection = (textArea = findTextEditorNode()) => {
+        const range = getActiveTextSelectionRange();
+        if (isTextEditorFullTextSelection(range, textArea) && !isTextEditorFullContentRange(range, textArea)) {
+            return selectAllTextEditorContents(textArea);
+        }
+        return updateTextEditorObjectRangeSelection(range, textArea);
+    };
     const getTextEditorShapePathMarkup = (shapeType = "rectangle") => {
         if (shapeType === "ellipse") return `<ellipse cx="50" cy="50" rx="46" ry="32" />`;
         if (shapeType === "triangle") return `<path d="M50 4 L96 96 H4 Z" />`;
@@ -731,6 +801,12 @@ a { color: #1d4ed8; text-decoration: underline; }
         imageNode.style.height = imageNode.style.height || "auto";
         imageNode.style.maxWidth = "100%";
         imageNode.style.cursor = "pointer";
+        if (imageNode.dataset.editorLayoutBound !== "1") {
+            imageNode.dataset.editorLayoutBound = "1";
+            imageNode.addEventListener("load", () => scheduleTextEditorLayoutRefresh());
+            imageNode.addEventListener("error", () => scheduleTextEditorLayoutRefresh());
+        }
+        if (imageNode.complete) scheduleTextEditorLayoutRefresh();
     };
     const createTextEditorImageFrame = (imageNode) => {
         if (!imageNode) return null;
@@ -2227,9 +2303,17 @@ a { color: #1d4ed8; text-decoration: underline; }
         const backdropNode = findTextEditorPageBackdrop(portal);
         const measureNode = findTextEditorPageMeasure(portal);
         const pageViewEnabled = !!enabled;
-        const requiredPages = pageViewEnabled ? paginateTextEditorFlow(textArea) : 1;
         const pageDimensionsCss = getTextPageDimensionsCss();
         const pageDimensionsPx = getTextPageDimensionsPx();
+        textArea.style.width = pageViewEnabled ? pageDimensionsCss.width : "";
+        textArea.style.maxWidth = pageViewEnabled ? pageDimensionsCss.width : "";
+        textArea.style.minWidth = pageViewEnabled ? pageDimensionsCss.width : "";
+        textArea.style.padding = pageViewEnabled ? TEXT_PAGE_VIEW_PADDING : "";
+        textArea.style.boxSizing = "border-box";
+        textArea.style.lineHeight = pageViewEnabled ? "1.5" : "";
+        textArea.style.minHeight = "";
+        textArea.style.height = "";
+        const requiredPages = pageViewEnabled ? paginateTextEditorFlow(textArea) : 1;
         const totalPageHeight = requiredPages > 0
             ? (requiredPages * pageDimensionsPx.height) + ((requiredPages - 1) * TEXT_PAGE_VIEW_GAP_PX)
             : pageDimensionsPx.height;
@@ -2258,12 +2342,8 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         const bodyNode = portal?.body?.();
         if (bodyNode) bodyNode.style.overflowX = pageViewEnabled ? "auto" : "";
-        textArea.style.width = pageViewEnabled ? pageDimensionsCss.width : "";
-        textArea.style.maxWidth = pageViewEnabled ? pageDimensionsCss.width : "";
-        textArea.style.minWidth = pageViewEnabled ? pageDimensionsCss.width : "";
         textArea.style.minHeight = pageViewEnabled ? `${totalPageHeight}px` : "";
         textArea.style.height = pageViewEnabled ? `${totalPageHeight}px` : "";
-        textArea.style.padding = pageViewEnabled ? TEXT_PAGE_VIEW_PADDING : "";
         textArea.style.margin = pageViewEnabled ? "0" : "";
         textArea.style.backgroundColor = pageViewEnabled ? "transparent" : "";
         textArea.style.backgroundImage = "";
@@ -2275,8 +2355,6 @@ a { color: #1d4ed8; text-decoration: underline; }
         textArea.style.borderRadius = "";
         textArea.style.boxShadow = "";
         textArea.style.color = pageViewEnabled ? "#111827" : "";
-        textArea.style.lineHeight = pageViewEnabled ? "1.5" : "";
-        textArea.style.boxSizing = "border-box";
         textArea.style.position = pageViewEnabled ? "relative" : "";
         textArea.style.zIndex = pageViewEnabled ? "1" : "";
         textArea.style.top = "";
@@ -2707,6 +2785,11 @@ a { color: #1d4ed8; text-decoration: underline; }
             showTextEditorFooterDialogue(portal);
         });
         textArea.addEventListener("keydown", (event) => {
+            if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key?.toLowerCase?.() === "a") {
+                event.preventDefault();
+                selectAllTextEditorContents(textArea);
+                return;
+            }
             if (event.ctrlKey && !event.altKey && !event.shiftKey && event.key?.toLowerCase?.() === "k") {
                 if (hasHighlightedTextSelection()) {
                     event.preventDefault();
@@ -2882,14 +2965,17 @@ a { color: #1d4ed8; text-decoration: underline; }
         });
         textArea.addEventListener("keyup", () => {
             rememberTextSelection();
+            syncTextEditorRangeSelection(textArea);
             updateTextToolbarState();
         });
         textArea.addEventListener("mouseup", () => {
             rememberTextSelection();
+            syncTextEditorRangeSelection(textArea);
             updateTextToolbarState();
         });
         textArea.addEventListener("focus", () => {
             rememberTextSelection();
+            syncTextEditorRangeSelection(textArea);
             updateTextToolbarState();
         });
         textArea.addEventListener("click", (event) => {
@@ -2905,17 +2991,20 @@ a { color: #1d4ed8; text-decoration: underline; }
             if (shapeFrameNode && textArea.contains(shapeFrameNode)) {
                 event.preventDefault();
                 event.stopPropagation();
+                updateTextEditorObjectRangeSelection(null, textArea);
                 selectTextEditorShapeFrame(shapeFrameNode);
                 textArea.focus();
                 return;
             }
             if (!frameNode) {
+                updateTextEditorObjectRangeSelection(null, textArea);
                 clearActiveTextImageSelection();
                 clearActiveTextShapeSelection();
                 return;
             }
             event.preventDefault();
             event.stopPropagation();
+            updateTextEditorObjectRangeSelection(null, textArea);
             selectTextEditorImageFrame(frameNode);
             textArea.focus();
         });
@@ -2968,8 +3057,12 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (!textEditorSelectionChangeBound) {
             textEditorSelectionChangeBound = true;
             document.addEventListener("selectionchange", () => {
-                if (!isSelectionInsideTextEditor()) return;
+                if (!isSelectionInsideTextEditor()) {
+                    updateTextEditorObjectRangeSelection(null);
+                    return;
+                }
                 rememberTextSelection();
+                syncTextEditorRangeSelection();
                 updateTextToolbarState();
             });
             document.addEventListener("mousemove", (event) => {
@@ -3036,6 +3129,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             });
             document.addEventListener("mousedown", (event) => {
                 if (event.target?.closest?.(".editor-text-image-frame, .editor-text-shape-frame")) return;
+                updateTextEditorObjectRangeSelection(null);
                 clearActiveTextImageSelection();
                 clearActiveTextShapeSelection();
             });
