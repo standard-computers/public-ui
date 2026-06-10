@@ -4,7 +4,7 @@
     const SVG_MARKUP_PATTERN = /^\s*<svg[\s>]/i;
     const VIDEO_FILE_PATTERN = /\.(mp4|webm|mov|m4v|avi|mkv|mpeg|mpg|ogv)$/i;
     const PDF_FILE_PATTERN = /\.pdf$/i;
-    const CODE_FILE_PATTERN = /\.(js|mjs|cjs|ts|tsx|jsx|json|css|scss|sass|less|html|htm|xml|yml|yaml|toml|ini|conf|cfg|env|sql|py|rb|php|java|c|h|hpp|cpp|cs|go|rs|swift|kt|kts|sh|bash|ps1|bat|cmd|pl|lua|r|dart|scala|clj|groovy|std|stds)$/i;
+    const CODE_FILE_PATTERN = /\.(js|mjs|cjs|ts|tsx|jsx|json|css|scss|sass|less|html|htm|xml|yml|yaml|toml|ini|conf|cfg|env|sql|py|rb|php|java|c|h|hpp|cpp|cs|go|rs|swift|kt|kts|sh|bash|ps1|bat|cmd|pl|lua|r|dart|scala|clj|groovy|std|stds|sui)$/i;
     const IMAGE_VIEWER_MAX_WIDTH = 750;
     const IMAGE_VIEWER_MAX_HEIGHT = 750;
     const FILES_CACHE_INTERFACE = "com.standard.files";
@@ -30,6 +30,7 @@
     let activeVideoLastSavedTime = -1;
     let activePdfFilePath = "";
     let activePdfFileSource = "";
+    let activePdfObjectUrl = "";
     let activeStandardDataReference = "";
     let activeStandardDataPayload = {};
     let activeArticleRecord = {};
@@ -1242,10 +1243,24 @@
     const openPdfFilePath = (rawPath = "", sourceNode = null) => {
         const filePath = getPathForDownload(rawPath);
         if (!filePath) return false;
+        if (activePdfObjectUrl) URL.revokeObjectURL(activePdfObjectUrl);
+        activePdfObjectUrl = "";
         activePdfFilePath = filePath;
         activePdfFileSource = pdfPreviewUrl(filePath);
         const portal = modular.show("com.standard.internals", 7, {newInstance: true});
         syncPortalWindowState(7, {directive: filePath, cachedContent: {source: activePdfFileSource}}, portal);
+        updatePdfPreview(portal);
+        return true;
+    };
+    const openPdfSource = (title = "", source = "", options = {}) => {
+        const pdfSource = String(source || "").trim();
+        if (!pdfSource) return false;
+        if (activePdfObjectUrl) URL.revokeObjectURL(activePdfObjectUrl);
+        activePdfFilePath = String(title || "PDF Preview");
+        activePdfFileSource = pdfSource;
+        activePdfObjectUrl = options?.isObjectUrl ? pdfSource : "";
+        const portal = modular.show("com.standard.internals", 7, {newInstance: true});
+        syncPortalWindowState(7, {directive: activePdfFilePath, cachedContent: {source: activePdfFileSource}}, portal);
         updatePdfPreview(portal);
         return true;
     };
@@ -1301,10 +1316,12 @@
     window.StandardInternals.openVideoFilePath = (rawPath = "", sourceNode = null) => openVideoFilePath(rawPath, sourceNode);
     window.StandardInternals.openVideoSource = (rawPath = "", source = "", options = {}) => openVideoSource(rawPath, source, options);
     window.StandardInternals.openPdfFilePath = (rawPath = "", sourceNode = null) => openPdfFilePath(rawPath, sourceNode);
+    window.StandardInternals.openPdfSource = (title = "", source = "", options = {}) => openPdfSource(title, source, options);
     window.addEventListener("beforeunload", () => {
         void saveActiveVideoProgress({force: true});
         revokeActiveObjectUrl("image");
         revokeActiveObjectUrl("video");
+        if (activePdfObjectUrl) URL.revokeObjectURL(activePdfObjectUrl);
     });
     window.StandardInternals.openStandardData = (standardReference = "", payload = {}, options = {}) => openStandardData(standardReference, payload, options?.sourceNode || null);
     window.StandardInternals.openArticle = (article = {}, options = {}) => openArticle(article, options?.sourceNode || null);

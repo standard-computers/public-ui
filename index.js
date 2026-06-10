@@ -2313,11 +2313,14 @@ app.get("/api/files/download", (req, res) => {
         }));
 });
 
-app.get("/api/records/images/:recordId", (req, res) => {
+const streamRecordContent = (req, res, options = {}) => {
     recordImageQueue = recordImageQueue
         .catch(() => null)
         .then(() => new Promise(resolve => {
             const recordId = req.params.recordId;
+            const contentType = String(options.contentType || req.query.contentType || "application/octet-stream").replace(/[\r\n]/g, "").trim() || "application/octet-stream";
+            const fileName = String(req.query.name || "").replace(/[\r\n"]/g, "").trim();
+            const requestLabel = options.requestLabel || "record content";
             if (!recordId) {
                 res.status(400).send("Record ID is required");
                 resolve();
@@ -2337,13 +2340,14 @@ app.get("/api/records/images/:recordId", (req, res) => {
             let finalized = false;
             let imageEntry = null;
             let payloadFrameReceived = false;
-            const payloadSink = createTempPayloadSink("image/*");
+            const payloadSink = createTempPayloadSink(contentType);
             const finalizePayload = () => {
                 if (finalized) return;
                 finalized = true;
                 const payload = payloadSink.finalize();
                 cleanup();
-                res.setHeader("Content-Type", payload.contentType);
+                res.setHeader("Content-Type", contentType || payload.contentType);
+                if (fileName) res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
                 res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
                 res.setHeader("Content-Length", `${payload.byteLength}`);
                 const cleanupTempFile = () => {
@@ -2354,10 +2358,10 @@ app.get("/api/records/images/:recordId", (req, res) => {
                 };
                 const readStream = fsSync.createReadStream(payload.tempPath);
                 readStream.on("error", err => {
-                    console.error("[/api/records/images] stream error:", err.message);
+                    console.error(`[${requestLabel}] stream error:`, err.message);
                     cleanupTempFile();
                     if (!res.headersSent) {
-                        res.status(500).send("Failed to stream record image");
+                        res.status(500).send(`Failed to stream ${requestLabel}`);
                     } else {
                         res.destroy(err);
                     }
@@ -2382,7 +2386,7 @@ app.get("/api/records/images/:recordId", (req, res) => {
                 }
                 cleanup();
                 if (!res.headersSent) {
-                    res.status(504).send("Timeout waiting for record image");
+                    res.status(504).send(`Timeout waiting for ${requestLabel}`);
                 }
             };
             const onRequestError = err => {
@@ -2412,7 +2416,7 @@ app.get("/api/records/images/:recordId", (req, res) => {
                         if (status !== "0x010") {
                             cleanup();
                             if (!res.headersSent) {
-                                res.status(502).send(status || "Unexpected record image status");
+                                res.status(502).send(status || `Unexpected ${requestLabel} status`);
                             }
                         }
                         if (remainder) {
@@ -2433,9 +2437,9 @@ app.get("/api/records/images/:recordId", (req, res) => {
                 resolve();
             }
             enqueueWsRequest({
-                name: "record-image",
+                name: requestLabel,
                 response: res,
-                timeoutMessage: "Timeout waiting for record image",
+                timeoutMessage: `Timeout waiting for ${requestLabel}`,
                 start: entry => {
                     imageEntry = entry;
                     sendQueuedWsPayload(entry, command);
@@ -2446,13 +2450,21 @@ app.get("/api/records/images/:recordId", (req, res) => {
                     if (payloadSink.hasData() || payloadFrameReceived || entry.relayBinaryStarted) {
                         finalizePayload();
                     } else if (!res.headersSent) {
-                        res.status(502).send("No record image payload received");
+                        res.status(502).send(`No ${requestLabel} payload received`);
                     }
                 },
                 onSettled: cleanup,
                 onSuccess: () => null
             }).catch(() => null);
         }));
+};
+
+app.get("/api/records/images/:recordId", (req, res) => {
+    streamRecordContent(req, res, {contentType: "image/*", requestLabel: "record image"});
+});
+
+app.get("/api/records/content/:recordId", (req, res) => {
+    streamRecordContent(req, res, {requestLabel: "record content"});
 });
 
 function handleCliRequest(req, res, command) {

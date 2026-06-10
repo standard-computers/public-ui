@@ -700,6 +700,7 @@ class Portal {
     #savedWindowState;
     #isMaximized = false;
     #preMinimizeState;
+    #minimizeHandlerTimer = null;
     #activeRoute;
     #minimizeButton;
     #maximizeMenuItem;
@@ -1376,14 +1377,18 @@ class Portal {
         }, {syncLayout: false});
         this.#windowDiv.classList.add("minimized");
         this.#scheduleAfterRender();
-        setTimeout(() => {
+        this.#minimizeHandlerTimer = setTimeout(() => {
+            this.#minimizeHandlerTimer = null;
+            if (!this.#windowDiv.classList.contains("minimized")) return;
             const handleClick = _ => {
                 this.restoreFromMinimize();
             };
             const handleMouseEnter = _ => {
+                if (!this.#windowDiv.classList.contains("minimized")) return;
                 this.#windowDiv.style.transform = "scale(0.5)";
             };
             const handleMouseLeave = () => {
+                if (!this.#windowDiv.classList.contains("minimized")) return;
                 this.#windowDiv.style.transform = "scale(0.3)";
             };
             this.#preMinimizeState.handlers = {handleClick, handleMouseEnter, handleMouseLeave};
@@ -1393,6 +1398,10 @@ class Portal {
         }, 500);
     }
     restoreFromMinimize() {
+        if (this.#minimizeHandlerTimer !== null) {
+            clearTimeout(this.#minimizeHandlerTimer);
+            this.#minimizeHandlerTimer = null;
+        }
         if (!this.#windowDiv.classList.contains("minimized")) return;
         this.#applyWindowLayout({
             transform: this.#preMinimizeState?.transform ?? "scale(1)",

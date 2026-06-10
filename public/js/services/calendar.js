@@ -1392,12 +1392,12 @@
                         input({type: "hidden", id: "event-category-id", value: ""}),
                         div({content: children([
                                 div({style: "faded small-padding bold", content: "Category"}),
-                                div({style: "padded", content: searchbox({id: "event-category", style: "undecorated no-padding", placeholder: "Select category", options: categoryOptions})})
+                                div({style: "padded", content: searchbox({id: "event-category", handle: "event-category", style: "undecorated no-padding", placeholder: "Select category", options: categoryOptions})})
                             ]),
                         }),
                         div({content: children([
                                 div({style: "faded small-padding bold", content: "Event Name"}),
-                                div({style: "padded", content: input({id: "event-name", style: "undecorated no-padding", placeholder: ""})})
+                                div({style: "padded", content: input({id: "event-name", handle: "event-name", style: "undecorated no-padding", placeholder: ""})})
                             ]),
                         }),
                         div({content: children([

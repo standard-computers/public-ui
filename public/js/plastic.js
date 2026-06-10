@@ -12,6 +12,7 @@ function applyCommonAttributes(el, n) {
     if (n.contenteditable) el.setAttribute("contenteditable", n.contenteditable);
     if (n.value) el.setAttribute("value", n.value);
     if (n.data) el.setAttribute("data", n.data);
+    if (n.handle !== undefined && n.handle !== null) el.setAttribute("handle", String(n.handle));
     if (n.style) el.className = n.style;
 }
 let asyncContentIndex = 0;
@@ -111,9 +112,8 @@ function applyContent(el, n) {
 }
 function img(n) {
     const el = document.createElement("img");
+    applyCommonAttributes(el, n);
     if (n.src) el.src = n.src;
-    if (n.id) el.id = n.id;
-    if (n.style) el.className = n.style;
     return el.outerHTML;
 }
 const elementEventHandlers = {};
@@ -293,6 +293,7 @@ document.addEventListener("change", (event) => {
 function button(n) {
     const el = document.createElement("button");
     applyCommonAttributes(el, n);
+    if (n.handle !== undefined && n.handle !== null) el.setAttribute("handle", String(n.handle));
     if (n.tooltip) el.setAttribute("tooltip", n.tooltip);
     if (n.type) el.type = n.type;
     if (n.value) el.value = n.value;
@@ -338,6 +339,7 @@ function searchbox(n = {}) {
     wrapper.className = n.wrapperStyle ?? "searchbox-wrapper";
     const el = document.createElement("input");
     applyCommonAttributes(el, n);
+    if (n.handle !== undefined && n.handle !== null) el.setAttribute("handle", String(n.handle));
     el.type = "text";
     el.autocomplete = "off";
     el.setAttribute("data-searchbox-id", searchboxId);
@@ -377,6 +379,7 @@ function switcher(n = {}) {
     const mergedStyle = `${styleClasses} switcher align-right inline`.trim();
     return div({
         style: mergedStyle,
+        handle: n.handle,
         content: children([input({
             style: "ios-switch float-right",
             type: "checkbox",

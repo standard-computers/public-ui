@@ -68,6 +68,15 @@ function applyAltSyncProperty(element, source = {}, ...args) {
     if (!element || !value) return;
     element.setAttribute("alt-sync", value);
 }
+function getHandlePropertyValue(source = {}, ...args) {
+    const value = source?.handle;
+    return typeof value === "function" ? value(...args) : value;
+}
+function applyHandleProperty(element, source = {}, ...args) {
+    const value = getHandlePropertyValue(source, ...args);
+    if (!element || value === undefined || value === null) return;
+    element.setAttribute("handle", String(value));
+}
 HTMLElement.prototype.out = function () {
     let e = this;
     e.style.opacity = 1;
@@ -109,6 +118,7 @@ Element.prototype.contextmenu = function (items, selector = null) {
             const option = document.createElement("div");
             option.className = "context-menu-item";
             applyAltSyncProperty(option, item, ele, lastClickedTarget);
+            applyHandleProperty(option, item, ele, lastClickedTarget);
             if (item.className) option.classList.add(...String(item.className).split(/\s+/).filter(Boolean));
             if (item.destructive) option.classList.add("text-red");
             const label = typeof item.label === "function" ? item.label(ele, lastClickedTarget) : item.label;
@@ -190,6 +200,7 @@ Element.prototype.popoutmenu = function (items, selector = null) {
             const option = document.createElement("div");
             option.className = "context-menu-item";
             applyAltSyncProperty(option, item, ele, lastClickedTarget);
+            applyHandleProperty(option, item, ele, lastClickedTarget);
             if (item.className) option.classList.add(...String(item.className).split(/\s+/).filter(Boolean));
             if (item.destructive) option.classList.add("text-red");
             if (item.content) {
@@ -686,6 +697,7 @@ window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
         if (config.name) input.name = config.name;
         if (config.title) input.title = config.title;
         applyAltSyncProperty(input, config);
+        applyHandleProperty(input, config);
         if (config.placeholder) input.placeholder = config.placeholder;
         if (config.style) input.className = config.style;
         if (config.value) input.value = config.value;

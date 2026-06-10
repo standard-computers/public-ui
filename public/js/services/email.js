@@ -39,6 +39,7 @@
     const ARCHIVE_ACTION_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg>`;
     const STAR_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>`;
     const CATEGORY_ACTION_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z" /></svg>`;
+    const ATTACHMENT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"/></svg>`;
     const COMPOSER_FORMAT_COMMANDS = [
         {command: "bold", title: "Bold", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`},
         {command: "italic", title: "Italicize", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.2558594 22.003906 L 14.0058594 22.003906 L 14.0058594 20.503906 L 13.2558594 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`},
@@ -61,6 +62,8 @@
     let emailContactsFetch = null;
     const mailboxCache = new Map();
     const mailboxFetches = new Map();
+    const emailAttachmentCache = new Map();
+    const emailAttachmentFetches = new Map();
     let mailboxPrefetchStarted = false;
     const escapeMarkup = value => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     const escapeCliQuotedValue = value => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -197,9 +200,133 @@
             snippet: stripMarkup(firstValue(record, ["snippet", "preview", "summary"], body)).replace(/\s+/g, " ").trim(),
             unread: isMessageUnread(record),
             starred: isMessageStarred(record),
+            attachments: parseBooleanValue(firstValueLoose(record, ["attachments", "hasAttachments", "has_attachments"])) === true,
             category: firstValue(record, ["category", "category_id", "categoryId"]),
             raw: record
         };
+    };
+    const parseAttachmentMetadata = attachment => {
+        const rawMetadata = attachment?.metadata;
+        if (rawMetadata && typeof rawMetadata === "object") return rawMetadata;
+        if (!rawMetadata) return {};
+        let candidate = String(rawMetadata).trim();
+        for (let attempt = 0; attempt < 3 && candidate; attempt++) {
+            try {
+                const parsed = JSON.parse(candidate);
+                if (parsed && typeof parsed === "object") return parsed;
+                candidate = String(parsed || "").trim();
+            } catch (_) {
+                const unescaped = candidate.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+                if (unescaped === candidate) break;
+                candidate = unescaped;
+            }
+        }
+        return {};
+    };
+    const normalizeAttachment = attachment => {
+        const metadata = parseAttachmentMetadata(attachment);
+        return {
+            ...attachment,
+            id: String(firstValue(attachment, ["id", "ID", "_id", "recordId", "record_id"])),
+            name: String(firstValue(attachment, ["name", "filename"], metadata.filename || "attachment")),
+            contentType: String(firstValue(attachment, ["contentType", "content_type", "type"], metadata.contentType || "application/octet-stream")),
+            size: Number(firstValue(attachment, ["size"], metadata.size || 0)) || 0,
+            metadata
+        };
+    };
+    const parseAttachmentsResponse = response => {
+        if (!response || response === "NO RECORDS FOUND") return [];
+        let payload = response;
+        if (typeof payload === "string") {
+            try {
+                payload = JSON.parse(payload);
+            } catch (_) {
+                return [];
+            }
+        }
+        const records = Array.isArray(payload) ? payload : (Array.isArray(payload?.attachments) ? payload.attachments : []);
+        return records.map(normalizeAttachment).filter(attachment => attachment.id);
+    };
+    const normalizeAttachmentEmailReference = value => {
+        const reference = String(value || "").trim();
+        if (!reference) return "";
+        if (reference.startsWith("<") && reference.endsWith(">")) return reference;
+        return reference.includes("@") && !/\s/.test(reference) ? `<${reference.replace(/[<>]/g, "")}>` : reference;
+    };
+    const getMessageAttachmentEmail = message => {
+        const raw = message?.raw || message || {};
+        const messageId = firstValueLoose(raw, EMAIL_MESSAGE_ID_KEYS, "");
+        if (messageId) return normalizeAttachmentEmailReference(messageId);
+        return normalizeAttachmentEmailReference(message?.thread || firstValueLoose(raw, EMAIL_THREAD_KEYS, ""));
+    };
+    const buildAttachmentLookupCommand = emailReference => `[attachments] <email "${escapeEmailCommandValue(emailReference)}">`;
+    const fetchEmailAttachments = message => {
+        if (!message?.attachments) return Promise.resolve([]);
+        const emailReference = getMessageAttachmentEmail(message);
+        if (!emailReference) return Promise.resolve([]);
+        if (emailAttachmentCache.has(emailReference)) return Promise.resolve(emailAttachmentCache.get(emailReference));
+        if (emailAttachmentFetches.has(emailReference)) return emailAttachmentFetches.get(emailReference);
+        const command = buildAttachmentLookupCommand(emailReference);
+        const fetchPromise = CLI.send(command).then(response => {
+            const attachments = parseAttachmentsResponse(response);
+            emailAttachmentCache.set(emailReference, attachments);
+            return attachments;
+        }).catch(error => {
+            console.error("Failed to load email attachments:", {command, emailReference, error});
+            return [];
+        }).finally(() => emailAttachmentFetches.delete(emailReference));
+        emailAttachmentFetches.set(emailReference, fetchPromise);
+        return fetchPromise;
+    };
+    const formatAttachmentSize = size => {
+        const bytes = Number(size) || 0;
+        if (!bytes) return "";
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+    const openEmailAttachment = async (attachment, sourceNode = null) => {
+        const query = new URLSearchParams({contentType: attachment.contentType, name: attachment.name});
+        const progressToken = window.StandardDownloads?.beginOpenProgress?.(`Opening ${attachment.name}`);
+        try {
+            const response = await fetch(`/api/records/content/${encodeURIComponent(attachment.id)}?${query.toString()}`);
+            if (!response.ok) throw new Error(`Attachment download failed (${response.status})`);
+            const downloadedBlob = await response.blob();
+            const blob = downloadedBlob.type === attachment.contentType ? downloadedBlob : new Blob([downloadedBlob], {type: attachment.contentType});
+            const opened = await window.StandardFiles?.openFileBlob?.(attachment.name, blob, sourceNode);
+            if (opened === false || opened === undefined) throw new Error("No attachment viewer is available");
+        } catch (error) {
+            console.error("Failed to open email attachment:", error);
+            modular?.error?.(error?.message || "Unable to open attachment");
+        } finally {
+            window.StandardDownloads?.hideOpenProgress?.(progressToken);
+        }
+    };
+    const renderAttachmentTile = attachment => {
+        const iconPath = window.StandardFiles?.getFileTypeIconPath?.(attachment) || "/icons/std.png";
+        return `<button type="button" class="email-attachment bordered inner-radius" data-attachment-id="${escapeMarkup(attachment.id)}" title="Open ${escapeMarkup(attachment.name)}">
+            <img src="${escapeMarkup(iconPath)}" alt="">
+            <span class="email-attachment-details"><strong>${escapeMarkup(attachment.name)}</strong><small>${escapeMarkup(formatAttachmentSize(attachment.size) || attachment.contentType)}</small></span>
+        </button>`;
+    };
+    const hydrateEmailAttachments = (root = document) => {
+        root.querySelectorAll?.(".email-attachments[data]").forEach(host => {
+            if (host.dataset.attachmentsLoading === "1" || host.dataset.attachmentsLoaded === "1") return;
+            const emailReference = host.getAttribute("data") || "";
+            const message = [...mailboxMessages, activeViewerMessage].find(entry => entry && getMessageAttachmentEmail(entry) === emailReference);
+            if (!message) return;
+            host.dataset.attachmentsLoading = "1";
+            fetchEmailAttachments(message).then(attachments => {
+                host.dataset.attachmentsLoaded = "1";
+                host.innerHTML = attachments.length
+                    ? `<div class="email-attachments-label">Attachments (${attachments.length})</div><div class="email-attachment-list">${attachments.map(renderAttachmentTile).join("")}</div>`
+                    : `<div class="email-attachments-empty faded">No attachment records found.</div>`;
+                host.querySelectorAll(".email-attachment").forEach(tile => tile.addEventListener("click", event => {
+                    const attachment = attachments.find(item => item.id === tile.dataset.attachmentId);
+                    if (attachment) void openEmailAttachment(attachment, event.currentTarget);
+                }));
+            }).finally(() => delete host.dataset.attachmentsLoading);
+        });
     };
     const emailMessageMatchesId = (message, emailId = "") => {
         const safeEmailId = String(emailId || "").trim();
@@ -1404,6 +1531,7 @@
         content: children([
             div({style: "email-message-row", content: children([
                 div({style: "email-message-sender", content: escapeMarkup(message.from || "Unknown sender")}),
+                message.attachments ? `<span class="email-message-attachment-icon" title="Has attachments" style="display:inline-flex;width:16px;height:16px;flex:none;opacity:.68">${ATTACHMENT_ICON}</span>` : "",
                 div({style: "email-message-date", content: escapeMarkup(formatDate(message.date))})
             ])}),
             renderMessageCategoryBadge(message),
@@ -1424,7 +1552,12 @@
                     message.date ? div({content: `<strong>Date</strong> ${escapeMarkup(formatDate(message.date))}`}) : ""
                 ])})
             ])}),
-            div({style: "email-reading-body", content: escapeMarkup(message.body || message.snippet || "")})
+            div({style: "email-reading-body", content: escapeMarkup(message.body || message.snippet || "")}),
+            message.attachments ? div({
+                style: "email-attachments",
+                data: getMessageAttachmentEmail(message),
+                content: div({style: "faded", content: "Loading attachments..."})
+            }) : ""
         ]);
     };
     const renderEmailViewer = (routeContext = {}) => {
@@ -1432,6 +1565,7 @@
         const message = activeViewerMessage;
         const folderTitle = activeViewerFolderTitle || state.folderTitle || "";
         requestAnimationFrame(() => bindEmailCategoryToolbarButtons(document));
+        requestAnimationFrame(() => hydrateEmailAttachments(routeContext?.window || document));
         return div({style: "email-workspace large-padding-top", content: children([
                 renderEmailToolbar(),
                 div({style: "spacer"}),
@@ -1477,6 +1611,7 @@
         requestAnimationFrame(() => bindEmailMessageContextMenus(document));
         requestAnimationFrame(() => bindEmailDragAndDrop(document));
         requestAnimationFrame(() => bindEmailCategoryToolbarButtons(document));
+        requestAnimationFrame(() => hydrateEmailAttachments(document));
         return div({
             style: "email-workspace",
             data: folder,
@@ -1511,7 +1646,10 @@
         });
         applyEmailMessageItemStyles(root);
         const pane = root.querySelector(".email-reading-pane");
-        if (pane) pane.innerHTML = renderReadingPane(selectedMessage, folderTitle);
+        if (pane) {
+            pane.innerHTML = renderReadingPane(selectedMessage, folderTitle);
+            hydrateEmailAttachments(pane);
+        }
     };
     const loadMailboxFolder = (folder = "inbox", title = "Inbox") => {
         prefetchMailboxFolders();

@@ -309,7 +309,7 @@
     const isWhiteboardFilePath = (rawPath = "") => /\.wtb$/i.test(String(rawPath || ""));
     const isSlidesFilePath = (rawPath = "") => /\.slds$/i.test(String(rawPath || ""));
     const isSpreadsheetFilePath = (rawPath = "") => /\.sprdshts$/i.test(String(rawPath || ""));
-    const isCodeFilePath = (rawPath = "") => /\.(std|stds)$/i.test(String(rawPath || ""));
+    const isCodeFilePath = (rawPath = "") => /\.(std|stds|sui)$/i.test(String(rawPath || ""));
     const isTextFilePath = (rawPath = "") => /\.txt$/i.test(String(rawPath || ""));
     const isImageFilePath = (rawPath = "") => /\.(png|ico|gif|jpeg|jpg|svg|tiff|bm|avif|webp)$/i.test(String(rawPath || ""));
     const isSvgFilePath = (rawPath = "") => /\.svg$/i.test(String(rawPath || ""));
@@ -427,8 +427,45 @@
         if (isPdfFilePath(rawPath)) return openPdfInInternalsApp(rawPath, sourceNode);
         return openFileInInternalsApp(rawPath, sourceNode);
     };
+    const openFileBlob = async (name = "", blob = null, sourceNode = null) => {
+        if (!(blob instanceof Blob)) return false;
+        const fileName = String(name || "attachment").trim() || "attachment";
+        if (isWhiteboardFilePath(fileName)) {
+            const openBoardData = await waitForServiceMethod(() => window.StandardBoards?.openBoardData, "com.standard.boards");
+            return openBoardData ? openBoardData(fileName, JSON.parse(await blob.text()), sourceNode) : false;
+        }
+        if (isSlidesFilePath(fileName)) {
+            const openSlidePayload = await waitForServiceMethod(() => window.StandardSlides?.openSlidePayload, "com.standard.editor.slides");
+            return openSlidePayload ? openSlidePayload(fileName, JSON.parse(await blob.text()), sourceNode) : false;
+        }
+        if (isSpreadsheetFilePath(fileName)) {
+            const openSheetPayload = await waitForServiceMethod(() => window.StandardSheets?.openSheetPayload, "com.standard.editor.sheet");
+            return openSheetPayload ? openSheetPayload(fileName, JSON.parse(await blob.text()), sourceNode) : false;
+        }
+        if (isCodeFilePath(fileName)) {
+            const openCodeFilePath = await waitForServiceMethod(() => window.StandardCodeEditor?.openCodeFilePath, "com.standard.editor.code");
+            return openCodeFilePath ? openCodeFilePath(fileName, await blob.text(), sourceNode) : false;
+        }
+        if (isImageFilePath(fileName)) {
+            const openImageSource = await waitForServiceMethod(() => window.StandardInternals?.openImageSource, "com.standard.internals");
+            if (!openImageSource) return false;
+            if (isSvgFilePath(fileName)) return openImageSource(await blob.text(), {path: fileName, title: fileName, sourceNode});
+            return openImageSource(URL.createObjectURL(blob), {path: fileName, title: fileName, isObjectUrl: true, revokePrevious: true, sourceNode});
+        }
+        if (isVideoFilePath(fileName)) {
+            const openVideoSource = await waitForServiceMethod(() => window.StandardInternals?.openVideoSource, "com.standard.internals");
+            return openVideoSource ? openVideoSource(fileName, URL.createObjectURL(blob), {title: fileName, isObjectUrl: true, revokePrevious: true, sourceNode}) : false;
+        }
+        if (isPdfFilePath(fileName)) {
+            const openPdfSource = await waitForServiceMethod(() => window.StandardInternals?.openPdfSource, "com.standard.internals");
+            return openPdfSource ? openPdfSource(fileName, URL.createObjectURL(blob), {isObjectUrl: true, sourceNode}) : false;
+        }
+        const openTextContent = await waitForServiceMethod(() => window.StandardInternals?.openTextContent, "com.standard.internals");
+        return openTextContent ? openTextContent(fileName, await blob.text(), {readOnly: false, sourceNode}) : false;
+    };
     window.StandardFiles = window.StandardFiles || {};
     window.StandardFiles.openFilePath = (rawPath = "", sourceNode = null) => openFilePath(rawPath, sourceNode);
+    window.StandardFiles.openFileBlob = (name = "", blob = null, sourceNode = null) => openFileBlob(name, blob, sourceNode);
     window.StandardFiles.getFileTypeIconPath = (fileLike = {}) => getFileTypeIconPath(fileLike);
     const getFilePathForRemoveCommand = (rawPath = "") => {
         return String(rawPath || "").replace(/^\/home\/standard-system\//, "");

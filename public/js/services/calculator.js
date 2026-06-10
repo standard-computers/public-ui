@@ -175,27 +175,27 @@
         else return;
         event.preventDefault();
     };
-    const button = ({label, action, value = "", style = "", wide = false}) => `<button type="button" class="fat hover-zoom ${style}" data-calculator-action="${action}" data-calculator-value="${value}" style="min-width:0;padding-left:8px;padding-right:8px;${wide ? "grid-column:span 2" : ""}">${label}</button>`;
+    const button = ({label, handle, action, value = "", style = "", wide = false}) => `<button type="button" handle="${handle}" class="fat hover-zoom ${style}" data-calculator-action="${action}" data-calculator-value="${value}" style="min-width:0;padding-left:8px;padding-right:8px;${wide ? "grid-column:span 2" : ""}">${label}</button>`;
     const calculatorButtons = () => [
-        button({label: "C", action: "clear"}),
-        button({label: "±", action: "sign"}),
-        button({label: "%", action: "percent"}),
-        button({label: "÷", action: "operator", value: "/", style: "primary"}),
-        button({label: "7", action: "digit", value: "7"}),
-        button({label: "8", action: "digit", value: "8"}),
-        button({label: "9", action: "digit", value: "9"}),
-        button({label: "×", action: "operator", value: "*", style: "primary"}),
-        button({label: "4", action: "digit", value: "4"}),
-        button({label: "5", action: "digit", value: "5"}),
-        button({label: "6", action: "digit", value: "6"}),
-        button({label: "−", action: "operator", value: "-", style: "primary"}),
-        button({label: "1", action: "digit", value: "1"}),
-        button({label: "2", action: "digit", value: "2"}),
-        button({label: "3", action: "digit", value: "3"}),
-        button({label: "+", action: "operator", value: "+", style: "primary"}),
-        button({label: "0", action: "digit", value: "0", wide: true}),
-        button({label: ".", action: "decimal"}),
-        button({label: "=", action: "equals", style: "primary"})
+        button({label: "C", handle: "calc-C", action: "clear"}),
+        button({label: "±", handle: "calc-pm", action: "sign"}),
+        button({label: "%", handle: "calc-mod", action: "percent"}),
+        button({label: "÷", handle: "calc-div", action: "operator", value: "/", style: "primary"}),
+        button({label: "7", handle: "calc-7", action: "digit", value: "7"}),
+        button({label: "8", handle: "calc-8", action: "digit", value: "8"}),
+        button({label: "9", handle: "calc-9", action: "digit", value: "9"}),
+        button({label: "×", handle: "calc-x", action: "operator", value: "*", style: "primary"}),
+        button({label: "4", handle: "calc-4", action: "digit", value: "4"}),
+        button({label: "5", handle: "calc-5", action: "digit", value: "5"}),
+        button({label: "6", handle: "calc-6", action: "digit", value: "6"}),
+        button({label: "−", handle: "calc--", action: "operator", value: "-", style: "primary"}),
+        button({label: "1", handle: "calc-1", action: "digit", value: "1"}),
+        button({label: "2", handle: "calc-2", action: "digit", value: "2"}),
+        button({label: "3", handle: "calc-3", action: "digit", value: "3"}),
+        button({label: "+", handle: "calc-+", action: "operator", value: "+", style: "primary"}),
+        button({label: "0", handle: "calc-0", action: "digit", value: "0", wide: true}),
+        button({label: ".", handle: "calc-.", action: "decimal"}),
+        button({label: "=", handle: "calc-eq", action: "equals", style: "primary"})
     ].join("");
     const bindCalculator = function () {
         restoreState(this.portal);
@@ -213,13 +213,12 @@
         root?.focus?.();
         renderDisplay(root);
     };
-
     window.StandardCalculator = window.StandardCalculator || {clear, equals, inputDigit, inputOperator};
     modular.register(new Service(SERVICE_ID, [new Portal({
         title: "Calculator",
         hints: ["calculator", "calculate", "math", "arithmetic"],
         internal: true,
-        dimensions: [340, 430],
+        dimensions: [340, 390],
         navigation: false,
         resizable: false,
         svg_icon: CALCULATOR_ICON,

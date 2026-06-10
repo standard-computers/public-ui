@@ -1,5 +1,9 @@
 (() => {
     const SERVICE_ID = "com.standard.editor.code";
+    const SUI_FILE_PATTERN = /\.sui$/i;
+    const SUI_CLICK_DELAY_MS = 250;
+    const SUI_TYPE_DELAY_MS = 24;
+    const CODE_EDITOR_RUN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>`;
     const CODE_EDITOR_KEYWORDS = new Set([
         "abstract", "alias", "and", "as", "asm", "assert", "async", "await", "auto", "base", "begin", "bool", "boolean", "break", "by", "byte", "case", "catch", "char", "checked", "class", "const",
         "constructor", "continue", "crate", "data", "debugger", "declare", "def", "default", "defer", "delete", "del", "do", "double", "dynamic", "echo", "elif", "else", "elseif", "end", "ensure",
@@ -268,6 +272,7 @@
         const textareaNode = getPortalCodeEditorInput(portal);
         if (windowNode) windowNode.dataset.codeFilePath = normalizedPath;
         if (textareaNode) textareaNode.dataset.codeFilePath = normalizedPath;
+        syncCodeEditorRunTool(portal);
         return normalizedPath;
     };
     const setPortalCodeState = (portal, nextState = {}, options = {}) => {
@@ -280,6 +285,10 @@
     const getPortalCodeLineNumbers = (portal) => portal?.window?.()?.querySelector?.("#editor-code-lines") || null;
     const getPortalCodeHighlight = (portal) => portal?.window?.()?.querySelector?.("#editor-code-highlight") || null;
     const getPortalCodeStage = (portal) => portal?.window?.()?.querySelector?.("#editor-code-stage") || null;
+    const syncCodeEditorRunTool = (portal) => {
+        const runTool = portal?.window?.()?.querySelector?.('[data-portal-tool-title="run"]');
+        if (runTool) runTool.hidden = !SUI_FILE_PATTERN.test(getPortalRememberedCodePath(portal));
+    };
     const isCodeEditorGoToLineShortcut = (event) => event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.key?.toLowerCase?.() === "g";
     const focusCodeEditorAtEnd = (portal) => {
         const focusEditor = () => {
@@ -629,6 +638,193 @@
         }
         await saveCodeEditorContentToPath(portal, directive);
     };
+    const parseSuiServiceInstruction = (instruction = "") => {
+        const normalizedInstruction = String(instruction || "").trim();
+        const routedMatch = normalizedInstruction.match(/^(com\..+?)-(\d+)(?:-(\d+))?$/);
+        if (!routedMatch) return {serviceId: normalizedInstruction, portalIndex: 0, routeIndex: null};
+        return {
+            serviceId: routedMatch[1],
+            portalIndex: Number.parseInt(routedMatch[2], 10),
+            routeIndex: routedMatch[3] === undefined ? null : Number.parseInt(routedMatch[3], 10)
+        };
+    };
+    const waitForSuiPortalRender = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const waitForSuiClick = async () => {
+        await waitForSuiPortalRender();
+        await new Promise(resolve => setTimeout(resolve, SUI_CLICK_DELAY_MS));
+    };
+    const typeSuiInputValue = async (input, value = "") => {
+        const nextValue = String(value ?? "");
+        input.value = "";
+        input.setAttribute("value", "");
+        input.dispatchEvent(new Event("input", {bubbles: true}));
+        for (const character of nextValue) {
+            input.value += character;
+            input.setAttribute("value", input.value);
+            input.dispatchEvent(new Event("input", {bubbles: true}));
+            await new Promise(resolve => setTimeout(resolve, SUI_TYPE_DELAY_MS));
+        }
+    };
+    const getSuiKeyboardKey = (value = "") => {
+        const normalizedKey = String(value || "").trim();
+        const namedKeys = {
+            BACKSPACE: "Backspace",
+            DELETE: "Delete",
+            DEL: "Delete",
+            DOWN: "ArrowDown",
+            END: "End",
+            ENTER: "Enter",
+            ESC: "Escape",
+            ESCAPE: "Escape",
+            HOME: "Home",
+            LEFT: "ArrowLeft",
+            PAGEDOWN: "PageDown",
+            PAGEUP: "PageUp",
+            RIGHT: "ArrowRight",
+            SPACE: " ",
+            TAB: "Tab",
+            UP: "ArrowUp"
+        };
+        return namedKeys[normalizedKey.toUpperCase()] || (normalizedKey.length === 1 ? normalizedKey.toLowerCase() : normalizedKey);
+    };
+    const getSuiKeyboardCode = (key = "") => {
+        if (/^[a-z]$/i.test(key)) return `Key${key.toUpperCase()}`;
+        if (/^\d$/.test(key)) return `Digit${key}`;
+        const namedCodes = {
+            " ": "Space",
+            ArrowDown: "ArrowDown",
+            ArrowLeft: "ArrowLeft",
+            ArrowRight: "ArrowRight",
+            ArrowUp: "ArrowUp",
+            Backspace: "Backspace",
+            Delete: "Delete",
+            End: "End",
+            Enter: "Enter",
+            Escape: "Escape",
+            Home: "Home",
+            PageDown: "PageDown",
+            PageUp: "PageUp",
+            Tab: "Tab"
+        };
+        return namedCodes[key] || key;
+    };
+    const dispatchSuiKeyboardEvent = (type, key, modifiers = {}) => {
+        const target = document.activeElement || document.body || document;
+        const event = new KeyboardEvent(type, {
+            key,
+            code: getSuiKeyboardCode(key),
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            ctrlKey: !!modifiers.ctrlKey,
+            altKey: !!modifiers.altKey,
+            shiftKey: !!modifiers.shiftKey,
+            metaKey: !!modifiers.metaKey
+        });
+        return !target.dispatchEvent(event);
+    };
+    const runSuiModifiedShortcut = async (modifier = "", shortcut = "", lineNumber = 0) => {
+        const normalizedShortcut = String(shortcut || "").trim();
+        if (!normalizedShortcut) throw new Error(`Line ${lineNumber}: shortcut key is required`);
+        await waitForSuiClick();
+        const key = getSuiKeyboardKey(normalizedShortcut);
+        const modifiers = modifier === "CTRL" ? {ctrlKey: true} : {altKey: true};
+        const handled = dispatchSuiKeyboardEvent("keydown", key, modifiers);
+        dispatchSuiKeyboardEvent("keyup", key, modifiers);
+        if (modifier !== "ALT" || handled) return true;
+        dispatchSuiKeyboardEvent("keydown", "Alt");
+        dispatchSuiKeyboardEvent("keyup", "Alt");
+        for (const character of normalizedShortcut) {
+            const sequenceKey = getSuiKeyboardKey(character);
+            dispatchSuiKeyboardEvent("keydown", sequenceKey);
+            dispatchSuiKeyboardEvent("keyup", sequenceKey);
+        }
+        return true;
+    };
+    const activateSuiPortalRoute = async (portal, routeIndex = null, lineNumber = 0) => {
+        if (routeIndex === null) return;
+        await waitForSuiClick();
+        const routeNodes = Array.from(portal?.window?.()?.querySelectorAll?.(".sidebar-item") || []);
+        const routeNode = routeNodes[routeIndex];
+        if (!routeNode) throw new Error(`Line ${lineNumber}: route ${routeIndex} does not exist`);
+        routeNode.click();
+    };
+    const resolveSuiHandleInstruction = (instruction = "") => {
+        const normalizedInstruction = String(instruction || "").trim();
+        const handles = [...new Set(Array.from(document.querySelectorAll("[handle]"))
+            .map(element => element.getAttribute("handle"))
+            .filter(Boolean))]
+            .sort((left, right) => right.length - left.length);
+        const handle = handles.find(candidate => normalizedInstruction === candidate || normalizedInstruction.startsWith(`${candidate} `)) || "";
+        return {
+            handle,
+            value: handle && normalizedInstruction.length > handle.length
+                ? normalizedInstruction.slice(handle.length).trimStart()
+                : null
+        };
+    };
+    const clickSuiHandle = async (instruction = "", lineNumber = 0) => {
+        const normalizedInstruction = String(instruction || "").trim();
+        if (!normalizedInstruction) throw new Error(`Line ${lineNumber}: handle is required`);
+        await waitForSuiClick();
+        const {handle: normalizedHandle, value} = resolveSuiHandleInstruction(normalizedInstruction);
+        if (!normalizedHandle) throw new Error(`Line ${lineNumber}: handle ${normalizedInstruction} was not found`);
+        const matchingElements = Array.from(document.querySelectorAll("[handle]"))
+            .filter(element => element.getAttribute("handle") === normalizedHandle);
+        const target = [...matchingElements].reverse().find(element => element.getClientRects().length > 0) || matchingElements[matchingElements.length - 1];
+        if (!target) throw new Error(`Line ${lineNumber}: handle ${normalizedHandle} was not found`);
+        if (target instanceof HTMLInputElement) {
+            target.focus();
+            if (value !== null) {
+                await typeSuiInputValue(target, value);
+            }
+            return true;
+        }
+        if (value !== null) throw new Error(`Line ${lineNumber}: handle ${normalizedHandle} is not an input`);
+        if (typeof target.click !== "function") throw new Error(`Line ${lineNumber}: handle ${normalizedHandle} cannot be clicked`);
+        target.click();
+        return true;
+    };
+    const executeSuiLine = async (line = "", lineNumber = 0) => {
+        const instruction = String(line || "").trim();
+        if (!instruction) return false;
+        if (instruction.startsWith("com.")) {
+            const {serviceId, portalIndex, routeIndex} = parseSuiServiceInstruction(instruction);
+            const launchedPortal = modular.start(serviceId, {portalIndex});
+            if (!launchedPortal) throw new Error(`Line ${lineNumber}: unable to launch ${serviceId} portal ${portalIndex}`);
+            await activateSuiPortalRoute(launchedPortal, routeIndex, lineNumber);
+            return true;
+        }
+        if (instruction.startsWith("* ")) return clickSuiHandle(instruction.slice(2), lineNumber);
+        if (instruction.startsWith("CTRL ")) return runSuiModifiedShortcut("CTRL", instruction.slice(5), lineNumber);
+        if (instruction.startsWith("ALT ")) return runSuiModifiedShortcut("ALT", instruction.slice(4), lineNumber);
+        return false;
+    };
+    const executeSuiSource = async (source = "") => {
+        const lines = String(source || "").replace(/\r\n?/g, "\n").split("\n");
+        let executedLineCount = 0;
+        for (let index = 0; index < lines.length; index += 1) {
+            if (await executeSuiLine(lines[index], index + 1)) executedLineCount += 1;
+        }
+        return executedLineCount;
+    };
+    const runSuiCode = async (portal) => {
+        const directive = getPortalRememberedCodePath(portal);
+        if (!SUI_FILE_PATTERN.test(directive)) return false;
+        const source = getPortalCodeEditorInput(portal)?.value ?? getPortalCodeState(portal).cachedContent;
+        if (!String(source || "").trim()) {
+            modular.error("SUI file is empty");
+            return false;
+        }
+        try {
+            const executedLineCount = await executeSuiSource(source);
+            modular.success(`Ran ${getCodeFileName(directive)} (${executedLineCount} ${executedLineCount === 1 ? "action" : "actions"})`);
+            return true;
+        } catch (error) {
+            modular.error(error?.message || `Unable to run ${getCodeFileName(directive)}`);
+            return false;
+        }
+    };
     const openFreshCodeEditor = () => {
         const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
         if (portal) {
@@ -662,6 +858,7 @@
             centered_nav: true,
             tools: [
                 {title: "Save", icon: modular.icons.save, onclick: (_, context) => saveLoadedCodeFile(context?.portal)},
+                {title: "Run", icon: CODE_EDITOR_RUN_ICON, onclick: (_, context) => runSuiCode(context?.portal)},
                 {title: "Search", icon: modular.icons.search, onclick: (event, context) => showCodeEditorSearchDialogue(context?.portal, event?.currentTarget)}
             ],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" /></svg>`,
@@ -685,6 +882,7 @@
                 bindCodeEditorInteractions(this.portal);
                 hydrateCodeEditorFromState(this.portal);
                 updateCodeEditorPortalTitle(this.portal);
+                syncCodeEditorRunTool(this.portal);
                 focusCodeEditorAtEnd(this.portal);
             }
         })
