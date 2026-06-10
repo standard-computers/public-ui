@@ -3,6 +3,8 @@
         {serviceId: "com.standard.internals", title: "Internals", script: "/js/services/internals.js", icon: "/icons/interfaces/cli.png", internal: true},
         {serviceId: "com.standard.integrator", title: "Integrator", script: "/js/services/integrator.js", icon: "/icons/interfaces/cli.png", internal: true},
         {serviceId: "com.standard.stopwatch", title: "Stopwatch", script: "/js/services/stopwatch.js", icon: "/icons/interfaces/alarms.png", internal: true},
+        {serviceId: "com.standard.calculator", title: "Calculator", script: "/js/services/calculator.js", icon: "/icons/interfaces/cli.png", internal: true},
+        {serviceId: "com.standard.timers", title: "Timers", script: "/js/services/timers.js", icon: "/icons/interfaces/alarms.png"},
         {serviceId: "com.standard.files", title: "Files", script: "/js/services/files.js", icon: "/icons/interfaces/files.png"},
         {serviceId: "com.standard.calendar", title: "Calendar", script: "/js/services/calendar.js", icon: "/icons/interfaces/calendar.png"},
         {serviceId: "com.standard.contacts", title: "Contacts", script: "/js/services/contacts.js", icon: "/icons/interfaces/contacts.png"},
@@ -26,7 +28,7 @@
     ];
     const serviceScripts = platformInterfaces.map(({script}) => script);
     const SERVICE_SCRIPT_CACHE_INTERFACE = "service-loader";
-    const SERVICE_SCRIPT_CACHE_VERSION = "v1";
+    const SERVICE_SCRIPT_CACHE_VERSION = "v3";
     const ENABLED_APPS_CACHE_KEY = "enabled-apps";
     const buildServiceScriptCacheKey = (url = "") => `${SERVICE_SCRIPT_CACHE_VERSION}:${url}`;
     const supportsServiceScriptCache = () => {

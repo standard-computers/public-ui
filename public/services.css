@@ -587,6 +587,22 @@ body.editor-sheet-resizing-rows {cursor:row-resize}
 .settings-interface-drawer {max-height:0;overflow:hidden;transition:max-height 180ms ease}
 .settings-interface-item.open .settings-interface-drawer {max-height:96px}
 .settings-interface-drawer-inner {align-items:center;border-top:1px solid var(--border);padding:10px}
+
+/*TIMERS*/
+.timer-quick-form {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}
+.timers-list {display:flex;flex-direction:column;gap:10px;overflow:auto;padding-bottom:12px}
+.timer-card {padding:12px;background:var(--secondary-bg);transition:opacity 160ms ease}
+.timer-card-complete {opacity:.72}
+.timer-card-header {display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.timer-card-copy {min-width:0}
+.timer-card-copy h3 {margin:0 0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.timer-card-display {flex:none;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.03em}
+.timer-progress {height:6px;margin:11px 0;overflow:hidden;border-radius:999px;background:var(--bg);border:1px solid var(--border)}
+.timer-progress span {display:block;height:100%;background:var(--primary);transition:width 250ms linear}
+.timer-card-complete .timer-progress span {background:var(--faded)}
+.timer-card-actions {display:flex;flex-wrap:wrap;gap:7px}
+.timer-empty {display:flex;flex-direction:column;align-items:center;gap:7px;padding:28px 16px;text-align:center}
+.timer-empty-icon svg {width:32px;height:32px}
 @media (prefers-reduced-motion: reduce) {
     .draggable-window:not(.widget-window) {animation:none}
 }

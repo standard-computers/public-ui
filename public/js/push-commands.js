@@ -40,6 +40,7 @@
         const message = `${notification.message || ""}`.trim();
         const icon = notification.icon || "";
         const hasAction = typeof notification.onclick === "function";
+        node.__standardNotificationOnDismiss = typeof notification.onDismiss === "function" ? notification.onDismiss : null;
         if (hasAction) {
             node.tabIndex = 0;
             node.role = "button";
@@ -64,7 +65,14 @@
         tray.prepend(node);
         requestAnimationFrame(() => node.classList.add("show"));
         window.StandardNotifications.dismiss = notificationNode => {
+            if (!notificationNode || notificationNode.dataset.dismissed === "true") return;
+            notificationNode.dataset.dismissed = "true";
             notificationNode?.classList?.remove?.("show");
+            try {
+                notificationNode.__standardNotificationOnDismiss?.(notificationNode);
+            } catch (error) {
+                console.error("Notification dismiss handler failed", error);
+            }
             setTimeout(() => notificationNode?.remove?.(), 220);
         };
         node.querySelector(".standard-notification-dismiss")?.addEventListener("click", () => {
