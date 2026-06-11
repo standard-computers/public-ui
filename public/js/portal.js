@@ -1201,8 +1201,10 @@ document.addEventListener("keydown", function (e) {
     if (e.altKey && e.key.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         const focusedWindow = getFocusedPortalWindow();
         if (focusedWindow?.portal && typeof focusedWindow.portal.hide === "function") {
+            const nextWindow = getOpenPortalWindows().filter(windowNode => windowNode !== focusedWindow).pop();
             e.preventDefault();
             focusedWindow.portal.hide();
+            if (nextWindow && typeof modular?.bringToFront === "function") modular.bringToFront(nextWindow);
             return;
         }
     }
