@@ -47,6 +47,7 @@ npm run start:desktop
 
 - `APP_RUNTIME`: `server` or `electron`
 - `MODE`: set to `relay` for hosted relay mode
+- `MODE`: set to `demo` for a standalone, temporary seeded demo
 - `CPP_WS_URL`: websocket endpoint for the backend system
 - `STANDARD_CHIT`: optional default device token
 - `RELAY_COOKIE_SECRET`: required in relay mode
@@ -58,6 +59,10 @@ npm run start:desktop
 - `RELAY_COOKIE_SECRET` is required when `MODE=relay`. The app will now fail fast if relay mode is enabled without a secret.
 - `MAPBOX_ACCESS_TOKEN` is exposed to the browser by design, so only use a public Mapbox token with appropriate restrictions.
 - Do not commit `.env`, `user_data/`, `private/`, build output, or IDE metadata.
+
+## Standalone Demo
+
+Run `MODE=demo npm start` to serve an isolated demo without a Standard System websocket. Each browser receives temporary seeded data from `demo-data.json`; logging out resets that browser's sandbox. Demo mode does not use relay cookies, desktop setup, mDNS, or websocket reconnect logic.
 
 ## Desktop Notes
 

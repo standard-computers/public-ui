@@ -1,0 +1,174 @@
+{
+  "nextId": 1000,
+  "records": {
+    "user": [
+      {
+        "id": "1",
+        "userid": "demo",
+        "userId": "demo",
+        "username": "demo",
+        "firstname": "Demo",
+        "lastname": "User",
+        "email": "demo@example.test",
+        "settings": {}
+      }
+    ],
+    "contacts": [
+      {
+        "id": "101",
+        "firstname": "Jordan",
+        "middlename": "",
+        "lastname": "Lee",
+        "birthday": "08/14/1990",
+        "address": "100 Main Street, Cincinnati, OH",
+        "phone": "+1 (513) 555-0142",
+        "email": "jordan@example.test",
+        "company": "Northstar Studio"
+      },
+      {
+        "id": "102",
+        "firstname": "Morgan",
+        "middlename": "A",
+        "lastname": "Reed",
+        "birthday": "02/21/1988",
+        "address": "42 Market Avenue, Columbus, OH",
+        "phone": "+1 (614) 555-0199",
+        "email": "morgan@example.test",
+        "company": "Acme Demo Co."
+      }
+    ],
+    "notes": [
+      {
+        "id": "201",
+        "user": "demo",
+        "content": "<strong>Welcome to the demo</strong><br>Every app is backed by temporary sample data.",
+        "color": "#fff2a8",
+        "created": "2026-06-10T14:00:00.000Z"
+      },
+      {
+        "id": "202",
+        "user": "demo",
+        "content": "Try editing this note or creating a new one. Logging out restores the original demo.",
+        "color": "#cce8ff",
+        "created": "2026-06-10T15:00:00.000Z"
+      }
+    ],
+    "alarms": [
+      {
+        "id": "301",
+        "user": "demo",
+        "name": "Daily review",
+        "timestamp": "9:00 AM",
+        "enabled": true,
+        "repeats": true,
+        "days": [1, 2, 3, 4, 5]
+      }
+    ],
+    "cats": [
+      {"id": "401", "name": "Work", "color": "#5b8def"},
+      {"id": "402", "name": "Personal", "color": "#7bc47f"}
+    ],
+    "events": [
+      {
+        "id": "501",
+        "owner": "demo",
+        "category": "401",
+        "name": "Product walkthrough",
+        "start": "2026-06-11T10:00:00-04:00",
+        "end": "2026-06-11T11:00:00-04:00"
+      },
+      {
+        "id": "502",
+        "owner": "demo",
+        "category": "402",
+        "name": "Demo follow-up",
+        "start": "2026-06-12T14:30:00-04:00",
+        "end": "2026-06-12T15:00:00-04:00"
+      }
+    ],
+    "email": [
+      {
+        "id": "601",
+        "thread": "welcome",
+        "messageId": "demo-welcome-1",
+        "from": "Jordan Lee <jordan@example.test>",
+        "to": "Demo User <demo@example.test>",
+        "subject": "Welcome to the Standard Computer demo",
+        "body": "This mailbox is simulated. You can read, star, move, delete, and compose messages safely.",
+        "html": "<p>This mailbox is simulated. You can read, star, move, delete, and compose messages safely.</p>",
+        "folder": "inbox",
+        "read": false,
+        "starred": true,
+        "direction": 1,
+        "date": "2026-06-10T16:30:00.000Z",
+        "attachments": true
+      },
+      {
+        "id": "602",
+        "thread": "project",
+        "messageId": "demo-project-1",
+        "from": "Morgan Reed <morgan@example.test>",
+        "to": "Demo User <demo@example.test>",
+        "subject": "Sample project files",
+        "body": "The Documents folder contains editable sample files for the demo.",
+        "folder": "inbox",
+        "read": true,
+        "starred": false,
+        "direction": 1,
+        "date": "2026-06-09T13:15:00.000Z"
+      }
+    ],
+    "attachments": [
+      {
+        "id": "701",
+        "email": "601",
+        "name": "demo-overview.txt",
+        "contentType": "text/plain",
+        "size": 66
+      }
+    ],
+    "articles": [
+      {
+        "id": "801",
+        "title": "A Standalone Demo Workspace",
+        "description": "An example article stored entirely inside this temporary session.",
+        "link": "https://example.test/demo",
+        "content": "This seeded article demonstrates the article viewer and search integration.",
+        "source": "Demo",
+        "priority": 1,
+        "created": "2026-06-10T12:00:00.000Z"
+      }
+    ],
+    "cache": []
+  },
+  "content": {
+    "701": {
+      "name": "demo-overview.txt",
+      "contentType": "text/plain",
+      "content": "V2VsY29tZSB0byB0aGUgU3RhbmRhcmQgQ29tcHV0ZXIgZGVtby4gQ2hhbmdlcyBhcmUgdGVtcG9yYXJ5Lg=="
+    }
+  },
+  "files": {
+    "Documents": {"type": "directory"},
+    "Documents/Welcome.txt": {
+      "contentType": "text/plain",
+      "content": "V2VsY29tZSB0byB0aGUgU3RhbmRhcmQgQ29tcHV0ZXIgZGVtby4KClRoaXMgaXMgYSB0ZW1wb3Jhcnkgc2FuZGJveC4="
+    },
+    "Documents/Project Notes.md": {
+      "contentType": "text/markdown",
+      "content": "IyBEZW1vIFByb2plY3QKCi0gRXhwbG9yZSB0aGUgYXBwcwotIEVkaXQgc2FtcGxlIGRhdGEKLSBMb2cgb3V0IHRvIHJlc2V0"
+    },
+    "Documents/Sample Board.wtb": {
+      "contentType": "application/json",
+      "content": "eyJ2ZXJzaW9uIjoxLCJvcGVyYXRpb25zIjpbXX0="
+    },
+    "Photos": {"type": "directory"},
+    "Videos": {"type": "directory"},
+    "Music": {"type": "directory"},
+    "Boards": {"type": "directory"},
+    "Boards/Sample Board.wtb": {
+      "contentType": "application/json",
+      "content": "eyJ2ZXJzaW9uIjoxLCJvcGVyYXRpb25zIjpbXX0="
+    }
+  }
+}

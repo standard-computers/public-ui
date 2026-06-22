@@ -1,4 +1,5 @@
 (() => {
+    const demoHiddenServices = new Set(["com.standard.internals", "com.standard.integrator", "com.standard.cli"]);
     const platformInterfaces = [
         {serviceId: "com.standard.internals", title: "Internals", script: "/js/services/internals.js", icon: "/icons/interfaces/cli.png", internal: true},
         {serviceId: "com.standard.integrator", title: "Integrator", script: "/js/services/integrator.js", icon: "/icons/interfaces/cli.png", internal: true},
@@ -20,7 +21,7 @@
         {serviceId: "com.standard.editor.code", title: "Code Editor", script: "/js/services/editor.code.js", icon: "/icons/interfaces/editor.png"},
         {serviceId: "com.standard.cli", title: "CLI", script: "/js/services/cli.js", icon: "/icons/interfaces/cli.png"},
         {serviceId: "com.standard.settings", title: "Settings", script: "/js/services/settings.js", icon: "/icons/interfaces/settings.png", required: true},
-    ];
+    ].filter(({serviceId}) => window.StandardRuntimeConfig?.isDemoMode !== true || !demoHiddenServices.has(serviceId));
     const widgetScripts = [
         "/js/services/widgets/player.widget.js",
         "/js/services/widgets/video.widget.js",

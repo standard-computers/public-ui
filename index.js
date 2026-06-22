@@ -16,6 +16,7 @@ const crypto = require("crypto");
 const os = require("os");
 const cookieParser = require('cookie-parser');
 const {Bonjour} = require("bonjour-service");
+const {DemoProvider} = require("./demo-provider");
 const app = express();
 const APP_RUNTIME = (process.env.APP_RUNTIME || (process.versions?.electron ? "electron" : "server")).trim().toLowerCase();
 const isElectronRuntime = APP_RUNTIME === "electron";
@@ -26,7 +27,8 @@ const SSL_CERT_PATH = process.env.SSL_CERT_PATH || "/etc/letsencrypt/live/ui.sta
 const SSL_KEY_PATH = process.env.SSL_KEY_PATH || "/etc/letsencrypt/live/ui.standardcomputers.net/privkey.pem";
 const MODE = (process.env.MODE || "").toLowerCase();
 const isRelayMode = MODE === "relay";
-const isDesktopSetupEnabled = isElectronRuntime && !isRelayMode;
+const isDemoMode = MODE === "demo";
+const isDesktopSetupEnabled = isElectronRuntime && !isRelayMode && !isDemoMode;
 function resolveWsUrl() {
     const configuredUrl = (process.env.CPP_WS_URL || "").trim();
     const defaultProtocol = isRelayMode ? "wss" : "ws";
@@ -57,9 +59,17 @@ const REQUEST_BODY_LIMIT = (process.env.REQUEST_BODY_LIMIT || "25mb").trim() || 
 const THEMES_REPO_PATH = path.join(__dirname, "public", "themes.json");
 const USER_DATA_ROOT = path.join(__dirname, "user_data");
 const ELECTRON_SETUP_CONFIG_PATH = path.join(USER_DATA_ROOT, "desktop-setup.json");
+const DEMO_FIXTURE_PATH = (process.env.DEMO_FIXTURE_PATH || path.join(__dirname, "demo-data.json")).trim();
+const DEMO_SESSION_TTL_MS = Math.max(60 * 1000, Number(process.env.DEMO_SESSION_TTL_MS || 2 * 60 * 60 * 1000) || 2 * 60 * 60 * 1000);
+const DEMO_MAX_SESSIONS = Math.max(1, Number(process.env.DEMO_MAX_SESSIONS || 50) || 50);
+const demoProvider = isDemoMode ? new DemoProvider({
+    fixturePath: DEMO_FIXTURE_PATH,
+    ttlMs: DEMO_SESSION_TTL_MS,
+    maxSessions: DEMO_MAX_SESSIONS
+}) : null;
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(origin => origin.trim()).filter(Boolean);
 const LOCAL_HOSTNAME = (process.env.LOCAL_HOSTNAME || "standard").replace(/\.local$/i, "").trim();
-const shouldAdvertiseLocalHostname = !isRelayMode && Boolean(LOCAL_HOSTNAME);
+const shouldAdvertiseLocalHostname = !isRelayMode && !isDemoMode && Boolean(LOCAL_HOSTNAME);
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
@@ -71,7 +81,7 @@ const corsOptions = {
 let wsClient;
 let reconnectTimer = null;
 let wsConnectTimer = null;
-let connectionStatus = "connecting";
+let connectionStatus = isDemoMode ? "connected" : "connecting";
 const statusSubscribers = new Set();
 const pushSubscribers = new Set();
 const userSessions = new Map();
@@ -1338,6 +1348,10 @@ function clearWsConnectTimer() {
 }
 
 function connectToStdSystem() {
+    if (isDemoMode) {
+        updateConnectionStatus("connected");
+        return;
+    }
     const targetWsUrl = getRuntimeWsUrl();
     const targetStandardChit = getRuntimeStandardChit();
     console.log(`attempting connection to ${targetWsUrl} (mode=${MODE || "default"})`);
@@ -1412,6 +1426,7 @@ function connectToStdSystem() {
 }
 
 function restartStdSystemConnection() {
+    if (isDemoMode) return;
     if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
@@ -1525,6 +1540,18 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({extended: true, limit: REQUEST_BODY_LIMIT}));
 app.use(express.json({limit: REQUEST_BODY_LIMIT}));
 app.use(sessionMiddleware);
+app.use((req, res, next) => {
+    if (!isDemoMode || req.session) return next();
+    try {
+        req.session = setSession(res, "demo", "demo");
+        demoProvider.ensureSession(req.session);
+        res.cookie("uid", "demo", {sameSite: "lax", path: "/", maxAge: DEMO_SESSION_TTL_MS});
+        return next();
+    } catch (err) {
+        console.error("Failed to create demo session:", err.message);
+        return res.status(err.code === "DEMO_CAPACITY" ? 503 : 500).send(err.message);
+    }
+});
 app.use((err, req, res, next) => {
     if (err?.message === "Not allowed by CORS") {
         return res.status(403).json({error: "CORS origin not allowed"});
@@ -1561,6 +1588,9 @@ function stopLocalHostnameAdvertisement() {
 }
 
 app.get("/login", (req, res) => {
+    if (isDemoMode) {
+        return res.redirect("/");
+    }
     if (isDesktopSetupEnabled && !hasCompletedDesktopSetup(req)) {
         return res.redirect("/setup");
     }
@@ -1588,6 +1618,10 @@ function redirectLoginError(req, res, message = "Unable to login", status = 303)
 }
 
 app.post("/login", async (req, res) => {
+    if (isDemoMode) {
+        if (wantsLoginJson(req)) return res.json({redirect: "/"});
+        return res.redirect("/");
+    }
     if (isDesktopSetupEnabled && !hasCompletedDesktopSetup(req)) {
         if (wantsLoginJson(req)) return res.json({redirect: "/setup"});
         return res.redirect("/setup");
@@ -1629,6 +1663,13 @@ app.post("/login", async (req, res) => {
 });
 
 app.get("/logout", (req, res) => {
+    if (isDemoMode) {
+        demoProvider.resetSession(req.session);
+        clearSession(res, req.sessionToken, req);
+        res.cookie("uid", "", {maxAge: 0, sameSite: "lax", path: "/"});
+        writeUserDataCookie(res, null);
+        return res.redirect("/");
+    }
     clearSession(res, req.sessionToken, req);
     res.cookie("uid", "", {maxAge: 0, sameSite: "lax", path: "/"});
     writeUserDataCookie(res, null);
@@ -1741,7 +1782,8 @@ app.get("/", async (req, res) => {
         console.error("Failed to refresh user cookie for home:", err.message);
     }
     return res.render("home", {
-        mapboxAccessTokenJson: JSON.stringify(getRuntimeMapboxAccessToken())
+        mapboxAccessTokenJson: JSON.stringify(getRuntimeMapboxAccessToken()),
+        isDemoMode
     });
 });
 
@@ -1787,6 +1829,7 @@ app.post("/setup", async (req, res) => {
 });
 
 app.get("/api/device/status", (req, res) => {
+    if (isDemoMode) return res.sendStatus(200);
     if (!wsClient || wsClient.readyState !== WebSocket.OPEN) {
         return res.sendStatus(404);
     } else {
@@ -1795,7 +1838,11 @@ app.get("/api/device/status", (req, res) => {
 })
 
 app.get("/api/client-context", (req, res) => {
-    return res.json({isRelayMode});
+    return res.json({
+        isRelayMode,
+        isDemoMode,
+        usesStandardBackend: !isDemoMode
+    });
 });
 
 app.get("/events/device-status", (req, res) => {
@@ -1835,6 +1882,7 @@ app.get("/events/push", (req, res) => {
  * Checks if a device with Serial (Device ID) is connected.
  */
 app.post("/api/status", (req, res) => {
+    if (isDemoMode) return res.status(200).json({connected: true});
     const deviceId = req.body?.d?.device_uid;
     if (!deviceId) return res.status(400).json({error: "device_uid is required"});
     withWsResponse(res, entry => sendQueuedWsPayload(entry, `relay ping ${deviceId}`), data => {
@@ -1845,6 +1893,7 @@ app.post("/api/status", (req, res) => {
 });
 
 app.get("/api/stds", (req, res) => {
+    if (isDemoMode) return res.send(demoProvider.execute(req.session, "stds"));
     const command = prepareCommandForRequest(req, res, "stds");
     if (!command) return;
     withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
@@ -1853,6 +1902,7 @@ app.get("/api/stds", (req, res) => {
 });
 
 app.get("/api/stds/:standard", (req, res) => {
+    if (isDemoMode) return res.send(demoProvider.execute(req.session, `stds ${req.params.standard}`));
     const command = prepareCommandForRequest(req, res, `stds ${req.params.standard}`);
     if (!command) return;
     withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
@@ -1861,6 +1911,7 @@ app.get("/api/stds/:standard", (req, res) => {
 });
 
 app.get("/api/stds/:standard/json", (req, res) => {
+    if (isDemoMode) return res.json(JSON.parse(demoProvider.execute(req.session, `stds ${req.params.standard} json`)));
     const command = prepareCommandForRequest(req, res, `stds ${req.params.standard} json`);
     if (!command) return;
     withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
@@ -1869,6 +1920,7 @@ app.get("/api/stds/:standard/json", (req, res) => {
 });
 
 app.get("/api/records/:standard", (req, res) => {
+    if (isDemoMode) return res.json(demoProvider.records(req.session, req.params.standard));
     const command = prepareCommandForRequest(req, res, `[${req.params.standard}]`);
     if (!command) return;
     withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
@@ -1879,6 +1931,7 @@ app.get("/api/records/:standard", (req, res) => {
 });
 
 app.get("/api/tree", (req, res) => {
+    if (isDemoMode) return res.json(JSON.parse(demoProvider.execute(req.session, "tree")));
     const command = prepareCommandForRequest(req, res, "tree");
     if (!command) return;
     withWsResponse(res, entry => sendQueuedWsPayload(entry, command), data => {
@@ -1887,6 +1940,10 @@ app.get("/api/tree", (req, res) => {
 });
 
 app.get("/api/user/by-email/:useremail", (req, res) => {
+    if (isDemoMode) {
+        const users = demoProvider.records(req.session, "user");
+        return res.json(users.filter(user => String(user.email || "").toLowerCase() === String(req.params.useremail || "").toLowerCase()));
+    }
     let command;
     try {
         command = prepareCommandForRequest(req, res, buildUserLookupByEmailCommand(req.params.useremail));
@@ -1982,6 +2039,7 @@ app.get("/api/rcs/:tempID/:recordID", (req, res) => {
     if (!tempID || !recordID) {
         return res.status(400).send("Temp ID and Record ID are required");
     }
+    if (isDemoMode) return res.send("1");
     const command = prepareCommandForRequest(req, res, `rcs ${recordID} * @${tempID}`);
     if (!command) {
         return;
@@ -1995,6 +2053,10 @@ app.post("/api/upload/temp/:recordID", uploadSingleFile, async (req, res) => {
     const {recordID} = req.params;
     if (!recordID) return res.status(400).send("Record ID is required");
     if (!req.file) return res.status(400).send("No file uploaded");
+    if (isDemoMode) {
+        const tempId = demoProvider.linkRecordContent(req.session, recordID, req.file);
+        return res.json({tempId, response: "1", rcsResponse: "1", tempMessages: [tempId]});
+    }
     if (!ensureWsOpen(res)) return;
     try {
         const fileName = req.file.originalname;
@@ -2063,6 +2125,11 @@ app.post("/api/upload/temp/:recordID", uploadSingleFile, async (req, res) => {
 
 app.post("/api/upload/temp", uploadSingleFile, async (req, res) => {
     if (!req.file) return res.status(400).send("No file uploaded");
+    if (isDemoMode) {
+        const tempId = `demo-${crypto.randomUUID()}`;
+        demoProvider.linkRecordContent(req.session, tempId, req.file);
+        return res.type("text/plain").send(tempId);
+    }
     try {
         const fileName = req.file.originalname;
         const tempPayload = buildBinaryCommandPayload("temp", fileName, req.file.buffer, resolveRelayContext(req));
@@ -2077,6 +2144,12 @@ app.post("/api/upload/temp", uploadSingleFile, async (req, res) => {
 
 app.post("/api/upload", uploadSingleFile, async (req, res) => {
     if (!req.file) return res.status(400).send("No file uploaded");
+    if (isDemoMode) {
+        const rawUploadDirectory = typeof req.query.directory === "string" ? req.query.directory.trim() : "";
+        const uploadDirectory = resolveUploadDirectoryForFile(req.file, rawUploadDirectory);
+        const filePath = demoProvider.uploadFile(req.session, uploadDirectory, req.file);
+        return res.send(filePath);
+    }
     fileUploadQueue = fileUploadQueue
         .catch(() => null)
         .then(() => new Promise(resolve => {
@@ -2114,6 +2187,18 @@ app.post("/api/upload", uploadSingleFile, async (req, res) => {
 });
 
 app.get("/api/files/download", (req, res) => {
+    if (isDemoMode) {
+        const filePath = req.query.path;
+        if (!filePath) return res.status(400).send("File path is required");
+        const file = demoProvider.getFile(req.session, filePath);
+        if (!file) return res.status(404).send("File not found");
+        const filename = path.basename(filePath) || "download.bin";
+        const inlinePreview = String(req.query.inline || "") === "1";
+        res.setHeader("Content-Type", file.contentType || "application/octet-stream");
+        res.setHeader("Content-Disposition", `${inlinePreview ? "inline" : "attachment"}; filename="${filename}"`);
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        return res.send(file.buffer);
+    }
     fileDownloadQueue = fileDownloadQueue
         .catch(() => null)
         .then(() => new Promise(resolve => {
@@ -2314,6 +2399,15 @@ app.get("/api/files/download", (req, res) => {
 });
 
 const streamRecordContent = (req, res, options = {}) => {
+    if (isDemoMode) {
+        const recordId = req.params.recordId;
+        if (!recordId) return res.status(400).send("Record ID is required");
+        const content = demoProvider.getRecordContent(req.session, recordId);
+        if (!content) return res.status(404).send("Record content not found");
+        res.setHeader("Content-Type", content.contentType || options.contentType || "application/octet-stream");
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        return res.send(content.buffer);
+    }
     recordImageQueue = recordImageQueue
         .catch(() => null)
         .then(() => new Promise(resolve => {
@@ -2468,6 +2562,25 @@ app.get("/api/records/content/:recordId", (req, res) => {
 });
 
 function handleCliRequest(req, res, command) {
+    if (isDemoMode) {
+        try {
+            const standard = String(command || "").match(/^\[([a-z0-9_-]+)]/i)?.[1]?.toLowerCase();
+            if (standard === "files" && /^\[files]\s*$/i.test(String(command || "").trim())) {
+                return res.json({files: demoProvider.allFiles(req.session)});
+            }
+            const response = demoProvider.execute(req.session, command);
+            res.set({
+                "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+                "Surrogate-Control": "no-store"
+            });
+            return res.send(response);
+        } catch (err) {
+            console.error("Demo command failed:", err.message);
+            return res.status(400).send(err.message || "Demo command failed");
+        }
+    }
     if (!wsClient || wsClient.readyState !== WebSocket.OPEN) {
         return res.status(503).send("WebSocket not connected");
     }
@@ -2650,6 +2763,11 @@ async function fetchCurrentUserRecord(req) {
     if (!sessionUserId) {
         return null;
     }
+    if (isDemoMode) {
+        const userRecord = normalizeCurrentUserRecord(demoProvider.user(req.session), sessionUserId);
+        if (userRecord) setCachedUserRecord(req.session, userRecord);
+        return userRecord;
+    }
     const cachedUserRecord = getCachedUserRecord(req?.session);
     if (cachedUserRecord) {
         return cachedUserRecord;
@@ -2672,6 +2790,9 @@ async function fetchCurrentUserRecord(req) {
 async function fetchUserRecordById(userId, {relayContext = null, allowMissingRelayContext = false} = {}) {
     const safeUserId = sanitizeUserId(userId);
     if (!safeUserId) return null;
+    if (isDemoMode) {
+        return normalizeCurrentUserRecord(cloneUserRecordForSession(demoProvider.fixture.records.user?.[0]), safeUserId);
+    }
     if (!wsClient || wsClient.readyState !== WebSocket.OPEN) {
         throw new Error("WebSocket not connected");
     }
@@ -2985,7 +3106,12 @@ async function startServer() {
                 console.log(`Relay mode enabled; listening on ${protocol}://0.0.0.0:${listeningPort}`);
             }
             advertiseLocalHostname();
-            connectToStdSystem();
+            if (isDemoMode) {
+                console.log(`Demo mode enabled with fixtures from ${DEMO_FIXTURE_PATH}`);
+                updateConnectionStatus("connected");
+            } else {
+                connectToStdSystem();
+            }
             resolve({
                 server,
                 port: listeningPort,
@@ -3033,5 +3159,6 @@ module.exports = {
     stopServer,
     getServerUrl,
     isElectronRuntime,
-    isRelayMode
+    isRelayMode,
+    isDemoMode
 };
