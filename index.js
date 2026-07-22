@@ -57,7 +57,7 @@ const SESSION_PRUNE_INTERVAL_MS = Math.max(60 * 1000, Number(process.env.SESSION
 const USER_RECORD_CACHE_TTL_MS = Math.max(5 * 1000, Number(process.env.USER_RECORD_CACHE_TTL_MS || 1000 * 60 * 5) || 1000 * 60 * 5);
 const REQUEST_BODY_LIMIT = (process.env.REQUEST_BODY_LIMIT || "25mb").trim() || "25mb";
 const THEMES_REPO_PATH = path.join(__dirname, "public", "themes.json");
-const USER_DATA_ROOT = path.join(__dirname, "user_data");
+const USER_DATA_ROOT = (process.env.PUBLIC_UI_USER_DATA_ROOT || "").trim() || path.join(__dirname, "user_data");
 const ELECTRON_SETUP_CONFIG_PATH = path.join(USER_DATA_ROOT, "desktop-setup.json");
 const DEMO_FIXTURE_PATH = (process.env.DEMO_FIXTURE_PATH || path.join(__dirname, "demo-data.json")).trim();
 const DEMO_SESSION_TTL_MS = Math.max(60 * 1000, Number(process.env.DEMO_SESSION_TTL_MS || 2 * 60 * 60 * 1000) || 2 * 60 * 60 * 1000);
@@ -1228,6 +1228,9 @@ function requireLogin(req, res, next) {
     if (publicPaths.some(path => req.path.startsWith(path))) {
         return next();
     }
+    if (isDesktopSetupEnabled && !hasCompletedDesktopSetup(req) && req.method === "GET" && req.path === "/") {
+        return next();
+    }
     if (isRelayMode && req.method === "GET" && req.path === "/") {
         return next();
     }
@@ -1749,10 +1752,10 @@ app.use((req, res, next) => {
     if (!isDesktopSetupEnabled || hasCompletedDesktopSetup(req)) {
         return next();
     }
-    if (req.path.startsWith("/setup")) {
+    if (req.path === "/" || req.path.startsWith("/setup")) {
         return next();
     }
-    return res.redirect("/setup");
+    return res.redirect("/");
 });
 
 app.use(requireLogin);
@@ -1783,7 +1786,14 @@ app.get("/", async (req, res) => {
     }
     return res.render("home", {
         mapboxAccessTokenJson: JSON.stringify(getRuntimeMapboxAccessToken()),
-        isDemoMode
+        isDemoMode,
+        desktopSetupEnabled: isDesktopSetupEnabled,
+        desktopSetupRequired: isDesktopSetupEnabled && !hasCompletedDesktopSetup(req),
+        desktopSetupConfigJson: JSON.stringify({
+            endpoint: getRuntimeWsUrl(),
+            deviceKey: getRuntimeStandardChit(),
+            mapboxKey: getRuntimeMapboxAccessToken()
+        })
     });
 });
 
@@ -1791,14 +1801,7 @@ app.get("/setup", (req, res) => {
     if (!isDesktopSetupEnabled) {
         return res.status(404).send("Not found");
     }
-    if (hasCompletedDesktopSetup(req)) {
-        return res.redirect("/");
-    }
-    res.render("setup", {
-        endpoint: getRuntimeWsUrl(),
-        deviceKey: getRuntimeStandardChit(),
-        mapboxKey: getRuntimeMapboxAccessToken()
-    });
+    return res.redirect("/");
 });
 
 app.post("/setup", async (req, res) => {
@@ -1814,14 +1817,13 @@ app.post("/setup", async (req, res) => {
         restartStdSystemConnection();
     } catch (err) {
         console.error("Failed to save desktop setup config:", err.message);
-        return res.status(500).render("setup", {
-            endpoint: typeof req.body?.endpoint === "string" ? req.body.endpoint.trim() : "",
-            deviceKey: typeof req.body?.["device-key"] === "string" ? req.body["device-key"].trim() : "",
-            mapboxKey: typeof req.body?.["mapbox-key"] === "string" ? req.body["mapbox-key"].trim() : "",
-            error: "Failed to save setup values"
-        });
+        if (wantsLoginJson(req)) return res.status(500).json({error: "Failed to save setup values"});
+        return res.redirect(303, "/");
     }
     setDesktopSetupCookie(res, req);
+    if (wantsLoginJson(req)) {
+        return res.json({redirect: req.session?.userId ? "/" : "/login"});
+    }
     if (req.session && req.session.userId) {
         return res.redirect("/");
     }

@@ -52,6 +52,15 @@
         document.body.removeChild(anchor);
         URL.revokeObjectURL(href);
     };
+    const formatStorageBytes = (value) => {
+        const bytes = Number(value);
+        if (!Number.isFinite(bytes) || bytes < 0) return "Unavailable";
+        if (bytes === 0) return "0 B";
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        const amount = bytes / (1024 ** unitIndex);
+        return `${amount.toLocaleString(undefined, {maximumFractionDigits: unitIndex === 0 ? 0 : 1})} ${units[unitIndex]}`;
+    };
     let standardsRequestVersion = 0;
     let sharedThemes = [];
     let themeTestTimer = null;
@@ -168,6 +177,79 @@
             renderInterfacesList();
         } catch (_) {
             root.innerHTML = div({style: "faded small-padding", content: "Unable to load interfaces."});
+        }
+    };
+    const HOST_CONFIG_FIELDS = [
+        {name: "name", defaultValue: "standard", readable: true, editable: false, description: "The host's product or installation name."},
+        {name: "version", defaultValue: "1.0.0", readable: true, editable: false, description: "The version of the Standard host software currently running."},
+        {name: "master", defaultValue: true, readable: true, editable: false, description: "Whether this host operates as the master node."},
+        {name: "server_port", defaultValue: 9002, readable: true, editable: false, description: "The TCP port used by the host server."},
+        {name: "server_bind_address", defaultValue: "0.0.0.0", readable: true, editable: false, description: "The network address on which the host server listens; 0.0.0.0 accepts connections on every interface."},
+        {name: "mode", defaultValue: "client", readable: true, editable: false, description: "The host's operating role, such as client or server."},
+        {name: "relay", defaultValue: "relay.standardcomputers.net", readable: true, editable: false, description: "The relay service used to route remote Standard connections."},
+        {name: "ai_host", defaultValue: "http://127.0.0.1:11434/api/generate", readable: true, editable: true, description: "The HTTP endpoint used to generate responses with the configured AI model."},
+        {name: "voice", defaultValue: "en_GB-northern_english_male-medium", readable: true, editable: true, description: "The text-to-speech voice identifier used for spoken responses."},
+        {name: "model", defaultValue: "standard || phi", readable: true, editable: true, description: "The AI model the host uses when generating responses."},
+        {name: "sms", defaultValue: true, readable: true, editable: true, description: "Allows the host to use SMS messaging features."},
+        {name: "email", defaultValue: true, readable: true, editable: true, description: "Allows the host to use email features."},
+        {name: "spoken", defaultValue: true, readable: true, editable: true, description: "Allows the host to produce spoken responses."},
+        {name: "remote_changes", defaultValue: true, readable: true, editable: true, description: "Allows configuration and data changes requested through remote connections."},
+        {name: "cli_output", defaultValue: true, readable: true, editable: true, description: "Allows command-line output to be returned to connected clients."},
+        {name: "smtp_enabled", defaultValue: true, readable: true, editable: true, description: "Enables the SMTP service used to send and receive email; the email standard must be loaded."},
+        {name: "nas_enabled", defaultValue: false, readable: true, editable: false, description: "Whether network-attached storage integration is enabled."},
+        {name: "preload_articles", defaultValue: false, readable: true, editable: true, description: "Loads bulletin articles in advance so they are ready for use."},
+        {name: "release_cadence", defaultValue: 86400, readable: true, editable: true, description: "The interval in seconds between bulletin and software update checks."},
+        {name: "indexing_cadence", defaultValue: 21600, readable: true, editable: true, description: "The interval in seconds between file-indexing runs."},
+        {name: "relay_response_timeout", defaultValue: 30, readable: true, editable: true, description: "The number of seconds the relay waits for a command response."}
+    ];
+    const isBooleanConfigField = (field) => typeof field.defaultValue === "boolean";
+    const normalizeConfigBoolean = (value) => value === true || value === 1 || `${value}`.trim().toLowerCase() === "true";
+    const escapeConfigValue = (value) => `"${String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    const configDisplayValue = (field, values = {}) => {
+        if (!field.readable) return "Not available";
+        return Object.prototype.hasOwnProperty.call(values, field.name) ? values[field.name] : field.defaultValue;
+    };
+    const saveHostConfigValue = async (field, value, inputNode) => {
+        if (!field?.editable) return;
+        if (inputNode) inputNode.disabled = true;
+        try {
+            const response = await CLI.send(`$config: ${field.name}: ${escapeConfigValue(value)}`);
+            if (typeof response === "string" && /^(UNKNOWN|INVALID|FAILED|EMAIL STANDARD)/i.test(response.trim())) throw new Error(response);
+            modular.success(`${field.name} updated`);
+            await initializeConfigRoute();
+        } catch (error) {
+            console.error(`Failed to update config value ${field.name}:`, error);
+            modular.error(`Unable to update ${field.name}`);
+            if (inputNode) inputNode.disabled = false;
+        }
+    };
+    const renderConfigField = (field, values) => {
+        const value = configDisplayValue(field, values);
+        const labelMarkup = label({input: `host-config-${field.name}`, style: "inline small-padding-top", title: field.description, content: escapeHtml(field.name)});
+        let control;
+        if (!field.readable) {
+            control = div({style: "faded align-right small-padding-top", title: field.description, content: "Not available"});
+        } else if (field.editable && isBooleanConfigField(field)) {
+            control = switcher({id: `host-config-${field.name}`, style: "align-right", checked: normalizeConfigBoolean(value), onchange: event => saveHostConfigValue(field, event.target?.checked === true, event.target)});
+        } else if (field.editable) {
+            const inputType = typeof field.defaultValue === "number" ? "number" : "text";
+            control = input({id: `host-config-${field.name}`, type: inputType, value: `${value}`, title: `${field.description} Changes are saved when you leave the field.`, onchange: event => saveHostConfigValue(field, event.target?.value ?? "", event.target)});
+        } else {
+            control = div({style: "align-right small-padding-top", title: field.description, content: escapeHtml(`${value}`)});
+        }
+        return div({style: "bi border radius padded spaced", title: field.description, content: children([labelMarkup, control])});
+    };
+    const initializeConfigRoute = async () => {
+        const root = document.getElementById("settings-config-list");
+        if (!root) return;
+        root.innerHTML = div({style: "faded small-padding", content: "Loading host config..."});
+        try {
+            const response = await CLI.send("$config");
+            const values = response && typeof response === "object" && !Array.isArray(response) ? (response.config && typeof response.config === "object" ? response.config : response) : {};
+            root.innerHTML = HOST_CONFIG_FIELDS.map(field => renderConfigField(field, values)).join("");
+        } catch (error) {
+            console.error("Failed to load host config:", error);
+            root.innerHTML = div({style: "faded small-padding", content: "Unable to load host config."});
         }
     };
     const parseStandardDataPayload = (response) => {
@@ -1126,13 +1208,40 @@
                     ])}),
                     afterRender: () => initializeInterfacesRoute()
                 }, {
+                    text: "Config",
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h15M4.5 12h15m-15 5.25h15" /><circle cx="8" cy="6.75" r="1.5" fill="currentColor" stroke="none" /><circle cx="16" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="10" cy="17.25" r="1.5" fill="currentColor" stroke="none" /></svg>`,
+                    route: () => div({id: "settings-config-root", style: "small-padding", content: children([
+                        div({style: "brick small-margin-bottom", content: children([
+                            button({style: "tiny inner-radius float-right", content: "Refresh", onclick: () => initializeConfigRoute()}),
+                            h({level: 3, content: "Host Config"}),
+                            div({style: "faded", content: "Hover over a setting for details. Editable values are saved when changed."})
+                        ])}),
+                        div({id: "settings-config-list", style: "brick", content: div({style: "faded small-padding", content: "Loading host config..."})})
+                    ])}),
+                    afterRender: () => initializeConfigRoute()
+                }, {
                     text: "Device Info",
                     icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>`,
                     route: () => div({style: "list spaced padded", content: () => {
                             return getDeviceInfo().then((deviceInfo) => {
                                 const config = deviceInfo?.config || {};
                                 const network = deviceInfo?.network || {};
+                                const storage = deviceInfo?.storage || {};
+                                const totalBytes = Number(storage.disk_total_bytes);
+                                const availableBytes = Number(storage.disk_available_bytes);
+                                const hasStorageInfo = Number.isFinite(totalBytes) && totalBytes > 0 && Number.isFinite(availableBytes) && availableBytes >= 0;
+                                const usedBytes = hasStorageInfo ? Math.max(0, Math.min(totalBytes, totalBytes - availableBytes)) : 0;
+                                const usedPercent = hasStorageInfo ? Math.round((usedBytes / totalBytes) * 100) : 0;
                                 return children([
+                                    div({style: "secondary-bordered radius padded", content: children([
+                                        div({style: "small-margin-bottom", content: children([
+                                            strong({style: "space-right", content: "Device Storage"}),
+                                            div({style: "faded float-right", content: hasStorageInfo ? `${usedPercent}% used` : "Unavailable"})
+                                        ])}),
+                                        `<div class="service-loader-bar" role="progressbar" aria-label="Device storage used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${usedPercent}"><div class="service-loader-bar-progress" style="width:${usedPercent}%"></div></div>`,
+                                        div({style: "faded small-padding-top", content: hasStorageInfo ? `${formatStorageBytes(availableBytes)} available of ${formatStorageBytes(totalBytes)}` : "Storage information is unavailable."})
+                                    ])}),
+                                    div({style: "spacer"}),
                                     div({style: "secondary-bordered radius padded", content: children([
                                             div({style: "float-left space-right", content: `<svg class="text-green small-icon" width="24px" height="24px" stroke-width="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19.51L12.01 19.4989" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M2 8C8 3.5 16 3.5 22 8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5 12C9 9 15 9 19 12" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8.5 15.5C10.7504 14.1 13.2498 14.0996 15.5001 15.5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>`}),
                                             div({style: "", content: "WiFi"}),

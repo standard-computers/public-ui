@@ -1,6 +1,7 @@
 (() => {
     const demoHiddenServices = new Set(["com.standard.internals", "com.standard.integrator", "com.standard.cli"]);
     const platformInterfaces = [
+        {serviceId: "com.standard.setup", title: "Setup", script: "/js/services/setup.js", icon: "/icons/interfaces/settings.png", internal: true, required: true, desktopOnly: true},
         {serviceId: "com.standard.internals", title: "Internals", script: "/js/services/internals.js", icon: "/icons/interfaces/cli.png", internal: true},
         {serviceId: "com.standard.integrator", title: "Integrator", script: "/js/services/integrator.js", icon: "/icons/interfaces/cli.png", internal: true},
         {serviceId: "com.standard.stopwatch", title: "Stopwatch", script: "/js/services/stopwatch.js", icon: "/icons/interfaces/alarms.png", internal: true},
@@ -15,13 +16,15 @@
         {serviceId: "com.standard.notes", title: "Notes", script: "/js/services/notes.js", icon: "/icons/interfaces/notes.png"},
         {serviceId: "com.standard.weather", title: "Weather", script: "/js/services/weather.js", icon: "/icons/interfaces/weather.png"},
         {serviceId: "com.standard.boards", title: "Boards", script: "/js/services/boards.js", icon: "/icons/interfaces/whiteboard.png"},
+        {serviceId: "com.standard.charts", title: "Charts", script: "/js/services/charts.js", icon: "/icons/interfaces/whiteboard.png"},
         {serviceId: "com.standard.editor.text", title: "Text Editor", script: "/js/services/editor.text.js", icon: "/icons/interfaces/editor.png"},
         {serviceId: "com.standard.editor.sheet", title: "Sheets", script: "/js/services/editor.sheet.js", icon: "/icons/interfaces/editor.png"},
         {serviceId: "com.standard.editor.slides", title: "Slides", script: "/js/services/editor.slides.js", icon: "/icons/interfaces/editor.png"},
         {serviceId: "com.standard.editor.code", title: "Code Editor", script: "/js/services/editor.code.js", icon: "/icons/interfaces/editor.png"},
         {serviceId: "com.standard.cli", title: "CLI", script: "/js/services/cli.js", icon: "/icons/interfaces/cli.png"},
         {serviceId: "com.standard.settings", title: "Settings", script: "/js/services/settings.js", icon: "/icons/interfaces/settings.png", required: true},
-    ].filter(({serviceId}) => window.StandardRuntimeConfig?.isDemoMode !== true || !demoHiddenServices.has(serviceId));
+    ].filter(({serviceId, desktopOnly}) => (!desktopOnly || window.StandardRuntimeConfig?.desktopSetupEnabled === true)
+        && (window.StandardRuntimeConfig?.isDemoMode !== true || !demoHiddenServices.has(serviceId)));
     const widgetScripts = [
         "/js/services/widgets/player.widget.js",
         "/js/services/widgets/video.widget.js",
@@ -450,6 +453,26 @@
         };
         const loadSequentially = async () => {
             showLoader();
+            if (window.StandardRuntimeConfig?.desktopSetupRequired === true) {
+                total = 1;
+                updateProgress("/js/services/setup.js");
+                try {
+                    await loadScript("/js/services/setup.js");
+                    loaded = 1;
+                    startupFinished = true;
+                    recordsFinished = true;
+                    updateProgress();
+                    modular.start("com.standard.setup");
+                } catch (err) {
+                    failures.push("/js/services/setup.js");
+                    console.error(err);
+                    loaded = 1;
+                    startupFinished = true;
+                    recordsFinished = true;
+                    updateProgress();
+                }
+                return;
+            }
             await window.StandardPlatformInterfaces.load();
             const enabledServiceScripts = platformInterfaces.filter(({serviceId, required}) => required || window.StandardPlatformInterfaces.isEnabled(serviceId)).map(({script}) => script);
             total = widgetScripts.length + enabledServiceScripts.length;

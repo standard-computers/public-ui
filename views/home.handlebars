@@ -15,7 +15,10 @@
             window.StandardServiceLoaderEnabled = true;
             window.StandardRuntimeConfig = {
                 mapboxAccessToken: {{{mapboxAccessTokenJson}}},
-                isDemoMode: {{#if isDemoMode}}true{{else}}false{{/if}}
+                isDemoMode: {{#if isDemoMode}}true{{else}}false{{/if}},
+                desktopSetupEnabled: {{#if desktopSetupEnabled}}true{{else}}false{{/if}},
+                desktopSetupRequired: {{#if desktopSetupRequired}}true{{else}}false{{/if}},
+                desktopSetup: {{{desktopSetupConfigJson}}}
             };
         </script>
         <script src="/js/plastic.js" defer></script>

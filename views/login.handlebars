@@ -5,18 +5,26 @@
         <title>Login</title>
         <link href="/root.css" rel="stylesheet"/>
         <link href="/style.css" rel="stylesheet"/>
+        <style>
+            .core-login {padding:15% 40% 100px 40%}
+        </style>
     </head>
     <body>
-        <div class="padded guttered">
+        <div class="core-login">
             <h1>Login</h1>
             <form method="POST" action="/login" id="login-form">
-                <label for="username">Username</label>
+                <p>
+                    <label for="username">Username</label>
+                </p>
                 <input id="username" name="username" type="text" autocomplete="username" placeholder="Username" autofocus required/>
-                <button type="submit" id="click-me">Continue</button>
+                <p>
+                    <input id="username" name="psswd" type="text" autocomplete="password"/>
+                </p>
+                <button type="submit" id="click-me" class="fill" style="width:100%">Continue</button>
                 {{#if error}}
                 <div class="error" id="login-error">{{error}}</div>
                 {{/if}}
-                <div id="retry-status" class="error" style="display:none"></div>
+                <div id="retry-status" class="error fill" style="display:none"></div>
             </form>
         </div>
         <script>

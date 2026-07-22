@@ -44,7 +44,10 @@
     "files": [
       "electron-main.js",
       "index.js",
+      "demo-provider.js",
+      "demo-data.json",
       "preload.js",
+      "LICENSE",
       "package.json",
       "public/**/*",
       "views/**/*"

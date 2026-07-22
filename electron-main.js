@@ -2,7 +2,9 @@ require("dotenv").config();
 
 const path = require("path");
 const {app, BrowserWindow, ipcMain} = require("electron");
-const {startServer, stopServer} = require("./index");
+
+let startServer = null;
+let stopServer = null;
 
 const WINDOW_WIDTH = Math.max(960, Number(process.env.ELECTRON_WINDOW_WIDTH || 1440) || 1440);
 const WINDOW_HEIGHT = Math.max(640, Number(process.env.ELECTRON_WINDOW_HEIGHT || 960) || 960);
@@ -84,6 +86,8 @@ ipcMain.handle("standard:set-kiosk-mode", (_, enabled) => {
 });
 
 async function bootstrapDesktopApp() {
+    process.env.PUBLIC_UI_USER_DATA_ROOT = path.join(app.getPath("userData"), "data");
+    ({startServer, stopServer} = require("./index"));
     const preferredUrl = (process.env.ELECTRON_START_URL || "").trim();
     const runtime = preferredUrl ? {url: preferredUrl} : await startServer();
     await createMainWindow(runtime.url);
@@ -103,6 +107,10 @@ app.on("activate", async () => {
         await createMainWindow(targetUrl);
         return;
     }
+    if (typeof startServer !== "function") {
+        await bootstrapDesktopApp();
+        return;
+    }
     const runtime = await startServer();
     await createMainWindow(runtime.url);
 });
@@ -114,6 +122,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+    if (typeof stopServer !== "function") return;
     stopServer().catch((err) => {
         console.error("Failed to stop server during Electron shutdown:", err);
     });

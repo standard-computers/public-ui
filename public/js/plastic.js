@@ -499,18 +499,18 @@ function searchDialogue(n = {}) {
         resultsNode.innerHTML = "";
         const query = inputNode?.value || "";
         matches = typeof n.matches === "function" ? (n.matches(query) || []) : [];
-        if (!query.trim()) {
-            const emptyNode = document.createElement("div");
-            emptyNode.className = "search-dialogue-empty";
-            emptyNode.textContent = n.emptyText || "Start typing to search.";
-            resultsNode.appendChild(emptyNode);
-            setActiveIndex(-1);
-            return;
-        }
+        // if (!query.trim()) {
+        //     const emptyNode = document.createElement("div");
+        //     emptyNode.className = "search-dialogue-empty";
+        //     emptyNode.textContent = n.emptyText || "Start typing to search.";
+        //     resultsNode.appendChild(emptyNode);
+        //     setActiveIndex(-1);
+        //     return;
+        // }
         if (!matches.length) {
             const emptyNode = document.createElement("div");
             emptyNode.className = "search-dialogue-empty";
-            emptyNode.textContent = n.noResultsText || "No matches found.";
+            emptyNode.textContent = n.noResultsText || "No matches";
             resultsNode.appendChild(emptyNode);
             setActiveIndex(-1);
             return;

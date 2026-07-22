@@ -346,6 +346,7 @@
                                     return container;
                                 }}),
                             div({style: "absolute left bottomed bordered radius shadowed no-padding align-top small-padding-top small-padding-left small-padding-right center blurred", id: "boards-toolbar", content: children([
+                                div({style: "color-block boards-custom-color pointer hover-zoom cube inline radius", content: input({id: "boards-custom-color-input", type: "color", value: "#000000", tooltip: "Custom color"})}),
                                 div({style: "color-block pointer hover-zoom cube inline background-black radius", altsync: "0", content: div({style: ""})}),
                                 div({style: "color-block pointer hover-zoom cube inline background-white radius", altsync: "1", content: div({style: ""})}),
                                 div({style: "color-block pointer hover-zoom cube inline background-red radius", altsync: "2", content: div({style: ""})}),
@@ -896,12 +897,19 @@
                             updateTransform();
                             renderOperations();
                         }, {passive: false});
-                        windowBody.querySelectorAll(".color-block").forEach(cb => {
+                        windowBody.querySelectorAll(".color-block:not(.boards-custom-color)").forEach(cb => {
                             cb.addEventListener("click", () => {
                                 pickedColor = getComputedStyle(cb).backgroundColor;
                                 windowBody.querySelectorAll(".color-block").forEach(c => c.classList.remove("active"));
                                 cb.classList.add("active");
                             });
+                        });
+                        const customColorBlock = windowBody.querySelector(".boards-custom-color");
+                        const customColorInput = windowBody.querySelector("#boards-custom-color-input");
+                        customColorInput?.addEventListener("change", event => {
+                            pickedColor = event.target.value;
+                            windowBody.querySelectorAll(".color-block").forEach(c => c.classList.remove("active"));
+                            customColorBlock?.classList.add("active");
                         });
                         attachInput.addEventListener("change", event => {
                             const file = event.target.files?.[0];

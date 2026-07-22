@@ -202,7 +202,7 @@
                 placeholder: "Find files",
                 confirmText: "Search",
                 anchor: anchorNode,
-                emptyText: "Start typing to search this view.",
+                // emptyText: "Start typing to search this view.",
                 noResultsText: "No files match.",
                 matches: query => createFilesSearchMatches(query, portal),
                 preview: (_, match) => previewFilesSearchMatch(match),
@@ -246,6 +246,7 @@
     };
     const getFileTypeIconPath = (fileLike = {}) => {
         const rawPath = typeof fileLike === "string" ? fileLike : (fileLike?.path || fileLike?.name || "");
+        if (/\.chrts$/i.test(rawPath)) return "/icons/interfaces/whiteboard.png";
         let icon = "folder";
         if (rawPath && rawPath.split("/").pop().includes(".")) icon = rawPath.split(".").pop().toLowerCase();
         return `/icons/${icon}.png`;
@@ -307,6 +308,7 @@
     };
     const renderNoNotesState = () => div({style: "notes-empty-state", content: children([img({src: "/icons/interfaces/notes.png", style: "notes-empty-icon"}), div({style: "notes-empty-label", content: "No notes"})])});
     const isWhiteboardFilePath = (rawPath = "") => /\.wtb$/i.test(String(rawPath || ""));
+    const isChartFilePath = (rawPath = "") => /\.chrts$/i.test(String(rawPath || ""));
     const isSlidesFilePath = (rawPath = "") => /\.slds$/i.test(String(rawPath || ""));
     const isSpreadsheetFilePath = (rawPath = "") => /\.sprdshts$/i.test(String(rawPath || ""));
     const isCodeFilePath = (rawPath = "") => /\.(std|stds|sui)$/i.test(String(rawPath || ""));
@@ -372,6 +374,13 @@
         const download = await downloadFileForOpen(rawPath);
         return openBoardData(download.path, JSON.parse(await download.blob.text()), sourceNode);
     };
+    const openChartInChartsApp = async (rawPath = "", sourceNode = null) => {
+        if (!isChartFilePath(rawPath)) return false;
+        const openChartData = await waitForServiceMethod(() => window.StandardCharts?.openChartData, "com.standard.charts");
+        if (!openChartData) return false;
+        const download = await downloadFileForOpen(rawPath);
+        return openChartData(download.path, JSON.parse(await download.blob.text()), sourceNode);
+    };
     const openFileInInternalsApp = async (rawPath = "", sourceNode = null) => {
         const [openTextContent, openImageSource, openVideoSource] = await Promise.all([
             waitForServiceMethod(() => window.StandardInternals?.openTextContent, "com.standard.internals"),
@@ -418,6 +427,7 @@
     };
     const openFilePath = async (rawPath = "", sourceNode = null) => {
         if (isWhiteboardFilePath(rawPath)) return openWhiteboardInBoardsApp(rawPath, sourceNode);
+        if (isChartFilePath(rawPath)) return openChartInChartsApp(rawPath, sourceNode);
         if (isSlidesFilePath(rawPath)) return openSlidesInSlidesApp(rawPath, sourceNode);
         if (isSpreadsheetFilePath(rawPath)) return openSheetInSheetsApp(rawPath, sourceNode);
         if (isCodeFilePath(rawPath)) return openCodeFileInCodeEditor(rawPath, sourceNode);
@@ -433,6 +443,10 @@
         if (isWhiteboardFilePath(fileName)) {
             const openBoardData = await waitForServiceMethod(() => window.StandardBoards?.openBoardData, "com.standard.boards");
             return openBoardData ? openBoardData(fileName, JSON.parse(await blob.text()), sourceNode) : false;
+        }
+        if (isChartFilePath(fileName)) {
+            const openChartData = await waitForServiceMethod(() => window.StandardCharts?.openChartData, "com.standard.charts");
+            return openChartData ? openChartData(fileName, JSON.parse(await blob.text()), sourceNode) : false;
         }
         if (isSlidesFilePath(fileName)) {
             const openSlidePayload = await waitForServiceMethod(() => window.StandardSlides?.openSlidePayload, "com.standard.editor.slides");
