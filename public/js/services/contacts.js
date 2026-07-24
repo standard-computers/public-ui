@@ -56,7 +56,7 @@
         field.oninput = () => field.value = formatContactBirthday(field.value);
     };
     const contactPreviewContacts = new Map();
-    const renderNoContactsState = () => div({style: "contacts-empty-state", content: children([img({src: contactServiceIcon, style: "contacts-empty-icon"}), div({style: "contacts-empty-label", content: "No contacts"})])});
+    const renderNoContactsState = () => emptyState({style: "contacts-empty-state", icon: contactServiceIcon, iconStyle: "contacts-empty-icon", label: "No contacts", labelStyle: "contacts-empty-label"});
     const renderNoContactsStateInto = (container) => {
         if (!container) return;
         const emptyStateMarkup = renderNoContactsState();

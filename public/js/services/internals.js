@@ -1149,9 +1149,11 @@
         const filePath = getPathForDownload(rawPath);
         if (!filePath) return false;
         try {
-            const response = await fetch(`/api/files/download?path=${encodeURIComponent(filePath)}`);
-            if (!response.ok) throw new Error("Unable to read file");
-            const fileBuffer = await response.arrayBuffer();
+            const download = await window.StandardDownloads.downloadForOpen(filePath, {
+                errorMessage: "Unable to read file",
+                suppressProgress: true
+            });
+            const fileBuffer = await download.blob.arrayBuffer();
             activeTextFilePath = filePath;
             activeTextFileContent = normalizeTextPreviewContent(new TextDecoder().decode(fileBuffer), filePath);
             activeTextReadOnly = false;

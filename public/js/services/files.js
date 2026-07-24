@@ -196,29 +196,17 @@
             modular.error("No file tiles to search");
             return false;
         }
-        if (typeof searchDialogue === "function") {
-            searchDialogue({
-                title: "Search",
-                placeholder: "Find files",
-                confirmText: "Search",
-                anchor: anchorNode,
-                // emptyText: "Start typing to search this view.",
-                noResultsText: "No files match.",
-                matches: query => createFilesSearchMatches(query, portal),
-                preview: (_, match) => previewFilesSearchMatch(match),
-                confirmation: (query, match, matches) => {
-                    const selectedMatch = match || matches?.[0] || createFilesSearchMatches(query, portal)[0];
-                    if (!previewFilesSearchMatch(selectedMatch)) modular.error("No matches found");
-                }
-            });
-            return true;
-        }
-        inputDialogue({title: "Search", placeholder: "Find files", confirmation: (_,query) => {
-                const match = createFilesSearchMatches(query, portal)[0];
-                if (!previewFilesSearchMatch(match)) modular.error("No matches found");
-            }
+        return window.StandardUI.openSearchDialogue({
+            title: "Search",
+            placeholder: "Find files",
+            confirmText: "Search",
+            anchor: anchorNode,
+            noResultsText: "No files match.",
+            matches: query => createFilesSearchMatches(query, portal),
+            onPreview: previewFilesSearchMatch,
+            onSelect: previewFilesSearchMatch,
+            onNoMatch: () => modular.error("No matches found")
         });
-        return true;
     };
     const refreshFileListRoot = (rootId, options = {}) => {
         const root = document.getElementById(rootId);
@@ -306,7 +294,7 @@
         if (!noteTile) return null;
         return {id: noteTile.getAttribute("directive"), created: noteTile.querySelector("em")?.innerText || "View Note", content: noteTile.querySelector(".note-tile-content")?.innerHTML || "", color: noteTile.style.background || window.getComputedStyle(noteTile).getPropertyValue("background-color")};
     };
-    const renderNoNotesState = () => div({style: "notes-empty-state", content: children([img({src: "/icons/interfaces/notes.png", style: "notes-empty-icon"}), div({style: "notes-empty-label", content: "No notes"})])});
+    const renderNoNotesState = () => emptyState({style: "notes-empty-state", icon: "/icons/interfaces/notes.png", iconStyle: "notes-empty-icon", label: "No notes", labelStyle: "notes-empty-label"});
     const isWhiteboardFilePath = (rawPath = "") => /\.wtb$/i.test(String(rawPath || ""));
     const isChartFilePath = (rawPath = "") => /\.chrts$/i.test(String(rawPath || ""));
     const isSlidesFilePath = (rawPath = "") => /\.slds$/i.test(String(rawPath || ""));
@@ -823,9 +811,11 @@
     const fetchPhotoBlobFromDevice = async rawPath => {
         const filePath = getFilePathForRemoveCommand(rawPath);
         if (!filePath) return null;
-        const response = await fetch(`/api/files/download?path=${encodeURIComponent(filePath)}`);
-        if (!response.ok) throw new Error(`Failed to download photo (${response.status})`);
-        return response.blob();
+        const download = await window.StandardDownloads.downloadForOpen(filePath, {
+            errorMessage: "Failed to download photo",
+            suppressProgress: true
+        });
+        return download.blob;
     };
     const resolvePhotoImageSource = async (photo = {}, cache = null) => {
         const cacheKey = getPhotoCacheKey(photo);

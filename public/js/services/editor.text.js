@@ -163,11 +163,6 @@
         text: String(settings?.text || ""),
         pageNumbers: !!settings?.pageNumbers
     });
-    const getTextFileDirectory = (rawPath = "") => {
-        const normalizedPath = normalizeTextFilePath(rawPath);
-        if (!normalizedPath.includes("/")) return "";
-        return normalizedPath.split("/").slice(0, -1).join("/");
-    };
     const readStoredTextDocumentViewSettings = () => {
         try {
             const rawSettings = window.localStorage?.getItem(TEXT_DOCUMENT_VIEW_SETTINGS_KEY);
@@ -1386,28 +1381,17 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (!textArea) return false;
         const selectedText = getTextSelectionPlainText().trim();
         const initialValue = selectedText && !selectedText.includes("\n") ? selectedText : "";
-        if (typeof searchDialogue === "function") {
-            searchDialogue({
-                title: "Search",
-                placeholder: "Find text",
-                value: initialValue,
-                confirmText: "Search",
-                anchor: anchorNode,
-                matches: (query) => createTextEditorSearchMatches(query, portal),
-                preview: (_, match) => scrollToTextEditorSearchMatch(match, portal),
-                confirmation: (query, match, matches) => {
-                    const selectedMatch = match || matches?.[0] || createTextEditorSearchMatches(query, portal)[0];
-                    if (!scrollToTextEditorSearchMatch(selectedMatch, portal)) modular.error("No matches found");
-                }
-            });
-            return true;
-        }
-        inputDialogue({title: "Search", placeholder: "Find text", value: initialValue, confirmation: (_, query) => {
-                const match = createTextEditorSearchMatches(query, portal)[0];
-                if (!scrollToTextEditorSearchMatch(match, portal)) modular.error("No matches found");
-            }
+        return window.StandardUI.openSearchDialogue({
+            title: "Search",
+            placeholder: "Find text",
+            value: initialValue,
+            confirmText: "Search",
+            anchor: anchorNode,
+            matches: query => createTextEditorSearchMatches(query, portal),
+            onPreview: match => scrollToTextEditorSearchMatch(match, portal),
+            onSelect: match => scrollToTextEditorSearchMatch(match, portal),
+            onNoMatch: () => modular.error("No matches found")
         });
-        return true;
     };
     const findTextLineNode = (node, rootNode = findTextEditorNode()) => {
         if (!node || !rootNode) return null;
@@ -3428,31 +3412,16 @@ a { color: #1d4ed8; text-decoration: underline; }
         persistTextDocumentFooterSettings(normalizedPath, activeTextFooterSettings);
         persistTextDocumentPageDimensions(normalizedPath, activeTextPageDimensions);
         const persistedContent = encodeTextEditorContentForSave(activeTextEditorContent);
-        const bytes = new TextEncoder().encode(persistedContent);
         const fileName = getTextFileName(normalizedPath);
-        const directory = getTextFileDirectory(normalizedPath);
-        const uploadPath = directory ? `/api/upload?directory=${encodeURIComponent(directory)}` : "/api/upload";
-        const textFile = new File([bytes], fileName, {type: "application/octet-stream"});
-        let saved = false;
-        if (typeof window.StandardUploads?.uploadFile === "function") {
-            const response = await window.StandardUploads.uploadFile(textFile, uploadPath, {
-                label: `Saving ${fileName}`
-            });
-            saved = !!response?.ok;
-        } else {
-            const formData = new FormData();
-            formData.append("file", textFile);
-            const response = await fetch(uploadPath, {method: "POST", body: formData});
-            saved = response.ok;
-        }
-        if (!saved) {
+        const response = await window.StandardUploads.saveFile(persistedContent, normalizedPath, {label: `Saving ${fileName}`});
+        if (!response?.ok) {
             modular.error("Unable to save text file");
             return false;
         }
         syncEditorWindowState(portal);
         updateTextEditorView(portal);
         await window.StandardFilesRefreshCache?.();
-        modular.success(`Saved ${normalizedPath} (${bytes.length} bytes)`);
+        modular.success(`Saved ${normalizedPath} (${response.byteCount} bytes)`);
         return true;
     };
     const saveNewTextFileToDocuments = (portal = findTextPortal()) => {

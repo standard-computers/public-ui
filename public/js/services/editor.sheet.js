@@ -508,22 +508,9 @@
         captureActiveSheetInput();
         const payload = buildSheetPayload();
         const serializedSheet = JSON.stringify(payload);
-        const bytes = new TextEncoder().encode(serializedSheet);
         const fileName = getSheetFileName(normalizedPath);
-        const directory = getSheetFileDirectory(normalizedPath);
-        const uploadPath = directory ? `/api/upload?directory=${encodeURIComponent(directory)}` : "/api/upload";
-        const sheetFile = new File([bytes], fileName, {type: "application/octet-stream"});
-        let saved = false;
-        if (typeof window.StandardUploads?.uploadFile === "function") {
-            const response = await window.StandardUploads.uploadFile(sheetFile, uploadPath, {label: `Saving ${fileName}`});
-            saved = !!response?.ok;
-        } else {
-            const formData = new FormData();
-            formData.append("file", sheetFile);
-            const response = await fetch(uploadPath, {method: "POST", body: formData});
-            saved = response.ok;
-        }
-        if (!saved) {
+        const response = await window.StandardUploads.saveFile(serializedSheet, normalizedPath, {label: `Saving ${fileName}`});
+        if (!response?.ok) {
             modular.error("Unable to save spreadsheet");
             return false;
         }
@@ -532,7 +519,7 @@
         saveSheetPortalState();
         updateSheetPortalTitle();
         await window.StandardFilesRefreshCache?.();
-        modular.success(`Saved ${normalizedPath} (${bytes.length} bytes)`);
+        modular.success(`Saved ${normalizedPath} (${response.byteCount} bytes)`);
         return true;
     };
     const saveNewSheetToDocuments = () => inputDialogue({title: "File name", placeholder: "spreadsheet.sprdshts", value: "spreadsheet.sprdshts",
@@ -567,9 +554,11 @@
         const sheetPath = normalizeSheetFilePath(rawPath);
         if (!sheetPath) return false;
         try {
-            const response = await fetch(`/api/files/download?path=${encodeURIComponent(sheetPath)}`);
-            if (!response.ok) throw new Error("Unable to read spreadsheet");
-            const buffer = await response.arrayBuffer();
+            const download = await window.StandardDownloads.downloadForOpen(sheetPath, {
+                errorMessage: "Unable to read spreadsheet",
+                suppressProgress: true
+            });
+            const buffer = await download.blob.arrayBuffer();
             return applySheetPayload(sheetPath, JSON.parse(new TextDecoder().decode(buffer)));
         } catch (_) {
             modular.error("Unable to open spreadsheet");
@@ -2198,27 +2187,16 @@
         return true;
     };
     const showSheetSearchDialogue = (anchorNode = null) => {
-        if (typeof searchDialogue === "function") {
-            searchDialogue({
-                title: "Search",
-                placeholder: "Find cell value",
-                confirmText: "Search",
-                anchor: anchorNode,
-                matches: createSheetSearchMatches,
-                preview: (_, match) => scrollToSheetSearchMatch(match),
-                confirmation: (query, match, matches) => {
-                    const selectedMatch = match || matches?.[0] || createSheetSearchMatches(query)[0];
-                    if (!scrollToSheetSearchMatch(selectedMatch)) modular.error("No matches found");
-                }
-            });
-            return true;
-        }
-        inputDialogue({title: "Search", placeholder: "Find cell value", confirmation: (_, query) => {
-                const match = createSheetSearchMatches(query)[0];
-                if (!scrollToSheetSearchMatch(match)) modular.error("No matches found");
-            }
+        return window.StandardUI.openSearchDialogue({
+            title: "Search",
+            placeholder: "Find cell value",
+            confirmText: "Search",
+            anchor: anchorNode,
+            matches: createSheetSearchMatches,
+            onPreview: scrollToSheetSearchMatch,
+            onSelect: scrollToSheetSearchMatch,
+            onNoMatch: () => modular.error("No matches found")
         });
-        return true;
     };
     const getSheetCellPosition = (cellReference = "A1") => {
         const position = parseSheetCellReference(cellReference);

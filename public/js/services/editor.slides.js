@@ -656,22 +656,9 @@
         }
         const payload = buildSlidesPayload();
         const serializedSlides = JSON.stringify(payload);
-        const bytes = new TextEncoder().encode(serializedSlides);
         const fileName = getSlidesFileName(normalizedPath);
-        const directory = getSlidesFileDirectory(normalizedPath);
-        const uploadPath = directory ? `/api/upload?directory=${encodeURIComponent(directory)}` : "/api/upload";
-        const slidesFile = new File([bytes], fileName, {type: "application/octet-stream"});
-        let saved = false;
-        if (typeof window.StandardUploads?.uploadFile === "function") {
-            const response = await window.StandardUploads.uploadFile(slidesFile, uploadPath, {label: `Saving ${fileName}`});
-            saved = !!response?.ok;
-        } else {
-            const formData = new FormData();
-            formData.append("file", slidesFile);
-            const response = await fetch(uploadPath, {method: "POST", body: formData});
-            saved = response.ok;
-        }
-        if (!saved) {
+        const response = await window.StandardUploads.saveFile(serializedSlides, normalizedPath, {label: `Saving ${fileName}`});
+        if (!response?.ok) {
             modular.error("Unable to save slideshow");
             return false;
         }
@@ -679,7 +666,7 @@
         saveSlidePortalState();
         updateSlidesPortalTitle();
         await window.StandardFilesRefreshCache?.();
-        modular.success(`Saved ${normalizedPath} (${bytes.length} bytes)`);
+        modular.success(`Saved ${normalizedPath} (${response.byteCount} bytes)`);
         return true;
     };
     const saveNewSlidesDeckToDocuments = () => {
@@ -713,9 +700,11 @@
         const slidePath = normalizeSlidesFilePath(rawPath);
         if (!slidePath) return false;
         try {
-            const response = await fetch(`/api/files/download?path=${encodeURIComponent(slidePath)}`);
-            if (!response.ok) throw new Error("Unable to read slide file");
-            const buffer = await response.arrayBuffer();
+            const download = await window.StandardDownloads.downloadForOpen(slidePath, {
+                errorMessage: "Unable to read slide file",
+                suppressProgress: true
+            });
+            const buffer = await download.blob.arrayBuffer();
             return applySlidesPayload(slidePath, JSON.parse(new TextDecoder().decode(buffer)));
         } catch (_) {
             modular.error("Unable to open slideshow");

@@ -168,7 +168,7 @@
             color: noteTile.style.background || window.getComputedStyle(noteTile).getPropertyValue("background-color")
         };
     };
-    const renderNoNotesState = () => div({style: "notes-empty-state", content: children([img({src: "/icons/interfaces/notes.png", style: "notes-empty-icon"}), div({style: "notes-empty-label", content: "No notes"})])});
+    const renderNoNotesState = () => emptyState({style: "notes-empty-state", icon: "/icons/interfaces/notes.png", iconStyle: "notes-empty-icon", label: "No notes", labelStyle: "notes-empty-label"});
     const noteColors = [{name: "Red", color: "rgba(240, 173, 176, 0.5)", secondary: "rgba(240, 173, 176, 0.5)"}, {name: "Orange", color: "rgba(245, 194, 171, 0.5)", secondary: "rgba(245, 194, 171, 0.5)"}, {name: "Yellow", color: "rgba(250, 224, 173, 0.5)", secondary: "rgba(250, 224, 173, 0.5)"}, {name: "Green", color: "rgba(198, 215, 178, 0.5)", secondary: "rgba(198, 215, 178, 0.5)"}, {name: "Blue", color: "rgba(196, 222, 240, 0.5)", secondary: "rgba(196, 222, 240, 0.5)"}, {name: "Off", color: "rgba(237, 237, 237, 0.5)", secondary: "rgba(209, 209, 209, 0.5)"}, {name: "Normal", color: "rgba(255, 255, 255, 0.5)", secondary: "rgba(238, 238, 238, 0.5)"}, {name: "Dark Gray", color: "rgba(211, 211, 211, 0.5)", secondary: "rgba(211, 211, 211, 0.5)"}];
     const deleteNote = (noteId, onSuccess = () => {}) => {
         if (!noteId) return;

@@ -1,3 +1,8 @@
+/**
+ * This code is platform/infrastructure specific.
+ * Not related to the structure of interfaces
+ * Refer to plastic.js on how to build elements and interfaces
+ */
 let dragCounter = 0;
 function isMouseOutside(e) {
     const rect = document.documentElement.getBoundingClientRect();
@@ -77,188 +82,7 @@ function applyHandleProperty(element, source = {}, ...args) {
     if (!element || value === undefined || value === null) return;
     element.setAttribute("handle", String(value));
 }
-HTMLElement.prototype.out = function () {
-    let e = this;
-    e.style.opacity = 1;
-    let n = null;
-    window.requestAnimationFrame(function i(o) {
-        o -= n = n || o, e.style.opacity = 1 - Math.min(o / 50, 1), o < 50 ? window.requestAnimationFrame(i) : e.style.display = "none"
-    })
-};
-HTMLElement.prototype.in = function () {
-    let e = this;
-    e.style.display = "block", e.style.opacity = 0;
-    let i = null;
-    window.requestAnimationFrame(function n(l) {
-        l -= i = i || l, e.style.opacity = Math.min(l / 50, 1), l < 50 && window.requestAnimationFrame(n)
-    })
-};
-Element.prototype.contextmenu = function (items, selector = null) {
-    const ele = this;
-    let lastClickedTarget = null;
-    let menu = document.createElement("div");
-    menu.className = "custom-context-menu hidden";
-    const resolveItems = () => typeof items === "function" ? (items(ele, lastClickedTarget) || []) : (items || []);
-    function buildMenu() {
-        menu.innerHTML = "";
-        let itemCount = 0;
-        resolveItems().forEach(item => {
-            if (typeof item?.visible === "function" && !item.visible(ele, lastClickedTarget)) return;
-            if (item?.visible === false) return;
-            if (item === "separator") {
-                if (!itemCount) return;
-                const hr = document.createElement("div");
-                hr.style.height = "1px";
-                hr.style.margin = "5px 0";
-                hr.style.background = "var(--secondary-border)";
-                menu.appendChild(hr);
-                return;
-            }
-            itemCount += 1;
-            const option = document.createElement("div");
-            option.className = "context-menu-item";
-            applyAltSyncProperty(option, item, ele, lastClickedTarget);
-            applyHandleProperty(option, item, ele, lastClickedTarget);
-            if (item.className) option.classList.add(...String(item.className).split(/\s+/).filter(Boolean));
-            if (item.destructive) option.classList.add("text-red");
-            const label = typeof item.label === "function" ? item.label(ele, lastClickedTarget) : item.label;
-            if (item.content) {
-                option.innerHTML = item.content;
-            } else if (item.icon) {
-                option.innerHTML = `${item.icon}<span>${label}</span>`;
-            } else {
-                option.textContent = label;
-            }
-            option.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                hideMenu();
-                if (typeof item.action === "function") {
-                    let target = lastClickedTarget;
-                    if (selector && lastClickedTarget) {
-                        target = lastClickedTarget.closest(selector);
-                    }
-                    item.action(ele, e, target);
-                }
-            };
-            menu.appendChild(option);
-        });
-        return itemCount;
-    }
-    function showMenu(x, y) {
-        menu.__altSyncOwnerWindow = ele.closest?.(".draggable-window") || null;
-        if (!buildMenu()) {
-            hideMenu();
-            return;
-        }
-        menu.style.left = x + "px";
-        menu.style.top = y + "px";
-        menu.classList.remove("hidden");
-        menu.in();
-        requestAnimationFrame(() => {
-            const rect = menu.getBoundingClientRect();
-            if (rect.right > window.innerWidth) {
-                menu.style.left = (x - rect.width) + "px";
-            }
-            if (rect.bottom > window.innerHeight) {
-                menu.style.top = (y - rect.height) + "px";
-            }
-        });
-        menu.addEventListener("mouseleave", _ => menu.out());
-    }
-    function hideMenu() {
-        menu.classList.add("hidden");
-        menu.style.display = "none";
-        menu.style.opacity = 0;
-    }
-    document.body.appendChild(menu);
-    ele.addEventListener("contextmenu", (e) => {
-        lastClickedTarget = e.target;
-        if (!buildMenu()) return;
-        e.preventDefault();
-        showMenu(e.clientX, e.clientY);
-    });
-    document.addEventListener("click", hideMenu);
-};
-Element.prototype.popoutmenu = function (items, selector = null) {
-    const ele = this;
-    let lastClickedTarget = null;
-    let menu = document.createElement("div");
-    menu.className = "custom-context-menu hidden";
-    const resolveItems = () => typeof items === "function" ? (items(ele, lastClickedTarget) || []) : (items || []);
-    function buildMenu() {
-        menu.innerHTML = "";
-        resolveItems().forEach(item => {
-            if (item === "separator") {
-                const hr = document.createElement("div");
-                hr.style.height = "1px";
-                hr.style.margin = "5px 0";
-                hr.style.background = "var(--secondary-border)";
-                menu.appendChild(hr);
-                return;
-            }
-            const option = document.createElement("div");
-            option.className = "context-menu-item";
-            applyAltSyncProperty(option, item, ele, lastClickedTarget);
-            applyHandleProperty(option, item, ele, lastClickedTarget);
-            if (item.className) option.classList.add(...String(item.className).split(/\s+/).filter(Boolean));
-            if (item.destructive) option.classList.add("text-red");
-            if (item.content) {
-                option.innerHTML = item.content;
-            } else if (item.icon) {
-                option.innerHTML = `${item.icon}<span>${item.label}</span>`;
-            } else {
-                option.textContent = item.label;
-            }
-            option.onclick = (e) => {
-                const interactiveTarget = e.target.closest('button, a, input, select, textarea, [contenteditable="true"]');
-                if (item.interactive && interactiveTarget && option.contains(interactiveTarget)) return;
-                e.preventDefault();
-                e.stopPropagation();
-                hideMenu();
-                if (typeof item.action === "function") {
-                    let target = lastClickedTarget;
-                    if (selector && lastClickedTarget) {
-                        target = lastClickedTarget.closest(selector);
-                    }
-                    item.action(ele, e, target);
-                }
-            };
-            menu.appendChild(option);
-            if (typeof item.bind === "function") item.bind(option, ele, lastClickedTarget, menu, hideMenu);
-        });
-    }
-    function showMenu(x, y) {
-        menu.__altSyncOwnerWindow = ele.closest?.(".draggable-window") || null;
-        buildMenu();
-        menu.style.left = x + "px";
-        menu.style.top = y + "px";
-        menu.classList.remove("hidden");
-        menu.in();
-        requestAnimationFrame(() => {
-            const rect = menu.getBoundingClientRect();
-            if (rect.right > window.innerWidth) menu.style.left = (x - rect.width) + "px";
-            if (rect.bottom > window.innerHeight) menu.style.top = (y - rect.height) + "px";
-        });
-        menu.addEventListener("mouseleave", _ => menu.out());
-    }
-    function hideMenu() {
-        menu.classList.add("hidden");
-        menu.style.display = "none";
-        menu.style.opacity = 0;
-    }
-    document.body.appendChild(menu);
-    ele.addEventListener("click", (e) => {
-        const interactiveTarget = e.target.closest('[data-onclick-id], [data-ondblclick-id], button, a, input, select, textarea, [contenteditable="true"]');
-        if (interactiveTarget && interactiveTarget !== ele && ele.contains(interactiveTarget)) return;
-        e.stopPropagation();
-        lastClickedTarget = e.target;
-        showMenu(e.clientX, e.clientY);
-    });
-    document.addEventListener("click", (e) => {
-        if (!menu.contains(e.target)) hideMenu();
-    });
-};
+
 function getLaunchInterfaceWindows() {
     return Array.from(document.querySelectorAll(".draggable-window:not(.widget-window):not(.minimized)"))
         .filter(element => document.body.contains(element))
@@ -302,62 +126,7 @@ if (document.readyState === "loading") {
 } else {
     setupLaunchInterfacesMenu();
 }
-Element.prototype.empty = function () {
-    for (; this.firstChild;) this.removeChild(this.firstChild)
-};
-Element.prototype.remove = function () {
-    this.parentNode && this.parentNode.removeChild(this)
-};
-Element.prototype.prepend = function () {
-    for (let t = 0; t < arguments.length; t++) {
-        let e = arguments[t];
-        if ("string" == typeof e) {
-            let i = document.createElement("div");
-            for (i.innerHTML = e.trim(); i.firstChild;) this.insertBefore(i.firstChild, this.firstChild)
-        } else this.insertBefore(e, this.firstChild)
-    }
-};
-Element.prototype.append = function () {
-    for (let e = 0; e < arguments.length; e++) {
-        let t = arguments[e];
-        if ("string" == typeof t) {
-            let i = document.createElement("div");
-            for (i.innerHTML = t.trim(); i.firstChild;) this.appendChild(i.firstChild)
-        } else this.appendChild(t)
-    }
-};
-Element.prototype.animate = function (n, t, o, c) {
-    let f = performance.now(), i = this, a = {}, e = {}, u = Object.keys(n);
-    u.forEach(function (t) {
-        a[t] = parseFloat(getComputedStyle(i)[t]), e[t] = parseFloat(n[t])
-    }), "function" != typeof o && (o = function (n) {
-        return n
-    }), requestAnimationFrame(function n() {
-        var r = performance.now() - f, p = o(r = Math.min(1, r / t));
-        u.forEach(function (n) {
-            var t = a[n];
-            t += (e[n] - t) * p, i.style[n] = t + ("opacity" === n ? "" : "px")
-        }), r < 1 ? requestAnimationFrame(n) : "function" == typeof c && c.call(i)
-    })
-};
-Element.prototype.keydown = function (n) {
-    let e, o = Date.now();
-    this.addEventListener("keydown", t => {
-        clearTimeout(e), o = Date.now(), e = setTimeout(() => {
-            let e = Date.now(), w = e - o;
-            w >= 600 && n(t)
-        }, 600)
-    })
-};
-Element.prototype.keyup = function (e) {
-    let t, n = Date.now();
-    this.addEventListener("keyup", o => {
-        clearTimeout(t), n = Date.now(), t = setTimeout(() => {
-            let t = Date.now(), p = t - n;
-            p >= 200 && e(o)
-        }, 200)
-    })
-};
+
 (function () {
     const frames = ['⣷', '⣯', '⣟', '⡿', '⢿', '⣻', '⣽', '⣾'];
     Element.prototype.isLoading = function (state = true, speed = 80) {
@@ -457,10 +226,10 @@ function pushMessage(type, t) {
         const pathNormalizer = typeof options.pathNormalizer === "function" ? options.pathNormalizer : normalizeDownloadPath;
         const filePath = pathNormalizer(rawPath);
         if (!filePath) throw new Error(options.emptyPathMessage || "File path is required");
-        const token = ++activeOpenProgressToken;
+        const token = options.suppressProgress ? 0 : ++activeOpenProgressToken;
         const fileName = filePath.split("/").pop() || options.fallbackFileName || "file";
         const label = options.label || `Opening ${fileName}`;
-        updateOpenProgress({label, loaded: 0, total: 0, indeterminate: true, token});
+        if (!options.suppressProgress) updateOpenProgress({label, loaded: 0, total: 0, indeterminate: true, token});
         try {
             const url = options.url || `/api/files/download?path=${encodeURIComponent(filePath)}`;
             const response = await fetch(url);
@@ -479,21 +248,23 @@ function pushMessage(type, t) {
                     if (!value) continue;
                     chunks.push(value);
                     loaded += value.byteLength || value.length || 0;
-                    updateOpenProgress({label, loaded, total, indeterminate: !(total > 0), token});
+                    if (!options.suppressProgress) updateOpenProgress({label, loaded, total, indeterminate: !(total > 0), token});
                 }
                 blob = new Blob(chunks, {type: response.headers.get("content-type") || "application/octet-stream"});
             }
-            updateOpenProgress({
-                label,
-                loaded: total || blob.size,
-                total: total || blob.size || 1,
-                indeterminate: false,
-                token
-            });
-            if (options.autoHide !== false) window.setTimeout(() => hideOpenProgress(token), options.hideDelay ?? 220);
+            if (!options.suppressProgress) {
+                updateOpenProgress({
+                    label,
+                    loaded: total || blob.size,
+                    total: total || blob.size || 1,
+                    indeterminate: false,
+                    token
+                });
+                if (options.autoHide !== false) window.setTimeout(() => hideOpenProgress(token), options.hideDelay ?? 220);
+            }
             return {path: filePath, fileName, blob, contentType: response.headers.get("content-type") || "application/octet-stream", token};
         } catch (error) {
-            hideOpenProgress(token);
+            if (!options.suppressProgress) hideOpenProgress(token);
             throw error;
         }
     }
@@ -507,6 +278,40 @@ function pushMessage(type, t) {
     };
 })();
 window.StandardUI = window.StandardUI || {};
+window.StandardUI.openSearchDialogue = (options = {}) => {
+    const {
+        matches = () => [],
+        onSelect,
+        onPreview,
+        onNoMatch,
+        ...dialogueOptions
+    } = options;
+    const selectMatch = (query, match = null, availableMatches = null) => {
+        const resolvedMatches = Array.isArray(availableMatches) ? availableMatches : matches(query);
+        const selectedMatch = match || resolvedMatches?.[0] || matches(query)?.[0];
+        const selected = typeof onSelect === "function" ? onSelect(selectedMatch, query, resolvedMatches) : false;
+        if (selected === false && typeof onNoMatch === "function") onNoMatch(query);
+    };
+    if (typeof searchDialogue === "function") {
+        searchDialogue({
+            ...dialogueOptions,
+            matches,
+            preview: typeof onPreview === "function" ? (_, match) => onPreview(match) : undefined,
+            confirmation: (query, match, availableMatches) => selectMatch(query, match, availableMatches)
+        });
+        return true;
+    }
+    if (typeof inputDialogue === "function") {
+        inputDialogue({
+            title: dialogueOptions.title,
+            placeholder: dialogueOptions.placeholder,
+            value: dialogueOptions.value,
+            confirmation: (_, query) => selectMatch(query)
+        });
+        return true;
+    }
+    return false;
+};
 window.StandardUI.fontFamilies = window.StandardUI.fontFamilies || [
     "Inter",
     "Arial",
@@ -1211,6 +1016,20 @@ window.StandardUploads.uploadFile = (file, url, options = {}) => new Promise((re
     };
     xhr.send(formData);
 });
+window.StandardUploads.saveFile = async (content, rawPath = "", options = {}) => {
+    const normalizedPath = window.StandardDownloads?.normalizeDownloadPath?.(rawPath) || String(rawPath || "").replace(/^\/+/, "");
+    if (!normalizedPath) throw new Error("File name is required");
+    const pathParts = normalizedPath.split("/");
+    const fileName = pathParts.pop() || "file";
+    const directory = pathParts.join("/");
+    const bytes = content instanceof Uint8Array ? content : new TextEncoder().encode(String(content ?? ""));
+    const file = new File([bytes], fileName, {type: String(options?.type || "application/octet-stream")});
+    const uploadUrl = directory ? `/api/upload?directory=${encodeURIComponent(directory)}` : "/api/upload";
+    const response = await window.StandardUploads.uploadFile(file, uploadUrl, {
+        label: String(options?.label || `Saving ${fileName}`)
+    });
+    return {...response, path: normalizedPath, fileName, byteCount: bytes.length};
+};
 const THEME_BACKGROUND_CACHE_KEY = "ui-background";
 const THEME_BACKGROUND_CACHE_INTERFACE = "com.standard.settings";
 const THEME_BACKGROUND_META_KEY = "ui-background-meta";

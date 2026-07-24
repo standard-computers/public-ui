@@ -43,11 +43,6 @@
             end: CODE_EDITOR_LINE_COMMENT_END_BY_EXTENSION[extension] || ""
         };
     };
-    const getCodeFileDirectory = (rawPath = "") => {
-        const normalizedPath = normalizeCodeFilePath(rawPath);
-        if (!normalizedPath.includes("/")) return "";
-        return normalizedPath.split("/").slice(0, -1).join("/");
-    };
     const sanitizeNewCodeFileName = (rawName = "") => {
         const trimmedName = String(rawName || "").trim().replace(/\\/g, "/");
         const baseName = trimmedName.split("/").pop() || "";
@@ -492,28 +487,17 @@
             ? codeEditorInput.value.slice(codeEditorInput.selectionStart, codeEditorInput.selectionEnd).trim()
             : "";
         const initialValue = selectedText && !selectedText.includes("\n") ? selectedText : "";
-        if (typeof searchDialogue === "function") {
-            searchDialogue({
-                title: "Search",
-                placeholder: "Find code",
-                value: initialValue,
-                confirmText: "Search",
-                anchor: anchorNode,
-                matches: (query) => createCodeEditorSearchMatches(query, portal),
-                preview: (_, match) => scrollToCodeEditorSearchMatch(match, portal),
-                confirmation: (query, match, matches) => {
-                    const selectedMatch = match || matches?.[0] || createCodeEditorSearchMatches(query, portal)[0];
-                    if (!scrollToCodeEditorSearchMatch(selectedMatch, portal)) modular.error("No matches found");
-                }
-            });
-            return true;
-        }
-        inputDialogue({title: "Search", placeholder: "Find code", value: initialValue, confirmation: (_, query) => {
-                const match = createCodeEditorSearchMatches(query, portal)[0];
-                if (!scrollToCodeEditorSearchMatch(match, portal)) modular.error("No matches found");
-            }
+        return window.StandardUI.openSearchDialogue({
+            title: "Search",
+            placeholder: "Find code",
+            value: initialValue,
+            confirmText: "Search",
+            anchor: anchorNode,
+            matches: (query) => createCodeEditorSearchMatches(query, portal),
+            onPreview: match => scrollToCodeEditorSearchMatch(match, portal),
+            onSelect: match => scrollToCodeEditorSearchMatch(match, portal),
+            onNoMatch: () => modular.error("No matches found")
         });
-        return true;
     };
     const bindCodeEditorInteractions = (portal) => {
         const codeEditorInput = getPortalCodeEditorInput(portal);
@@ -596,22 +580,9 @@
         const codeEditorInput = getPortalCodeEditorInput(portal);
         const currentState = getPortalCodeState(portal);
         const nextContent = codeEditorInput?.value ?? currentState.cachedContent;
-        const bytes = new TextEncoder().encode(nextContent);
         const fileName = getCodeFileName(normalizedPath);
-        const directory = getCodeFileDirectory(normalizedPath);
-        const uploadPath = directory ? `/api/upload?directory=${encodeURIComponent(directory)}` : "/api/upload";
-        const codeFile = new File([bytes], fileName, {type: "application/octet-stream"});
-        let saved = false;
-        if (typeof window.StandardUploads?.uploadFile === "function") {
-            const response = await window.StandardUploads.uploadFile(codeFile, uploadPath, {label: `Saving ${fileName}`});
-            saved = !!response?.ok;
-        } else {
-            const formData = new FormData();
-            formData.append("file", codeFile);
-            const response = await fetch(uploadPath, {method: "POST", body: formData});
-            saved = response.ok;
-        }
-        if (!saved) {
+        const response = await window.StandardUploads.saveFile(nextContent, normalizedPath, {label: `Saving ${fileName}`});
+        if (!response?.ok) {
             modular.error("Unable to save code file");
             return false;
         }
@@ -619,7 +590,7 @@
         syncCodeEditorPresentation(portal);
         updateCodeEditorPortalTitle(portal);
         await window.StandardFilesRefreshCache?.();
-        modular.success(`Saved ${normalizedPath} (${bytes.length} bytes)`);
+        modular.success(`Saved ${normalizedPath} (${response.byteCount} bytes)`);
         return true;
     };
     const saveNewCodeFileToDocuments = (portal) => {
