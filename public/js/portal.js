@@ -912,6 +912,9 @@ function initGlobalFileDrop(onFiles) {
     if (window.__stdGlobalFileDropInitialized) return;
     window.__stdGlobalFileDropInitialized = true;
     let dragDepth = 0;
+    document.addEventListener("dragstart", (e) => {
+        if (e.target instanceof HTMLImageElement) e.preventDefault();
+    }, true);
     function activate(e) {
         e.preventDefault();
         e.stopPropagation();

@@ -590,6 +590,11 @@ body.editor-sheet-resizing-rows {cursor:row-resize}
 .settings-interface-item.open .settings-interface-drawer {max-height:96px}
 .settings-interface-drawer-inner {align-items:center;border-top:1px solid var(--border);padding:10px}
 
+.settings-people-user-tile {display:flex;align-items:center;gap:12px;min-height:48px;box-sizing:border-box}
+button.people-user-photo-button {display:flex;align-items:center;justify-content:center;flex:0 0 48px;width:48px;height:48px;min-width:48px;min-height:48px;margin:0;padding:0 !important;overflow:hidden;box-sizing:border-box}
+button.people-user-photo-button svg,.people-user-photo-image {display:block;width:48px !important;height:48px !important;max-width:48px;max-height:48px;object-fit:cover}
+.settings-people-user-copy {min-width:0}
+
 /*TIMERS*/
 .timer-quick-form {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}
 .timers-list {display:flex;flex-direction:column;gap:10px;overflow:auto;padding-bottom:12px}

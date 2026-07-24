@@ -1,4 +1,5 @@
 (async () => {
+
     let default_settings_options = {
         name: "Default",
         font_family: "",
@@ -22,6 +23,7 @@
         media_widget: true,
         video_widget: true,
     }
+
     window.StandardUI = window.StandardUI || {};
     window.StandardUI.defaultTheme = {...default_settings_options};
     let ui_settings_options = {...default_settings_options};
@@ -32,6 +34,7 @@
     const BACKGROUND_IMAGE_META_KEY = "ui-background-meta";
     let latestDeviceInfo = null;
     const defaultDeviceInfo = {serial: "Unknown", config: {}, network: {}, storage: {}, volume: {}};
+
     const getDeviceInfo = () => CLI.send("status").then((response) => {
         latestDeviceInfo = response;
         return response;
@@ -39,6 +42,7 @@
         latestDeviceInfo = defaultDeviceInfo;
         return defaultDeviceInfo;
     });
+
     const downloadDeviceInfo = () => {
         if (!latestDeviceInfo) return;
         const payload = JSON.stringify(latestDeviceInfo, null, 2);
@@ -52,6 +56,7 @@
         document.body.removeChild(anchor);
         URL.revokeObjectURL(href);
     };
+
     const formatStorageBytes = (value) => {
         const bytes = Number(value);
         if (!Number.isFinite(bytes) || bytes < 0) return "Unavailable";
@@ -61,11 +66,14 @@
         const amount = bytes / (1024 ** unitIndex);
         return `${amount.toLocaleString(undefined, {maximumFractionDigits: unitIndex === 0 ? 0 : 1})} ${units[unitIndex]}`;
     };
+
     let standardsRequestVersion = 0;
     let sharedThemes = [];
     let themeTestTimer = null;
     let themeTestCountdownTimer = null;
+
     const escapeHtml = (value = "") => `${value}`.replace(/[&<>"']/g, (character) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[character] || character));
+
     const parseStandardsResponse = (raw = "") => {
         const text = `${raw || ""}`;
         const matches = [...text.matchAll(/([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z0-9_]+)/g)];
@@ -77,16 +85,20 @@
             return true;
         });
     };
+
     const STANDARD_SHEETS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon brick" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5" /></svg>`;
     const INTERFACES_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>`;
+
     const getPlatformInterfaces = () => {
         const interfaces = typeof window.StandardPlatformInterfaces?.all === "function" ? window.StandardPlatformInterfaces.all() : [];
         return interfaces.filter(item => item?.serviceId && item?.title);
     };
+
     const isPlatformInterfaceEnabled = (serviceId) => {
         if (typeof window.StandardPlatformInterfaces?.isEnabled === "function") return window.StandardPlatformInterfaces.isEnabled(serviceId);
         return true;
     };
+
     const openInterfaceSettings = async (app = {}) => {
         const serviceId = String(app?.serviceId || "").trim();
         if (!serviceId) return;
@@ -103,11 +115,13 @@
             modular.error("Settings viewer is not ready yet");
         }
     };
+
     const renderInterfaceIcon = (app) => {
         const icon = `${app?.icon || ""}`.trim();
         if (!icon) return INTERFACES_ICON;
         return icon.startsWith("<svg") ? icon : `<img src="${escapeHtml(icon)}" style="cover" alt="${escapeHtml(app.title || "")}" />`;
     };
+
     const renderInterfacesList = () => {
         const root = document.getElementById("settings-interfaces-list");
         if (!root) return;
@@ -166,6 +180,7 @@
             };
         });
     };
+
     const initializeInterfacesRoute = async () => {
         const root = document.getElementById("settings-interfaces-list");
         if (!root) return;
@@ -179,6 +194,7 @@
             root.innerHTML = div({style: "faded small-padding", content: "Unable to load interfaces."});
         }
     };
+
     const HOST_CONFIG_FIELDS = [
         {name: "name", defaultValue: "standard", readable: true, editable: false, description: "The host's product or installation name."},
         {name: "version", defaultValue: "1.0.0", readable: true, editable: false, description: "The version of the Standard host software currently running."},
@@ -202,13 +218,18 @@
         {name: "indexing_cadence", defaultValue: 21600, readable: true, editable: true, description: "The interval in seconds between file-indexing runs."},
         {name: "relay_response_timeout", defaultValue: 30, readable: true, editable: true, description: "The number of seconds the relay waits for a command response."}
     ];
+
     const isBooleanConfigField = (field) => typeof field.defaultValue === "boolean";
+
     const normalizeConfigBoolean = (value) => value === true || value === 1 || `${value}`.trim().toLowerCase() === "true";
+
     const escapeConfigValue = (value) => `"${String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+
     const configDisplayValue = (field, values = {}) => {
         if (!field.readable) return "Not available";
         return Object.prototype.hasOwnProperty.call(values, field.name) ? values[field.name] : field.defaultValue;
     };
+
     const saveHostConfigValue = async (field, value, inputNode) => {
         if (!field?.editable) return;
         if (inputNode) inputNode.disabled = true;
@@ -223,6 +244,7 @@
             if (inputNode) inputNode.disabled = false;
         }
     };
+
     const renderConfigField = (field, values) => {
         const value = configDisplayValue(field, values);
         const labelMarkup = label({input: `host-config-${field.name}`, style: "inline small-padding-top", title: field.description, content: escapeHtml(field.name)});
@@ -239,6 +261,7 @@
         }
         return div({style: "bi border radius padded spaced", title: field.description, content: children([labelMarkup, control])});
     };
+
     const initializeConfigRoute = async () => {
         const root = document.getElementById("settings-config-list");
         if (!root) return;
@@ -252,6 +275,7 @@
             root.innerHTML = div({style: "faded small-padding", content: "Unable to load host config."});
         }
     };
+
     const parseStandardDataPayload = (response) => {
         if (typeof response !== "string") return response;
         try {
@@ -260,6 +284,7 @@
             return response;
         }
     };
+
     const flattenStandardRow = (value, prefix = "", output = {}) => {
         if (value && typeof value === "object" && !Array.isArray(value)) {
             Object.entries(value).forEach(([key, childValue]) => flattenStandardRow(childValue, prefix ? `${prefix}.${key}` : key, output));
@@ -268,6 +293,7 @@
         output[prefix || "value"] = Array.isArray(value) ? JSON.stringify(value) : (value ?? "");
         return output;
     };
+
     const normalizeStandardRows = (standardData) => {
         if (Array.isArray(standardData)) return standardData.map((item) => flattenStandardRow(item));
         if (standardData && typeof standardData === "object") {
@@ -279,10 +305,12 @@
         }
         return [{value: standardData ?? ""}];
     };
+
     const escapeCsvValue = (value = "") => {
         const text = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value ?? "");
         return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
     };
+
     const standardDataToCsv = (standardData) => {
         const rows = normalizeStandardRows(standardData);
         const headers = [];
@@ -292,6 +320,7 @@
         if (!headers.length) headers.push("value");
         return [headers.map(escapeCsvValue).join(","), ...rows.map((row) => headers.map((header) => escapeCsvValue(row?.[header] ?? "")).join(","))].join("\n");
     };
+
     const waitForSheetsCsvLoader = async () => {
         if (typeof window.StandardSheets?.openCsvContent === "function") return window.StandardSheets.openCsvContent;
         modular.start("com.standard.editor.sheet");
@@ -301,18 +330,21 @@
         }
         return null;
     };
+
     const formatBytes = (value = 0) => {
         const bytes = Number(value) || 0;
         if (bytes < 1024) return `${bytes} B`;
         if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     };
+
     const formatCacheTimestamp = (value = "") => {
         if (!value) return "";
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return value;
         return date.toLocaleString();
     };
+
     const openCacheFileInInternals = async (entry = {}, triggerNode = null) => {
         const interfaceName = entry?.interfaceName || "";
         const cacheKey = entry?.key || "";
@@ -341,6 +373,7 @@
             modular.error("Unable to open cache file");
         }
     };
+
     const openStandardDataInInternals = async (standardReference = "", triggerNode = null) => {
         const normalizedReference = `${standardReference || ""}`.trim();
         if (!normalizedReference) return;
@@ -363,6 +396,7 @@
             modular.error("Unable to load standard data");
         }
     };
+
     const openStandardDataInSheets = async (standardReference = "", standardName = "", triggerNode = null) => {
         const normalizedReference = `${standardReference || ""}`.trim();
         if (!normalizedReference) return;
@@ -379,6 +413,7 @@
             modular.error("Unable to load standard data as sheet");
         }
     };
+
     const deleteCacheEntry = async (entry = {}) => {
         if (!entry.interfaceName || !entry.key) return;
         try {
@@ -389,6 +424,7 @@
             modular.error("Unable to delete cache entry");
         }
     };
+
     const renderHistoryList = (entries = [], mode = "Use") => {
         const historyList = document.getElementById("home-history-cache-list");
         if (!historyList) return;
@@ -428,6 +464,7 @@
             };
         });
     };
+
     const initializeHistoryRoute = () => {
         const interfaceSelect = document.getElementById("home-history-interface-select");
         const modeSelect = document.getElementById("home-history-mode-select");
@@ -484,6 +521,7 @@
             }
         };
     };
+
     const initializeStandardsRoute = async () => {
         const listRoot = document.getElementById("home-standards-list");
         if (!listRoot) return;
@@ -521,6 +559,7 @@
             listRoot.innerHTML = div({style: "faded small-padding", content: "Unable to load standards."});
         }
     };
+
     const applyBackgroundImage = (backgroundImageFileName) => {
         const rawValue = backgroundImageFileName === true ? (window.StandardUI?.currentBackgroundImageSource || window.StandardUI?.getAppliedBackgroundImageUrl?.() || "") : `${backgroundImageFileName || ""}`.trim();
         const imageUrl = rawValue && !rawValue.startsWith("data:") && !rawValue.startsWith("blob:") && !rawValue.startsWith("http://") && !rawValue.startsWith("https://") && !rawValue.startsWith("/") ? `/api/user-data/${encodeURIComponent(rawValue)}?t=${Date.now()}` : rawValue;
@@ -545,6 +584,7 @@
             });
         }
     };
+
     const refreshUITheme = (os) => {
         let temp = ui_settings_options;
         if (os) temp = os;
@@ -561,6 +601,7 @@
         document.documentElement.style.setProperty("--darker-shadow", shadowsEnabled ? "4px 4px 10px rgba(0, 0, 0, 0.3)" : "none");
         applyBackgroundImage(temp.background_image);
     }
+
     const saveSettings = async ({successMessage = "Settings saved", errorMessage = "Unable to save settings"} = {}) => {
         try {
             const currentUserRecord = await getCurrentUserRecord();
@@ -587,7 +628,9 @@
             return false;
         }
     }
+
     const cloneThemeData = (themeData = {}) => JSON.parse(JSON.stringify(themeData || {}));
+
     const normalizeSharedThemeData = (theme = {}) => {
         const candidate = theme?.data ?? theme?.theme ?? theme?.settings;
         if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) return cloneThemeData(candidate);
@@ -599,6 +642,7 @@
         }
         return null;
     };
+
     const loadSharedThemes = async () => {
         try {
             const response = await fetch(`/themes.json?t=${Date.now()}`, {cache: "no-store"});
@@ -611,6 +655,7 @@
         }
         renderSharedThemes();
     };
+
     const renderThemeColorPreview = (themeData = {}) => {
         const themeColors = [
             {name: "Font", color: themeData.foreground},
@@ -621,6 +666,7 @@
         if (!themeColors.length) return "";
         return div({style: "colors settings-theme-colors", content: children(themeColors.map(({name, color}) => div({style: "color-option animated", background: color, primary: color, secondary: color, title: `${name}: ${color}`, content: div({style: "color-name no-wrap hidden", content: name})})))});
     };
+
     const renderThemeMetricPreview = (themeData = {}) => {
         const metrics = [
             {label: "Font", value: themeData.font_size, suffix: "px"},
@@ -630,6 +676,7 @@
         if (!metrics.length) return "";
         return div({style: "settings-theme-metrics faded center", content: children(metrics.map(({label, value, suffix}) => div({style: "inline border inner-radius tiny small-padding space-right tiny-text", content: `${label} ${escapeHtml(value)}${suffix}`})))});
     };
+
     const renderSharedThemes = () => {
         const list = document.getElementById("settings-themes-list");
         if (!list) return;
@@ -669,12 +716,14 @@
             });
         });
     };
+
     const cancelThemeTestTimers = () => {
         if (themeTestTimer) clearTimeout(themeTestTimer);
         if (themeTestCountdownTimer) clearInterval(themeTestCountdownTimer);
         themeTestTimer = null;
         themeTestCountdownTimer = null;
     };
+
     const testSharedTheme = (theme) => {
         const themeData = normalizeSharedThemeData(theme);
         if (!themeData) {
@@ -700,6 +749,7 @@
             modular.message("Theme test ended");
         }, 10000);
     };
+
     const applySharedTheme = async (theme) => {
         const themeData = normalizeSharedThemeData(theme);
         if (!themeData) {
@@ -712,6 +762,7 @@
         renderBackgroundImageThumbnail();
         await saveSettings({successMessage: "Theme applied"});
     };
+
     const saveSharedTheme = () => {
         inputDialogue({title: "Save Theme", placeholder: "Theme name", confirmation: async (_, value) => {
                 const name = `${value || ""}`.trim();
@@ -735,6 +786,7 @@
             }
         });
     };
+
     const updateKioskMode = async (enabled = false) => {
         ui_settings_options.kiosk_mode = enabled === true;
         const applied = await window.StandardUI?.setKioskMode?.(ui_settings_options.kiosk_mode);
@@ -755,16 +807,20 @@
         }
         return true;
     };
+
     let peopleProfileFileInput = null;
     const peopleProfileImageCacheKeys = {};
+
     const getPeopleProfileImageCacheKey = (recordId) => {
         const cacheKey = peopleProfileImageCacheKeys[String(recordId)];
         return cacheKey ?? "cached";
     };
+
     const bumpPeopleProfileImageCacheKey = (recordId) => {
         if (!recordId) return;
         peopleProfileImageCacheKeys[String(recordId)] = Date.now();
     };
+
     const normalizeCurrentUserRecord = (payload) => {
         if (!payload) return null;
         if (Array.isArray(payload)) return payload[0] || null;
@@ -773,23 +829,40 @@
         if (typeof payload === "object") return payload;
         return null;
     };
+
     const sanitizeUserRecordId = (value = "") => `${value || ""}`.trim().replace(/[^a-zA-Z0-9_-]/g, "");
-    const getCurrentUserRecord = async () => {
+
+    const getAllUserRecords = async () => {
+        try {
+            const response = await CLI.send("[user]");
+            return Array.isArray(response?.user) ? response.user : Array.isArray(response) ? response : [];
+        } catch (_) {
+            return [];
+        }
+    };
+
+    const userRecordsMatch = (left = null, right = null) => {
+        if (!left || !right) return false;
+        return ["id", "userid", "username"].some(key => {
+            const leftValue = `${left?.[key] || ""}`.trim();
+            const rightValue = `${right?.[key] || ""}`.trim();
+            return leftValue && rightValue && leftValue === rightValue;
+        });
+    };
+
+    const getCurrentUserRecord = async (availableUsers = null) => {
+        const allUsers = Array.isArray(availableUsers) ? availableUsers : null;
         try {
             const selectedUserRecord = normalizeCurrentUserRecord(await modular.user.data());
-            if (selectedUserRecord) return selectedUserRecord;
+            if (selectedUserRecord) return allUsers?.find(userRecord => userRecordsMatch(userRecord, selectedUserRecord)) || selectedUserRecord;
         } catch (_) {
         }
         const sessionUserId = `${modular.user.id() || ""}`.trim();
         if (!sessionUserId) return null;
-        try {
-            const allUsersResponse = await CLI.send("[user]");
-            const allUsers = Array.isArray(allUsersResponse?.user) ? allUsersResponse.user : Array.isArray(allUsersResponse) ? allUsersResponse : [];
-            return allUsers.find(userRecord => `${userRecord?.userid || ""}`.trim() === sessionUserId) || null;
-        } catch (_) {
-            return null;
-        }
+        const users = allUsers || await getAllUserRecords();
+        return users.find(userRecord => `${userRecord?.userid || ""}`.trim() === sessionUserId) || null;
     };
+
     const getCurrentUserRecordId = async (userRecord = null) => {
         const candidateRecord = normalizeCurrentUserRecord(userRecord) || normalizeCurrentUserRecord(typeof modular?.user?.readCachedUserRecord === "function" ? modular.user.readCachedUserRecord() : null);
         const candidateRecordId = sanitizeUserRecordId(candidateRecord?.id);
@@ -797,7 +870,9 @@
         const selectedUserRecord = normalizeCurrentUserRecord(await getCurrentUserRecord());
         return sanitizeUserRecordId(selectedUserRecord?.id);
     };
+
     const sanitizeBackgroundImageFormat = (value = "") => `${value || ""}`.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
     const inferBackgroundImageFormat = (file = {}) => {
         const extensionMatch = `${file?.name || ""}`.match(/\.([a-zA-Z0-9]+)$/);
         const extension = sanitizeBackgroundImageFormat(extensionMatch ? extensionMatch[1] : "");
@@ -805,6 +880,7 @@
         const typeSuffix = sanitizeBackgroundImageFormat(`${file?.type || ""}`.split("/")[1] || "");
         return typeSuffix || "png";
     };
+
     const createBackgroundImageObjectUrl = (file) => {
         try {
             return URL.createObjectURL(file);
@@ -812,6 +888,7 @@
             return "";
         }
     };
+
     const saveBackgroundImageCache = async (file) => {
         const previousMetadata = await loadBackgroundImageMetadata();
         const previousFormat = sanitizeBackgroundImageFormat(previousMetadata?.format || "");
@@ -827,6 +904,7 @@
         }
         return metadata;
     };
+
     const loadBackgroundImageMetadata = async () => {
         try {
             return await window.StandardBrowserCache?.get?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_META_KEY, {format: "json"});
@@ -835,12 +913,14 @@
             return null;
         }
     };
+
     const deleteBackgroundImageCache = async () => {
         const metadata = await loadBackgroundImageMetadata();
         const format = sanitizeBackgroundImageFormat(metadata?.format || "");
         if (format) await window.StandardBrowserCache?.delete?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_CACHE_KEY, {format});
         await window.StandardBrowserCache?.delete?.(BACKGROUND_IMAGE_CACHE_INTERFACE, BACKGROUND_IMAGE_META_KEY, {format: "json"});
     };
+
     const getAppliedBackgroundImageUrl = () => {
         if (typeof window.StandardUI?.getAppliedBackgroundImageUrl === "function") return window.StandardUI.getAppliedBackgroundImageUrl() || "";
         const targets = [document.body, document.documentElement];
@@ -853,6 +933,7 @@
         }
         return "";
     };
+
     const renderBackgroundImageThumbnail = () => {
         const previewRoot = document.getElementById("settings-background-image-preview");
         if (!previewRoot) return;
@@ -896,6 +977,7 @@
         };
         previewRoot.append(label, thumbnailButton);
     };
+
     const buildPeopleDisplayName = (userRecord = {}) => {
         const firstName = `${userRecord.firstname || ""}`.trim();
         const middleName = `${userRecord.middlename || ""}`.trim();
@@ -909,14 +991,70 @@
         }
         return "Unknown User";
     };
+
     const buildPeopleUsername = (userRecord = {}) => {
         const rawUsername = `${userRecord.username || userRecord.userid || userRecord.userId || userRecord.id || userRecord.email || modular.user.id() || ""}`.trim();
         return rawUsername || "Unavailable";
     };
+
+    const ADD_PERSON_FIELDS = [
+        {property: "firstname", label: "First Name"},
+        {property: "lastname", label: "Last Name"},
+        {property: "birthday", label: "Birthday", type: "date"},
+        {property: "username", label: "Username"},
+        {property: "email", label: "Email", type: "email"},
+        {property: "phone", label: "Phone", type: "tel"},
+        {property: "address", label: "Address"}
+    ];
+
+    const escapePeopleCliValue = (value = "") => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
+    const getAddPersonFieldId = (property = "") => `settings-add-person-${property}`;
+
+    const renderAddPersonField = (field = {}) => div({content: children([
+        div({style: "bold small-padding", content: field.label || field.property}),
+        div({style: "padded", content: input({
+            id: getAddPersonFieldId(field.property),
+            style: "undecorated no-padding fill",
+            type: field.type || "text"
+        })})
+    ])});
+
+    const saveAddedPerson = async (_, context = {}) => {
+        const portal = context?.portal;
+        const portalRoot = portal?.body?.() || document;
+        const fields = ADD_PERSON_FIELDS.map(field => ({
+            ...field,
+            input: portalRoot.querySelector(`#${getAddPersonFieldId(field.property)}`)
+        }));
+        if (fields.some(field => !field.input)) {
+            modular.error("Unable to read the person form");
+            return;
+        }
+        const values = fields.map(field => `"${escapePeopleCliValue(field.input.value.trim())}"`);
+        const command = `[user] + (@, ${values.join(", ")}, "", "", @, @)`;
+        try {
+            const response = await CLI.send(command, false);
+            if (response === 0) {
+                modular.error("Failed to create person");
+                return;
+            }
+            portal?.close?.();
+            modular.success("Person created");
+            void renderPeopleRoute();
+        } catch (error) {
+            console.error("Failed to create person:", error);
+            modular.error("Unable to create person");
+        }
+    };
+
+    const openAddPersonPortal = () => modular.show("com.standard.settings", 1, {newInstance: true});
+
     const buildProfileImageUrl = (recordId = "") => {
         const safeRecordId = sanitizeUserRecordId(recordId);
         return safeRecordId ? `/api/records/images/${encodeURIComponent(safeRecordId)}?cb=${safeRecordId}-${getPeopleProfileImageCacheKey(safeRecordId)}` : "";
     };
+
     const checkPeopleProfileImageExists = async (recordId = "") => {
         const profileImageUrl = buildProfileImageUrl(recordId);
         if (!profileImageUrl) return false;
@@ -927,6 +1065,34 @@
             return false;
         }
     };
+
+    const buildPeopleFallbackPhoto = (size = 56) => `<svg class="text-foreground" xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75a17.933 17.933 0 0 1-7.499-1.632Z" /></svg>`;
+
+    const renderPeopleUserTile = async (userRecord = {}) => {
+        const recordId = sanitizeUserRecordId(userRecord?.id);
+        const hasProfileImage = recordId ? await checkPeopleProfileImageExists(recordId) : false;
+        const displayName = buildPeopleDisplayName(userRecord);
+        const username = buildPeopleUsername(userRecord);
+        const email = `${userRecord?.email || ""}`.trim();
+        return div({style: "settings-people-user-tile secondary-bordered inner-radius padded small-margin-top", content: children([
+            button({
+                style: `people-user-photo-button naked no-margin ${hasProfileImage ? "" : "background-secondary"} round`,
+                data: recordId,
+                title: `Change ${displayName}'s photo`,
+                content: hasProfileImage
+                    ? img({src: buildProfileImageUrl(recordId), style: "people-user-photo-image round cover", alt: displayName, width: 48, height: 48})
+                    : buildPeopleFallbackPhoto(48),
+                width: 48,
+                height: 48
+            }),
+            div({style: "settings-people-user-copy", content: children([
+                div({style: "bold", content: escapeHtml(displayName)}),
+                div({style: "faded", content: escapeHtml(username)}),
+                email ? div({style: "faded", content: escapeHtml(email)}) : ""
+            ])})
+        ])});
+    };
+
     const uploadPeopleProfilePhoto = async (file, userRecord = null) => {
         if (!(file instanceof File)) return false;
         if (!file.type || !file.type.startsWith("image/")) {
@@ -957,17 +1123,45 @@
             return false;
         }
     };
+
+    const bindPeopleProfilePhotoButton = (photoButton, userRecord = null) => {
+        if (!photoButton || !userRecord) return;
+        photoButton.style.cursor = "pointer";
+        photoButton.onclick = () => {
+            if (peopleProfileFileInput) peopleProfileFileInput.remove();
+            const fileInput = document.createElement("input");
+            peopleProfileFileInput = fileInput;
+            fileInput.type = "file";
+            fileInput.accept = "image/*";
+            fileInput.style.display = "none";
+            document.body.appendChild(fileInput);
+            fileInput.onchange = async () => {
+                const file = fileInput.files && fileInput.files[0];
+                if (!file) return;
+                const didUpload = await uploadPeopleProfilePhoto(file, userRecord);
+                fileInput.value = "";
+                fileInput.remove();
+                if (peopleProfileFileInput === fileInput) peopleProfileFileInput = null;
+                if (didUpload) void renderPeopleRoute();
+            };
+            fileInput.click();
+        };
+    };
+
     const renderPeopleRoute = async () => {
         const routeRoot = document.getElementById("settings-people-route");
         if (!routeRoot) return;
         routeRoot.innerHTML = div({style: "faded padded", content: "Loading user..."});
-        const userRecord = await getCurrentUserRecord();
+        const allUsers = await getAllUserRecords();
+        const userRecord = await getCurrentUserRecord(allUsers);
         const userRecordId = await getCurrentUserRecordId(userRecord);
         const hasProfileImage = userRecordId ? await checkPeopleProfileImageExists(userRecordId) : false;
         const displayName = buildPeopleDisplayName(userRecord || {});
         const username = buildPeopleUsername(userRecord || {});
         const email = `${userRecord?.email || ""}`.trim();
         const profileImageUrl = hasProfileImage ? buildProfileImageUrl(userRecordId) : "";
+        const otherUsers = allUsers.filter(candidate => !userRecordsMatch(candidate, userRecord));
+        const userTiles = await Promise.all(otherUsers.map(renderPeopleUserTile));
         routeRoot.innerHTML = div({style: "padded", content: children([
             div({style: "secondary-bordered radius padded shadowed", content: children([
                 button({
@@ -975,42 +1169,34 @@
                     style: `naked no-margin ${hasProfileImage ? "" : "background-secondary"} round float-left space-right`,
                     content: hasProfileImage
                         ? img({src: profileImageUrl, style: "round cover medium-icon", alt: displayName, width: 56, height: 56})
-                        : `<svg class="text-foreground" xmlns="http://www.w3.org/2000/svg" width="56" height="56" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75a17.933 17.933 0 0 1-7.499-1.632Z" /></svg>`,
+                        : buildPeopleFallbackPhoto(),
                     width: 56,
                     height: 56
                 }),
                 div({style: "small-padding-top", content: children([
-                    div({style: "bold", content: displayName}),
-                    div({style: "faded", content: username}),
-                    email ? div({style: "faded small-padding-top", content: email}) : ""
+                    div({style: "bold", content: escapeHtml(displayName)}),
+                    div({style: "faded", content: escapeHtml(username)}),
+                    email ? div({style: "faded small-padding-top", content: escapeHtml(email)}) : ""
                 ])})
             ])}),
+            div({
+                id: "settings-people-list",
+                style: "medium-margin-top",
+                content: userTiles.length ? children(userTiles) : div({style: "faded small-padding", content: "No other users."})
+            }),
+            button({id: "settings-add-person", style: "primary medium-margin-top", type: "button", content: "Add Person", onclick: openAddPersonPortal}),
             !userRecord ? div({style: "faded small-padding", content: "No selected user record was returned for this session."}) : ""
         ])});
         const photoButton = document.getElementById("people-profile-photo-button");
         if (!photoButton) return;
-        if (peopleProfileFileInput) {
-            peopleProfileFileInput.remove();
-            peopleProfileFileInput = null;
-        }
-        const fileInput = document.createElement("input");
-        peopleProfileFileInput = fileInput;
-        fileInput.type = "file";
-        fileInput.accept = "image/*";
-        fileInput.style.display = "none";
-        document.body.appendChild(fileInput);
-        photoButton.style.cursor = "pointer";
-        photoButton.onclick = () => fileInput.click();
-        fileInput.onchange = async () => {
-            const file = fileInput.files && fileInput.files[0];
-            if (!file) return;
-            const didUpload = await uploadPeopleProfilePhoto(file, userRecord);
-            fileInput.value = "";
-            fileInput.remove();
-            if (peopleProfileFileInput === fileInput) peopleProfileFileInput = null;
-            if (didUpload) renderPeopleRoute();
-        };
+        bindPeopleProfilePhotoButton(photoButton, userRecord);
+        routeRoot.querySelectorAll(".people-user-photo-button").forEach(tilePhotoButton => {
+            const recordId = sanitizeUserRecordId(tilePhotoButton.getAttribute("data"));
+            const tileUserRecord = otherUsers.find(candidate => sanitizeUserRecordId(candidate?.id) === recordId);
+            bindPeopleProfilePhotoButton(tilePhotoButton, tileUserRecord);
+        });
     };
+
     const pickBackgroundImage = () => {
         const fileInput = document.createElement("input");
         fileInput.type = "file";
@@ -1041,6 +1227,7 @@
         };
         fileInput.click();
     }
+    
     modular.register(new Service("com.standard.settings", [
         new Portal({
             title: "Settings",
@@ -1300,6 +1487,24 @@
                     afterRender: () => initializeStandardsRoute()
                 }
             ]
+        }),
+        new Portal({
+            title: "Add Person",
+            internal: true,
+            dimensions: [420, 620],
+            navigation: false,
+            tools: [{title: "Save", icon: modular.icons.save, onclick: saveAddedPerson}],
+            route: () => div({
+                style: "large-padding-top small-padding fill",
+                content: children([
+                    div({style: "faded small-padding", content: "Enter the new person's user details."}),
+                    ...ADD_PERSON_FIELDS.map(renderAddPersonField),
+                    div({style: "spacer"})
+                ])
+            }),
+            afterRender: function () {
+                this.portal?.body?.().querySelector(`#${getAddPersonFieldId("firstname")}`)?.focus?.();
+            }
         })
     ]));
 })();
