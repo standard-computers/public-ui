@@ -1131,6 +1131,13 @@ function isEditableShortcutTarget(element = document.activeElement) {
 function getFocusedPortalWindow() {
     return document.querySelector(".draggable-window.window-focused:not(.widget-window)");
 }
+function isAltLetterShortcut(event, letter = "") {
+    if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
+    const normalizedLetter = `${letter || ""}`.trim().toLowerCase();
+    if (!/^[a-z]$/.test(normalizedLetter)) return false;
+    return event.key?.toLowerCase?.() === normalizedLetter
+        || event.code === `Key${normalizedLetter.toUpperCase()}`;
+}
 let lastHandledTileShortcutDirection = "";
 function tileFocusedPortalFromShortcut(e) {
     if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return false;
@@ -1198,17 +1205,18 @@ document.addEventListener("keydown", function (e) {
         return;
     }
     if (tileFocusedPortalFromShortcut(e)) return;
-    if (e.altKey && e.key.toLowerCase() === "w" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    if (isAltLetterShortcut(e, "w")) {
         const focusedWindow = getFocusedPortalWindow();
         if (focusedWindow?.portal && typeof focusedWindow.portal.hide === "function") {
             const nextWindow = getOpenPortalWindows().filter(windowNode => windowNode !== focusedWindow).pop();
             e.preventDefault();
+            window.StandardUI?.altSync?.deactivate?.();
             focusedWindow.portal.hide();
             if (nextWindow && typeof modular?.bringToFront === "function") modular.bringToFront(nextWindow);
             return;
         }
     }
-    if (e.altKey && e.key.toLowerCase() === "t" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    if (isAltLetterShortcut(e, "t")) {
         const openPortalWindows = getOpenPortalWindows();
         if (openPortalWindows.length) {
             const focusedWindow = getFocusedPortalWindow();
