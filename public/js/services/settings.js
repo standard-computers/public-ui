@@ -86,8 +86,8 @@
         });
     };
 
-    const STANDARD_SHEETS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon brick" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5" /></svg>`;
-    const INTERFACES_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>`;
+    const STANDARD_SHEETS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon brick" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5"/></svg>`;
+    const INTERFACES_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>`;
 
     const getPlatformInterfaces = () => {
         const interfaces = typeof window.StandardPlatformInterfaces?.all === "function" ? window.StandardPlatformInterfaces.all() : [];
@@ -119,7 +119,7 @@
     const renderInterfaceIcon = (app) => {
         const icon = `${app?.icon || ""}`.trim();
         if (!icon) return INTERFACES_ICON;
-        return icon.startsWith("<svg") ? icon : `<img src="${escapeHtml(icon)}" style="cover" alt="${escapeHtml(app.title || "")}" />`;
+        return icon.startsWith("<svg") ? icon : `<img src="${escapeHtml(icon)}" style="cover" alt="${escapeHtml(app.title || "")}"/>`;
     };
 
     const renderInterfacesList = () => {
@@ -560,6 +560,119 @@
         }
     };
 
+    const STANDARD_MAKER_FIELD_ID = (name = "") => `standard-maker-${name}`;
+    const STANDARD_CONSTRAINT_TYPES = ["string", "bool", "int", "double", "char", "array", "standard"];
+    const STANDARD_ACCESS_TYPES = ["public", "protected", "private", "global"];
+
+    const openStandardMaker = () => modular.show("com.standard.settings", 2, {newInstance: true});
+
+    const renderStandardMakerRow = (mode = "standard") => {
+        if (mode === "definition") {
+            return `<div class="standard-maker-row standard-maker-definition-row">
+                <input class="standard-maker-definition-name" type="text" placeholder="name" aria-label="Definition name">
+                <input class="standard-maker-definition-value" type="text" placeholder="Stored value" aria-label="Stored value">
+                <button type="button" class="tiny inner-radius standard-maker-remove" title="Remove definition" aria-label="Remove definition">×</button>
+            </div>`;
+        }
+        return `<div class="standard-maker-row standard-maker-constraint-row">
+            <select class="standard-maker-access" aria-label="Access type">${STANDARD_ACCESS_TYPES.map(type => `<option value="${type}"${type === "protected" ? " selected" : ""}>${type}</option>`).join("")}</select>
+            <input class="standard-maker-name" type="text" placeholder="field_name" aria-label="Constraint name">
+            <select class="standard-maker-type" aria-label="Constraint type">${STANDARD_CONSTRAINT_TYPES.map(type => `<option value="${type}">${type}</option>`).join("")}</select>
+            <input class="standard-maker-reference" type="text" placeholder="REF" aria-label="Constraint reference" maxlength="12">
+            <label class="standard-maker-required" title="Require a value"><input type="checkbox"> Required</label>
+            <button type="button" class="tiny inner-radius standard-maker-remove" title="Remove constraint" aria-label="Remove constraint">×</button>
+        </div>`;
+    };
+
+    const getStandardMakerPortalRoot = (portal = null) => portal?.body?.() || document;
+
+    const syncStandardMakerMode = (portal = null, {resetRows = false} = {}) => {
+        const root = getStandardMakerPortalRoot(portal);
+        const mode = root.querySelector(`#${STANDARD_MAKER_FIELD_ID("mode")}`)?.value || "standard";
+        const list = root.querySelector(`#${STANDARD_MAKER_FIELD_ID("rows")}`);
+        const helper = root.querySelector(`#${STANDARD_MAKER_FIELD_ID("helper")}`);
+        if (!list) return;
+        if (helper) helper.textContent = mode === "definition"
+            ? "Definitions restrict a field to a small set of named values."
+            : "Constraints describe the fields stored in each record.";
+        if (resetRows || !list.children.length) list.innerHTML = renderStandardMakerRow(mode);
+        list.querySelectorAll(".standard-maker-remove").forEach(buttonNode => {
+            buttonNode.onclick = () => {
+                buttonNode.closest(".standard-maker-row")?.remove();
+                if (!list.children.length) list.innerHTML = renderStandardMakerRow(mode);
+                syncStandardMakerMode(portal);
+            };
+        });
+    };
+
+    const initializeStandardMaker = function () {
+        const portal = this.portal;
+        const root = getStandardMakerPortalRoot(portal);
+        const modeSelect = root.querySelector(`#${STANDARD_MAKER_FIELD_ID("mode")}`);
+        const addButton = root.querySelector(`#${STANDARD_MAKER_FIELD_ID("add-row")}`);
+        if (modeSelect) modeSelect.onchange = () => syncStandardMakerMode(portal, {resetRows: true});
+        if (addButton) addButton.onclick = () => {
+            const list = root.querySelector(`#${STANDARD_MAKER_FIELD_ID("rows")}`);
+            list?.insertAdjacentHTML("beforeend", renderStandardMakerRow(modeSelect?.value || "standard"));
+            syncStandardMakerMode(portal);
+            list?.lastElementChild?.querySelector("input")?.focus?.();
+        };
+        syncStandardMakerMode(portal);
+        root.querySelector(`#${STANDARD_MAKER_FIELD_ID("name")}`)?.focus?.();
+    };
+
+    const normalizeStandardIdentifier = (value = "") => String(value || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    const normalizeStandardReference = (value = "") => String(value || "").trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
+    const quoteStandardValue = (value = "") => `"${String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+
+    const buildStandardMakerContent = (root) => {
+        const mode = root.querySelector(`#${STANDARD_MAKER_FIELD_ID("mode")}`)?.value || "standard";
+        const name = normalizeStandardIdentifier(root.querySelector(`#${STANDARD_MAKER_FIELD_ID("name")}`)?.value);
+        const reference = normalizeStandardReference(root.querySelector(`#${STANDARD_MAKER_FIELD_ID("reference")}`)?.value);
+        const history = root.querySelector(`#${STANDARD_MAKER_FIELD_ID("history")}`)?.checked === true;
+        if (!name || !reference) throw new Error("Enter a valid name and reference");
+        const rows = Array.from(root.querySelectorAll(".standard-maker-row")).map(row => {
+            if (mode === "definition") {
+                const definitionName = normalizeStandardIdentifier(row.querySelector(".standard-maker-definition-name")?.value);
+                const definitionValue = String(row.querySelector(".standard-maker-definition-value")?.value || "").trim();
+                if (!definitionName || !definitionValue) return "";
+                return `    def ${definitionName} ${quoteStandardValue(definitionValue)}`;
+            }
+            const access = row.querySelector(".standard-maker-access")?.value || "protected";
+            const constraintName = normalizeStandardIdentifier(row.querySelector(".standard-maker-name")?.value);
+            const type = row.querySelector(".standard-maker-type")?.value || "string";
+            const constraintReference = normalizeStandardReference(row.querySelector(".standard-maker-reference")?.value);
+            const required = row.querySelector(".standard-maker-required input")?.checked === true;
+            if (!constraintName || !constraintReference) return "";
+            return `    ${access} ${constraintName} ${type} ${constraintReference}${required ? " *" : ""}`;
+        }).filter(Boolean);
+        if (!rows.length) throw new Error(mode === "definition" ? "Add at least one definition" : "Add at least one constraint");
+        return {name, content: `${history ? "!" : ""}${name}: ${reference} {\n${rows.join("\n")}\n}\n`};
+    };
+
+    const saveCreatedStandard = async (_, context = {}) => {
+        const portal = context?.portal;
+        const root = getStandardMakerPortalRoot(portal);
+        try {
+            const standard = buildStandardMakerContent(root);
+            if (typeof window.StandardUploads?.saveFile !== "function") throw new Error("File saving is unavailable");
+            const relativePath = `Standards/${standard.name}.stds`;
+            const hostPath = `/home/standard-system/${relativePath}`;
+            const response = await window.StandardUploads.saveFile(standard.content, relativePath, {label: `Creating ${standard.name}`});
+            if (!response?.ok) throw new Error("Unable to save the Standard file");
+            const importResponse = await CLI.send(`import ${standard.name} "${hostPath}"`, false);
+            if (importResponse === 0 || importResponse === false || `${importResponse || ""}`.trim().toLowerCase() === "false") {
+                throw new Error("The Standard file was saved but could not be imported");
+            }
+            await CLI.send("reload standards", false);
+            portal?.close?.();
+            modular.success(`${standard.name} created`);
+            await initializeStandardsRoute();
+        } catch (error) {
+            modular.error(error?.message || "Unable to create Standard");
+        }
+    };
+
     const applyBackgroundImage = (backgroundImageFileName) => {
         const rawValue = backgroundImageFileName === true ? (window.StandardUI?.currentBackgroundImageSource || window.StandardUI?.getAppliedBackgroundImageUrl?.() || "") : `${backgroundImageFileName || ""}`.trim();
         const imageUrl = rawValue && !rawValue.startsWith("data:") && !rawValue.startsWith("blob:") && !rawValue.startsWith("http://") && !rawValue.startsWith("https://") && !rawValue.startsWith("/") ? `/api/user-data/${encodeURIComponent(rawValue)}?t=${Date.now()}` : rawValue;
@@ -997,6 +1110,48 @@
         return rawUsername || "Unavailable";
     };
 
+    let selectedPeopleUserRecord = null;
+
+    const openPeopleUser = (userRecord = {}) => {
+        selectedPeopleUserRecord = {...userRecord};
+        modular.show("com.standard.settings", 3, {newInstance: true});
+    };
+
+    const formatPeopleBirthdate = (value = "") => {
+        const birthdate = `${value || ""}`.trim();
+        if (!birthdate) return "";
+        const yearFirst = birthdate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (yearFirst) return `${yearFirst[2].padStart(2, "0")}/${yearFirst[3].padStart(2, "0")}/${yearFirst[1]}`;
+        const monthFirst = birthdate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (monthFirst) return `${monthFirst[1].padStart(2, "0")}/${monthFirst[2].padStart(2, "0")}/${monthFirst[3]}`;
+        const parsedBirthdate = new Date(birthdate);
+        if (Number.isNaN(parsedBirthdate.getTime())) return birthdate;
+        return `${String(parsedBirthdate.getUTCMonth() + 1).padStart(2, "0")}/${String(parsedBirthdate.getUTCDate()).padStart(2, "0")}/${parsedBirthdate.getUTCFullYear()}`;
+    };
+
+    const renderPeopleUserPortal = () => {
+        const userRecord = selectedPeopleUserRecord || {};
+        const recordId = sanitizeUserRecordId(userRecord?.id);
+        const displayName = buildPeopleDisplayName(userRecord);
+        const detailValue = value => `${value || ""}`.trim();
+        const details = [
+            detailValue(userRecord.username || userRecord.userid) && div({style: "small-padding faded", content: escapeHtml(detailValue(userRecord.username || userRecord.userid))}),
+            detailValue(userRecord.phone) && div({style: "small-padding faded", content: escapeHtml(detailValue(userRecord.phone))}),
+            detailValue(userRecord.email) && div({style: "small-padding faded", content: escapeHtml(detailValue(userRecord.email))}),
+            detailValue(userRecord.address) && div({style: "small-padding", content: escapeHtml(detailValue(userRecord.address)).replace(/\s*,\s*/g, "<br>")}),
+            detailValue(userRecord.birthday) && div({style: "small-padding faded", content: escapeHtml(formatPeopleBirthdate(userRecord.birthday))})
+        ].filter(Boolean);
+        return div({content: children([
+            div({style: "center large-margin-top large-margin-bottom", content: children([
+                recordId && userRecord.__hasPeopleProfileImage
+                    ? img({style: "contact-image real-large-icon round inline", src: buildProfileImageUrl(recordId), alt: displayName})
+                    : div({style: "background-secondary round real-large-icon inline", content: buildPeopleFallbackPhoto(120)})
+            ])}),
+            div({style: "small-padding bold large-margin-top", content: escapeHtml(displayName)}),
+            ...details
+        ])});
+    };
+
     const ADD_PERSON_FIELDS = [
         {property: "firstname", label: "First Name"},
         {property: "lastname", label: "Last Name"},
@@ -1066,7 +1221,7 @@
         }
     };
 
-    const buildPeopleFallbackPhoto = (size = 56) => `<svg class="text-foreground" xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75a17.933 17.933 0 0 1-7.499-1.632Z" /></svg>`;
+    const buildPeopleFallbackPhoto = (size = 56) => `<svg class="text-foreground" xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75a17.933 17.933 0 0 1-7.499-1.632Z"/></svg>`;
 
     const renderPeopleUserTile = async (userRecord = {}) => {
         const recordId = sanitizeUserRecordId(userRecord?.id);
@@ -1074,7 +1229,13 @@
         const displayName = buildPeopleDisplayName(userRecord);
         const username = buildPeopleUsername(userRecord);
         const email = `${userRecord?.email || ""}`.trim();
-        return div({style: "settings-people-user-tile secondary-bordered inner-radius padded small-margin-top", content: children([
+        return div({
+            style: "settings-people-user-tile secondary-bordered inner-radius padded small-margin-top pointer",
+            onclick: event => {
+                if (event.target.closest("button")) return;
+                openPeopleUser({...userRecord, __hasPeopleProfileImage: hasProfileImage});
+            },
+            content: children([
             button({
                 style: `people-user-photo-button naked no-margin ${hasProfileImage ? "" : "background-secondary"} round`,
                 data: recordId,
@@ -1163,7 +1324,13 @@
         const otherUsers = allUsers.filter(candidate => !userRecordsMatch(candidate, userRecord));
         const userTiles = await Promise.all(otherUsers.map(renderPeopleUserTile));
         routeRoot.innerHTML = div({style: "padded", content: children([
-            div({style: "secondary-bordered radius padded shadowed", content: children([
+            div({
+                style: "secondary-bordered radius padded shadowed pointer",
+                onclick: event => {
+                    if (event.target.closest("button")) return;
+                    openPeopleUser({...userRecord, __hasPeopleProfileImage: hasProfileImage});
+                },
+                content: children([
                 button({
                     id: "people-profile-photo-button",
                     style: `naked no-margin ${hasProfileImage ? "" : "background-secondary"} round float-left space-right`,
@@ -1184,7 +1351,7 @@
                 style: "medium-margin-top",
                 content: userTiles.length ? children(userTiles) : div({style: "faded small-padding", content: "No other users."})
             }),
-            button({id: "settings-add-person", style: "primary medium-margin-top", type: "button", content: "Add Person", onclick: openAddPersonPortal}),
+            button({id: "settings-add-person", style: "secondary medium-margin-top", type: "button", content: "Add Person", onclick: openAddPersonPortal}),
             !userRecord ? div({style: "faded small-padding", content: "No selected user record was returned for this session."}) : ""
         ])});
         const photoButton = document.getElementById("people-profile-photo-button");
@@ -1234,7 +1401,7 @@
             hints: ["settings", "config"],
             dimensions: [850, 700],
             navigation: false,
-            svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>`,
+            svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>`,
             icon: "/icons/interfaces/settings.png",
             routes: [
                 {
@@ -1244,7 +1411,7 @@
                     afterRender: () => renderPeopleRoute()
                 }, {
                     text: "Appearance",
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.098 19.902a3.75 3.75 0 0 0 5.304 0l6.401-6.402M6.75 21A3.75 3.75 0 0 1 3 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 0 0 3.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88M6.75 17.25h.008v.008H6.75v-.008Z" /></svg>`,
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.098 19.902a3.75 3.75 0 0 0 5.304 0l6.401-6.402M6.75 21A3.75 3.75 0 0 1 3 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 0 0 3.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88M6.75 17.25h.008v.008H6.75v-.008Z"/></svg>`,
                     route: () => div({style: "padded adjust-top", content: children([
                             div({content: children([
                                     button({style: "tiny inner-radius brick spaced float-right", content: "Use Defaults",
@@ -1347,7 +1514,7 @@
                     }
                 }, {
                     text: "Behavior",
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75a4.5 4.5 0 0 1-4.884 4.484c-1.076-.091-2.264.071-2.95.904l-7.152 8.684a2.548 2.548 0 1 1-3.586-3.586l8.684-7.152c.833-.686.995-1.874.904-2.95a4.5 4.5 0 0 1 6.336-4.486l-3.276 3.276a3.004 3.004 0 0 0 2.25 2.25l3.276-3.276c.256.565.398 1.192.398 1.852Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M4.867 19.125h.008v.008h-.008v-.008Z" /></svg>`,
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75a4.5 4.5 0 0 1-4.884 4.484c-1.076-.091-2.264.071-2.95.904l-7.152 8.684a2.548 2.548 0 1 1-3.586-3.586l8.684-7.152c.833-.686.995-1.874.904-2.95a4.5 4.5 0 0 1 6.336-4.486l-3.276 3.276a3.004 3.004 0 0 0 2.25 2.25l3.276-3.276c.256.565.398 1.192.398 1.852Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M4.867 19.125h.008v.008h-.008v-.008Z"/></svg>`,
                     route: () => div({style: "padded adjust-top", content: children([
                             div({style: "spacer"}),
                             switcher({id: "interface-state", checked: ui_settings_options.interface_state}),
@@ -1396,7 +1563,7 @@
                     afterRender: () => initializeInterfacesRoute()
                 }, {
                     text: "Config",
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h15M4.5 12h15m-15 5.25h15" /><circle cx="8" cy="6.75" r="1.5" fill="currentColor" stroke="none" /><circle cx="16" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="10" cy="17.25" r="1.5" fill="currentColor" stroke="none" /></svg>`,
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h15M4.5 12h15m-15 5.25h15"/><circle cx="8" cy="6.75" r="1.5" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="10" cy="17.25" r="1.5" fill="currentColor" stroke="none"/></svg>`,
                     route: () => div({id: "settings-config-root", style: "small-padding", content: children([
                         div({style: "brick small-margin-bottom", content: children([
                             button({style: "tiny inner-radius float-right", content: "Refresh", onclick: () => initializeConfigRoute()}),
@@ -1408,7 +1575,7 @@
                     afterRender: () => initializeConfigRoute()
                 }, {
                     text: "Device Info",
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>`,
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>`,
                     route: () => div({style: "list spaced padded", content: () => {
                             return getDeviceInfo().then((deviceInfo) => {
                                 const config = deviceInfo?.config || {};
@@ -1456,7 +1623,7 @@
                     })
                 }, {
                     text: "History",
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75h1.5m9 0h-9" /></svg>`,
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75h1.5m9 0h-9"/></svg>`,
                     route: () => {
                         const interfaces = (modular.running || []).map((service) => {
                             const shortcut = service?.interfaceShortcut?.();
@@ -1475,12 +1642,15 @@
                     afterRender: () => initializeHistoryRoute()
                 }, {
                     text: "Standards",
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>`,
+                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>`,
                     route: () => div({
                         id: "home-standards-root",
                         style: "small-padding",
                         content: children([
-                            div({style: "brick small-margin-bottom", content: h({level: 3, content: "Standards"})}),
+                            div({style: "brick small-margin-bottom settings-standards-heading", content: children([
+                                h({level: 3, content: "Standards"}),
+                                button({id: "settings-create-standard", type: "button", style: "tiny inner-radius", content: "Create Standard", onclick: openStandardMaker})
+                            ])}),
                             div({id: "home-standards-list", style: "brick", content: div({style: "faded small-padding", content: "Loading standards..."})})
                         ])
                     }),
@@ -1504,6 +1674,52 @@
             }),
             afterRender: function () {
                 this.portal?.body?.().querySelector(`#${getAddPersonFieldId("firstname")}`)?.focus?.();
+            }
+        }),
+        new Portal({
+            title: "Create Standard",
+            internal: true,
+            dimensions: [620, 620],
+            navigation: false,
+            hints: ["create a standard"],
+            tools: [{title: "Create", icon: modular.icons.save, onclick: saveCreatedStandard}],
+            route: () => div({style: "large-padding-top padded", content: children([
+                    div({style: "faded small-padding", content: "Create a simple data shape or a fixed set of allowed values."}),
+                    div({style: "standard-maker-basics", content: children([
+                        div({content: children([
+                            label({input: STANDARD_MAKER_FIELD_ID("mode"), content: "Kind"}),
+                            select({id: STANDARD_MAKER_FIELD_ID("mode"), options: [{label: "Standard", value: "standard"}, {label: "Standard definition", value: "definition"}]})
+                        ])}),
+                        div({content: children([
+                            label({input: STANDARD_MAKER_FIELD_ID("name"), content: "Name"}),
+                            input({id: STANDARD_MAKER_FIELD_ID("name"), type: "text", placeholder: "vehicle"})
+                        ])}),
+                        div({content: children([
+                            label({input: STANDARD_MAKER_FIELD_ID("reference"), content: "Reference"}),
+                            input({id: STANDARD_MAKER_FIELD_ID("reference"), type: "text", placeholder: "VHL", maxlength: 12})
+                        ])})
+                    ])}),
+                    div({style: "standard-maker-history", content: label({input: STANDARD_MAKER_FIELD_ID("history"), content: children([
+                        input({id: STANDARD_MAKER_FIELD_ID("history"), type: "checkbox"}),
+                        " Track record changes"
+                    ])})}),
+                    div({id: STANDARD_MAKER_FIELD_ID("helper"), style: "faded small-padding", content: "Constraints describe the fields stored in each record."}),
+                    div({id: STANDARD_MAKER_FIELD_ID("rows"), style: "standard-maker-rows", content: renderStandardMakerRow("standard")}),
+                    button({id: STANDARD_MAKER_FIELD_ID("add-row"), type: "button", style: "tiny inner-radius medium-margin-top", content: "Add row"})
+                ])
+            }),
+            afterRender: initializeStandardMaker
+        }),
+        new Portal({
+            title: "View Person",
+            internal: true,
+            dimensions: [350, 400],
+            navigation: false,
+            resizable: false,
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25"/></svg>`,
+            route: renderPeopleUserPortal,
+            afterRender: function () {
+                this.portal?.setTitle?.(buildPeopleDisplayName(selectedPeopleUserRecord || {}));
             }
         })
     ]));

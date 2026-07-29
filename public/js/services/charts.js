@@ -28,11 +28,11 @@
 	const FONT_FAMILIES = ["Inter", "Arial", "Georgia", "Courier New", "Times New Roman", "Trebuchet MS", "Verdana"];
 	const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 72, 96];
 	const ALIGN_ICONS = {
-		left: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M4 10.5h10M4 14.5h16M4 18.5h10" /></svg>`,
-		center: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M7 10.5h10M4 14.5h16M7 18.5h10" /></svg>`,
-		right: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M10 10.5h10M4 14.5h16M10 18.5h10" /></svg>`
+		left: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M4 10.5h10M4 14.5h16M4 18.5h10"/></svg>`,
+		center: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M7 10.5h10M4 14.5h16M7 18.5h10"/></svg>`,
+		right: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M10 10.5h10M4 14.5h16M10 18.5h10"/></svg>`
 	};
-	const TEXT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" d="M5 6h14M12 6v12m-4 0h8" /></svg>`;
+	const TEXT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" d="M5 6h14M12 6v12m-4 0h8"/></svg>`;
 	const IMAGE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="m3 16 5-5 4 4 3-3 6 6M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><circle cx="16" cy="8" r="1.5"/></svg>`;
 	const DUPLICATE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>`;
 	const DELETE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg>`;
@@ -228,7 +228,7 @@
 			itemsLayer = root.querySelector(".charts-items"), linesLayer = root.querySelector(".charts-lines"),
 			imageInput = root.querySelector(".charts-image-input");
 		let selected = new Set(), editing = null, drag = null, pan = null, resize = null, connectorDraft = null,
-			clipboard = [], activeTool = "select", drawStart = null;
+			clipboard = [], activeTool = "select", drawStart = null, drawPreview = null;
 		const currentStyle = defaultStyle();
 		const itemById = id => documentState.items.find(item => item.id === id);
 		const vertexPoint = (item, vertex) => ({
@@ -326,6 +326,41 @@
 			node.setAttribute("stroke-width", "2");
 			shape.append(node);
 			return shape;
+		};
+		const updateDrawPreview = point => {
+			if (!drawStart || !drawPreview) return;
+			const x = Math.min(drawStart.x, point.x), y = Math.min(drawStart.y, point.y),
+				w = Math.max(80, Math.abs(point.x - drawStart.x)), h = Math.max(36, Math.abs(point.y - drawStart.y));
+			Object.assign(drawPreview.style, {
+				left: `${x}px`,
+				top: `${y}px`,
+				width: `${w}px`,
+				height: `${h}px`
+			});
+			if (drawPreview.dataset.type === "shape") {
+				const previewShape = shapeSvg({
+					kind: drawPreview.dataset.kind,
+					w,
+					h,
+					style: currentStyle
+				});
+				drawPreview.replaceChildren(previewShape);
+			}
+		};
+		const beginDrawPreview = point => {
+			const isText = activeTool === "text";
+			drawPreview = document.createElement("div");
+			drawPreview.className = `charts-item charts-draw-preview charts-${isText ? "text" : "shape"}`;
+			drawPreview.dataset.type = isText ? "text" : "shape";
+			drawPreview.dataset.kind = isText ? "rectangle" : activeTool.slice(6);
+			if (isText) {
+				const text = document.createElement("div");
+				text.className = "charts-item-text";
+				text.textContent = "Text";
+				drawPreview.append(text);
+			}
+			itemsLayer.append(drawPreview);
+			updateDrawPreview(point);
 		};
 		const renderItems = () => {
 			itemsLayer.innerHTML = "";
@@ -559,6 +594,7 @@
 			if (event.target === stage || event.target === world || event.target === itemsLayer) {
 				if (activeTool === "text" || activeTool.startsWith("shape:")) {
 					drawStart = screenToWorld(event.clientX, event.clientY);
+					beginDrawPreview(drawStart);
 					stage.setPointerCapture?.(event.pointerId);
 					return;
 				}
@@ -571,7 +607,9 @@
 		stage.addEventListener("pointermove", event => {
 			if (connectorDraft) return;
 			const p = screenToWorld(event.clientX, event.clientY);
-			if (drag) {
+			if (drawStart && drawPreview) {
+				updateDrawPreview(p);
+			} else if (drag) {
 				const dx = p.x - drag.start.x, dy = p.y - drag.start.y;
 				drag.originals.forEach(o => {
 					o.item.x = o.x + dx;
@@ -615,6 +653,8 @@
 					};
 				documentState.items.push(item);
 				selected = new Set([item.id]);
+				drawPreview?.remove();
+				drawPreview = null;
 				drawStart = null;
 				setTool("select");
 				render();
@@ -622,6 +662,12 @@
 				return;
 			}
 			finishConnector(event);
+			drag = pan = resize = null;
+		});
+		stage.addEventListener("pointercancel", () => {
+			drawPreview?.remove();
+			drawPreview = null;
+			drawStart = null;
 			drag = pan = resize = null;
 		});
 		stage.addEventListener("wheel", event => {
@@ -764,7 +810,7 @@
 		centered_nav: true,
 		maximized: true,
 		icon: ICON,
-		svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h6A1.5 1.5 0 0 1 11.25 6v3A1.5 1.5 0 0 1 9.75 10.5h-6A1.5 1.5 0 0 1 2.25 9V6A1.5 1.5 0 0 1 3.75 4.5Zm10.5 9h6A1.5 1.5 0 0 1 21.75 15v3a1.5 1.5 0 0 1-1.5 1.5h-6a1.5 1.5 0 0 1-1.5-1.5v-3a1.5 1.5 0 0 1 1.5-1.5ZM11.25 7.5h3.375A3.375 3.375 0 0 1 18 10.875V13.5m0 0-2.25-2.25M18 13.5l2.25-2.25" /></svg>`,
+		svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h6A1.5 1.5 0 0 1 11.25 6v3A1.5 1.5 0 0 1 9.75 10.5h-6A1.5 1.5 0 0 1 2.25 9V6A1.5 1.5 0 0 1 3.75 4.5Zm10.5 9h6A1.5 1.5 0 0 1 21.75 15v3a1.5 1.5 0 0 1-1.5 1.5h-6a1.5 1.5 0 0 1-1.5-1.5v-3a1.5 1.5 0 0 1 1.5-1.5ZM11.25 7.5h3.375A3.375 3.375 0 0 1 18 10.875V13.5m0 0-2.25-2.25M18 13.5l2.25-2.25"/></svg>`,
 		tools: [{title: "Save", icon: modular.icons.save, onclick: saveChart}, {
 			title: "Search",
 			icon: modular.icons.search,

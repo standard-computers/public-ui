@@ -861,7 +861,7 @@
             `<div class="internals-article-meta">`,
             article.description ? `<div class="faded">${escapeHtml(article.description)}</div>` : "",
             `</div>`,
-            `<img class="article-icon internals-article-icon" src="${escapeHtml(articleIconSrc(article, {preferPreview: true}))}" alt="${escapeHtml(title)}" />`,
+            `<img class="article-icon internals-article-icon" src="${escapeHtml(articleIconSrc(article, {preferPreview: true}))}" alt="${escapeHtml(title)}"/>`,
             `<h2>${escapeHtml(title)}</h2>`,
             sanitizeArticleUrl(article.link) ? `<a href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.link)}</a>` : `<div>${escapeHtml(article.link)}</div>`,
             `</div>`,

@@ -54,10 +54,10 @@
                     ${message ? `<div class="standard-notification-message">${escapeHtml(message)}</div>` : ""}
                 </div>
                 ${details.length ? `<button class="plain standard-notification-toggle" type="button" aria-label="Show notification details" aria-expanded="false" aria-controls="${id}-details">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
                 </button>` : ""}
                 <button class="plain standard-notification-dismiss" type="button" aria-label="Dismiss notification">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
                 </button>
             </div>
             ${details.length ? `<div class="standard-notification-details" id="${id}-details">${details.map(item => `<div>${escapeHtml(item)}</div>`).join("")}</div>` : ""}

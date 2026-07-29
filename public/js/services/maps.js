@@ -4,7 +4,7 @@
     let detachMapsSearchHandlers = null;
     const MAPS_CACHE_KEY = "recent-searches";
     const MAPS_CACHE_LIMIT = 10;
-    const MAP_STYLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3" /></svg>`;
+    const MAP_STYLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3"/></svg>`;
     const MAP_STYLE_OPTIONS = [
         {id: "default", label: "Default", style: "mapbox://styles/mapbox/streets-v12"},
         {id: "monochrome", label: "Monochrome", style: "mapbox://styles/mapbox/standard", config: {basemap: {theme: "monochrome"}}},
@@ -23,14 +23,14 @@
             horizontal_nav: true,
             centered_nav: true,
             icon: "/icons/interfaces/maps.png",
-            svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" /></svg>`,
+            svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"/></svg>`,
             route: () => div({empty: true, style: "flex maps-shell", id: "map-shell", content: div({style: "maps-search-overlay", content: [
                             div({style: "maps-search-stack", content: [
                             input({id: "maps-search-input", placeholder: "Search by address or lat, lng", style: "maps-search-input", type: "text"}),
                                 div({id: "maps-search-autocomplete", style: "maps-search-autocomplete hidden"})
                             ].join("")}),
-                            button({id: "maps-search-button", style: "maps-search-button", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="smaller-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>`}),
-                            button({id: "maps-directions-toggle", style: "maps-search-button", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="smaller-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75 11.25 4.5 13.5 6.75M11.25 4.5v15m0 0L9 17.25m2.25 2.25 2.25-2.25M15.75 8.25h1.875A2.625 2.625 0 0 1 20.25 10.875v0A2.625 2.625 0 0 1 17.625 13.5H6.375A2.625 2.625 0 0 0 3.75 16.125v0A2.625 2.625 0 0 0 6.375 18.75H7.5" /></svg>`})
+                            button({id: "maps-search-button", style: "maps-search-button", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="smaller-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>`}),
+                            button({id: "maps-directions-toggle", style: "maps-search-button", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="smaller-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75 11.25 4.5 13.5 6.75M11.25 4.5v15m0 0L9 17.25m2.25 2.25 2.25-2.25M15.75 8.25h1.875A2.625 2.625 0 0 1 20.25 10.875v0A2.625 2.625 0 0 1 17.625 13.5H6.375A2.625 2.625 0 0 0 3.75 16.125v0A2.625 2.625 0 0 0 6.375 18.75H7.5"/></svg>`})
                         ].join("")}) +
                     div({id: "maps-directions-panel", style: "maps-directions-panel hidden", content: [
                             div({style: "maps-directions-fields", content: [
@@ -59,11 +59,11 @@
                                 ].join("")})
                         ].join("")}) +
                     div({style: "maps-controls-overlay no-background", content: [
-                            button({id: "maps-zoom-in", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`}),
-                            button({id: "maps-zoom-out", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" /></svg>`}),
+                            button({id: "maps-zoom-in", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>`}),
+                            button({id: "maps-zoom-out", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"/></svg>`}),
                             div({style: "maps-control-row no-background", content: [
                                     button({id: "maps-style", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: MAP_STYLE_ICON}),
-                                    button({id: "maps-home", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>`})
+                                    button({id: "maps-home", style: "maps-control-button no-padding small-padding secondary-bordered no-background blurred", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>`})
                                 ].join("")})
                         ].join("")
                     }) +
@@ -136,7 +136,23 @@
                 let activeLocationLayerHandlersAttached = false;
                 let pendingDirectionsRouteData = null;
                 let pendingDirectionsPointsData = null;
+                let contextMenuCoordinates = null;
                 const formatCoordinate = (value) => Number(value).toFixed(6);
+                const createLocationRecord = (coordinates) => {
+                    const latitude = Number(coordinates?.lat);
+                    const longitude = Number(coordinates?.lng);
+                    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+                        modular.error("Couldn't determine the selected location");
+                        return;
+                    }
+                    CLI.send(`[locations] + ("", "Location", "", "", "", "", "", 0, ${latitude}, ${longitude}, "", @)`).then(response => {
+                        if (response !== 0 && response !== "0") {
+                            modular.success("Location saved");
+                        } else {
+                            modular.error("Couldn't save location");
+                        }
+                    }).catch(() => modular.error("Couldn't save location"));
+                };
                 const buildActiveLocationFeature = (lng, lat, label = "Selected Location") => ({type: "Feature", geometry: {type: "Point", coordinates: [lng, lat]}, properties: {label, coordinatesLabel: `${formatCoordinate(lat)}, ${formatCoordinate(lng)}`}});
                 const buildActiveLocationData = (lng, lat, label = "Selected Location") => ({type: "FeatureCollection", features: [buildActiveLocationFeature(lng, lat, label)]});
                 const clearActiveLocationPopup = () => {
@@ -594,6 +610,15 @@
                 };
                 document.addEventListener("click", handleDocumentClick);
                 detachMapsSearchHandlers = () => document.removeEventListener("click", handleDocumentClick);
+                mapContainer.addEventListener("contextmenu", (event) => {
+                    const bounds = mapContainer.getBoundingClientRect();
+                    contextMenuCoordinates = map.unproject([event.clientX - bounds.left, event.clientY - bounds.top]);
+                }, {capture: true});
+                mapContainer.contextmenu([{
+                    icon: modular.icons.create,
+                    label: "Create Location",
+                    action: () => createLocationRecord(contextMenuCoordinates)
+                }]);
                 const applyMapStyle = (styleOption) => {
                     if (!styleOption || activeStyleId === styleOption.id) return;
                     const previousStyleId = activeStyleId;

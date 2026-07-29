@@ -491,12 +491,12 @@
 		content: children([
 			button({
 				style: "naked tiny secondary",
-				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>`,
+				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/></svg>`,
 				onclick: previous
 			}),
 			button({
 				style: "naked tiny secondary",
-				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3.75H6A2.25 2.25 0 0 0 3.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0 1 20.25 6v1.5m0 9V18A2.25 2.25 0 0 1 18 20.25h-1.5m-9 0H6A2.25 2.25 0 0 1 3.75 18v-1.5M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>`,
+				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3.75H6A2.25 2.25 0 0 0 3.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0 1 20.25 6v1.5m0 9V18A2.25 2.25 0 0 1 18 20.25h-1.5m-9 0H6A2.25 2.25 0 0 1 3.75 18v-1.5M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>`,
 				onclick: () => {
 					selectToday();
 					refreshMainCalendarPortal();
@@ -504,7 +504,7 @@
 			}),
 			button({
 				style: "naked tiny secondary",
-				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>`,
+				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>`,
 				onclick: next
 			}),
 			div({style: "float-right strong small-padding-top", content: label})
@@ -1073,6 +1073,8 @@
 	let selectedDateRangeEnd = selectedDate;
 	let disposeRangeSelectionListeners = () => {
 	};
+	let disposeDayTimeSelectionListeners = () => {
+	};
 	const yearStart = new Date(currentYear, 0, 1);
 	const daysInYear = Math.round((new Date(currentYear + 1, 0, 1) - yearStart) / 86400000);
 	const weekdayLabels = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -1085,7 +1087,7 @@
 			centered_nav: true,
 			tools: [{
 				title: "New Event",
-				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
+				icon: modular.icons.create,
 				onclick: _ => {
 					selectToday();
 					openCreateEventPortal();
@@ -1095,7 +1097,7 @@
 				icon: `<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><style>.s0{fill:none;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width: 1 } </style><path class="s0" d="m10 5h-3.29q-0.34 0-0.65 0.13-0.32 0.13-0.56 0.37-0.24 0.24-0.37 0.56-0.13 0.31-0.13 0.65v3.29c0 0.45 0.18 0.89 0.5 1.21l7.3 7.3c0.53 0.53 1.35 0.66 1.98 0.25q0.59-0.39 1.14-0.84 0.55-0.45 1.05-0.95 0.5-0.5 0.95-1.05 0.45-0.55 0.84-1.14c0.41-0.63 0.28-1.45-0.25-1.98l-7.3-7.3q-0.12-0.12-0.26-0.21-0.14-0.09-0.29-0.16-0.16-0.06-0.33-0.1-0.16-0.03-0.33-0.03z"/><path class="s0" d="m7.28 7.28h0.01v0.01h-0.01z"/></svg>`,
 				onclick: () => modular.show("com.standard.calendar", 1)
 			}],
-			svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" /></svg>`,
+			svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z"/></svg>`,
 			icon: "/icons/interfaces/calendar.png",
 			routes: [
 				{
@@ -1302,28 +1304,14 @@
 													openCreateEventPortal();
 												},
 												content: children([
-													div({
-														style: "line", content: children([
-															div({
-																style: `strong ${isToday ? "text-primary" : ""}`,
-																content: weekDate.toLocaleDateString([], {weekday: "short"})
-															}),
-															div({
-																style: "float-right faded",
-																content: weekDate.toLocaleDateString([], {
-																	month: "short",
-																	day: "numeric"
-																})
-															})
+													div({style: "line", content: children([
+															div({style: "float-right faded", content: weekDate.toLocaleDateString([], {month: "short", day: "numeric"})}),
+															div({style: `strong ${isToday ? "text-primary" : ""}`, content: weekDate.toLocaleDateString([], {weekday: "short"})})
 														])
 													}),
 													div({style: "spaced"}),
-													div({
-														style: "notes-list",
-														content: dayEntries.length === 0 ? div({
-															style: "faded padded center",
-															content: "No events"
-														}) : children(dayEntries.map(eventEntry => div({
+													div({style: "notes-list",
+														content: dayEntries.length === 0 ? div({style: "faded padded center"}) : children(dayEntries.map(eventEntry => div({
 															style: "calendar-week-event small-padding-bottom",
 															content: renderCalendarEventChip(eventEntry, weekDate, {compact: true})
 														})))
@@ -1386,13 +1374,19 @@
 										label: getDayRouteTitle(selectedDate)
 									}),
 									div({
-										style: "notes-list", content: children(Array.from({length: 24}, (_, hour) => {
+										id: "calendar-day-time-grid",
+										style: "notes-list calendar-day-time-grid", content: children(Array.from({length: 24}, (_, hour) => {
 											const slotDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), hour, 0, 0, 0);
 											const slotEndDate = new Date(slotDate.getTime() + 60 * 60 * 1000);
 											const slotEntries = entriesByHour[hour] || [];
 											return div({
-												style: "bordered-bottom padded small-spaced hover-shadowed pointer",
+												id: `calendar-day-hour-${hour}`,
+												style: "calendar-day-time-slot bordered-bottom padded small-spaced hover-shadowed pointer",
 												onclick: event => {
+													if (event.currentTarget?.classList?.contains("calendar-day-time-slot--dragged")) {
+														event.currentTarget.classList.remove("calendar-day-time-slot--dragged");
+														return;
+													}
 													if (event.target?.closest?.(".calendar-day-event")) return;
 													openCreateEventPortalForDateTime(slotDate, slotEndDate);
 												},
@@ -1427,6 +1421,81 @@
 								]);
 							})
 						});
+					},
+					afterRender: () => {
+						const dayGrid = document.getElementById("calendar-day-time-grid");
+						if (!dayGrid) return;
+						disposeDayTimeSelectionListeners();
+						const slots = Array.from(dayGrid.querySelectorAll(".calendar-day-time-slot"));
+						let anchorHour = null;
+						let activeHour = null;
+						let isSelecting = false;
+						let hasDragged = false;
+						const getSlotHour = slot => {
+							const match = `${slot?.id || ""}`.match(/^calendar-day-hour-(\d+)$/);
+							return match ? Number(match[1]) : null;
+						};
+						const getSlotFromPoint = event => {
+							const directSlot = event.target?.closest?.(".calendar-day-time-slot");
+							if (directSlot && dayGrid.contains(directSlot)) return directSlot;
+							const pointedElement = document.elementFromPoint?.(event.clientX, event.clientY);
+							const pointedSlot = pointedElement?.closest?.(".calendar-day-time-slot");
+							return pointedSlot && dayGrid.contains(pointedSlot) ? pointedSlot : null;
+						};
+						const paintSelection = () => {
+							const firstHour = Math.min(anchorHour, activeHour);
+							const lastHour = Math.max(anchorHour, activeHour);
+							slots.forEach(slot => {
+								const hour = getSlotHour(slot);
+								slot.classList.toggle("calendar-day-time-slot--selected", isSelecting && hour >= firstHour && hour <= lastHour);
+							});
+						};
+						const startSelection = event => {
+							if (event.button !== 0 || event.target?.closest?.(".calendar-day-event")) return;
+							const slot = getSlotFromPoint(event);
+							const hour = getSlotHour(slot);
+							if (hour === null) return;
+							anchorHour = hour;
+							activeHour = hour;
+							isSelecting = true;
+							hasDragged = false;
+							dayGrid.classList.add("calendar-day-time-grid--selecting");
+							paintSelection();
+							event.preventDefault();
+						};
+						const updateSelection = event => {
+							if (!isSelecting) return;
+							const slot = getSlotFromPoint(event);
+							const hour = getSlotHour(slot);
+							if (hour === null || hour === activeHour) return;
+							activeHour = hour;
+							hasDragged = true;
+							paintSelection();
+							event.preventDefault();
+						};
+						const stopSelection = event => {
+							if (!isSelecting) return;
+							updateSelection(event);
+							const firstHour = Math.min(anchorHour, activeHour);
+							const lastHour = Math.max(anchorHour, activeHour);
+							const anchorSlot = document.getElementById(`calendar-day-hour-${anchorHour}`);
+							isSelecting = false;
+							dayGrid.classList.remove("calendar-day-time-grid--selecting");
+							slots.forEach(slot => slot.classList.remove("calendar-day-time-slot--selected"));
+							if (!hasDragged) return;
+							anchorSlot?.classList.add("calendar-day-time-slot--dragged");
+							const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), firstHour, 0, 0, 0);
+							const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), lastHour + 1, 0, 0, 0);
+							openCreateEventPortalForDateTime(start, end);
+						};
+						dayGrid.addEventListener("mousedown", startSelection);
+						document.addEventListener("mousemove", updateSelection);
+						document.addEventListener("mouseup", stopSelection);
+						disposeDayTimeSelectionListeners = () => {
+							dayGrid.removeEventListener("mousedown", startSelection);
+							document.removeEventListener("mousemove", updateSelection);
+							document.removeEventListener("mouseup", stopSelection);
+						};
 					}
 				}
 			]
@@ -1438,7 +1507,7 @@
 			resizable: false,
 			tools: [{
 				title: "Create Category",
-				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
+				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>`,
 				onclick: () => modular.show("com.standard.calendar", 2)
 			}],
 			icon: `<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><style>.s0{fill:none;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width: 1 } </style><path class="s0" d="m10 5h-3.29q-0.34 0-0.65 0.13-0.32 0.13-0.56 0.37-0.24 0.24-0.37 0.56-0.13 0.31-0.13 0.65v3.29c0 0.45 0.18 0.89 0.5 1.21l7.3 7.3c0.53 0.53 1.35 0.66 1.98 0.25q0.59-0.39 1.14-0.84 0.55-0.45 1.05-0.95 0.5-0.5 0.95-1.05 0.45-0.55 0.84-1.14c0.41-0.63 0.28-1.45-0.25-1.98l-7.3-7.3q-0.12-0.12-0.26-0.21-0.14-0.09-0.29-0.16-0.16-0.06-0.33-0.1-0.16-0.03-0.33-0.03z"/><path class="s0" d="m7.28 7.28h0.01v0.01h-0.01z"/></svg>`,
@@ -1666,7 +1735,7 @@
 				icon: modular.icons.save,
 				onclick: () => createEventFromPortal(4)
 			}],
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" /></svg>`,
+			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z"/></svg>`,
 			route: () => div({
 				style: "no-scrollbars large-padding-top", id: "", content: () => CLI.send("[cats]").then(response => {
 					const categories = getCategoriesList(response);
@@ -1804,7 +1873,7 @@
 			navigation: false,
 			tools: [{
 				title: "Edit",
-				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><g transform="scale(0.9) translate(1.333 1.333) translate(0.25 0.6)"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75a2.121 2.121 0 1 1 3 3L9 17.25 4.5 18.75 6 14.25 16.5 3.75Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 5.25l3 3" /></g></svg>`,
+				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><g transform="scale(0.9) translate(1.333 1.333) translate(0.25 0.6)"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75a2.121 2.121 0 1 1 3 3L9 17.25 4.5 18.75 6 14.25 16.5 3.75Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 5.25l3 3"/></g></svg>`,
 				onclick: () => {
 					if (!selectedEvent) return;
 					hideCalendarPortal(5);

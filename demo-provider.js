@@ -212,6 +212,7 @@ class DemoProvider {
             alarms: ["user", "name", "timestamp", "level", "enabled", "repeats", "days"],
             cats: ["name", "color"],
             events: ["owner", "category", "name", "start", "end", "invitees", "recurrence"],
+            locations: ["name", "description", "street", "city", "territory", "country", "postal", "established", "latitude", "longitude", "timezone", "origin"],
             email: ["thread", "messageId", "inReplyTo", "references", "threadTopic", "threadIndex", "draft", "from", "to", "cc", "bcc", "subject", "body", "html", "folder", "category", "read", "starred", "priority", "direction", "date", "parent"],
             articles: ["title", "description", "link", "content", "source", "priority"]
         };

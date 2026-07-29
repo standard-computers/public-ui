@@ -2,7 +2,13 @@
 
 	const ALARMS_SERVICE_ID = "com.standard.alarms";
 	const DEFAULT_ALARM_NAME = "Untitled";
-	const ALARM_SETTINGS = {default_name: {label: "Default Name", type: "text", default: DEFAULT_ALARM_NAME}};
+	const ALARM_SETTINGS = {
+		default_name: {
+			label: "Default Name",
+			type: "text",
+			default: DEFAULT_ALARM_NAME
+		}
+	};
 
 	const padTimeUnit = value => `${Number.isFinite(value) ? value : 0}`.padStart(2, "0");
 
@@ -159,37 +165,35 @@
 			dimensions: [340, 146],
 			resizable: false,
 			navigation: false,
-			tools: [{title: "Save", icon: modular.icons.save, onclick: saveAlarm}, {
-				title: "Delete",
-				icon: modular.icons.delete,
-				onclick: () => handleAlarmMutation(CLI.send(`[alarms] - <id ${alarm.id}>`), "Deleted alarm", "Couldn't delete alarm")
-			}],
+			tools: [
+				{
+					title: "Delete",
+					icon: modular.icons.delete,
+					onclick: () => handleAlarmMutation(CLI.send(`[alarms] - <id ${alarm.id}>`), "Deleted alarm", "Couldn't delete alarm")
+				},
+				{title: "Save", icon: modular.icons.save, onclick: saveAlarm}
+			],
 			icon: "/icons/interfaces/alarms.png",
-			route: () => div({
-				style: "large-padding-top no-scrollbars", content: children([div({
-					style: "list padded", content: children([em({
-						style: "faded", content: `Currently set for ${alarm.timestamp}`
-					}), div({style: "spacer"}), div({
-						style: "bi", content: children([div({
-							content: children([label({
-								style: "faded", content: "Hour"
-							}), input({
-								id: "alarm-edit-hour", type: "number", min: 0, max: 23, value: parsedTime.hour
-							})])
-						}), div({
-							content: children([label({
-								style: "faded", content: "Minute"
-							}), input({
-								id: "alarm-edit-minute",
-								type: "text",
-								inputmode: "numeric",
-								pattern: "[0-9]*",
-								maxlength: 2,
-								value: padTimeUnit(parsedTime.minute)
-							})])
-						})])
-					})])
-				})])
+			route: () => div({style: "large-padding-top no-scrollbars", content: children([
+					div({style: "list padded", content: children([
+							em({style: "faded", content: `Currently set for ${alarm.timestamp}`}),
+							div({style: "spacer"}),
+							div({style: "bi", content: children([
+									div({content: children([
+											label({style: "faded", content: "Hour"}),
+											input({id: "alarm-edit-hour", type: "number", min: 0, max: 23, value: parsedTime.hour})
+										])
+									}),
+									div({content: children([
+										label({style: "faded", content: "Minute"}),
+										input({id: "alarm-edit-minute", type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: 2, value: padTimeUnit(parsedTime.minute)})
+										])
+									})
+								])
+							})
+						])
+					})
+				])
 			})
 		});
 		alarmPortal.show();
@@ -256,7 +260,7 @@
 			type: "alarms",
 			title: alarm ? alarmName : fallbackLabel,
 			message: alarmTime ? `Alarm set for ${alarmTime}` : "Alarm triggered",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>`
+			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`
 		});
 		modular.refresh(ALARMS_SERVICE_ID);
 	};
@@ -271,7 +275,7 @@
 		resizable: false,
 		tools: [{
 			title: "New Alarm",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>`,
+			icon: modular.icons.create,
 			onclick: async (_event, view) => {
 				const defaultAlarmName = await getDefaultAlarmName(view);
 				inputDialogue({
@@ -299,39 +303,38 @@
 				})
 			}
 		}],
-		svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>`,
+		svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`,
 		icon: "/icons/interfaces/alarms.png",
-		route: () => div({
-			style: "large-padding-top", content: children([div({
-				id: "alarms-list", style: "list", content: () => {
+		route: () => div({style: "large-padding-top", content: children([
+			div({id: "alarms-list", style: "list", content: () => {
 					return CLI.send("[alarms]").then(d => {
 						const sorted = [...d.alarms].sort((a, b) => getAlarmSortKey(a) - getAlarmSortKey(b));
 						let as = [];
 						for (let i = 0; i < sorted.length; i++) {
 							const alarm = sorted[i];
-							as.push(div({
-								style: "alarm-tile padded secondary-tile brick line",
-								data: alarm.id,
+							as.push(div({style: "alarm-tile padded secondary-tile brick line", data: alarm.id,
 								onclick: () => openAlarmPortal(alarm),
-								content: children([div({
-									onclick: event => event.stopPropagation(), content: switcher({
-										style: "no-margin float-right large-adjust-top",
-										id: `alarm-enabled-${alarm.id}`,
-										checked: alarm.enabled,
-										onchange: event => {
-											event.stopPropagation();
-											const isActive = event.target.checked;
-											CLI.send(`[alarms] enabled ${isActive} <id ${alarm.id}>`).then(r => {
-												if (r !== 0) {
-													modular.success((isActive ? "Enabled" : "Disabled") + " " + (alarm.name || "Untitled"));
-													modular.refresh("com.standard.alarms");
-												} else {
-													modular.error("Couldn't update alarm");
-												}
-											});
-										}
-									})
-								}), h({level: 3, content: alarm.name}), em({content: alarm.timestamp})])
+								content: children([
+									div({onclick: event => event.stopPropagation(), content: switcher({
+											style: "no-margin float-right large-adjust-top", id: `alarm-enabled-${alarm.id}`,
+											checked: alarm.enabled,
+											onchange: event => {
+												event.stopPropagation();
+												const isActive = event.target.checked;
+												CLI.send(`[alarms] enabled ${isActive} <id ${alarm.id}>`).then(r => {
+													if (r !== 0) {
+														modular.success((isActive ? "Enabled" : "Disabled") + " " + (alarm.name || "Untitled"));
+														modular.refresh("com.standard.alarms");
+													} else {
+														modular.error("Couldn't update alarm");
+													}
+												});
+											}
+										})
+									}),
+									h({level: 3, content: alarm.name}),
+									em({content: alarm.timestamp})
+								])
 							}))
 						}
 						return children(as);
