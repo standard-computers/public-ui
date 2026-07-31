@@ -195,14 +195,26 @@
         {name: "Normal", color: "rgba(255, 255, 255, 0.5)", secondary: "rgba(238, 238, 238, 0.5)"},
         {name: "Dark Gray", color: "rgba(211, 211, 211, 0.5)", secondary: "rgba(211, 211, 211, 0.5)"}
     ];
-    const deleteNote = (noteId, onSuccess = () => {}) => {
+    const removeDeletedNoteTile = (noteId, tile = null) => {
+        const deletedTile = tile?.closest?.(".note-tile");
+        if (deletedTile) {
+            deletedTile.remove();
+            return;
+        }
+        document.querySelectorAll(".note-tile").forEach(noteTile => {
+            if (noteTile.getAttribute("data") === String(noteId) || noteTile.getAttribute("directive") === String(noteId)) {
+                noteTile.remove();
+            }
+        });
+    };
+    const deleteNote = (noteId, onSuccess = () => {}, tile = null) => {
         if (!noteId) return;
         confirmationDialogue({title: "Delete Note", content: "You're sure you want to delete this note?",
             confirmation: () => {
                 CLI.send(`[notes] - <id ${noteId}>`).then(response => {
                     if (response !== 0) {
+                        removeDeletedNoteTile(noteId, tile);
                         onSuccess();
-                        refreshNotes();
                         modular.success("Deleted note");
                     } else {
                         modular.error("Unable to delete note");
@@ -383,7 +395,7 @@
                                                 button({
                                                     style: "naked inner-radius float-right expose small-padding",
                                                     icon: modular.icons.delete,
-                                                    onclick: () => deleteNote(note.id)
+                                                    onclick: event => deleteNote(note.id, undefined, event.currentTarget)
                                                 }),
                                                 em({style: "smaller faded", content: note.created}),
                                                 div({
@@ -423,7 +435,7 @@
                     {
                         icon: modular.icons.delete, label: "Delete", destructive: true, action: (b, e, el) => {
                             const noteTile = el.closest(".note-tile");
-                            deleteNote(noteTile?.getAttribute("data"));
+                            deleteNote(noteTile?.getAttribute("data"), undefined, noteTile);
                         }
                     }
                 ]);

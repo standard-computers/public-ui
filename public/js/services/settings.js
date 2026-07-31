@@ -561,7 +561,7 @@
     };
 
     const STANDARD_MAKER_FIELD_ID = (name = "") => `standard-maker-${name}`;
-    const STANDARD_CONSTRAINT_TYPES = ["string", "bool", "int", "double", "char", "array", "standard"];
+    const STANDARD_CONSTRAINT_TYPES = ["string", "bool", "int", "double", "char", "array"];
     const STANDARD_ACCESS_TYPES = ["public", "protected", "private", "global"];
 
     const openStandardMaker = () => modular.show("com.standard.settings", 2, {newInstance: true});
@@ -656,12 +656,13 @@
         try {
             const standard = buildStandardMakerContent(root);
             if (typeof window.StandardUploads?.saveFile !== "function") throw new Error("File saving is unavailable");
-            const relativePath = `Standards/${standard.name}.stds`;
+            const relativePath = `standards/${standard.name}.stds`;
             const hostPath = `/home/standard-system/${relativePath}`;
             const response = await window.StandardUploads.saveFile(standard.content, relativePath, {label: `Creating ${standard.name}`});
             if (!response?.ok) throw new Error("Unable to save the Standard file");
             const importResponse = await CLI.send(`import ${standard.name} "${hostPath}"`, false);
-            if (importResponse === 0 || importResponse === false || `${importResponse || ""}`.trim().toLowerCase() === "false") {
+            const normalizedImportResponse = `${importResponse ?? ""}`.trim();
+            if (importResponse === 0 || importResponse === false || /^(false|failed|error|invalid|unknown)\b/i.test(normalizedImportResponse)) {
                 throw new Error("The Standard file was saved but could not be imported");
             }
             await CLI.send("reload standards", false);
@@ -1155,25 +1156,30 @@
     const ADD_PERSON_FIELDS = [
         {property: "firstname", label: "First Name"},
         {property: "lastname", label: "Last Name"},
-        {property: "birthday", label: "Birthday", type: "date"},
+        {property: "birthday", label: "Birthday", input: dateInput},
         {property: "username", label: "Username"},
         {property: "email", label: "Email", type: "email"},
-        {property: "phone", label: "Phone", type: "tel"},
+        {property: "phone", label: "Phone", input: phoneInput},
         {property: "address", label: "Address"}
     ];
 
     const escapePeopleCliValue = (value = "") => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
     const getAddPersonFieldId = (property = "") => `settings-add-person-${property}`;
+    const getModifyPersonFieldId = (property = "") => `settings-modify-person-${property}`;
 
-    const renderAddPersonField = (field = {}) => div({content: children([
+    const renderPersonField = (field = {}, idForProperty = getAddPersonFieldId, userRecord = {}) => div({content: children([
         div({style: "bold small-padding", content: field.label || field.property}),
-        div({style: "padded", content: input({
-            id: getAddPersonFieldId(field.property),
+        div({style: "padded", content: (field.input || input)({
+            id: idForProperty(field.property),
             style: "undecorated no-padding fill",
-            type: field.type || "text"
+            type: field.type || "text",
+            value: field.property === "birthday" ? formatPeopleBirthdate(userRecord[field.property]) : userRecord[field.property]
         })})
     ])});
+
+    const renderAddPersonField = (field = {}) => renderPersonField(field);
+    const renderModifyPersonField = (field = {}) => renderPersonField(field, getModifyPersonFieldId, selectedPeopleUserRecord || {});
 
     const saveAddedPerson = async (_, context = {}) => {
         const portal = context?.portal;
@@ -1204,6 +1210,89 @@
     };
 
     const openAddPersonPortal = () => modular.show("com.standard.settings", 1, {newInstance: true});
+
+    const saveModifiedPerson = async (_, context = {}) => {
+        const portal = context?.portal;
+        const portalRoot = portal?.body?.() || document;
+        const recordId = sanitizeUserRecordId(selectedPeopleUserRecord?.id);
+        if (!recordId) {
+            modular.error("Unable to identify the person");
+            return;
+        }
+        const fields = ADD_PERSON_FIELDS.map(field => ({
+            ...field,
+            input: portalRoot.querySelector(`#${getModifyPersonFieldId(field.property)}`)
+        }));
+        if (fields.some(field => !field.input)) {
+            modular.error("Unable to read the person form");
+            return;
+        }
+        try {
+            const responses = await Promise.all(fields.map(field => CLI.send(
+                `[user] ${field.property} "${escapePeopleCliValue(field.input.value.trim())}" <id "${escapePeopleCliValue(recordId)}">`,
+                false
+            )));
+            if (responses.some(response => response === 0)) {
+                modular.error("Failed to update one or more person fields");
+                return;
+            }
+            selectedPeopleUserRecord = {
+                ...selectedPeopleUserRecord,
+                ...Object.fromEntries(fields.map(field => [field.property, field.input.value.trim()]))
+            };
+            portal?.close?.();
+            modular.success("Person updated");
+            void renderPeopleRoute();
+        } catch (error) {
+            console.error("Failed to update person:", error);
+            modular.error("Unable to update person");
+        }
+    };
+
+    const openModifyPersonPortal = (_, context = {}) => {
+        context?.portal?.hide?.();
+        modular.show("com.standard.settings", 4, {newInstance: true});
+    };
+
+    const deleteModifiedPerson = (_, context = {}) => {
+        if (selectedPeopleUserRecord?.__isPrimaryUser) return;
+        const portal = context?.portal;
+        const displayName = buildPeopleDisplayName(selectedPeopleUserRecord || {});
+        confirmationDialogue({
+            title: "Delete Person",
+            content: `You're sure you want to delete ${displayName}?`,
+            confirmation: async () => {
+                const recordId = sanitizeUserRecordId(selectedPeopleUserRecord?.id);
+                if (!recordId) {
+                    modular.error("Unable to identify the person");
+                    return;
+                }
+                try {
+                    const allUsers = await getAllUserRecords();
+                    if (!allUsers.length) {
+                        modular.error("Unable to verify the primary user");
+                        return;
+                    }
+                    if (userRecordsMatch(selectedPeopleUserRecord, allUsers[0])) {
+                        modular.error("The primary user cannot be deleted");
+                        return;
+                    }
+                    const response = await CLI.send(`[user] - <id "${escapePeopleCliValue(recordId)}">`, false);
+                    if (response === 0) {
+                        modular.error("Failed to delete person");
+                        return;
+                    }
+                    portal?.close?.();
+                    selectedPeopleUserRecord = null;
+                    modular.success("Person deleted");
+                    void renderPeopleRoute();
+                } catch (error) {
+                    console.error("Failed to delete person:", error);
+                    modular.error("Unable to delete person");
+                }
+            }
+        });
+    };
 
     const buildProfileImageUrl = (recordId = "") => {
         const safeRecordId = sanitizeUserRecordId(recordId);
@@ -1315,20 +1404,24 @@
         routeRoot.innerHTML = div({style: "faded padded", content: "Loading user..."});
         const allUsers = await getAllUserRecords();
         const userRecord = await getCurrentUserRecord(allUsers);
+        const primaryUser = allUsers[0] || null;
+        const selectedUser = userRecord ? {...userRecord, __isPrimaryUser: userRecordsMatch(userRecord, primaryUser)} : null;
         const userRecordId = await getCurrentUserRecordId(userRecord);
         const hasProfileImage = userRecordId ? await checkPeopleProfileImageExists(userRecordId) : false;
         const displayName = buildPeopleDisplayName(userRecord || {});
         const username = buildPeopleUsername(userRecord || {});
         const email = `${userRecord?.email || ""}`.trim();
         const profileImageUrl = hasProfileImage ? buildProfileImageUrl(userRecordId) : "";
-        const otherUsers = allUsers.filter(candidate => !userRecordsMatch(candidate, userRecord));
+        const otherUsers = allUsers
+            .filter(candidate => !userRecordsMatch(candidate, userRecord))
+            .map(candidate => ({...candidate, __isPrimaryUser: userRecordsMatch(candidate, primaryUser)}));
         const userTiles = await Promise.all(otherUsers.map(renderPeopleUserTile));
         routeRoot.innerHTML = div({style: "padded", content: children([
             div({
                 style: "secondary-bordered radius padded shadowed pointer",
                 onclick: event => {
                     if (event.target.closest("button")) return;
-                    openPeopleUser({...userRecord, __hasPeopleProfileImage: hasProfileImage});
+                    openPeopleUser({...selectedUser, __hasPeopleProfileImage: hasProfileImage});
                 },
                 content: children([
                 button({
@@ -1716,10 +1809,35 @@
             dimensions: [350, 400],
             navigation: false,
             resizable: false,
+            tools: [{title: "Modify", icon: modular.icons.modify, onclick: openModifyPersonPortal}],
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25"/></svg>`,
             route: renderPeopleUserPortal,
             afterRender: function () {
                 this.portal?.setTitle?.(buildPeopleDisplayName(selectedPeopleUserRecord || {}));
+            }
+        }),
+        new Portal({
+            title: "Modify Person",
+            internal: true,
+            dimensions: [420, 620],
+            navigation: false,
+            tools: [
+                {title: "Delete", icon: modular.icons.delete, onclick: deleteModifiedPerson},
+                {title: "Save", icon: modular.icons.save, onclick: saveModifiedPerson}
+            ],
+            route: () => div({
+                style: "large-padding-top small-padding fill",
+                content: children([
+                    div({style: "faded small-padding", content: "Modify the person's user details."}),
+                    ...ADD_PERSON_FIELDS.map(renderModifyPersonField),
+                    div({style: "spacer"})
+                ])
+            }),
+            afterRender: function () {
+                if (selectedPeopleUserRecord?.__isPrimaryUser) {
+                    this.portal?.window?.().querySelector('[data-portal-tool-title="delete"]')?.remove?.();
+                }
+                this.portal?.body?.().querySelector(`#${getModifyPersonFieldId("firstname")}`)?.focus?.();
             }
         })
     ]));

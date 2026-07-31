@@ -566,6 +566,11 @@ document.addEventListener("contextmenu", (event) => {
 	}
 });
 document.addEventListener("input", (event) => {
+	const formattedInput = event.target.closest('input[data-plastic-input]');
+	if (formattedInput) {
+		const formatter = formattedInput.getAttribute("data-plastic-input") === "phone" ? formatPhoneInputValue : formatDateInputValue;
+		formattedInput.value = formatter(formattedInput.value);
+	}
 	const target = event.target.closest('input[data-searchbox-id]');
 	if (!target) return;
 	renderSearchboxOptions(target, target.value);
@@ -617,6 +622,45 @@ function input(n) {
 	if (n.value) el.value = n.value;
 	if (n.autofocus) el.autofocus = true;
 	if (n.checked) el.setAttribute("checked", true)
+	registerElementHandler(el, "onchange", n.onchange);
+	return el.outerHTML;
+}
+
+function formatPhoneInputValue(value = "") {
+	const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+	if (digits.length <= 1) return digits ? `+${digits}` : "";
+	if (digits.length <= 4) return `+${digits[0]} (${digits.slice(1)}`;
+	if (digits.length <= 7) return `+${digits[0]} (${digits.slice(1, 4)}) ${digits.slice(4)}`;
+	return `+${digits[0]} (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+}
+
+function phoneInput(n = {}) {
+	const el = document.createElement("input");
+	applyCommonAttributes(el, n);
+	el.type = "tel";
+	el.inputMode = "tel";
+	el.placeholder = n.placeholder || "+# (###) ###-####";
+	el.value = formatPhoneInputValue(n.value);
+	el.setAttribute("data-plastic-input", "phone");
+	registerElementHandler(el, "onchange", n.onchange);
+	return el.outerHTML;
+}
+
+function formatDateInputValue(value = "") {
+	const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
+	if (digits.length <= 2) return digits;
+	if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+	return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function dateInput(n = {}) {
+	const el = document.createElement("input");
+	applyCommonAttributes(el, n);
+	el.type = "text";
+	el.inputMode = "numeric";
+	el.placeholder = n.placeholder || "MM/DD/YYYY";
+	el.value = formatDateInputValue(n.value);
+	el.setAttribute("data-plastic-input", "date");
 	registerElementHandler(el, "onchange", n.onchange);
 	return el.outerHTML;
 }

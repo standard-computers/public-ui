@@ -251,8 +251,12 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .shortcut-overlay {position:absolute;background-color:#ffa500;border:1px solid #FF8B00;color:#1f1b1b;font-size:14px;border-radius:calc(var(--radius) - 2px);padding:4px 6px;pointer-events:none;font-weight:bold;z-index:1000;transform:scale(0.9);animation:fadeIn 0.2s ease-out forwards}
 body.drag-active #app {filter:blur(3px)}
 body.drag-active::before {content:"";position:fixed;inset:0;pointer-events:none;box-sizing:border-box;border:12px solid var(--border);box-shadow:0 0 0 9999px rgba(0,0,0,0.0) inset}
-.calendar-day-time-grid--selecting {cursor:ns-resize;user-select:none}
-.calendar-day-time-slot {position:relative;transition:background-color 100ms ease,box-shadow 100ms ease}
+.calendar-day-time-grid {-webkit-user-select:none;position:relative;user-select:none}
+.calendar-day-time-grid--selecting {cursor:ns-resize}
+.calendar-day-selection-preview {background:color-mix(in srgb,var(--primary) 18%,transparent);border:1px solid color-mix(in srgb,var(--primary) 42%,transparent);border-radius:calc(var(--radius) / 2);box-sizing:border-box;display:none;left:2px;pointer-events:none;position:absolute;right:2px;z-index:2}
+.calendar-day-time-slot {min-height:76px;position:relative;transition:background-color 100ms ease,box-shadow 100ms ease}
+.calendar-day-time-slot::before {background:linear-gradient(to right,color-mix(in srgb,var(--border) 52%,transparent),color-mix(in srgb,var(--border) 52%,transparent)) 0 25%/100% 1px no-repeat,linear-gradient(to right,color-mix(in srgb,var(--border) 70%,transparent),color-mix(in srgb,var(--border) 70%,transparent)) 0 50%/100% 1px no-repeat,linear-gradient(to right,color-mix(in srgb,var(--border) 52%,transparent),color-mix(in srgb,var(--border) 52%,transparent)) 0 75%/100% 1px no-repeat;content:"";inset:0;pointer-events:none;position:absolute}
+.calendar-day-time-slot>* {position:relative;z-index:1}
 .calendar-day-time-slot--selected {background:color-mix(in srgb,var(--primary) 16%,var(--secondary-bg));box-shadow:inset 3px 0 0 var(--primary)}
 .calendar-day-time-slot--selected::after {content:"";position:absolute;inset:0;border:1px solid color-mix(in srgb,var(--primary) 50%,transparent);pointer-events:none}
 .calendar-recurrence-shell {border-top:1px solid var(--border);margin-top:10px;padding-top:4px}
@@ -392,6 +396,12 @@ input.calendar-recurrence-number {width:46px;padding:5px 6px;text-align:center}
 .maps-control-row {display:flex;gap:4px}
 .maps-control-button {margin:0 !important}
 .maps-control-button svg {margin:0 !important;display:block}
+.maps-locations-list {display:flex;flex-direction:column;gap:8px}
+.maps-location-item {display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;padding:12px;text-align:left;background:var(--secondary-bg);border:1px solid var(--border);border-radius:var(--radius);color:inherit}
+.maps-location-item:hover {filter:brightness(1.04)}
+.maps-location-item strong {font-size:1em}
+.maps-location-item span {font-size:.85em;opacity:.72}
+.maps-locations-empty {padding:28px 12px;text-align:center}
 
 /*SPREADSHEETS*/
 .editor-portal-shell {display:flex;flex-direction:column;min-height:100%;height:100%;min-width:0;box-sizing:border-box;overflow:hidden}
@@ -510,6 +520,22 @@ body.editor-sheet-resizing-rows {cursor:row-resize}
 .editor-code-token-operator,
 .editor-code-token-punctuation {color:#475569}
 .editor-code-token-tag {color:#be123c}
+.editor-code-shell.editor-code-dark {--fg:#e5e7eb;--faded:#94a3b8;--bg:#111827;--secondary-bg:#0f172a;--border:#334155;--secondary-border:#334155}
+.editor-code-shell.editor-code-dark .editor-code-wrap {background:#0f172a}
+.editor-code-shell.editor-code-dark .editor-code-stage {background:#111827}
+.editor-code-shell.editor-code-dark .editor-code-highlight {background:radial-gradient(circle at top right, rgba(96,165,250,.1), transparent 30%),linear-gradient(180deg,rgba(255,255,255,.015),rgba(0,0,0,.12))}
+.editor-code-shell.editor-code-dark .editor-code-input {caret-color:#f8fafc}
+.editor-code-shell.editor-code-dark .editor-code-token-comment {color:#94a3b8}
+.editor-code-shell.editor-code-dark .editor-code-token-string {color:#86efac}
+.editor-code-shell.editor-code-dark .editor-code-token-number {color:#fbbf24}
+.editor-code-shell.editor-code-dark .editor-code-token-keyword {color:#93c5fd}
+.editor-code-shell.editor-code-dark .editor-code-token-builtin {color:#c4b5fd}
+.editor-code-shell.editor-code-dark .editor-code-token-type,
+.editor-code-shell.editor-code-dark .editor-code-token-title {color:#fdba74}
+.editor-code-shell.editor-code-dark .editor-code-token-call {color:#5eead4}
+.editor-code-shell.editor-code-dark .editor-code-token-operator,
+.editor-code-shell.editor-code-dark .editor-code-token-punctuation {color:#cbd5e1}
+.editor-code-shell.editor-code-dark .editor-code-token-tag {color:#fda4af}
 
 .editor-slide-shell {height:100%;display:flex;flex-direction:column;gap:8px}
 .editor-slide-add-button {background:#f97316 !important;color:#fff !important;border:1px solid #ea580c !important}

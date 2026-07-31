@@ -1075,6 +1075,8 @@
 	};
 	let disposeDayTimeSelectionListeners = () => {
 	};
+	let suppressDaySlotClickUntil = 0;
+	let lastDayDragCompletionAt = 0;
 	const yearStart = new Date(currentYear, 0, 1);
 	const daysInYear = Math.round((new Date(currentYear + 1, 0, 1) - yearStart) / 86400000);
 	const weekdayLabels = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -1381,8 +1383,13 @@
 											const slotEntries = entriesByHour[hour] || [];
 											return div({
 												id: `calendar-day-hour-${hour}`,
-												style: "calendar-day-time-slot bordered-bottom padded small-spaced hover-shadowed pointer",
+												style: "calendar-day-time-slot bordered-bottom padded small-spaced pointer",
 												onclick: event => {
+													if (Date.now() < suppressDaySlotClickUntil) {
+														event.preventDefault();
+														event.stopPropagation();
+														return;
+													}
 													if (event.currentTarget?.classList?.contains("calendar-day-time-slot--dragged")) {
 														event.currentTarget.classList.remove("calendar-day-time-slot--dragged");
 														return;
@@ -1391,25 +1398,13 @@
 													openCreateEventPortalForDateTime(slotDate, slotEndDate);
 												},
 												content: children([
-													div({
-														style: "line",
-														content: children([div({
-															style: "strong",
-															content: slotDate.toLocaleTimeString([], {
-																hour: "numeric",
-																minute: "2-digit"
-															})
-														}), div({
-															style: "float-right faded tiny-text",
-															content: slotEntries.length === 0 ? "Open" : `${slotEntries.length} event${slotEntries.length === 1 ? "" : "s"}`
-														})])
+													div({style: "line", content: children([
+															div({style: "strong", content: slotDate.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})}),
+															div({style: "float-right faded tiny-text", content: slotEntries.length === 0 ? "Open" : `${slotEntries.length} event${slotEntries.length === 1 ? "" : "s"}`})
+														])
 													}),
-													div({
-														style: "small-padding-top",
-														content: slotEntries.length === 0 ? div({
-															style: "faded tiny-text",
-															content: "Create event"
-														}) : children(slotEntries.map(eventEntry => div({
+													div({style: "small-padding-top",
+														content: slotEntries.length === 0 ? div({}) : children(slotEntries.map(eventEntry => div({
 															style: "calendar-day-event small-padding-bottom",
 															content: renderCalendarEventChip(eventEntry, selectedDate)
 														})))
@@ -1423,14 +1418,27 @@
 						});
 					},
 					afterRender: () => {
+						let bindAttempts = 0;
+						const bindDayTimeSelection = () => {
 						const dayGrid = document.getElementById("calendar-day-time-grid");
-						if (!dayGrid) return;
+						if (!dayGrid) {
+							if (bindAttempts < 60) {
+								bindAttempts += 1;
+								requestAnimationFrame(bindDayTimeSelection);
+							}
+							return;
+						}
 						disposeDayTimeSelectionListeners();
 						const slots = Array.from(dayGrid.querySelectorAll(".calendar-day-time-slot"));
-						let anchorHour = null;
-						let activeHour = null;
+						const selectionPreview = document.createElement("div");
+						selectionPreview.className = "calendar-day-selection-preview";
+						selectionPreview.setAttribute("aria-hidden", "true");
+						dayGrid.appendChild(selectionPreview);
+						let anchorQuarter = null;
+						let activeQuarter = null;
 						let isSelecting = false;
 						let hasDragged = false;
+						let startClientY = null;
 						const getSlotHour = slot => {
 							const match = `${slot?.id || ""}`.match(/^calendar-day-hour-(\d+)$/);
 							return match ? Number(match[1]) : null;
@@ -1442,60 +1450,92 @@
 							const pointedSlot = pointedElement?.closest?.(".calendar-day-time-slot");
 							return pointedSlot && dayGrid.contains(pointedSlot) ? pointedSlot : null;
 						};
+						const getQuarterFromPoint = (event, slot) => {
+							const hour = getSlotHour(slot);
+							if (hour === null || !slot) return null;
+							const bounds = slot.getBoundingClientRect();
+							const relativeY = Math.max(0, Math.min(bounds.height - 1, event.clientY - bounds.top));
+							return (hour * 4) + Math.min(3, Math.floor((relativeY / Math.max(1, bounds.height)) * 4));
+						};
 						const paintSelection = () => {
-							const firstHour = Math.min(anchorHour, activeHour);
-							const lastHour = Math.max(anchorHour, activeHour);
-							slots.forEach(slot => {
-								const hour = getSlotHour(slot);
-								slot.classList.toggle("calendar-day-time-slot--selected", isSelecting && hour >= firstHour && hour <= lastHour);
-							});
+							if (!isSelecting || anchorQuarter === null || activeQuarter === null) {
+								selectionPreview.style.display = "none";
+								return;
+							}
+							const firstQuarter = Math.min(anchorQuarter, activeQuarter);
+							const lastQuarter = Math.max(anchorQuarter, activeQuarter);
+							const firstSlot = document.getElementById(`calendar-day-hour-${Math.floor(firstQuarter / 4)}`);
+							const lastSlot = document.getElementById(`calendar-day-hour-${Math.floor(lastQuarter / 4)}`);
+							if (!firstSlot || !lastSlot) return;
+							const firstOffset = (firstQuarter % 4) / 4;
+							const lastOffset = ((lastQuarter % 4) + 1) / 4;
+							const top = firstSlot.offsetTop + (firstSlot.offsetHeight * firstOffset);
+							const bottom = lastSlot.offsetTop + (lastSlot.offsetHeight * lastOffset);
+							selectionPreview.style.display = "block";
+							selectionPreview.style.top = `${top}px`;
+							selectionPreview.style.height = `${Math.max(1, bottom - top)}px`;
 						};
 						const startSelection = event => {
 							if (event.button !== 0 || event.target?.closest?.(".calendar-day-event")) return;
 							const slot = getSlotFromPoint(event);
-							const hour = getSlotHour(slot);
-							if (hour === null) return;
-							anchorHour = hour;
-							activeHour = hour;
+							const quarter = getQuarterFromPoint(event, slot);
+							if (quarter === null) return;
+							anchorQuarter = quarter;
+							activeQuarter = quarter;
 							isSelecting = true;
 							hasDragged = false;
+							startClientY = event.clientY;
 							dayGrid.classList.add("calendar-day-time-grid--selecting");
 							paintSelection();
 							event.preventDefault();
+							event.stopPropagation();
 						};
 						const updateSelection = event => {
 							if (!isSelecting) return;
 							const slot = getSlotFromPoint(event);
-							const hour = getSlotHour(slot);
-							if (hour === null || hour === activeHour) return;
-							activeHour = hour;
-							hasDragged = true;
-							paintSelection();
+							const quarter = getQuarterFromPoint(event, slot);
+							if (quarter !== null && quarter !== activeQuarter) {
+								activeQuarter = quarter;
+								paintSelection();
+							}
+							if (Math.abs(event.clientY - startClientY) >= 4 || activeQuarter !== anchorQuarter) hasDragged = true;
 							event.preventDefault();
+							event.stopPropagation();
 						};
 						const stopSelection = event => {
 							if (!isSelecting) return;
 							updateSelection(event);
-							const firstHour = Math.min(anchorHour, activeHour);
-							const lastHour = Math.max(anchorHour, activeHour);
-							const anchorSlot = document.getElementById(`calendar-day-hour-${anchorHour}`);
+							const firstQuarter = Math.min(anchorQuarter, activeQuarter);
+							const lastQuarter = Math.max(anchorQuarter, activeQuarter);
+							const anchorSlot = document.getElementById(`calendar-day-hour-${Math.floor(anchorQuarter / 4)}`);
 							isSelecting = false;
 							dayGrid.classList.remove("calendar-day-time-grid--selecting");
-							slots.forEach(slot => slot.classList.remove("calendar-day-time-slot--selected"));
+							paintSelection();
 							if (!hasDragged) return;
+							const completedAt = Date.now();
+							suppressDaySlotClickUntil = completedAt + 500;
+							if (completedAt - lastDayDragCompletionAt < 100) return;
+							lastDayDragCompletionAt = completedAt;
 							anchorSlot?.classList.add("calendar-day-time-slot--dragged");
-							const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), firstHour, 0, 0, 0);
-							const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), lastHour + 1, 0, 0, 0);
+							event.preventDefault();
+							event.stopPropagation();
+							const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, firstQuarter * 15, 0, 0);
+							const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, (lastQuarter + 1) * 15, 0, 0);
 							openCreateEventPortalForDateTime(start, end);
 						};
-						dayGrid.addEventListener("mousedown", startSelection);
-						document.addEventListener("mousemove", updateSelection);
-						document.addEventListener("mouseup", stopSelection);
+						dayGrid.addEventListener("pointerdown", startSelection, true);
+						document.addEventListener("pointermove", updateSelection, true);
+						document.addEventListener("pointerup", stopSelection, true);
+						document.addEventListener("pointercancel", stopSelection, true);
 						disposeDayTimeSelectionListeners = () => {
-							dayGrid.removeEventListener("mousedown", startSelection);
-							document.removeEventListener("mousemove", updateSelection);
-							document.removeEventListener("mouseup", stopSelection);
+							dayGrid.removeEventListener("pointerdown", startSelection, true);
+							document.removeEventListener("pointermove", updateSelection, true);
+							document.removeEventListener("pointerup", stopSelection, true);
+							document.removeEventListener("pointercancel", stopSelection, true);
+							selectionPreview.remove();
 						};
+						};
+						bindDayTimeSelection();
 					}
 				}
 			]
@@ -2000,8 +2040,7 @@
 							div({
 								content: children([
 									div({style: "small-padding", content: "End"}),
-									div({
-										style: "padded", content: input({
+									div({style: "padded", content: input({
 											id: "edit-end-timestamp",
 											type: "datetime-local",
 											style: "undecorated no-padding",

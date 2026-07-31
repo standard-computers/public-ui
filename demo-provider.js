@@ -123,6 +123,10 @@ class DemoProvider {
         state.records = state.records || {};
         state.content = state.content || {};
         state.files = state.files || {};
+        state.standards = state.standards || Object.fromEntries(Object.keys(state.records).map(name => [
+            name,
+            {reference: name.replace(/[^a-z0-9]/gi, "").slice(0, 4).toUpperCase() || "STD", source: ""}
+        ]));
         state.nextId = Number(state.nextId) || 1000;
         return state;
     }
@@ -171,15 +175,30 @@ class DemoProvider {
         const command = String(rawCommand || "").trim();
         if (!command) return "";
         if (command === "status") return JSON.stringify({status: "connected", mode: "demo", device: "Public Demo"});
-        if (command === "stds") return Object.keys(state.records).join("\n");
+        if (command === "stds") return Object.entries(state.standards).map(([name, standard]) => `${name}: ${standard.reference}`).join("\n");
         if (command.startsWith("stds ")) {
             const standard = command.slice(5).replace(/\s+json$/i, "").trim().toLowerCase();
+            if (state.standards[standard]?.source && !command.endsWith(" json")) return state.standards[standard].source;
             const fields = Object.keys(state.records[standard]?.[0] || {});
             return command.endsWith(" json") ? JSON.stringify({name: standard, fields}) : fields.join("\n");
         }
         if (/^tree(?:\s|$)/i.test(command)) return JSON.stringify(this.tree(state, command.replace(/^tree\s*/i, "")));
         if (/^files\s+/i.test(command)) return this.executeFileCommand(state, command);
         if (/^rcs\s+/i.test(command)) return "1";
+        if (/^reload\s+(?:standards|stds)$/i.test(command)) return "1";
+        const standardImport = command.match(/^import\s+([a-z0-9_]+)\s+"([^"]+\.stds)"$/i);
+        if (standardImport) {
+            const standardName = standardImport[1].toLowerCase();
+            const standardPath = normalizePath(standardImport[2]);
+            const standardFile = state.files[standardPath];
+            if (!standardFile?.content) return "0";
+            const standardSource = Buffer.from(standardFile.content, "base64").toString("utf8");
+            const standardHeader = standardSource.trim().match(new RegExp(`^!?${standardName}\\s*:\\s*([A-Z0-9_]+)`, "i"));
+            if (!standardHeader) return "0";
+            if (!state.records[standardName]) state.records[standardName] = [];
+            state.standards[standardName] = {reference: standardHeader[1].toUpperCase(), source: standardSource.trim()};
+            return "1";
+        }
 
         const match = command.match(/^\[([a-z0-9_-]+)]\s*([\s\S]*)$/i);
         if (!match) return "0";

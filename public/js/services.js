@@ -1530,6 +1530,9 @@ class Portal {
     #updateMaximizeMenuItem() {
         if (!this.#maximizeMenuItem) return;
         this.#maximizeMenuItem.label = this.#isMaximized ? "Downsize" : "Maximize";
+        this.#maximizeMenuItem.icon = this.#isMaximized
+            ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 7L7 17M7 17H16M7 17V8" stroke="black" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+            : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H8M17 7V16" stroke="black" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     }
     #renderRouteContent(routeContent, afterRender) {
         const resolvedRoute = typeof routeContent === "function" ? routeContent() : routeContent;

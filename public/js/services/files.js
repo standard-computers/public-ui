@@ -1,7 +1,10 @@
 (async () => {
     const NOTE_CONTENT_PREFIX = "__STD_NOTE_B64__:";
     let photoCascadeObserver = null;
+    let photoDisplayStyle = "cascade";
     const photoObjectUrls = new Set();
+    const PHOTO_GRID_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>`;
+    const PHOTO_CASCADE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 7.125C2.25 6.504 2.754 6 3.375 6h6c.621 0 1.125.504 1.125 1.125v3.75c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 0 1-1.125-1.125v-3.75ZM14.25 8.625c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v8.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 0 1-1.125-1.125v-8.25ZM3.75 16.125c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 0 1-1.125-1.125v-2.25Z"/></svg>`;
     const decodeNoteContent = value => {
         const raw = String(value || "");
         if (!raw.startsWith(NOTE_CONTENT_PREFIX)) return raw;
@@ -1227,7 +1230,15 @@
                 setActiveUploadDirectory("Photos");
                 return div({
                     style: "small-padding-right",
-                    content: children([h({level: 3, content: "Photos"}), div({style: "spacer"}), div({
+                    content: children([div({
+                        style: "files-photos-heading",
+                        content: children([h({level: 3, content: "Photos"}), button({
+                            id: "photos-display-style",
+                            style: "naked inner-radius files-photo-display-button",
+                            title: "Photo display: Cascade. Switch to grid",
+                            icon: PHOTO_CASCADE_ICON
+                        })])
+                    }), div({style: "spacer"}), div({
                         id: "photos",
                         style: "masonry",
                         content: () => CLI.send("tree Photos").then(async photos => {
@@ -1250,32 +1261,55 @@
             afterRender: () => {
                 setActiveUploadDirectory("Photos");
                 const photosRoot = document.getElementById("photos");
-                const applyPhotoCascadeLayout = () => {
-                    if (photosRoot) photosRoot.style.columnGap = "0.75rem";
+                const displayStyleButton = document.getElementById("photos-display-style");
+                const applyPhotoDisplayStyle = () => {
+                    const isGrid = photoDisplayStyle === "grid";
+                    if (photosRoot) {
+                        photosRoot.style.display = isGrid ? "grid" : "block";
+                        photosRoot.style.gridTemplateColumns = isGrid ? "repeat(auto-fill, minmax(150px, 1fr))" : "";
+                        photosRoot.style.gap = isGrid ? "0.75rem" : "";
+                        photosRoot.style.columnCount = isGrid ? "auto" : "3";
+                        photosRoot.style.columnGap = "0.75rem";
+                    }
                     const photoTiles = photosRoot?.querySelectorAll?.(".file-folder") || [];
                     photoTiles.forEach(tile => {
-                        tile.style.display = "inline-block";
+                        tile.style.display = isGrid ? "block" : "inline-block";
                         tile.style.width = "100%";
-                        tile.style.marginBottom = "0.75rem";
-                        tile.style.breakInside = "avoid";
-                        tile.style.aspectRatio = "auto";
+                        tile.style.marginBottom = isGrid ? "0" : "0.75rem";
+                        tile.style.breakInside = isGrid ? "auto" : "avoid";
+                        tile.style.aspectRatio = isGrid ? "1 / 1" : "auto";
                         tile.style.overflow = "hidden";
                         tile.style.borderRadius = "var(--radius)";
+                        if (tile.firstElementChild) tile.firstElementChild.style.height = isGrid ? "100%" : "auto";
                     });
                     const photoImages = photosRoot?.querySelectorAll?.(".file-folder img") || [];
                     photoImages.forEach(image => {
-                        image.style.height = "auto";
-                        image.style.objectFit = "contain";
+                        image.style.height = isGrid ? "100%" : "auto";
+                        image.style.objectFit = isGrid ? "cover" : "contain";
                         image.style.display = "block";
                     });
+                    if (displayStyleButton) {
+                        const currentLabel = isGrid ? "Grid" : "Cascade";
+                        const nextLabel = isGrid ? "cascade" : "grid";
+                        displayStyleButton.innerHTML = isGrid ? PHOTO_GRID_ICON : PHOTO_CASCADE_ICON;
+                        displayStyleButton.title = `Photo display: ${currentLabel}. Switch to ${nextLabel}`;
+                        displayStyleButton.setAttribute("aria-label", displayStyleButton.title);
+                        displayStyleButton.setAttribute("aria-pressed", String(isGrid));
+                    }
                 };
-                applyPhotoCascadeLayout();
+                if (displayStyleButton) {
+                    displayStyleButton.addEventListener("click", () => {
+                        photoDisplayStyle = photoDisplayStyle === "cascade" ? "grid" : "cascade";
+                        applyPhotoDisplayStyle();
+                    });
+                }
+                applyPhotoDisplayStyle();
                 if (photoCascadeObserver) {
                     photoCascadeObserver.disconnect();
                     photoCascadeObserver = null;
                 }
                 if (photosRoot) {
-                    photoCascadeObserver = new MutationObserver(() => applyPhotoCascadeLayout());
+                    photoCascadeObserver = new MutationObserver(() => applyPhotoDisplayStyle());
                     photoCascadeObserver.observe(photosRoot, {childList: true, subtree: true});
                 }
                 document.querySelectorAll("#photos").forEach((el) => el.contextmenu([{

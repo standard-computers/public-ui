@@ -1,10 +1,103 @@
 (() => {
+
     let activeMap = null;
     let activeMapContainer = null;
     let detachMapsSearchHandlers = null;
+    let detachMapsLocationsHandler = null;
+    let savedLocations = [];
+    let locationsFetchPromise = null;
+    let focusSavedLocation = null;
+    let locationsSourcePortal = null;
     const MAPS_CACHE_KEY = "recent-searches";
     const MAPS_CACHE_LIMIT = 10;
+
+    const firstLocationValue = (location, keys, fallback = "") => {
+        for (const key of keys) {
+            const value = location?.[key];
+            if (value !== undefined && value !== null && `${value}`.trim() !== "") return value;
+        }
+        return fallback;
+    };
+
+    const normalizeLocationRecord = (location, index) => {
+        const rawLatitude = firstLocationValue(location, ["latitude", "lat"], null);
+        const rawLongitude = firstLocationValue(location, ["longitude", "lng", "lon"], null);
+        if (rawLatitude === null || rawLongitude === null) return null;
+        const latitude = Number(rawLatitude);
+        const longitude = Number(rawLongitude);
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+        const name = `${firstLocationValue(location, ["name", "title", "label"], "Location")}`.trim() || "Location";
+        const addressParts = [
+            firstLocationValue(location, ["address", "street", "address1"]),
+            firstLocationValue(location, ["city"]),
+            firstLocationValue(location, ["state", "province", "region"]),
+            firstLocationValue(location, ["postal", "postal_code", "zip"])
+        ].map(value => `${value || ""}`.trim()).filter(Boolean);
+        return {
+            ...location,
+            id: firstLocationValue(location, ["id", "uuid", "_id"], `location-${index}`),
+            name,
+            address: addressParts.join(", "),
+            latitude,
+            longitude
+        };
+    };
+
+    const parseLocationsResponse = response => {
+        const records = Array.isArray(response?.locations) ? response.locations
+            : Array.isArray(response?.location) ? response.location
+                : Array.isArray(response) ? response : [];
+        return records.map(normalizeLocationRecord).filter(Boolean);
+    };
+
+    const notifyLocationsChanged = () => {
+        renderLocationsList(document.getElementById("maps-locations-list"), savedLocations);
+        document.dispatchEvent(new CustomEvent("standard:maps-locations", {detail: {locations: savedLocations}}));
+    };
+
+    const fetchSavedLocations = ({force = false} = {}) => {
+        if (!force && locationsFetchPromise) return locationsFetchPromise;
+        locationsFetchPromise = CLI.send("[locations]").then(response => {
+            savedLocations = parseLocationsResponse(response);
+            notifyLocationsChanged();
+            return savedLocations;
+        }).catch(error => {
+            console.error("Failed to load saved locations:", error);
+            savedLocations = [];
+            notifyLocationsChanged();
+            return savedLocations;
+        }).finally(() => {
+            locationsFetchPromise = null;
+        });
+        return locationsFetchPromise;
+    };
+
+    const renderLocationsList = (container, locations = savedLocations) => {
+        if (!container) return;
+        container.replaceChildren();
+        if (!locations.length) {
+            const empty = document.createElement("div");
+            empty.className = "maps-locations-empty faded";
+            empty.textContent = "No saved locations";
+            container.appendChild(empty);
+            return;
+        }
+        locations.forEach((location, index) => {
+            const item = document.createElement("button");
+            item.type = "button";
+            item.className = "maps-location-item";
+            item.dataset.locationIndex = `${index}`;
+            const title = document.createElement("strong");
+            title.textContent = location.name;
+            const detail = document.createElement("span");
+            detail.textContent = location.address || `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
+            item.append(title, detail);
+            container.appendChild(item);
+        });
+    };
+
     const MAP_STYLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3"/></svg>`;
+
     const MAP_STYLE_OPTIONS = [
         {id: "default", label: "Default", style: "mapbox://styles/mapbox/streets-v12"},
         {id: "monochrome", label: "Monochrome", style: "mapbox://styles/mapbox/standard", config: {basemap: {theme: "monochrome"}}},
@@ -15,6 +108,7 @@
         {id: "light", label: "Light", style: "mapbox://styles/mapbox/light-v11"},
         {id: "navigation", label: "Navigation", style: "mapbox://styles/mapbox/navigation-day-v1"}
     ];
+
     modular.register(new Service("com.standard.maps", [
         new Portal({
             title: "Maps",
@@ -22,6 +116,15 @@
             dimensions: [900, 600],
             horizontal_nav: true,
             centered_nav: true,
+            tools: [{
+                title: "Locations",
+                icon: modular.icons.globe,
+                onclick: (_, context) => {
+                    locationsSourcePortal = context?.portal || null;
+                    fetchSavedLocations({force: true});
+                    modular.show("com.standard.maps", 1);
+                }
+            }],
             icon: "/icons/interfaces/maps.png",
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"/></svg>`,
             route: () => div({empty: true, style: "flex maps-shell", id: "map-shell", content: div({style: "maps-search-overlay", content: [
@@ -73,6 +176,7 @@
                 const mapShell = document.getElementById("map-shell");
                 const mapContainer = document.getElementById("map");
                 if (!mapShell || !mapContainer) return;
+                const savedLocationsPromise = fetchSavedLocations();
                 const bodyNode = view?.body instanceof HTMLElement ? view.body : mapContainer.closest(".window-body");
                 const syncMapViewport = () => {
                     const availableHeight = Math.max(bodyNode?.clientHeight || mapShell.clientHeight || mapContainer.clientHeight, 200);
@@ -105,6 +209,10 @@
                     detachMapsSearchHandlers();
                     detachMapsSearchHandlers = null;
                 }
+                if (typeof detachMapsLocationsHandler === "function") {
+                    detachMapsLocationsHandler();
+                    detachMapsLocationsHandler = null;
+                }
                 const mapboxToken = window.StandardRuntimeConfig?.mapboxAccessToken || "";
                 if (!mapboxToken) {
                     console.error("Missing Mapbox access token");
@@ -127,6 +235,9 @@
                 const ACTIVE_LOCATION_SOURCE_ID = "active-location-source";
                 const ACTIVE_LOCATION_LAYER_ID = "active-location-layer";
                 const ACTIVE_LOCATION_IMAGE_ID = "active-location-dot";
+                const SAVED_LOCATIONS_SOURCE_ID = "saved-locations-source";
+                const SAVED_LOCATIONS_LAYER_ID = "saved-locations-layer";
+                const SAVED_LOCATIONS_LABEL_LAYER_ID = "saved-locations-label-layer";
                 const DIRECTIONS_ROUTE_SOURCE_ID = "directions-route-source";
                 const DIRECTIONS_ROUTE_OUTLINE_LAYER_ID = "directions-route-outline-layer";
                 const DIRECTIONS_ROUTE_LAYER_ID = "directions-route-layer";
@@ -134,6 +245,7 @@
                 const DIRECTIONS_POINTS_LAYER_ID = "directions-points-layer";
                 const DIRECTIONS_POINTS_LABEL_LAYER_ID = "directions-points-label-layer";
                 let activeLocationLayerHandlersAttached = false;
+                let savedLocationLayerHandlersAttached = false;
                 let pendingDirectionsRouteData = null;
                 let pendingDirectionsPointsData = null;
                 let contextMenuCoordinates = null;
@@ -148,6 +260,7 @@
                     CLI.send(`[locations] + ("", "Location", "", "", "", "", "", 0, ${latitude}, ${longitude}, "", @)`).then(response => {
                         if (response !== 0 && response !== "0") {
                             modular.success("Location saved");
+                            fetchSavedLocations({force: true});
                         } else {
                             modular.error("Couldn't save location");
                         }
@@ -225,6 +338,77 @@
                         }
                     }
                 };
+                const buildSavedLocationsData = (locations = savedLocations) => ({
+                    type: "FeatureCollection",
+                    features: locations.map(location => ({
+                        type: "Feature",
+                        geometry: {type: "Point", coordinates: [location.longitude, location.latitude]},
+                        properties: {id: `${location.id}`, label: location.name, address: location.address || ""}
+                    }))
+                });
+                const showSavedLocationPopup = (event) => {
+                    const feature = event.features?.[0];
+                    if (!feature || feature.geometry?.type !== "Point") return;
+                    map.getCanvas().style.cursor = "pointer";
+                    const [lng, lat] = feature.geometry.coordinates;
+                    const content = document.createElement("div");
+                    const title = document.createElement("strong");
+                    title.textContent = feature.properties?.label || "Saved Location";
+                    content.appendChild(title);
+                    if (feature.properties?.address) {
+                        const address = document.createElement("div");
+                        address.textContent = feature.properties.address;
+                        content.appendChild(address);
+                    }
+                    clearActiveLocationPopup();
+                    activeLocationPopup = new mapboxgl.Popup({closeButton: false, closeOnClick: false, offset: 18}).setLngLat([lng, lat]).setDOMContent(content).addTo(map);
+                };
+                const hideSavedLocationPopup = () => {
+                    map.getCanvas().style.cursor = "";
+                    clearActiveLocationPopup();
+                };
+                const ensureSavedLocationsLayer = () => {
+                    if (!map.isStyleLoaded()) return;
+                    const data = buildSavedLocationsData();
+                    if (!map.getSource(SAVED_LOCATIONS_SOURCE_ID)) map.addSource(SAVED_LOCATIONS_SOURCE_ID, {type: "geojson", data});
+                    else map.getSource(SAVED_LOCATIONS_SOURCE_ID).setData(data);
+                    if (!map.getLayer(SAVED_LOCATIONS_LAYER_ID)) map.addLayer({
+                        id: SAVED_LOCATIONS_LAYER_ID,
+                        type: "circle",
+                        source: SAVED_LOCATIONS_SOURCE_ID,
+                        paint: {
+                            "circle-radius": 8,
+                            "circle-color": "#0a84ff",
+                            "circle-stroke-color": "#ffffff",
+                            "circle-stroke-width": 3
+                        }
+                    });
+                    if (!map.getLayer(SAVED_LOCATIONS_LABEL_LAYER_ID)) map.addLayer({
+                        id: SAVED_LOCATIONS_LABEL_LAYER_ID,
+                        type: "symbol",
+                        source: SAVED_LOCATIONS_SOURCE_ID,
+                        layout: {
+                            "text-field": ["get", "label"],
+                            "text-size": 12,
+                            "text-offset": [0, 1.4],
+                            "text-anchor": "top",
+                            "text-optional": true
+                        },
+                        paint: {"text-color": "#202124", "text-halo-color": "#ffffff", "text-halo-width": 1.5}
+                    });
+                    if (!savedLocationLayerHandlersAttached) {
+                        savedLocationLayerHandlersAttached = true;
+                        map.on("mouseenter", SAVED_LOCATIONS_LAYER_ID, showSavedLocationPopup);
+                        map.on("mouseleave", SAVED_LOCATIONS_LAYER_ID, hideSavedLocationPopup);
+                        map.on("click", SAVED_LOCATIONS_LAYER_ID, event => {
+                            const coordinates = event.features?.[0]?.geometry?.coordinates;
+                            if (Array.isArray(coordinates)) map.flyTo({center: coordinates, zoom: Math.max(map.getZoom(), 14)});
+                        });
+                    }
+                };
+                const handleSavedLocationsChanged = () => ensureSavedLocationsLayer();
+                document.addEventListener("standard:maps-locations", handleSavedLocationsChanged);
+                detachMapsLocationsHandler = () => document.removeEventListener("standard:maps-locations", handleSavedLocationsChanged);
                 const buildDirectionsRouteData = (geometry) => ({type: "FeatureCollection", features: [{type: "Feature", geometry, properties: {}}]});
                 const buildDirectionsPointsData = (origin, destination) => ({
                     type: "FeatureCollection",
@@ -289,6 +473,10 @@
                     if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
                     setActiveLocation(lng, lat, label);
                     map.flyTo({center: [lng, lat], zoom});
+                };
+                focusSavedLocation = location => {
+                    if (!location) return;
+                    flyToCoordinates(location.longitude, location.latitude, 15, location.name);
                 };
                 const searchInput = document.getElementById("maps-search-input");
                 const autocomplete = document.getElementById("maps-search-autocomplete");
@@ -641,6 +829,7 @@
                         map.resize();
                         ensureActiveLocationLayer();
                         setActiveLocation(pendingActiveLocationFeature.lng, pendingActiveLocationFeature.lat, pendingActiveLocationFeature.label);
+                        ensureSavedLocationsLayer();
                         ensureDirectionsLayers();
                         if (pendingDirectionsRouteData) map.getSource(DIRECTIONS_ROUTE_SOURCE_ID)?.setData(pendingDirectionsRouteData);
                         if (pendingDirectionsPointsData) map.getSource(DIRECTIONS_POINTS_SOURCE_ID)?.setData(pendingDirectionsPointsData);
@@ -662,9 +851,42 @@
                     homeCoordinates = [position.coords.longitude, position.coords.latitude];
                     homeLocationLabel = "Current Location";
                 });
-                map.once("load", () => {
+                const initializeMapLocationLayers = () => {
                     ensureActiveLocationLayer();
                     setActiveLocation(defaultCenter[0], defaultCenter[1], defaultLocationLabel);
+                    savedLocationsPromise.then(ensureSavedLocationsLayer);
+                };
+                if (map.loaded() || map.isStyleLoaded()) {
+                    initializeMapLocationLayers();
+                } else {
+                    map.once("load", initializeMapLocationLayers);
+                }
+            }
+        }),
+        new Portal({
+            title: "Locations",
+            hints: ["saved locations", "locations"],
+            internal: true,
+            dimensions: [420, 520],
+            navigation: false,
+            icon: "/icons/interfaces/maps.png",
+            svg_icon: modular.icons.globe,
+            tools: [{title: "Refresh", icon: modular.icons.refresh, onclick: () => fetchSavedLocations({force: true})}],
+            route: () => div({style: "maps-locations-portal large-padding-top", content: div({id: "maps-locations-list", style: "maps-locations-list"})}),
+            afterRender: async () => {
+                const list = document.getElementById("maps-locations-list");
+                renderLocationsList(list);
+                const locations = await fetchSavedLocations();
+                renderLocationsList(list, locations);
+                list?.addEventListener("click", event => {
+                    const item = event.target.closest("[data-location-index]");
+                    if (!item) return;
+                    const location = savedLocations[Number(item.dataset.locationIndex)];
+                    if (!location) return;
+                    const sourceWindow = locationsSourcePortal?.window?.();
+                    const mapsWindow = sourceWindow?.isConnected ? sourceWindow : modular.findPortalWindow?.("com.standard.maps", 0);
+                    if (mapsWindow) modular.bringToFront?.(mapsWindow);
+                    focusSavedLocation?.(location);
                 });
             }
         })

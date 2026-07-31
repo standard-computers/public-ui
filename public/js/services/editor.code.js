@@ -4,6 +4,11 @@
     const SUI_CLICK_DELAY_MS = 250;
     const SUI_TYPE_DELAY_MS = 24;
     const CODE_EDITOR_RUN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>`;
+    const CODE_EDITOR_MOON_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>`;
+    const CODE_EDITOR_SUN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/></svg>`;
+    const CODE_EDITOR_SETTINGS = {
+        dark_mode: {label: "Dark mode", type: "boolean", default: false}
+    };
     const CODE_EDITOR_KEYWORDS = new Set([
         "abstract", "alias", "and", "as", "asm", "assert", "async", "await", "auto", "base", "begin", "bool", "boolean", "break", "by", "byte", "case", "catch", "char", "checked", "class", "const",
         "constructor", "continue", "crate", "data", "debugger", "declare", "def", "default", "defer", "delete", "del", "do", "double", "dynamic", "echo", "elif", "else", "elseif", "end", "ensure",
@@ -280,6 +285,41 @@
     const getPortalCodeLineNumbers = (portal) => portal?.window?.()?.querySelector?.("#editor-code-lines") || null;
     const getPortalCodeHighlight = (portal) => portal?.window?.()?.querySelector?.("#editor-code-highlight") || null;
     const getPortalCodeStage = (portal) => portal?.window?.()?.querySelector?.("#editor-code-stage") || null;
+    const setCodeEditorThemeToolIcon = (tool, darkMode) => {
+        if (!tool) return;
+        const title = darkMode ? "Light mode" : "Dark mode";
+        const iconMarkup = darkMode ? CODE_EDITOR_SUN_ICON : CODE_EDITOR_MOON_ICON;
+        const icon = new DOMParser().parseFromString(iconMarkup, "image/svg+xml").documentElement;
+        tool.replaceChildren(icon);
+        tool.title = title;
+        tool.setAttribute("aria-label", title);
+        tool.dataset.portalToolTitle = title.toLowerCase();
+    };
+    const applyCodeEditorDarkMode = (darkMode) => {
+        const enabled = darkMode === true;
+        document.querySelectorAll(".editor-code-shell").forEach(shell => {
+            shell.classList.toggle("editor-code-dark", enabled);
+            const editorWindow = shell.closest(".draggable-window");
+            editorWindow?.querySelectorAll?.('[data-portal-tool-title="dark mode"], [data-portal-tool-title="light mode"]').forEach(tool => {
+                setCodeEditorThemeToolIcon(tool, enabled);
+            });
+        });
+    };
+    const loadCodeEditorDarkMode = async () => {
+        const settings = await window.StandardAppSettings?.values?.(SERVICE_ID);
+        const darkMode = settings?.dark_mode === true;
+        applyCodeEditorDarkMode(darkMode);
+        return darkMode;
+    };
+    const toggleCodeEditorDarkMode = async (_event, context) => {
+        const settingsApi = context?.settings;
+        const currentSettings = await settingsApi?.values?.() || await window.StandardAppSettings?.values?.(SERVICE_ID) || {};
+        const darkMode = currentSettings.dark_mode !== true;
+        applyCodeEditorDarkMode(darkMode);
+        const saved = await (settingsApi?.save?.({...currentSettings, dark_mode: darkMode})
+            || window.StandardAppSettings?.save?.(SERVICE_ID, {...currentSettings, dark_mode: darkMode}));
+        if (!saved) modular.error("Unable to save code editor theme");
+    };
     const syncCodeEditorRunTool = (portal) => {
         const runTool = portal?.window?.()?.querySelector?.('[data-portal-tool-title="run"]');
         if (runTool) runTool.hidden = !SUI_FILE_PATTERN.test(getPortalRememberedCodePath(portal));
@@ -830,7 +870,8 @@
             tools: [
                 {title: "Save", icon: modular.icons.save, onclick: (_, context) => saveLoadedCodeFile(context?.portal)},
                 {title: "Run", icon: CODE_EDITOR_RUN_ICON, onclick: (_, context) => runSuiCode(context?.portal)},
-                {title: "Search", icon: modular.icons.search, onclick: (event, context) => showCodeEditorSearchDialogue(context?.portal, event?.currentTarget)}
+                {title: "Search", icon: modular.icons.search, onclick: (event, context) => showCodeEditorSearchDialogue(context?.portal, event?.currentTarget)},
+                {title: "Dark mode", icon: CODE_EDITOR_MOON_ICON, onclick: toggleCodeEditorDarkMode}
             ],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5"/></svg>`,
             icon: "/icons/code.png",
@@ -854,8 +895,9 @@
                 hydrateCodeEditorFromState(this.portal);
                 updateCodeEditorPortalTitle(this.portal);
                 syncCodeEditorRunTool(this.portal);
+                loadCodeEditorDarkMode();
                 focusCodeEditorAtEnd(this.portal);
             }
         })
-    ]));
+    ], CODE_EDITOR_SETTINGS));
 })();

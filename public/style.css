@@ -51,6 +51,9 @@ button.tiny {padding:5px;font-size:calc(var(--fs) - 2px);border:1px solid var(--
 button.tiny:hover {box-shadow:var(--shadow);background-color:var(--bg)}
 button.fat {padding:11px 24px 11px 24px}
 h1, h2, h3, h4, h5, h6 {padding:0;margin:0}
+.files-photos-heading {display:flex;align-items:center;justify-content:space-between;gap:12px}
+.files-photo-display-button {display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:5px}
+.files-photo-display-button svg {width:24px;height:24px;display:block}
 label {font-weight:700;font-size:calc(var(--fs) + 2px);display:block;cursor:pointer}
 a {transition:all 100ms;color:var(--fg);text-decoration:1px solid underline var(--border)}
 a:hover {text-decoration:1px solid underline var(--fg)}

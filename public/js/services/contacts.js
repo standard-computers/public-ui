@@ -24,37 +24,6 @@
         if (!(target instanceof HTMLImageElement) || !target.classList.contains("contact-image")) return;
         setContactImageFallback(target);
     }, true);
-    const phonePlaceholder = "+# (###) ###-####";
-    const formatContactPhone = (value = "") => {
-        const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
-        if (digits.length <= 1) return digits ? `+${digits}` : "";
-        if (digits.length <= 4) return `+${digits[0]} (${digits.slice(1)}`;
-        if (digits.length <= 7) return `+${digits[0]} (${digits.slice(1, 4)}) ${digits.slice(4)}`;
-        return `+${digits[0]} (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-    };
-    const bindPhoneFormatter = (id) => {
-        const field = document.getElementById(id);
-        if (!field) return;
-        field.placeholder = phonePlaceholder;
-        field.inputMode = "tel";
-        field.value = formatContactPhone(field.value);
-        field.oninput = () => field.value = formatContactPhone(field.value);
-    };
-    const birthdayPlaceholder = "MM/DD/YYYY";
-    const formatContactBirthday = (value = "") => {
-        const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
-        if (digits.length <= 2) return digits;
-        if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-        return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-    };
-    const bindBirthdayFormatter = (id) => {
-        const field = document.getElementById(id);
-        if (!field) return;
-        field.placeholder = birthdayPlaceholder;
-        field.inputMode = "numeric";
-        field.value = formatContactBirthday(field.value);
-        field.oninput = () => field.value = formatContactBirthday(field.value);
-    };
     const contactPreviewContacts = new Map();
     const renderNoContactsState = () => emptyState({style: "contacts-empty-state", icon: contactServiceIcon, iconStyle: "contacts-empty-icon", label: "No contacts", labelStyle: "contacts-empty-label"});
     const renderNoContactsStateInto = (container) => {
@@ -403,10 +372,26 @@
     const openContact = (contact = {}) => {
         const fullName = [contact.firstname, contact.middlename, contact.lastname].filter(Boolean).join(" ").trim() || "View Contact";
         const contactValue = (value) => String(value || "").trim();
+        const phone = contactValue(contact.phone);
+        const email = contactValue(contact.email);
+        const contactActions = [
+            phone && button({
+                style: "naked small-padding round background-secondary margin-right",
+                title: `Call ${fullName}`,
+                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102A1.125 1.125 0 0 0 5.872 2.25H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z"/></svg>`,
+                onclick: () => window.location.href = `tel:${phone}`
+            }),
+            email && button({
+                style: "naked small-padding round background-secondary",
+                title: `Email ${fullName}`,
+                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>`,
+                onclick: () => window.location.href = `mailto:${email}`
+            })
+        ].filter(Boolean);
         const contactDetails = [
             contactValue(contact.company) && div({style: "small-padding faded", content: contactValue(contact.company)}),
-            contactValue(contact.phone) && div({style: "small-padding faded", content: contactValue(contact.phone)}),
-            contactValue(contact.email) && div({style: "small-padding faded", content: contactValue(contact.email)}),
+            phone && div({style: "small-padding faded", content: phone}),
+            email && div({style: "small-padding faded", content: email}),
             contactValue(contact.address) && div({style: "small-padding", content: contactValue(contact.address).replace(/\s*,\s*/g, "<br>")}),
             contactValue(contact.birthday) && div({style: "small-padding faded", content: contactValue(contact.birthday)})
         ].filter(Boolean);
@@ -431,7 +416,10 @@
             }],
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25"/></svg>`,
             route: () => div({content: children([
-                    div({style: "center large-margin-top large-margin-bottom", content: children([img({style: "contact-image real-large-icon round inline", src: contactImageUrl(contact.id)})])}),
+                    div({style: "center large-margin-top large-margin-bottom", content: children([
+                        img({style: "contact-image real-large-icon round inline", src: contactImageUrl(contact.id)}),
+                        contactActions.length && div({style: "center small-padding", content: children(contactActions)})
+                    ].filter(Boolean))}),
                     div({style: "small-padding bold large-margin-top", content: fullName}),
                     ...contactDetails,
                 ])
@@ -520,7 +508,7 @@
                     }),
                     div({content: children([
                             div({style: "bold small-padding", content: "Birthday"}),
-                            div({style: "padded", content: input({id: "birthday", style: "undecorated no-padding", placeholder: birthdayPlaceholder})})
+                            div({style: "padded", content: dateInput({id: "birthday", style: "undecorated no-padding"})})
                         ])
                     }),
                     div({content: children([
@@ -530,7 +518,7 @@
                     }),
                     div({content: children([
                             div({style: "bold small-padding", content: "Phone"}),
-                            div({style: "padded", content: input({id: "phone", style: "undecorated no-padding", placeholder: phonePlaceholder})})
+                            div({style: "padded", content: phoneInput({id: "phone", style: "undecorated no-padding"})})
                         ])
                     }),
                     div({content: children([
@@ -547,8 +535,6 @@
                 ])
             }),
             afterRender: () => {
-                bindBirthdayFormatter("birthday");
-                bindPhoneFormatter("phone");
                 const photoEl = document.getElementById("add-contact-photo");
                 if (!photoEl) return;
                 applyContactImageBackground(photoEl, defaultContactImage);
@@ -615,7 +601,7 @@
                     }),
                     div({content: children([
                             div({style: "bold small-padding", content: "Birthday"}),
-                            div({style: "padded", content: input({id: "edit-birthday", style: "undecorated no-padding", placeholder: birthdayPlaceholder})})
+                            div({style: "padded", content: dateInput({id: "edit-birthday", style: "undecorated no-padding", value: selected_contact.birthday})})
                         ])
                     }),
                     div({content: children([
@@ -625,7 +611,7 @@
                     }),
                     div({content: children([
                             div({style: "bold faded small-padding", content: "Phone"}),
-                            div({style: "padded", content: input({id: "edit-phone", style: "undecorated no-padding", placeholder: phonePlaceholder})})
+                            div({style: "padded", content: phoneInput({id: "edit-phone", style: "undecorated no-padding", value: selected_contact.phone})})
                         ])
                     }),
                     div({content: children([
@@ -650,11 +636,7 @@
                 setValue("edit-first-name", selected_contact.firstname);
                 setValue("edit-middle-name", selected_contact.middlename);
                 setValue("edit-last-name", selected_contact.lastname);
-                setValue("edit-birthday", selected_contact.birthday);
-                bindBirthdayFormatter("edit-birthday");
                 setValue("edit-address", selected_contact.address);
-                setValue("edit-phone", selected_contact.phone);
-                bindPhoneFormatter("edit-phone");
                 setValue("edit-email", selected_contact.email);
                 setValue("edit-company", selected_contact.company);
                 if (photoEl) {
