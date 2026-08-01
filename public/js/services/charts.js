@@ -36,6 +36,8 @@
 	const IMAGE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="m3 16 5-5 4 4 3-3 6 6M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><circle cx="16" cy="8" r="1.5"/></svg>`;
 	const DUPLICATE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>`;
 	const DELETE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg>`;
+	const PDF_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M6 2.75h8l4 4v14.5H6zM14 2.75v4h4"/><path stroke-linecap="round" d="M8.5 16.5v-5h1.25a1.5 1.5 0 0 1 0 3H8.5m4-3h1a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-1zm5 5v-5h2.5m-2.5 2h2"/></svg>`;
+	const PNG_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="16.5" cy="8.5" r="1.5"/><path stroke-linejoin="round" d="m5.5 17 4.5-5 3 3 2-2 3.5 4"/></svg>`;
 	const defaultStyle = () => ({
 		fontFamily: "Inter",
 		fontSize: 16,
@@ -160,6 +162,210 @@
 			}
 		});
 	}
+
+	const chartTitle = extension => `${cleanName(documentState.name) || "Untitled_Chart"}.${extension}`;
+	const chartBounds = () => {
+		if (!documentState.items.length) return null;
+		const padding = 48;
+		const left = Math.min(...documentState.items.map(item => Number(item.x) || 0)) - padding;
+		const top = Math.min(...documentState.items.map(item => Number(item.y) || 0)) - padding;
+		const right = Math.max(...documentState.items.map(item => (Number(item.x) || 0) + (Number(item.w) || 0))) + padding;
+		const bottom = Math.max(...documentState.items.map(item => (Number(item.y) || 0) + (Number(item.h) || 0))) + padding;
+		return {left, top, width: Math.max(1, right - left), height: Math.max(1, bottom - top)};
+	};
+	const chartVertexPoint = (item, vertex) => ({
+		top: {x: item.x + item.w / 2, y: item.y},
+		right: {x: item.x + item.w, y: item.y + item.h / 2},
+		bottom: {x: item.x + item.w / 2, y: item.y + item.h},
+		left: {x: item.x, y: item.y + item.h / 2}
+	}[vertex]);
+	const chartConnectorPath = connector => {
+		const fromItem = documentState.items.find(item => item.id === connector.from?.itemId);
+		const toItem = documentState.items.find(item => item.id === connector.to?.itemId);
+		if (!fromItem || !toItem) return "";
+		const from = chartVertexPoint(fromItem, connector.from.vertex), to = chartVertexPoint(toItem, connector.to.vertex);
+		if (documentState.connectorStyle === "curved") {
+			const dx = Math.max(70, Math.abs(to.x - from.x) * .5);
+			return `M${from.x},${from.y} C${from.x + dx},${from.y} ${to.x - dx},${to.y} ${to.x},${to.y}`;
+		}
+		if (documentState.connectorStyle === "vertexed") {
+			const middleX = (from.x + to.x) / 2;
+			return `M${from.x},${from.y} L${middleX},${from.y} L${middleX},${to.y} L${to.x},${to.y}`;
+		}
+		return `M${from.x},${from.y} L${to.x},${to.y}`;
+	};
+	const wrapChartText = (value, width, fontSize) => {
+		const maximumCharacters = Math.max(1, Math.floor(width / Math.max(4, fontSize * .58)));
+		return String(value || "").split(/\r?\n/).flatMap(paragraph => {
+			const words = paragraph.split(/\s+/).filter(Boolean), lines = [];
+			if (!words.length) return [""];
+			words.forEach(word => {
+				if (!lines.length || `${lines.at(-1)} ${word}`.trim().length > maximumCharacters) lines.push(word);
+				else lines[lines.length - 1] += ` ${word}`;
+			});
+			return lines;
+		});
+	};
+	const chartSvg = bounds => {
+		const shapeMarkup = documentState.items.map(item => {
+			const style = {...defaultStyle(), ...(item.style || {})};
+			let shape = "";
+			if (item.type === "image") shape = `<image href="${esc(item.src)}" x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" preserveAspectRatio="none"/>`;
+			else if (item.type === "shape") {
+				if (item.kind === "ellipse") shape = `<ellipse cx="${item.x + item.w / 2}" cy="${item.y + item.h / 2}" rx="${item.w / 2 - 2}" ry="${item.h / 2 - 2}"/>`;
+				else if (item.kind === "diamond") shape = `<path d="M${item.x + item.w / 2},${item.y + 2} L${item.x + item.w - 2},${item.y + item.h / 2} L${item.x + item.w / 2},${item.y + item.h - 2} L${item.x + 2},${item.y + item.h / 2} Z"/>`;
+				else shape = `<rect x="${item.x + 2}" y="${item.y + 2}" width="${item.w - 4}" height="${item.h - 4}" rx="${item.kind === "rounded" ? 18 : 2}"/>`;
+				shape = `<g fill="${esc(style.fill)}" stroke="${esc(style.stroke)}" stroke-width="2">${shape}</g>`;
+			}
+			if (item.type === "image") return shape;
+			const fontSize = Math.max(8, Number(style.fontSize) || 16), lineHeight = fontSize * 1.2;
+			const lines = wrapChartText(item.text, Math.max(1, item.w - 16), fontSize);
+			const textAnchor = style.align === "left" ? "start" : style.align === "right" ? "end" : "middle";
+			const textX = style.align === "left" ? item.x + 8 : style.align === "right" ? item.x + item.w - 8 : item.x + item.w / 2;
+			const firstLineY = item.y + item.h / 2 - ((lines.length - 1) * lineHeight) / 2;
+			const decoration = style.underline ? " text-decoration=\"underline\"" : "";
+			const text = lines.map((line, index) => `<tspan x="${textX}" y="${firstLineY + index * lineHeight}">${esc(line)}</tspan>`).join("");
+			return `${shape}<text text-anchor="${textAnchor}" dominant-baseline="middle" fill="${esc(style.textColor)}" font-family="${esc(style.fontFamily)}" font-size="${fontSize}" font-weight="${style.bold ? 700 : 400}" font-style="${style.italic ? "italic" : "normal"}"${decoration}>${text}</text>`;
+		}).join("");
+		const connectors = documentState.connectors.map(connector => {
+			const path = chartConnectorPath(connector);
+			if (!path) return "";
+			const fromItem = documentState.items.find(item => item.id === connector.from?.itemId);
+			const toItem = documentState.items.find(item => item.id === connector.to?.itemId);
+			const from = chartVertexPoint(fromItem, connector.from.vertex), to = chartVertexPoint(toItem, connector.to.vertex);
+			const label = connector.text ? `<text x="${(from.x + to.x) / 2}" y="${(from.y + to.y) / 2 - 7}" text-anchor="middle" fill="#172033" stroke="${esc(documentState.background || "#f5f6f8")}" stroke-width="5" paint-order="stroke" stroke-linejoin="round" font-family="Inter" font-size="14" font-weight="600">${esc(connector.text)}</text>` : "";
+			return `<path d="${path}" fill="none" stroke="#657089" stroke-width="2" marker-end="url(#chart-print-arrow)"/>${label}`;
+		}).join("");
+		return `<svg xmlns="http://www.w3.org/2000/svg" width="${bounds.width}" height="${bounds.height}" viewBox="${bounds.left} ${bounds.top} ${bounds.width} ${bounds.height}"><defs><marker id="chart-print-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#657089"/></marker></defs><rect x="${bounds.left}" y="${bounds.top}" width="${bounds.width}" height="${bounds.height}" fill="${esc(documentState.background || "#f5f6f8")}"/>${connectors}${shapeMarkup}</svg>`;
+	};
+	const renderChartCanvas = async () => {
+		const bounds = chartBounds();
+		if (!bounds) throw new Error("Add something to the chart before printing");
+		const maximumDimension = 4096, scale = Math.min(2, maximumDimension / Math.max(bounds.width, bounds.height));
+		const canvas = document.createElement("canvas"), image = new Image();
+		canvas.width = Math.max(1, Math.round(bounds.width * scale));
+		canvas.height = Math.max(1, Math.round(bounds.height * scale));
+		const source = URL.createObjectURL(new Blob([chartSvg(bounds)], {type: "image/svg+xml"}));
+		try {
+			await new Promise((resolve, reject) => {
+				image.onload = resolve;
+				image.onerror = () => reject(new Error("Unable to render this chart"));
+				image.src = source;
+			});
+			canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+			return canvas;
+		} finally {
+			URL.revokeObjectURL(source);
+		}
+	};
+	const concatBytes = parts => {
+		const length = parts.reduce((total, part) => total + part.length, 0), output = new Uint8Array(length);
+		let offset = 0;
+		parts.forEach(part => {
+			output.set(part, offset);
+			offset += part.length;
+		});
+		return output;
+	};
+	const pdfBlobFromCanvas = canvas => {
+		const encoder = new TextEncoder(), text = value => encoder.encode(value);
+		const jpegBytes = Uint8Array.from(atob(canvas.toDataURL("image/jpeg", .94).split(",")[1]), character => character.charCodeAt(0));
+		const landscape = canvas.width >= canvas.height, pageWidth = landscape ? 792 : 612, pageHeight = landscape ? 612 : 792, margin = 36;
+		const scale = Math.min((pageWidth - margin * 2) / canvas.width, (pageHeight - margin * 2) / canvas.height);
+		const imageWidth = canvas.width * scale, imageHeight = canvas.height * scale, x = (pageWidth - imageWidth) / 2, y = (pageHeight - imageHeight) / 2;
+		const content = `q\n${imageWidth.toFixed(3)} 0 0 ${imageHeight.toFixed(3)} ${x.toFixed(3)} ${y.toFixed(3)} cm\n/Im0 Do\nQ\n`;
+		const objects = [
+			text("<< /Type /Catalog /Pages 2 0 R >>"),
+			text("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+			text(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`),
+			concatBytes([text(`<< /Type /XObject /Subtype /Image /Width ${canvas.width} /Height ${canvas.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`), jpegBytes, text("\nendstream")]),
+			text(`<< /Length ${content.length} >>\nstream\n${content}endstream`)
+		];
+		const parts = [text("%PDF-1.4\n%\xFF\xFF\xFF\xFF\n")], offsets = [0];
+		objects.forEach((object, index) => {
+			offsets.push(parts.reduce((total, part) => total + part.length, 0));
+			parts.push(text(`${index + 1} 0 obj\n`), object, text("\nendobj\n"));
+		});
+		const xrefOffset = parts.reduce((total, part) => total + part.length, 0);
+		parts.push(text(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map(offset => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\ntrailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`));
+		return new Blob([concatBytes(parts)], {type: "application/pdf"});
+	};
+	const waitForChartPreviewMethod = async lookup => {
+		let method = lookup();
+		if (typeof method === "function") return method;
+		modular.start?.("com.standard.internals");
+		for (let attempt = 0; attempt < 20; attempt++) {
+			await new Promise(resolve => setTimeout(resolve, 50));
+			method = lookup();
+			if (typeof method === "function") return method;
+		}
+		return null;
+	};
+	const printChart = () => {
+		const bounds = chartBounds();
+		if (!bounds) return modular.error("Add something to the chart before printing");
+		const frame = document.createElement("iframe");
+		Object.assign(frame.style, {position: "fixed", right: "0", bottom: "0", width: "0", height: "0", border: "0", opacity: "0"});
+		frame.setAttribute("aria-hidden", "true");
+		document.body.appendChild(frame);
+		const frameWindow = frame.contentWindow;
+		if (!frameWindow) {
+			frame.remove();
+			return modular.error("Unable to prepare chart for printing");
+		}
+		frameWindow.document.open();
+		frameWindow.document.write(`<!doctype html><html><head><title>${esc(chartTitle("chrts"))}</title><style>@page{margin:.35in}html,body{margin:0;width:100%;height:100%}body{display:grid;place-items:center}svg{max-width:100%;max-height:100vh;width:auto;height:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${chartSvg(bounds)}</body></html>`);
+		frameWindow.document.close();
+		const cleanup = () => window.setTimeout(() => frame.remove(), 500);
+		frameWindow.addEventListener("afterprint", cleanup, {once: true});
+		window.setTimeout(() => {
+			try {
+				frameWindow.focus();
+				frameWindow.print();
+				window.setTimeout(cleanup, 1000);
+			} catch (_) {
+				frame.remove();
+				modular.error("Unable to print this chart");
+			}
+		}, 80);
+	};
+	const previewChartPng = async sourceNode => {
+		try {
+			const canvas = await renderChartCanvas();
+			const openImage = await waitForChartPreviewMethod(() => window.StandardInternals?.openImageSource);
+			if (!openImage) throw new Error("Image preview is unavailable");
+			openImage(canvas.toDataURL("image/png"), {title: chartTitle("png"), sourceNode});
+		} catch (error) {
+			modular.error(error.message || "Unable to preview this chart as PNG");
+		}
+	};
+	const previewChartPdf = async sourceNode => {
+		try {
+			const canvas = await renderChartCanvas(), source = URL.createObjectURL(pdfBlobFromCanvas(canvas));
+			const openPdf = await waitForChartPreviewMethod(() => window.StandardInternals?.openPdfSource);
+			if (!openPdf) {
+				URL.revokeObjectURL(source);
+				throw new Error("PDF preview is unavailable");
+			}
+			openPdf(chartTitle("pdf"), source, {isObjectUrl: true, sourceNode});
+		} catch (error) {
+			modular.error(error.message || "Unable to preview this chart as PDF");
+		}
+	};
+	const showPrintMenu = event => {
+		const button = event?.currentTarget;
+		if (!button || typeof button.contextmenu !== "function") return;
+		if (!button.__chartsPrintMenu) {
+			button.__chartsPrintMenu = true;
+			button.contextmenu([
+				{label: "Print", icon: modular.icons.print, action: printChart},
+				{label: "Preview as PDF", icon: PDF_ICON, action: () => previewChartPdf(button)},
+				{label: "Preview as PNG", icon: PNG_ICON, action: () => previewChartPng(button)}
+			]);
+		}
+		const rect = button.getBoundingClientRect();
+		button.dispatchEvent(new MouseEvent("contextmenu", {bubbles: true, cancelable: true, clientX: rect.left + rect.width / 2, clientY: rect.bottom}));
+	};
 
 	function showSearch(anchor) {
 		window.StandardUI.openSearchDialogue({
@@ -812,6 +1018,10 @@
 		icon: ICON,
 		svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h6A1.5 1.5 0 0 1 11.25 6v3A1.5 1.5 0 0 1 9.75 10.5h-6A1.5 1.5 0 0 1 2.25 9V6A1.5 1.5 0 0 1 3.75 4.5Zm10.5 9h6A1.5 1.5 0 0 1 21.75 15v3a1.5 1.5 0 0 1-1.5 1.5h-6a1.5 1.5 0 0 1-1.5-1.5v-3a1.5 1.5 0 0 1 1.5-1.5ZM11.25 7.5h3.375A3.375 3.375 0 0 1 18 10.875V13.5m0 0-2.25-2.25M18 13.5l2.25-2.25"/></svg>`,
 		tools: [{title: "Save", icon: modular.icons.save, onclick: saveChart}, {
+			title: "Print",
+			icon: modular.icons.print,
+			onclick: showPrintMenu
+		}, {
 			title: "Search",
 			icon: modular.icons.search,
 			onclick: event => showSearch(event.currentTarget)

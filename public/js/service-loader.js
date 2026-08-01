@@ -32,7 +32,7 @@
     ];
     const serviceScripts = platformInterfaces.map(({script}) => script);
     const SERVICE_SCRIPT_CACHE_INTERFACE = "service-loader";
-    const SERVICE_SCRIPT_CACHE_VERSION = "v7";
+    const SERVICE_SCRIPT_CACHE_VERSION = "v11";
     const ENABLED_APPS_CACHE_KEY = "enabled-apps";
     const buildServiceScriptCacheKey = (url = "") => `${SERVICE_SCRIPT_CACHE_VERSION}:${url}`;
     const supportsServiceScriptCache = () => {

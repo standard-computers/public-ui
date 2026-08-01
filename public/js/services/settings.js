@@ -563,6 +563,7 @@
     const STANDARD_MAKER_FIELD_ID = (name = "") => `standard-maker-${name}`;
     const STANDARD_CONSTRAINT_TYPES = ["string", "bool", "int", "double", "char", "array"];
     const STANDARD_ACCESS_TYPES = ["public", "protected", "private", "global"];
+    let standardMakerRowIndex = 0;
 
     const openStandardMaker = () => modular.show("com.standard.settings", 2, {newInstance: true});
 
@@ -574,12 +575,13 @@
                 <button type="button" class="tiny inner-radius standard-maker-remove" title="Remove definition" aria-label="Remove definition">×</button>
             </div>`;
         }
+        const requiredId = `${STANDARD_MAKER_FIELD_ID("required")}-${standardMakerRowIndex++}`;
         return `<div class="standard-maker-row standard-maker-constraint-row">
-            <select class="standard-maker-access" aria-label="Access type">${STANDARD_ACCESS_TYPES.map(type => `<option value="${type}"${type === "protected" ? " selected" : ""}>${type}</option>`).join("")}</select>
+            ${dropdown({style: "standard-maker-access", ariaLabel: "Access type", value: "protected", options: STANDARD_ACCESS_TYPES.map(type => ({label: type, value: type}))})}
             <input class="standard-maker-name" type="text" placeholder="field_name" aria-label="Constraint name">
-            <select class="standard-maker-type" aria-label="Constraint type">${STANDARD_CONSTRAINT_TYPES.map(type => `<option value="${type}">${type}</option>`).join("")}</select>
+            ${dropdown({style: "standard-maker-type", ariaLabel: "Constraint type", options: STANDARD_CONSTRAINT_TYPES.map(type => ({label: type, value: type}))})}
             <input class="standard-maker-reference" type="text" placeholder="REF" aria-label="Constraint reference" maxlength="12">
-            <label class="standard-maker-required" title="Require a value"><input type="checkbox"> Required</label>
+            <div class="standard-maker-required" title="Require a value">${switcher({id: requiredId, style: "standard-maker-required-control", content: "Required"})}</div>
             <button type="button" class="tiny inner-radius standard-maker-remove" title="Remove constraint" aria-label="Remove constraint">×</button>
         </div>`;
     };
@@ -624,6 +626,7 @@
     const normalizeStandardIdentifier = (value = "") => String(value || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
     const normalizeStandardReference = (value = "") => String(value || "").trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
     const quoteStandardValue = (value = "") => `"${String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    const standardMakerCommandFailed = response => response === 0 || response === false || /^(0|false|failed|error|invalid|unknown)\b/i.test(`${response ?? ""}`.trim());
 
     const buildStandardMakerContent = (root) => {
         const mode = root.querySelector(`#${STANDARD_MAKER_FIELD_ID("mode")}`)?.value || "standard";
@@ -656,16 +659,37 @@
         try {
             const standard = buildStandardMakerContent(root);
             if (typeof window.StandardUploads?.saveFile !== "function") throw new Error("File saving is unavailable");
-            const relativePath = `standards/${standard.name}.stds`;
+            const relativePath = `Documents/${standard.name}.stds`;
             const hostPath = `/home/standard-system/${relativePath}`;
-            const response = await window.StandardUploads.saveFile(standard.content, relativePath, {label: `Creating ${standard.name}`});
-            if (!response?.ok) throw new Error("Unable to save the Standard file");
-            const importResponse = await CLI.send(`import ${standard.name} "${hostPath}"`, false);
-            const normalizedImportResponse = `${importResponse ?? ""}`.trim();
-            if (importResponse === 0 || importResponse === false || /^(false|failed|error|invalid|unknown)\b/i.test(normalizedImportResponse)) {
-                throw new Error("The Standard file was saved but could not be imported");
+            let savedToDocuments = false;
+            let workflowError = null;
+            try {
+                const response = await window.StandardUploads.saveFile(standard.content, relativePath, {label: `Creating ${standard.name}`});
+                if (!response?.ok) throw new Error("Unable to save the Standard file");
+                savedToDocuments = true;
+                const importResponse = await CLI.send(`import "${hostPath}"`, false);
+                if (standardMakerCommandFailed(importResponse)) {
+                    throw new Error("The Standard file was saved but could not be imported");
+                }
+                const reloadResponse = await CLI.send("reload standards", false);
+                if (standardMakerCommandFailed(reloadResponse)) {
+                    throw new Error("The Standard was imported but standards could not be reloaded");
+                }
+            } catch (error) {
+                workflowError = error;
             }
-            await CLI.send("reload standards", false);
+            if (savedToDocuments) {
+                try {
+                    const removeResponse = await CLI.send(CLI.buildFilesCommand("remove", relativePath), false);
+                    if (standardMakerCommandFailed(removeResponse)) {
+                        throw new Error("The Standard was created but its temporary file could not be removed from Documents");
+                    }
+                } catch (error) {
+                    if (!workflowError) workflowError = error;
+                    else console.error("Unable to remove temporary Standard file:", error);
+                }
+            }
+            if (workflowError) throw workflowError;
             portal?.close?.();
             modular.success(`${standard.name} created`);
             await initializeStandardsRoute();
@@ -1772,16 +1796,15 @@
         new Portal({
             title: "Create Standard",
             internal: true,
-            dimensions: [620, 620],
+            dimensions: [620, 420],
             navigation: false,
             hints: ["create a standard"],
             tools: [{title: "Create", icon: modular.icons.save, onclick: saveCreatedStandard}],
             route: () => div({style: "large-padding-top padded", content: children([
-                    div({style: "faded small-padding", content: "Create a simple data shape or a fixed set of allowed values."}),
                     div({style: "standard-maker-basics", content: children([
                         div({content: children([
                             label({input: STANDARD_MAKER_FIELD_ID("mode"), content: "Kind"}),
-                            select({id: STANDARD_MAKER_FIELD_ID("mode"), options: [{label: "Standard", value: "standard"}, {label: "Standard definition", value: "definition"}]})
+                            dropdown({id: STANDARD_MAKER_FIELD_ID("mode"), options: [{label: "Standard", value: "standard"}, {label: "Standard definition", value: "definition"}]})
                         ])}),
                         div({content: children([
                             label({input: STANDARD_MAKER_FIELD_ID("name"), content: "Name"}),
@@ -1792,10 +1815,11 @@
                             input({id: STANDARD_MAKER_FIELD_ID("reference"), type: "text", placeholder: "VHL", maxlength: 12})
                         ])})
                     ])}),
-                    div({style: "standard-maker-history", content: label({input: STANDARD_MAKER_FIELD_ID("history"), content: children([
-                        input({id: STANDARD_MAKER_FIELD_ID("history"), type: "checkbox"}),
-                        " Track record changes"
-                    ])})}),
+                    div({style: "standard-maker-history", content: switcher({
+                        id: STANDARD_MAKER_FIELD_ID("history"),
+                        style: "no-margin",
+                        content: "Track record changes"
+                    })}),
                     div({id: STANDARD_MAKER_FIELD_ID("helper"), style: "faded small-padding", content: "Constraints describe the fields stored in each record."}),
                     div({id: STANDARD_MAKER_FIELD_ID("rows"), style: "standard-maker-rows", content: renderStandardMakerRow("standard")}),
                     button({id: STANDARD_MAKER_FIELD_ID("add-row"), type: "button", style: "tiny inner-radius medium-margin-top", content: "Add row"})
@@ -1807,6 +1831,7 @@
             title: "View Person",
             internal: true,
             dimensions: [350, 400],
+            auto_height: true,
             navigation: false,
             resizable: false,
             tools: [{title: "Modify", icon: modular.icons.modify, onclick: openModifyPersonPortal}],

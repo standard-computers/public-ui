@@ -19,7 +19,7 @@ input[type=range]::-webkit-slider-thumb {-webkit-appearance:none;appearance:none
 input[type=range]::-moz-range-thumb {-webkit-appearance:none;appearance:none;cursor:pointer;box-shadow:var(--shadow);width:35px;height:30px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)}
 input[type="checkbox"] {display:none}
 input[type="checkbox"].ios-switch {cursor:pointer;position:absolute;margin:8px 0 0 16px}
-input[type="checkbox"].ios-switch + label {position:relative;padding:0 0 0 70px;line-height:24px;font-weight:normal;margin-top:0;margin-bottom:0}
+input[type="checkbox"].ios-switch + label {position:relative;min-height:24px;padding:0 0 0 70px;line-height:24px;font-weight:normal;margin-top:0;margin-bottom:0}
 input[type="checkbox"].ios-switch + label:before {content:"";cursor:pointer;position:absolute;display:block;left:0;top:0;width:52px;height:16px;margin-top:3px;border-radius:16px;background:var(--bg);border:1px solid var(--border);-webkit-transition:all 0.3s;transition:all 0.3s}
 input[type="checkbox"].ios-switch + label:before:hover {box-shadow:var(--shadow)}
 input[type="checkbox"].ios-switch + label:after {content:"";cursor:pointer;position:absolute;display:block;left:0;top:0;width:34px;height:22px;border-radius:12px;background:var(--secondary-bg);border:1px solid var(--border);-webkit-transition:all 0.3s;transition:all 0.3s}
@@ -39,6 +39,10 @@ button:hover a {text-decoration:1px underline solid var(--border)}
 button.secondary {border:1px solid var(--border);background-color:rgba(0,0,0,0)}
 button.secondary:hover {box-shadow:var(--shadow);border-color:var(--secondary-border);background-color:var(--transparent-bg)}
 button.secondary svg {color:var(--fg);width:25px;height:25px;display:block}
+.plastic-dropdown {align-items:center;display:inline-flex;gap:12px;justify-content:space-between;text-align:left}
+.plastic-dropdown svg {flex:0 0 auto;height:16px !important;width:16px !important}
+.plastic-dropdown-menu {box-sizing:border-box;max-height:min(320px,50vh);overflow-y:auto}
+.plastic-dropdown-menu .context-menu-item.selected {opacity:1;transform:scale(var(--zoom));box-shadow:var(--shadow);background-color:var(--secondary-bg)}
 button.plain {border:1px solid rgba(0,0,0,0);padding:5px;background-color:rgba(0,0,0,0)}
 button.plain:hover {background-color:var(--secondary-bg);border:1px solid var(--border);box-shadow:var(--shadow)}
 button.plain svg {color:var(--fg);width:25px;height:25px;display:block}
@@ -130,3 +134,7 @@ li {list-style:none}
 .editor-text-footer-text-label {font-size:calc(var(--fs) - 1px)}
 .editor-text-footer-text {box-sizing:border-box;width:100%}
 footer {margin-top:50px;opacity:0.8}
+.draggable-window.window-keyboard-moving {
+    outline: 2px solid var(--accent, #0c92c2);
+    outline-offset: 2px;
+}

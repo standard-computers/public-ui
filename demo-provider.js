@@ -186,17 +186,18 @@ class DemoProvider {
         if (/^files\s+/i.test(command)) return this.executeFileCommand(state, command);
         if (/^rcs\s+/i.test(command)) return "1";
         if (/^reload\s+(?:standards|stds)$/i.test(command)) return "1";
-        const standardImport = command.match(/^import\s+([a-z0-9_]+)\s+"([^"]+\.stds)"$/i);
+        const standardImport = command.match(/^import\s+"([^"]+\.stds)"$/i);
         if (standardImport) {
-            const standardName = standardImport[1].toLowerCase();
-            const standardPath = normalizePath(standardImport[2]);
+            const standardPath = normalizePath(standardImport[1]);
             const standardFile = state.files[standardPath];
             if (!standardFile?.content) return "0";
             const standardSource = Buffer.from(standardFile.content, "base64").toString("utf8");
-            const standardHeader = standardSource.trim().match(new RegExp(`^!?${standardName}\\s*:\\s*([A-Z0-9_]+)`, "i"));
+            const standardHeader = standardSource.trim().match(/^!?([a-z0-9_]+)\s*:\s*([A-Z0-9_]+)/i);
             if (!standardHeader) return "0";
+            const standardName = standardHeader[1].toLowerCase();
+            if (path.posix.basename(standardPath, ".stds").toLowerCase() !== standardName) return "0";
             if (!state.records[standardName]) state.records[standardName] = [];
-            state.standards[standardName] = {reference: standardHeader[1].toUpperCase(), source: standardSource.trim()};
+            state.standards[standardName] = {reference: standardHeader[2].toUpperCase(), source: standardSource.trim()};
             return "1";
         }
 
@@ -227,7 +228,7 @@ class DemoProvider {
         const id = String(++state.nextId);
         const fieldMap = {
             contacts: ["firstname", "middlename", "lastname", "birthday", "address", "phone", "email", "company"],
-            notes: ["user", "content", "color", "parent"],
+            notes: ["user", "title", "content", "color", "created"],
             alarms: ["user", "name", "timestamp", "level", "enabled", "repeats", "days"],
             cats: ["name", "color"],
             events: ["owner", "category", "name", "start", "end", "invitees", "recurrence"],

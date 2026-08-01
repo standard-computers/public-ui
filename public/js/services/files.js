@@ -1,4 +1,8 @@
 (async () => {
+    const FILES_SERVICE_ID = "com.standard.files";
+    const FILES_SETTINGS = {
+        display_style: {label: "Display style", type: "text", default: "rows", restrictions: ["rows", "tiles", "details"]}
+    };
     const NOTE_CONTENT_PREFIX = "__STD_NOTE_B64__:";
     let photoCascadeObserver = null;
     let photoDisplayStyle = "cascade";
@@ -17,6 +21,14 @@
         }
     };
     const normalizeNoteContent = value => decodeNoteContent(value);
+    const normalizeNoteRecord = (note = {}) => ({
+        ...note,
+        id: note.id ?? note.ID ?? "",
+        title: note.title ?? note.TTL ?? note.ttl ?? "",
+        content: note.content ?? note.CNT ?? note.cnt ?? "",
+        color: note.color ?? note.CLR ?? note.clr ?? "",
+        created: note.created ?? note.CRTD ?? note.crtd ?? ""
+    });
     const sanitizeNoteMarkup = markup => {
         const parser = new DOMParser();
         const parsed = parser.parseFromString(`<div>${String(markup || "")}</div>`, "text/html");
@@ -141,6 +153,49 @@
         return type === "directory" || type === "folder" || type === "dir";
     };
     let fileSortMode = "name-asc";
+    const FILE_DISPLAY_STYLES = [{
+        id: "rows",
+        label: "Row list",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z"/></svg>`
+    }, {
+        id: "tiles",
+        label: "Tiles",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>`
+    }, {
+        id: "details",
+        label: "Details list",
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>`
+    }];
+    let fileDisplayStyleIndex = 0;
+    let fileDisplaySettingsPromise = null;
+    const getFileDisplayStyle = () => FILE_DISPLAY_STYLES[fileDisplayStyleIndex];
+    const getFileDisplayRootClass = () => `files-display files-display-${getFileDisplayStyle().id}`;
+    const setFileDisplayStyle = (styleId = "rows") => {
+        const nextIndex = FILE_DISPLAY_STYLES.findIndex(displayStyle => displayStyle.id === styleId);
+        fileDisplayStyleIndex = nextIndex >= 0 ? nextIndex : 0;
+        document.querySelectorAll("#all-files, #documents").forEach(root => {
+            root.className = getFileDisplayRootClass();
+        });
+        syncFileDisplayButtons();
+        return getFileDisplayStyle();
+    };
+    const loadFileDisplayStyleSetting = ({force = false} = {}) => {
+        if (!fileDisplaySettingsPromise || force) {
+            fileDisplaySettingsPromise = Promise.resolve(window.StandardAppSettings?.values?.(FILES_SERVICE_ID, {force}) || {})
+                .then(values => setFileDisplayStyle(values?.display_style || FILES_SETTINGS.display_style.default))
+                .catch(error => {
+                    console.error("Failed to load Files display style", error);
+                    return setFileDisplayStyle(FILES_SETTINGS.display_style.default);
+                });
+        }
+        return fileDisplaySettingsPromise;
+    };
+    const saveFileDisplayStyleSetting = async styleId => {
+        const currentSettings = await window.StandardAppSettings?.values?.(FILES_SERVICE_ID) || {};
+        const saved = await window.StandardAppSettings?.save?.(FILES_SERVICE_ID, {...currentSettings, display_style: styleId});
+        if (!saved) modular.error("Unable to save Files display style");
+        return saved;
+    };
     const getFileName = (file = {}) => String(file.name || file.path?.split?.("/")?.pop?.() || "").toLowerCase();
     const getFileType = (file = {}) => {
         if (isDirectory(file)) return "folder";
@@ -212,7 +267,10 @@
     };
     const refreshFileListRoot = (rootId, options = {}) => {
         const root = document.getElementById(rootId);
-        if (root) root.innerHTML = renderFiles(options);
+        if (root) {
+            root.className = getFileDisplayRootClass();
+            root.innerHTML = renderFiles(options);
+        }
     };
     const createFileSortMenuItems = (rootId, options = {}) => [
         {mode: "name-asc", label: "Name A-Z"},
@@ -226,6 +284,28 @@
         }
     }));
     const fileSortButton = id => button({id, style: "small naked float-right hover-zoom", altsync: "F", icon: modular.icons.sort, title: "Sort"});
+    const fileDisplayButton = id => button({id, style: "small naked float-right hover-zoom files-display-button", icon: getFileDisplayStyle().icon, title: `Display style: ${getFileDisplayStyle().label}`});
+    const syncFileDisplayButtons = () => {
+        const displayStyle = getFileDisplayStyle();
+        document.querySelectorAll(".files-display-button").forEach(displayButton => {
+            displayButton.innerHTML = displayStyle.icon;
+            displayButton.title = `Display style: ${displayStyle.label}`;
+            displayButton.setAttribute("aria-label", `Display style: ${displayStyle.label}. Click to cycle views.`);
+        });
+    };
+    const bindFileDisplayButton = (id, rootId, options = {}) => {
+        const displayButton = document.getElementById(id);
+        if (!displayButton || displayButton.dataset.displayStyleBound === "1") return;
+        displayButton.dataset.displayStyleBound = "1";
+        displayButton.onclick = async () => {
+            await loadFileDisplayStyleSetting();
+            const nextIndex = (fileDisplayStyleIndex + 1) % FILE_DISPLAY_STYLES.length;
+            const nextStyle = setFileDisplayStyle(FILE_DISPLAY_STYLES[nextIndex].id);
+            await saveFileDisplayStyleSetting(nextStyle.id);
+        };
+        syncFileDisplayButtons();
+        loadFileDisplayStyleSetting();
+    };
     const bindFileSortButton = (id, rootId, options = {}) => {
         const sortButton = document.getElementById(id);
         if (sortButton?.dataset.sortMenuBound === "1") return;
@@ -273,14 +353,23 @@
     const openNoteEditorInNotesApp = (note = {}) => {
         if (window.StandardNotes?.openNoteEditor) window.StandardNotes.openNoteEditor(note);
     };
-    const deleteNoteFromNotesSection = (noteId, note = {}) => {
+    const removeDeletedNoteTile = (noteId, tile = null) => {
+        const deletedTile = tile?.closest?.(".note-tile");
+        if (deletedTile) {
+            deletedTile.remove();
+            return;
+        }
+        document.querySelectorAll("#notes .note-tile").forEach(noteTile => {
+            if (noteTile.getAttribute("directive") === String(noteId)) noteTile.remove();
+        });
+    };
+    const deleteNoteFromNotesSection = (noteId, note = {}, tile = null) => {
         if (!noteId) return;
         const noteLabel = String(note?.created || "note").trim() || "note";
         confirmationDialogue({title: "Delete note", content: `Are you sure you want to delete ${noteLabel}?`, confirmation: () => {
                 CLI.send(`[notes] - <id ${noteId}>`).then(response => {
                     if (response === 1) {
-                        modular.refresh("com.standard.notes");
-                        modular.refresh("com.standard.files");
+                        removeDeletedNoteTile(noteId, tile);
                         modular.success(`Deleted ${noteLabel}`);
                     } else {
                         modular.error(`Failed to delete ${noteLabel}`);
@@ -294,7 +383,8 @@
     const getNoteFromTile = root => {
         const noteTile = root?.closest?.(".note-tile");
         if (!noteTile) return null;
-        return {id: noteTile.getAttribute("directive"), created: noteTile.querySelector("em")?.innerText || "View Note", content: noteTile.querySelector(".note-tile-content")?.innerHTML || "", color: noteTile.style.background || window.getComputedStyle(noteTile).getPropertyValue("background-color")};
+        const displayedTitle = noteTile.querySelector(".note-tile-title")?.innerText || "";
+        return {id: noteTile.getAttribute("directive"), title: displayedTitle, created: noteTile.querySelector("em")?.innerText || displayedTitle || "View Note", content: noteTile.querySelector(".note-tile-content")?.innerHTML || "", color: noteTile.style.background || window.getComputedStyle(noteTile).getPropertyValue("background-color")};
     };
     const renderNoNotesState = () => emptyState({style: "notes-empty-state", icon: "/icons/interfaces/notes.png", iconStyle: "notes-empty-icon", label: "No notes", labelStyle: "notes-empty-label"});
     const isWhiteboardFilePath = (rawPath = "") => /\.wtb$/i.test(String(rawPath || ""));
@@ -318,7 +408,7 @@
         });
     };
     const refreshFilesAfterMutation = () => {
-        modular.refresh("com.standard.files");
+        modular.refresh(FILES_SERVICE_ID);
         return refreshFilesRecordCache();
     };
     const uploadSelectedFiles = async (fileList, options = {}) => {
@@ -1038,7 +1128,7 @@
     const openDirectoryPath = async (rawPath = "") => {
         const directoryPath = String(rawPath || "").trim();
         if (!directoryPath) return false;
-        if (typeof modular?.show === "function") modular.show("com.standard.files", 1);
+        if (typeof modular?.show === "function") modular.show(FILES_SERVICE_ID, 1);
         await navigateDocumentsDirectory(directoryPath);
         return true;
     };
@@ -1052,9 +1142,9 @@
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             as.push(div({
-                style: "padded secondary-tile brick list-item hidden file-folder",
+                style: "padded secondary-tile brick list-item hidden file-folder files-file-item",
                 directive: file.path,
-                content: children([img({style: "margined-icon float-left no-events", src: getFileTypeIconPath(file)}), div({content: children([div({style: "no-events", content: file.name}), em({style: "faded no-wrap hidden", content: file.path.replace("/home/standard-system/", "")})])})]),
+                content: children([img({style: "margined-icon float-left no-events files-file-icon", src: getFileTypeIconPath(file)}), div({style: "files-file-copy", content: children([div({style: "no-events files-file-name", content: file.name}), em({style: "faded no-wrap hidden files-file-detail", content: file.path.replace("/home/standard-system/", "")})])})]),
                 onclick: () => {
                     if (!isDirectory(file) || !openDirectories) {
                         openFilePath(file.path);
@@ -1066,7 +1156,7 @@
         }
         return children(as);
     }
-    modular.register(new Service("com.standard.files", [new Portal({
+    modular.register(new Service(FILES_SERVICE_ID, [new Portal({
         title: "Files",
         hints: ["files"],
         dimensions: [775, 500],
@@ -1082,8 +1172,8 @@
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"/></svg>`,
             route: () => div({
                 style: "small-padding",
-                content: children([fileSortButton("everything-sort", "all-files", {openDirectories: false}), h({level: 3, content: "Everything"}), div({style: "spacer"}), div({
-                    id: "all-files", menu: "file", content: () => {
+                content: children([fileDisplayButton("everything-display"), fileSortButton("everything-sort"), h({level: 3, content: "Everything"}), div({style: "spacer"}), div({
+                    id: "all-files", style: getFileDisplayRootClass(), menu: "file", content: () => {
                         return CLI.send("[files]").then(everything => {
                             working_files = everything.files;
                             return renderFiles({openDirectories: false});
@@ -1093,6 +1183,7 @@
             }),
             afterRender: () => {
                 bindFileSortButton("everything-sort", "all-files", {openDirectories: false});
+                bindFileDisplayButton("everything-display", "all-files", {openDirectories: false});
                 document.querySelectorAll("#all-files").forEach((el) => el.contextmenu(createFileMenuItems()));
             }
         }, {
@@ -1105,7 +1196,7 @@
                                     button({id: "documents-nav-forward", style: "small naked hover-zoom", disabled: true, icon: `<svg class="smaller-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>`})
                                 ])
                             }),
-                            fileSortButton("documents-sort", "documents"), button({
+                            fileDisplayButton("documents-display"), fileSortButton("documents-sort"), button({
                                 id: "documents-create-folder",
                                 style: "small naked float-right hover-zoom",
                                 icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>`,
@@ -1114,7 +1205,7 @@
                             h({level: 3, id: "documents-title", style: "very-small-padding-top padding-left", content: "Documents"})
                         ])
                     }), div({style: "spacer"}), div({
-                        id: "documents", content: () => {
+                        id: "documents", style: getFileDisplayRootClass(), content: () => {
                             return loadDocumentsDirectory(current_documents_directory).then(documents => {
                                 working_files = documents.children;
                                 return renderFiles()
@@ -1144,6 +1235,7 @@
                     createFolderButton.onclick = () => createFolderInCurrentDocumentsDirectory();
                 }
                 bindFileSortButton("documents-sort", "documents");
+                bindFileDisplayButton("documents-display", "documents");
                 updateDocumentsHeader();
                 document.querySelectorAll("#documents").forEach((el) => el.contextmenu(createFileMenuItems()));
             }
@@ -1154,8 +1246,9 @@
                 style: "small-padding-right", content: children([div({
                     style: "masonry", id: "notes", content: () => {
                         return CLI.send("[notes]").then(d => {
-                            const notes = d === 0 ? [] : d.notes;
-                            if (!Array.isArray(notes)) throw new Error("Invalid notes response");
+                            const noteRecords = d === 0 ? [] : (d.notes || d.NTS);
+                            if (!Array.isArray(noteRecords)) throw new Error("Invalid notes response");
+                            const notes = noteRecords.map(normalizeNoteRecord);
                             if (notes.length === 0) return renderNoNotesState();
                             let as = []
                             for (let i = 0; i < notes.length; i++) {
@@ -1172,11 +1265,11 @@
                                         onclick: () => openNoteEditorInNotesApp(notes[i])
                                     }), button({style: "naked inner-radius float-right expose no-padding small-padding",
                                         icon: `<svg class="tiny-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`,
-                                        onclick: () => deleteNoteFromNotesSection(notes[i].id, notes[i])
-                                    }), div({style: "note-tile-content", content: sanitizeNoteMarkup(normalizeNoteContent(notes[i].content))}), em({
+                                        onclick: event => deleteNoteFromNotesSection(notes[i].id, notes[i], event.target)
+                                    }), strong({style: "note-tile-title", content: escapeHtml(notes[i].title || notes[i].created || "Untitled Note")}), div({style: "note-tile-content", content: sanitizeNoteMarkup(normalizeNoteContent(notes[i].content))}), notes[i].title ? em({
                                         style: "smaller faded no-wrap",
                                         content: notes[i].created
-                                    })])
+                                    }) : ""])
                                 }))
                             }
                             return children(as);
@@ -1219,7 +1312,7 @@
                     destructive: true,
                     action: (b, e, target) => {
                         const note = getNoteFromTile(target);
-                        deleteNoteFromNotesSection(note?.id, note);
+                        deleteNoteFromNotesSection(note?.id, note, target);
                     }
                 }]))
             }
@@ -1435,7 +1528,8 @@
                 }), div({style: "spacer"}), em({style: "faded", content: "Max file upload size is 1 GB"})])
             })
         }]
-    })]))
+    })], FILES_SETTINGS));
+    loadFileDisplayStyleSetting();
     window.addEventListener("beforeunload", () => {
         if (photoCascadeObserver) {
             photoCascadeObserver.disconnect();

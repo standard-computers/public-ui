@@ -201,6 +201,159 @@ Element.prototype.popoutmenu = function (items, selector = null) {
 	});
 };
 
+/**
+ * Anchored, keyboard-navigable suggestions for text inputs.
+ * Items may be strings or {label, value, description} objects.
+ */
+Element.prototype.autocompleteMenu = function (options = {}) {
+	const input = this;
+	const menu = document.createElement("div");
+	const listId = options.id || `autocomplete-menu-${Math.random().toString(36).slice(2)}`;
+	let items = [];
+	let selectedIndex = -1;
+	let open = false;
+	menu.id = listId;
+	menu.className = `custom-context-menu autocomplete-context-menu hidden${options.className ? ` ${options.className}` : ""}`;
+	menu.setAttribute("role", "listbox");
+	input.setAttribute("aria-autocomplete", "list");
+	input.setAttribute("aria-controls", listId);
+	input.setAttribute("aria-expanded", "false");
+
+	const normalizeItem = item => typeof item === "string" ? {label: item, value: item} : {
+		...item,
+		label: `${item?.label ?? item?.value ?? ""}`,
+		value: `${item?.value ?? item?.label ?? ""}`
+	};
+	const positionMenu = () => {
+		if (!open) return;
+		const rect = input.getBoundingClientRect();
+		const gap = Number.isFinite(options.gap) ? options.gap : 6;
+		const viewportMargin = 8;
+		const availableWidth = window.innerWidth - (viewportMargin * 2);
+		const matchAnchorWidth = options.matchAnchorWidth !== false;
+		const minimumWidth = matchAnchorWidth ? Math.max(rect.width, options.minWidth || 0) : (options.minWidth || 0);
+		menu.style.width = matchAnchorWidth ? "auto" : "max-content";
+		menu.style.minWidth = `${Math.min(availableWidth, minimumWidth)}px`;
+		menu.style.maxWidth = `${Math.max(180, Math.min(options.maxWidth || 520, availableWidth))}px`;
+		menu.style.left = `${Math.max(viewportMargin, Math.min(rect.left, window.innerWidth - menu.offsetWidth - viewportMargin))}px`;
+		const below = rect.bottom + gap;
+		const above = rect.top - menu.offsetHeight - gap;
+		const preferAbove = options.placement === "above";
+		menu.style.top = `${preferAbove || below + menu.offsetHeight > window.innerHeight - viewportMargin ? Math.max(viewportMargin, above) : below}px`;
+	};
+	const updateSelection = index => {
+		if (!items.length) {
+			selectedIndex = -1;
+			input.removeAttribute("aria-activedescendant");
+			return;
+		}
+		selectedIndex = ((index % items.length) + items.length) % items.length;
+		Array.from(menu.children).forEach((node, nodeIndex) => {
+			const selected = nodeIndex === selectedIndex;
+			node.classList.toggle("selected", selected);
+			node.setAttribute("aria-selected", `${selected}`);
+			if (selected) {
+				input.setAttribute("aria-activedescendant", node.id);
+				node.scrollIntoView({block: "nearest"});
+			}
+		});
+	};
+	const hide = () => {
+		open = false;
+		menu.classList.add("hidden");
+		menu.style.display = "none";
+		input.setAttribute("aria-expanded", "false");
+		input.removeAttribute("aria-activedescendant");
+	};
+	const select = (index = selectedIndex) => {
+		if (!items.length) return false;
+		const item = items[index < 0 ? 0 : index];
+		hide();
+		if (typeof options.onSelect === "function") options.onSelect(item, input);
+		else input.value = item.value;
+		input.focus();
+		return true;
+	};
+	const render = () => {
+		menu.innerHTML = "";
+		items.forEach((item, index) => {
+			const option = document.createElement("div");
+			const label = document.createElement("span");
+			option.id = `${listId}-option-${index}`;
+			option.className = "context-menu-item autocomplete-context-menu-item";
+			option.setAttribute("role", "option");
+			label.className = "autocomplete-context-menu-label";
+			label.textContent = item.label;
+			option.appendChild(label);
+			if (item.description) {
+				const description = document.createElement("span");
+				description.className = "autocomplete-context-menu-description";
+				description.textContent = item.description;
+				option.appendChild(description);
+			}
+			option.addEventListener("pointerenter", () => updateSelection(index));
+			option.addEventListener("mousedown", event => event.preventDefault());
+			option.addEventListener("click", event => {
+				event.preventDefault();
+				event.stopPropagation();
+				select(index);
+			});
+			menu.appendChild(option);
+		});
+	};
+	const setItems = nextItems => {
+		items = (nextItems || []).map(normalizeItem).filter(item => item.value);
+		if (!items.length) {
+			hide();
+			return;
+		}
+		render();
+		open = true;
+		menu.style.display = "block";
+		menu.classList.remove("hidden");
+		input.setAttribute("aria-expanded", "true");
+		updateSelection(0);
+		requestAnimationFrame(positionMenu);
+	};
+	const handleKeydown = event => {
+		if (!open) return false;
+		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+			event.preventDefault();
+			updateSelection(selectedIndex + (event.key === "ArrowDown" ? 1 : -1));
+			return true;
+		}
+		if (event.key === "Enter" || event.key === "Tab") {
+			event.preventDefault();
+			return select();
+		}
+		if (event.key === "Escape") {
+			event.preventDefault();
+			hide();
+			return true;
+		}
+		return false;
+	};
+	const handleDocumentPointer = event => {
+		if (event.target !== input && !menu.contains(event.target)) hide();
+	};
+	const destroy = () => {
+		hide();
+		menu.remove();
+		input.removeAttribute("aria-autocomplete");
+		input.removeAttribute("aria-controls");
+		input.removeAttribute("aria-expanded");
+		document.removeEventListener("pointerdown", handleDocumentPointer);
+		window.removeEventListener("resize", positionMenu);
+		window.removeEventListener("scroll", positionMenu, true);
+	};
+
+	document.body.appendChild(menu);
+	document.addEventListener("pointerdown", handleDocumentPointer);
+	window.addEventListener("resize", positionMenu);
+	window.addEventListener("scroll", positionMenu, true);
+	return {destroy, handleKeydown, hide, isOpen: () => open, select, setItems};
+};
+
 Element.prototype.empty = function () {
 	for (; this.firstChild;) this.removeChild(this.firstChild)
 };
@@ -475,7 +628,11 @@ function strong(n) {
 
 const searchboxPayloads = {};
 let searchboxIndex = 0;
-
+const dropdownPayloads = {};
+let dropdownIndex = 0;
+let openDropdown = null;
+let openDropdownMenu = null;
+let openDropdownOptionIndex = -1;
 function escapeHtml(value) {
 	return String(value ?? "")
 		.replace(/&/g, "&amp;")
@@ -483,6 +640,82 @@ function escapeHtml(value) {
 		.replace(/>/g, "&gt;")
 		.replace(/"/g, "&quot;")
 		.replace(/'/g, "&#39;");
+}
+
+function hideDropdownMenu({focus = false} = {}) {
+	if (!openDropdown) return;
+	openDropdown.setAttribute("aria-expanded", "false");
+	openDropdownMenu?.remove();
+	const previousDropdown = openDropdown;
+	openDropdown = null;
+	openDropdownMenu = null;
+	openDropdownOptionIndex = -1;
+	if (focus) previousDropdown.focus();
+}
+
+function positionDropdownMenu() {
+	if (!openDropdown || !openDropdownMenu) return;
+	const anchorRect = openDropdown.getBoundingClientRect();
+	const viewportMargin = 8;
+	const gap = 6;
+	openDropdownMenu.style.minWidth = `${anchorRect.width}px`;
+	openDropdownMenu.style.left = `${Math.max(viewportMargin, Math.min(anchorRect.left, window.innerWidth - openDropdownMenu.offsetWidth - viewportMargin))}px`;
+	const below = anchorRect.bottom + gap;
+	const above = anchorRect.top - openDropdownMenu.offsetHeight - gap;
+	openDropdownMenu.style.top = `${below + openDropdownMenu.offsetHeight > window.innerHeight - viewportMargin ? Math.max(viewportMargin, above) : below}px`;
+}
+
+function updateDropdownOption(index) {
+	if (!openDropdownMenu?.children.length) return;
+	const options = Array.from(openDropdownMenu.children);
+	openDropdownOptionIndex = ((index % options.length) + options.length) % options.length;
+	options.forEach((option, optionIndex) => {
+		const selected = optionIndex === openDropdownOptionIndex;
+		option.classList.toggle("selected", selected);
+		option.setAttribute("aria-selected", `${selected}`);
+		if (selected) option.scrollIntoView({block: "nearest"});
+	});
+}
+
+function selectDropdownOption(dropdown, optionIndex) {
+	const dropdownId = dropdown?.getAttribute("data-plastic-dropdown-id");
+	const payload = dropdownPayloads[dropdownId];
+	const option = payload?.options?.[optionIndex];
+	if (!payload || !option) return;
+	dropdown.value = option.value;
+	dropdown.querySelector(".plastic-dropdown-label").textContent = option.label;
+	hideDropdownMenu({focus: true});
+	dropdown.dispatchEvent(new Event("change", {bubbles: true}));
+}
+
+function showDropdownMenu(dropdown) {
+	const dropdownId = dropdown?.getAttribute("data-plastic-dropdown-id");
+	const payload = dropdownPayloads[dropdownId];
+	if (!payload?.options?.length) return;
+	if (openDropdown === dropdown) {
+		hideDropdownMenu({focus: true});
+		return;
+	}
+	hideDropdownMenu();
+	const menu = document.createElement("div");
+	menu.className = "custom-context-menu plastic-dropdown-menu";
+	menu.setAttribute("role", "listbox");
+	if (dropdown.id) menu.setAttribute("aria-labelledby", dropdown.id);
+	payload.options.forEach((option, optionIndex) => {
+		const menuOption = document.createElement("div");
+		menuOption.className = "context-menu-item";
+		menuOption.setAttribute("role", "option");
+		menuOption.setAttribute("data-plastic-dropdown-option", `${optionIndex}`);
+		menuOption.textContent = option.label;
+		menu.appendChild(menuOption);
+	});
+	document.body.appendChild(menu);
+	openDropdown = dropdown;
+	openDropdownMenu = menu;
+	dropdown.setAttribute("aria-expanded", "true");
+	const selectedIndex = payload.options.findIndex(option => option.value === dropdown.value);
+	updateDropdownOption(selectedIndex < 0 ? 0 : selectedIndex);
+	requestAnimationFrame(positionDropdownMenu);
 }
 
 function renderSearchboxOptions(input, query = "") {
@@ -517,6 +750,20 @@ function hideSearchboxOptions(searchboxId) {
 }
 
 document.addEventListener("click", (event) => {
+	const dropdownOption = event.target.closest('[data-plastic-dropdown-option]');
+	if (dropdownOption && openDropdownMenu?.contains(dropdownOption)) {
+		event.preventDefault();
+		event.stopPropagation();
+		selectDropdownOption(openDropdown, Number(dropdownOption.getAttribute("data-plastic-dropdown-option")));
+		return;
+	}
+	const dropdown = event.target.closest('[data-plastic-dropdown-id]');
+	if (dropdown) {
+		event.preventDefault();
+		showDropdownMenu(dropdown);
+		return;
+	}
+	hideDropdownMenu();
 	const searchboxOption = event.target.closest('[data-searchbox-option-id]');
 	if (searchboxOption) {
 		const searchboxId = searchboxOption.getAttribute("data-searchbox-option-id");
@@ -581,6 +828,25 @@ document.addEventListener("focusin", (event) => {
 	renderSearchboxOptions(target, target.value);
 });
 document.addEventListener("keydown", (event) => {
+	const dropdown = event.target.closest('[data-plastic-dropdown-id]');
+	if (dropdown) {
+		if (event.key === "Escape") {
+			event.preventDefault();
+			hideDropdownMenu({focus: true});
+			return;
+		}
+		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+			event.preventDefault();
+			if (openDropdown !== dropdown) showDropdownMenu(dropdown);
+			else updateDropdownOption(openDropdownOptionIndex + (event.key === "ArrowDown" ? 1 : -1));
+			return;
+		}
+		if ((event.key === "Enter" || event.key === " ") && openDropdown === dropdown) {
+			event.preventDefault();
+			selectDropdownOption(dropdown, openDropdownOptionIndex);
+			return;
+		}
+	}
 	const target = event.target.closest('input[data-searchbox-id]');
 	if (!target) return;
 	if (event.key === "Escape") {
@@ -683,6 +949,37 @@ function select(n = {}) {
 	return el.outerHTML;
 }
 
+function dropdown(n = {}) {
+	const dropdownId = `plastic-dropdown-${dropdownIndex++}`;
+	const options = (Array.isArray(n.options) ? n.options : []).map(item => ({
+		label: `${item?.label ?? item?.value ?? ""}`,
+		value: `${item?.value ?? item?.label ?? ""}`
+	}));
+	const selectedOption = options.find(option => option.value === `${n.value ?? ""}`) || options[0] || {label: "", value: ""};
+	const el = document.createElement("button");
+	applyCommonAttributes(el, n);
+	el.className = `${n.style || ""} secondary plastic-dropdown`.trim();
+	el.type = "button";
+	if (n.disabled) el.disabled = true;
+	el.value = selectedOption.value;
+	el.setAttribute("data-plastic-dropdown-id", dropdownId);
+	el.setAttribute("role", "combobox");
+	el.setAttribute("aria-haspopup", "listbox");
+	el.setAttribute("aria-expanded", "false");
+	if (n.ariaLabel) el.setAttribute("aria-label", n.ariaLabel);
+	registerElementHandler(el, "onchange", n.onchange);
+	const labelNode = document.createElement("span");
+	labelNode.className = "plastic-dropdown-label";
+	labelNode.textContent = selectedOption.label;
+	const chevron = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+	chevron.setAttribute("viewBox", "0 0 20 20");
+	chevron.setAttribute("aria-hidden", "true");
+	chevron.innerHTML = '<path d="m5 7.5 5 5 5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>';
+	el.append(labelNode, chevron);
+	dropdownPayloads[dropdownId] = {options};
+	return el.outerHTML;
+}
+
 function searchbox(n = {}) {
 	const searchboxId = `searchbox-${searchboxIndex++}`;
 	const wrapper = document.createElement("div");
@@ -740,7 +1037,7 @@ function switcher(n = {}) {
 			id: n.id,
 			checked: n.checked,
 			onchange: n.onchange
-		}), label({input: n.id})])
+		}), label({input: n.id, content: n.content})])
 	})
 }
 

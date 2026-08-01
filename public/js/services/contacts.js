@@ -395,7 +395,7 @@
             contactValue(contact.address) && div({style: "small-padding", content: contactValue(contact.address).replace(/\s*,\s*/g, "<br>")}),
             contactValue(contact.birthday) && div({style: "small-padding faded", content: contactValue(contact.birthday)})
         ].filter(Boolean);
-        const detailsPortal = new Portal({title: fullName, dimensions: [350, 400], navigation: false, resizable: false,
+        const detailsPortal = new Portal({title: fullName, dimensions: [350, 400], auto_height: true, navigation: false, resizable: false,
             tools: [{
                 title: "Edit",
                 icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><g transform="scale(0.9) translate(1.333 1.333) translate(0.25 0.6)"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75a2.121 2.121 0 1 1 3 3L9 17.25 4.5 18.75 6 14.25 16.5 3.75Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 5.25l3 3"/></g></svg>`,

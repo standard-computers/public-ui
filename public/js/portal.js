@@ -1134,6 +1134,80 @@ function isEditableShortcutTarget(element = document.activeElement) {
 function getFocusedPortalWindow() {
     return document.querySelector(".draggable-window.window-focused:not(.widget-window)");
 }
+const windowMoveShortcut = (() => {
+    const MOVE_STEP = 10;
+    const directionByKey = {
+        ArrowLeft: [-MOVE_STEP, 0],
+        Left: [-MOVE_STEP, 0],
+        ArrowRight: [MOVE_STEP, 0],
+        Right: [MOVE_STEP, 0],
+        ArrowUp: [0, -MOVE_STEP],
+        Up: [0, -MOVE_STEP],
+        ArrowDown: [0, MOVE_STEP],
+        Down: [0, MOVE_STEP]
+    };
+    let movingWindow = null;
+
+    function getFocusedWindow() {
+        return document.querySelector(".draggable-window.window-focused:not(.minimized)");
+    }
+    function isActivationShortcut(event) {
+        return event.altKey
+            && !event.ctrlKey
+            && !event.metaKey
+            && !event.shiftKey
+            && (event.key === " " || event.key === "Spacebar" || event.code === "Space");
+    }
+    function consume(event) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+    }
+    function persistPosition(windowNode) {
+        const controller = windowNode?.portal;
+        if (windowNode?.classList.contains("widget-window") && typeof controller?.setPosition === "function") {
+            controller.setPosition(windowNode.offsetLeft, windowNode.offsetTop, modular?.widgetDockPosition);
+            return;
+        }
+        if (typeof controller?.setWindowState === "function") {
+            controller.setWindowState({}, {persist: true});
+        }
+    }
+    function exit() {
+        if (!movingWindow) return false;
+        const completedWindow = movingWindow;
+        movingWindow = null;
+        completedWindow.classList.remove("window-keyboard-moving");
+        persistPosition(completedWindow);
+        return true;
+    }
+    function handleKeydown(event) {
+        if (movingWindow && !movingWindow.isConnected) exit();
+        if (movingWindow) {
+            if (event.key === "Escape" || event.key === "Enter") {
+                consume(event);
+                exit();
+                return true;
+            }
+            const delta = directionByKey[event.key];
+            if (!delta) return false;
+            consume(event);
+            movingWindow.style.left = `${movingWindow.offsetLeft + delta[0]}px`;
+            movingWindow.style.top = `${movingWindow.offsetTop + delta[1]}px`;
+            return true;
+        }
+        if (!isActivationShortcut(event)) return false;
+        const focusedWindow = getFocusedWindow();
+        if (!focusedWindow) return false;
+        consume(event);
+        window.StandardUI?.altSync?.deactivate?.();
+        movingWindow = focusedWindow;
+        movingWindow.classList.add("window-keyboard-moving");
+        modular?.bringToFront?.(movingWindow);
+        return true;
+    }
+    window.addEventListener("blur", exit);
+    return {handleKeydown, exit, isActive: () => Boolean(movingWindow)};
+})();
 function isAltLetterShortcut(event, letter = "") {
     if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
     const normalizedLetter = `${letter || ""}`.trim().toLowerCase();
@@ -1169,6 +1243,7 @@ function tileFocusedPortalFromShortcut(e) {
     return true;
 }
 document.addEventListener("keydown", function (e) {
+    if (windowMoveShortcut.handleKeydown(e)) return;
     if (e.ctrlKey && !e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "s") {
         const saveTool = getFocusedPortalSaveTool();
         e.preventDefault();

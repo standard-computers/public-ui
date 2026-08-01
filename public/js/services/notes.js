@@ -108,6 +108,18 @@
             return "";
         }
     };
+    const normalizeNoteRecord = (note = {}) => ({
+        ...note,
+        id: note.id ?? note.ID ?? "",
+        title: note.title ?? note.TTL ?? note.ttl ?? "",
+        content: note.content ?? note.CNT ?? note.cnt ?? "",
+        color: note.color ?? note.CLR ?? note.clr ?? "",
+        created: note.created ?? note.CRTD ?? note.crtd ?? ""
+    });
+    const readPortalTitle = (context, fallback = "") => {
+        const visibleTitle = context?.portal?.window?.()?.querySelector?.(".window-header .title")?.textContent;
+        return `${visibleTitle || context?.portal?.title?.() || fallback || ""}`.replace(/\s+/g, " ").trim();
+    };
     const openNoteImage = async source => {
         const imageSource = String(source || "").trim();
         if (!imageSource) return false;
@@ -171,9 +183,11 @@
     };
     const getNoteTileData = noteTile => {
         if (!noteTile) return null;
+        const displayedTitle = noteTile.querySelector(".note-tile-title")?.innerText || noteTile.getAttribute("title") || "";
         return {
             id: noteTile.getAttribute("data"),
-            created: noteTile.querySelector("em")?.innerText || "View Note",
+            title: displayedTitle,
+            created: noteTile.querySelector("em")?.innerText || displayedTitle || "View Note",
             content: noteTile.querySelector(".note-tile-content")?.innerHTML || "",
             color: noteTile.style.background || window.getComputedStyle(noteTile).getPropertyValue("background-color")
         };
@@ -226,9 +240,10 @@
         });
     };
     const openNote = (note = {}) => {
+        note = normalizeNoteRecord(note);
         const noteContent = normalizeNoteContent(note.content || "");
         const noteColor = note.color || "";
-        const noteCreated = note.created || "View Note";
+        const noteCreated = note.title || note.created || "View Note";
         const notePortal = new Portal({
             title: noteCreated, dimensions: [380, 270], navigation: false, tools: [
                 {
@@ -258,10 +273,18 @@
         notePortal.show();
     };
     const openNoteEditor = (note = {}) => {
+        note = normalizeNoteRecord(note);
         const noteId = note.id;
         const noteContent = normalizeNoteContent(note.content || "");
         const noteColor = note.color || "";
-        const noteEditorPortal = new Portal({title: "Edit Note", dimensions: [380, 300], navigation: false, tools: [
+        let updatedTitle = `${note.title || note.created || "Edit Note"}`.trim();
+        const noteEditorPortal = new Portal({
+            title: updatedTitle || "Edit Note",
+            title_editable: true,
+            on_title_change: title => {
+                updatedTitle = title;
+            },
+            dimensions: [380, 300], navigation: false, tools: [
                 {
                     title: "Delete",
                     icon: modular.icons.delete,
@@ -269,15 +292,17 @@
                 },
                 {
                     title: "Save", icon: modular.icons.save, onclick: (_, context) => {
+                        updatedTitle = readPortalTitle(context, updatedTitle);
                         const updatedContent = getNoteMarkup(document.getElementById("edit-note-content"));
                         const updatedColor = document.getElementById("edit-note-color").value;
                         const escapedContent = serializeNoteContent(updatedContent);
                         const escapedColor = escapeQuotedValue(updatedColor);
                         Promise.all([
                             CLI.send(`[notes] content "${escapedContent}" <id ${noteId}>`),
-                            CLI.send(`[notes] color "${escapedColor}" <id ${noteId}>`)
-                        ]).then(([contentResponse, colorResponse]) => {
-                            if (contentResponse !== 0 && colorResponse !== 0) {
+                            CLI.send(`[notes] color "${escapedColor}" <id ${noteId}>`),
+                            CLI.send(`[notes] title "${escapeQuotedValue(updatedTitle)}" <id ${noteId}>`)
+                        ]).then(([contentResponse, colorResponse, titleResponse]) => {
+                            if (contentResponse !== 0 && colorResponse !== 0 && titleResponse !== 0) {
                                 context?.portal?.close?.();
                                 refreshNotes();
                             } else {
@@ -312,8 +337,16 @@
         noteEditorPortal.show();
     };
     window.StandardNotes = {openNote, openNoteEditor};
+    let newNoteTitle = "";
     const createNotePortal = new Portal({
         title: "Create Note",
+        title_editable: true,
+        on_title_change: title => {
+            newNoteTitle = title;
+        },
+        onDispose: () => {
+            newNoteTitle = "";
+        },
         hints: ["create note", "new note", "make a note"],
         dimensions: [380, 300],
         navigation: false,
@@ -322,7 +355,9 @@
                 const userId = modular.user.id();
                 const content = getNoteMarkup(document.getElementById("new-note-content"));
                 const color = document.getElementById("new-note-color").value;
-                CLI.send(`[notes] + (@${userId}, "${serializeNoteContent(content)}", "${escapeQuotedValue(color)}", @)`).then(d => {
+                const visibleTitle = readPortalTitle(context, newNoteTitle);
+                const title = escapeQuotedValue(newNoteTitle || (visibleTitle === "Create Note" ? "" : visibleTitle));
+                CLI.send(`[notes] + (@${userId}, "${title}", "${serializeNoteContent(content)}", "${escapeQuotedValue(color)}", @)`).then(d => {
                     if (d !== 0) {
                         context?.portal?.close?.();
                         refreshNotes();
@@ -372,8 +407,9 @@
                         style: "notes-list", content: div({
                             style: "padded", content: () => {
                                 return CLI.send("[notes]").then(d => {
-                                    const notes = d === 0 ? [] : d.notes;
-                                    if (!Array.isArray(notes)) throw new Error("Invalid notes response");
+                                    const noteRecords = d === 0 ? [] : (d.notes || d.NTS);
+                                    if (!Array.isArray(noteRecords)) throw new Error("Invalid notes response");
+                                    const notes = noteRecords.map(normalizeNoteRecord);
                                     if (notes.length === 0) return renderNoNotesState();
                                     let as = [];
                                     for (let i = 0; i < notes.length; i++) {
@@ -381,6 +417,7 @@
                                         as.push(div({
                                             style: "note-tile padded secondary-tile brick line small-spaced hover-shadowed",
                                             data: note.id,
+                                            title: note.title || note.created || "",
                                             background: note.color,
                                             onclick: event => {
                                                 if (event.target.closest("button") || event.target.closest("img")) return;
@@ -397,7 +434,8 @@
                                                     icon: modular.icons.delete,
                                                     onclick: event => deleteNote(note.id, undefined, event.currentTarget)
                                                 }),
-                                                em({style: "smaller faded", content: note.created}),
+                                                strong({style: "note-tile-title", content: escapeHtml(note.title || note.created || "Untitled Note")}),
+                                                note.title ? em({style: "smaller faded", content: escapeHtml(note.created || "")}) : "",
                                                 div({
                                                     style: "note-tile-content",
                                                     content: sanitizeNoteMarkup(normalizeNoteContent(note.content))

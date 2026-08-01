@@ -509,6 +509,13 @@
 										icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.72-7.72a2.25 2.25 0 0 1 3.18 0l2.57 2.57a2.25 2.25 0 0 1 0 3.18l-5.47 5.47H7.5l-3-3Z"/><path stroke-linecap="round" stroke-linejoin="round" d="m9 11.25 5.25 5.25M12.5 19.25H20"/></svg>`
 									}),
 									button({
+										style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top",
+										altsync: "T",
+										data: "action-text",
+										title: "Insert text box",
+										icon: modular.icons.text
+									}),
+									button({
 										style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button",
 										altsync: "B",
 										data: "tool-draw",
@@ -566,6 +573,8 @@
 						let contextShapeIndex = -1;
 						let selectionAction = null;
 						let eraserCursorPosition = null;
+						let activeTextEditor = null;
+						let activeTextOperationIndex = -1;
 						const resizeHandleSize = 12;
 						const eraserWidth = 20;
 						const canvasGrowthPadding = 512;
@@ -671,7 +680,7 @@
 
 						const renderOperations = () => {
 							ctx.clearRect(0, 0, canvas.width, canvas.height);
-							boardOperations.forEach(operation => {
+							boardOperations.forEach((operation, operationIndex) => {
 								if ((operation?.type === "stroke" || operation?.type === "erase") && Array.isArray(operation.points) && operation.points.length) {
 									ctx.save();
 									ctx.beginPath();
@@ -695,6 +704,7 @@
 									img.src = operation.dataUrl;
 								}
 								if (operation?.type === "shape") renderShapeOperation(operation);
+								if (operation?.type === "text" && operationIndex !== activeTextOperationIndex) renderTextOperation(operation);
 							});
 							const selectedOperation = boardOperations[selectedOperationIndex];
 							if (isSelectableOperation(selectedOperation)) {
@@ -737,6 +747,7 @@
 								ctx.stroke();
 								ctx.restore();
 							}
+							updateTextEditorPosition();
 						};
 
 						const syncStateAndRender = () => {
@@ -777,7 +788,7 @@
 							};
 						};
 
-						const isSelectableOperation = operation => operation?.type === "image" || operation?.type === "shape";
+						const isSelectableOperation = operation => operation?.type === "image" || operation?.type === "shape" || operation?.type === "text";
 
 						const getOperationBounds = operation => ({
 							x: Number(operation?.x) || 0,
@@ -870,6 +881,44 @@
 							ctx.restore();
 						};
 
+						const renderTextOperation = operation => {
+							const bounds = getOperationBounds(operation);
+							const fontSize = Math.max(8, Number(operation.fontSize) || 24);
+							const lineHeight = fontSize * 1.2;
+							const padding = 8;
+							const maxWidth = Math.max(1, bounds.width - (padding * 2));
+							const lines = [];
+							ctx.save();
+							ctx.font = `${fontSize}px sans-serif`;
+							String(operation.text ?? "Text").split("\n").forEach(paragraph => {
+								const words = paragraph.split(/\s+/).filter(Boolean);
+								if (!words.length) {
+									lines.push("");
+									return;
+								}
+								let line = words.shift();
+								words.forEach(word => {
+									const candidate = `${line} ${word}`;
+									if (ctx.measureText(candidate).width <= maxWidth) line = candidate;
+									else {
+										lines.push(line);
+										line = word;
+									}
+								});
+								lines.push(line);
+							});
+							ctx.beginPath();
+							ctx.rect(bounds.x - canvasOrigin.x, bounds.y - canvasOrigin.y, bounds.width, bounds.height);
+							ctx.clip();
+							ctx.fillStyle = operation.color || "#000000";
+							ctx.textBaseline = "top";
+							lines.forEach((line, index) => {
+								const y = bounds.y - canvasOrigin.y + padding + (index * lineHeight);
+								if (y < bounds.y - canvasOrigin.y + bounds.height) ctx.fillText(line, bounds.x - canvasOrigin.x + padding, y);
+							});
+							ctx.restore();
+						};
+
 						const setTool = t => {
 							tool = t;
 							if (tool !== "erase") eraserCursorPosition = null;
@@ -949,6 +998,91 @@
 							selectedOperationIndex = boardOperations.length - 1;
 							setTool("select");
 							renderOperations();
+						};
+
+						const closeTextEditor = (focusCanvas = true) => {
+							if (!activeTextEditor) return;
+							const editor = activeTextEditor;
+							const operation = boardOperations[activeTextOperationIndex];
+							if (operation?.type === "text") operation.text = editor.value;
+							activeTextEditor = null;
+							activeTextOperationIndex = -1;
+							editor.remove();
+							renderOperations();
+							if (focusCanvas) requestAnimationFrame(() => canvas.focus());
+						};
+
+						const updateTextEditorPosition = () => {
+							if (!activeTextEditor) return;
+							const operation = boardOperations[activeTextOperationIndex];
+							if (operation?.type !== "text") {
+								closeTextEditor(false);
+								return;
+							}
+							const fontSize = Math.max(8, Number(operation.fontSize) || 24);
+							activeTextEditor.style.left = `${(operation.x * scale) + translate.x}px`;
+							activeTextEditor.style.top = `${(operation.y * scale) + translate.y}px`;
+							activeTextEditor.style.width = `${operation.width * scale}px`;
+							activeTextEditor.style.height = `${operation.height * scale}px`;
+							activeTextEditor.style.padding = `${8 * scale}px`;
+							activeTextEditor.style.fontSize = `${fontSize * scale}px`;
+							activeTextEditor.style.lineHeight = `${fontSize * 1.2 * scale}px`;
+						};
+
+						const editTextOperation = operationIndex => {
+							const operation = boardOperations[operationIndex];
+							if (operation?.type !== "text") return;
+							if (activeTextOperationIndex === operationIndex && activeTextEditor) {
+								activeTextEditor.focus();
+								return;
+							}
+							closeTextEditor(false);
+							const editor = document.createElement("textarea");
+							editor.className = "boards-text-editor";
+							editor.value = operation.text || "";
+							editor.placeholder = "Type…";
+							editor.spellcheck = true;
+							editor.style.position = "absolute";
+							editor.style.zIndex = "3";
+							editor.style.boxSizing = "border-box";
+							editor.style.resize = "none";
+							editor.style.overflow = "hidden";
+							editor.style.border = "1.5px solid #4c8bf5";
+							editor.style.borderRadius = "2px";
+							editor.style.outline = "none";
+							editor.style.background = "var(--bg)";
+							editor.style.color = operation.color || "#000000";
+							editor.style.fontFamily = "sans-serif";
+							editor.addEventListener("mousedown", event => event.stopPropagation());
+							editor.addEventListener("input", () => {
+								operation.text = editor.value;
+								renderOperations();
+							});
+							editor.addEventListener("keydown", event => {
+								if (event.key !== "Escape") return;
+								event.preventDefault();
+								editor.blur();
+							});
+							editor.addEventListener("blur", () => closeTextEditor());
+							activeTextEditor = editor;
+							activeTextOperationIndex = operationIndex;
+							canvasContainer.appendChild(editor);
+							updateTextEditorPosition();
+							editor.focus();
+							if (editor.value) editor.select();
+						};
+
+						const insertText = () => {
+							boardOperations.push({
+								type: "text",
+								text: "",
+								...getCenteredInsertionRect(240, 80),
+								color: pickedColor,
+								fontSize: 24
+							});
+							selectedOperationIndex = boardOperations.length - 1;
+							setTool("select");
+							editTextOperation(selectedOperationIndex);
 						};
 
 						const changeShapeProperty = (property, title, placeholder, parser = value => value) => {
@@ -1115,6 +1249,19 @@
 						canvas.addEventListener("mousedown", startDrawing);
 						canvas.addEventListener("mousemove", draw);
 						canvas.addEventListener("mouseup", stopDrawing);
+						canvas.addEventListener("dblclick", event => {
+							const operationIndex = getSelectableOperationIndexAtPos(getPos(event));
+							if (boardOperations[operationIndex]?.type === "text") editTextOperation(operationIndex);
+						});
+						canvas.addEventListener("keydown", event => {
+							if (event.key !== "Delete" && event.key !== "Backspace") return;
+							if (activeTextEditor || boardOperations[selectedOperationIndex]?.type !== "text") return;
+							event.preventDefault();
+							boardOperations.splice(selectedOperationIndex, 1);
+							selectedOperationIndex = -1;
+							selectionAction = null;
+							renderOperations();
+						});
 						canvas.addEventListener("mouseleave", () => {
 							eraserCursorPosition = null;
 							stopDrawing();
@@ -1226,6 +1373,7 @@
 						windowBody.querySelector('button[data="tool-line"]')?.addEventListener("click", () => setTool("line"));
 						windowBody.querySelector('button[data="tool-drag"]')?.addEventListener("click", () => setTool("drag"));
 						windowBody.querySelector('button[data="action-attach"]')?.addEventListener("click", () => attachInput.click());
+						windowBody.querySelector('button[data="action-text"]')?.addEventListener("click", insertText);
 						windowBody.querySelector('button[data="action-clear"]')?.addEventListener("click", confirmClearCanvas);
 
 						if (typeof ResizeObserver !== "undefined") {

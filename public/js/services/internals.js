@@ -763,7 +763,20 @@
             const checked = normalizedValue === true || normalizedValue === "true" || normalizedValue === 1 || normalizedValue === "1";
             return `<input id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="boolean" type="checkbox" ${checked ? "checked" : ""}>`;
         }
-        if (restrictions.length) return `<select id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="${escapeHtml(type)}" class="undecorated no-padding fill">${restrictions.map(option => `<option value="${escapeHtml(option)}" ${String(option) === String(normalizedValue) ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>`;
+        if (restrictions.length) {
+            const wrapper = document.createElement("div");
+            wrapper.innerHTML = dropdown({
+                id: fieldId,
+                style: "fill internals-app-setting-dropdown",
+                ariaLabel: String(setting?.label || name),
+                value: String(normalizedValue),
+                options: restrictions.map(option => ({label: String(option), value: String(option)}))
+            });
+            const field = wrapper.firstElementChild;
+            field.setAttribute("data-setting-name", name);
+            field.setAttribute("data-setting-type", type);
+            return field.outerHTML;
+        }
         const inputType = type === "number" ? "number" : "text";
         return `<input id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="${escapeHtml(type)}" type="${inputType}" class="undecorated no-padding fill" value="${escapeHtml(normalizedValue)}">`;
     };

@@ -723,12 +723,12 @@ class Portal {
     #iconElement;
     #portalToolElements = [];
     constructor(data) {
-        this.#struct = data;
-        this.#serviceId = data?.serviceId;
-        this.#portalIndex = data?.portalIndex ?? 0;
-        this.#instanceId = data?.instanceId || "default";
-        this.#restoreWindowContext = data?.restoreWindowContext !== false;
-        this.#onCloseInstance = typeof data?.onCloseInstance === "function" ? data.onCloseInstance : null;
+        this.#struct = {title_editable: false, ...(data || {})};
+        this.#serviceId = this.#struct.serviceId;
+        this.#portalIndex = this.#struct.portalIndex ?? 0;
+        this.#instanceId = this.#struct.instanceId || "default";
+        this.#restoreWindowContext = this.#struct.restoreWindowContext !== false;
+        this.#onCloseInstance = typeof this.#struct.onCloseInstance === "function" ? this.#struct.onCloseInstance : null;
         this.#container = document.body;
         this.#build();
     }
@@ -785,6 +785,50 @@ class Portal {
     }
     #isMaximizeEnforced() {
         return this.#struct?.maximized === true || this.#struct?.maximized === "true";
+    }
+    #isTitleEditable() {
+        return this.#struct?.title_editable === true || this.#struct?.title_editable === "true";
+    }
+    #commitTitleEdit(previousTitle = "") {
+        if (!this.#titleElement) return;
+        const nextTitle = `${this.#titleElement.textContent || ""}`.replace(/\s+/g, " ").trim();
+        if (!nextTitle) {
+            this.#titleElement.textContent = previousTitle;
+            return;
+        }
+        this.setTitle(nextTitle);
+        if (nextTitle === previousTitle || typeof this.#struct?.on_title_change !== "function") return;
+        this.#struct.on_title_change(nextTitle, this.#createRouteContext(), previousTitle);
+    }
+    #enableTitleEditing(titleElement) {
+        if (!this.#isTitleEditable() || !titleElement) return;
+        titleElement.contentEditable = "true";
+        titleElement.spellcheck = true;
+        titleElement.setAttribute("role", "textbox");
+        titleElement.setAttribute("aria-label", "Portal title");
+        titleElement.setAttribute("aria-multiline", "false");
+        titleElement.setAttribute("data-no-drag", "true");
+        titleElement.classList.add("editable-title");
+        let previousTitle = this.title();
+        titleElement.addEventListener("focus", () => {
+            previousTitle = this.title();
+        });
+        titleElement.addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                titleElement.blur();
+            } else if (event.key === "Escape") {
+                event.preventDefault();
+                titleElement.textContent = previousTitle;
+                titleElement.blur();
+            }
+        });
+        titleElement.addEventListener("paste", event => {
+            event.preventDefault();
+            const text = event.clipboardData?.getData("text/plain") || "";
+            document.execCommand("insertText", false, text.replace(/\s+/g, " "));
+        });
+        titleElement.addEventListener("blur", () => this.#commitTitleEdit(previousTitle));
     }
     setTitle(title = "") {
         this.#struct = {...this.#struct, title};
@@ -945,6 +989,40 @@ class Portal {
         this.#syncWindowBodySize(minBodyHeight);
         this.#syncDescendantDimensions(this.#windowBody);
     }
+    #syncAutoHeight() {
+        if (!this.#windowDiv || !this.#windowBody) return;
+        const contentContainer = this.#windowBody.parentElement;
+        const containerStyles = contentContainer ? window.getComputedStyle(contentContainer) : null;
+        const bodyStyles = window.getComputedStyle(this.#windowBody);
+        const bodyTopOffset = this.#windowBody.offsetTop;
+        const containerBottomExtras = containerStyles
+            ? this.#readPixelValue(containerStyles.marginBottom)
+                + this.#readPixelValue(containerStyles.paddingBottom)
+                + this.#readPixelValue(containerStyles.borderBottomWidth)
+            : 0;
+        const bodyVerticalExtras = bodyStyles.boxSizing === "border-box"
+            ? 0
+            : this.#readPixelValue(bodyStyles.paddingTop)
+                + this.#readPixelValue(bodyStyles.paddingBottom)
+                + this.#readPixelValue(bodyStyles.borderTopWidth)
+                + this.#readPixelValue(bodyStyles.borderBottomWidth);
+
+        this.#windowBody.style.minHeight = "0";
+        this.#windowBody.style.maxHeight = "none";
+        this.#windowBody.style.height = "auto";
+
+        const naturalBodyHeight = Math.ceil(this.#windowBody.scrollHeight + bodyVerticalExtras);
+        const maxFrameHeight = Math.max(150, window.innerHeight - 16);
+        const maxBodyHeight = Math.max(150, maxFrameHeight - bodyTopOffset - containerBottomExtras);
+        const resolvedBodyHeight = Math.min(Math.max(naturalBodyHeight, 1), maxBodyHeight);
+        const frameHeight = Math.ceil(resolvedBodyHeight + bodyTopOffset + containerBottomExtras);
+
+        this.#windowBody.style.minHeight = `${resolvedBodyHeight}px`;
+        this.#windowBody.style.maxHeight = `${resolvedBodyHeight}px`;
+        this.#windowBody.style.height = `${resolvedBodyHeight}px`;
+        this.#windowDiv.style.height = `${frameHeight}px`;
+        this.#syncDescendantDimensions(this.#windowBody);
+    }
     #runAfterRender() {
         if (typeof this.#activeRoute?.afterRender === "function") {
             const routeContext = this.#createRouteContext();
@@ -961,7 +1039,11 @@ class Portal {
             const previous = this.#lastObservedWindowSize;
             if (previous && previous.width === width && previous.height === height) return;
             this.#lastObservedWindowSize = {width, height};
-            this.#syncPortalLayout(150);
+            if (this.#struct?.auto_height === true || this.#struct?.auto_height === "true") {
+                this.#syncAutoHeight();
+            } else {
+                this.#syncPortalLayout(150);
+            }
             this.#scheduleAfterRender();
         });
         this.#resizeObserver.observe(this.#windowDiv);
@@ -1033,6 +1115,7 @@ class Portal {
         this.#titleElement = titleElement;
         if (accent) titleElement.style.color = accent;
         header.appendChild(titleElement);
+        this.#enableTitleEditing(titleElement);
         this.#updateWindowIcon(accent);
         this.#renderPortalTools(tools, accent);
         if (actionable !== false && isResizable) {
@@ -1548,7 +1631,11 @@ class Portal {
             } else {
                 this.#windowBody.innerHTML = content ?? "";
             }
-            this.#syncPortalLayout(150);
+            if (this.#struct?.auto_height === true || this.#struct?.auto_height === "true") {
+                this.#syncAutoHeight();
+            } else {
+                this.#syncPortalLayout(150);
+            }
             runAfterRender();
         };
         if (resolvedRoute instanceof Promise) {
