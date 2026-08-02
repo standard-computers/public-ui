@@ -1,11 +1,7 @@
 (() => {
     const SERVICE_ID = "com.standard.setup";
     const config = window.StandardRuntimeConfig?.desktopSetup || {};
-    const escapeHtml = value => String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;");
+    const escapeHtml = value => String(value ?? "").replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
     const keepOnTop = () => {
         if (window.StandardRuntimeConfig?.desktopSetupRequired !== true) return;
@@ -90,7 +86,6 @@
         </div>`,
         afterRender: bindSetup
     })]));
-
     document.addEventListener("mousedown", () => setTimeout(keepOnTop, 0));
     window.setInterval(keepOnTop, 500);
 })();

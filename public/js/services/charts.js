@@ -1,43 +1,46 @@
 (() => {
+
 	const SERVICE_ID = "com.standard.charts";
 	const ICON = "/icons/interfaces/whiteboard.png";
 	const NS = "http://www.w3.org/2000/svg";
+
 	const SHAPE_OPTIONS = [
 		{
 			type: "rectangle",
 			label: "Rectangle",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="1"/></svg>`
+			icon: modular.icons.rectangle,
 		},
 		{
 			type: "rounded",
 			label: "Rounded Rectangle",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="4"/></svg>`
+			icon: modular.icons.rounded_rectangle,
 		},
 		{
 			type: "ellipse",
 			label: "Ellipse",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><ellipse cx="12" cy="12" rx="9" ry="7"/></svg>`
+			icon: modular.icons.ellipse,
 		},
 		{
 			type: "diamond",
 			label: "Diamond",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 2.5 21.5 12 12 21.5 2.5 12 12 2.5Z"/></svg>`
+			icon: modular.icons.diamond,
 		}
 	];
-	const SHAPE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3" y="4" width="8" height="7" rx="1"/><circle cx="17" cy="8" r="4"/><path stroke-linejoin="round" d="m5 20 4-6 4 6H5Z"/></svg>`;
+
 	const FONT_FAMILIES = ["Inter", "Arial", "Georgia", "Courier New", "Times New Roman", "Trebuchet MS", "Verdana"];
+
 	const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 72, 96];
+
 	const ALIGN_ICONS = {
-		left: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M4 10.5h10M4 14.5h16M4 18.5h10"/></svg>`,
-		center: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M7 10.5h10M4 14.5h16M7 18.5h10"/></svg>`,
-		right: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M10 10.5h10M4 14.5h16M10 18.5h10"/></svg>`
+		left: modular.icons.left,
+		center: modular.icons.center,
+		right: modular.icons.right
 	};
+
 	const TEXT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" d="M5 6h14M12 6v12m-4 0h8"/></svg>`;
-	const IMAGE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="m3 16 5-5 4 4 3-3 6 6M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><circle cx="16" cy="8" r="1.5"/></svg>`;
 	const DUPLICATE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>`;
-	const DELETE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg>`;
-	const PDF_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M6 2.75h8l4 4v14.5H6zM14 2.75v4h4"/><path stroke-linecap="round" d="M8.5 16.5v-5h1.25a1.5 1.5 0 0 1 0 3H8.5m4-3h1a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-1zm5 5v-5h2.5m-2.5 2h2"/></svg>`;
 	const PNG_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="16.5" cy="8.5" r="1.5"/><path stroke-linejoin="round" d="m5.5 17 4.5-5 3 3 2-2 3.5 4"/></svg>`;
+
 	const defaultStyle = () => ({
 		fontFamily: "Inter",
 		fontSize: 16,
@@ -49,6 +52,7 @@
 		stroke: "#657089",
 		align: "center"
 	});
+
 	let documentState = freshState();
 	let activePath = "";
 	let activeController = null;
@@ -69,13 +73,7 @@
 	const uid = prefix => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 	const cleanName = value => String(value || "").trim().replace(/\.chrts$/i, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
 	const normalizePath = value => String(value || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
-	const esc = value => String(value ?? "").replace(/[&<>\"']/g, c => ({
-		"&": "&amp;",
-		"<": "&lt;",
-		">": "&gt;",
-		'"': "&quot;",
-		"'": "&#39;"
-	}[c]));
+	const esc = value => String(value ?? "").replace(/[&<>\"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
 	const svg = (tag, attrs = {}) => {
 		const node = document.createElementNS(NS, tag);
 		Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
@@ -90,7 +88,7 @@
 			const fileName = `${documentState.name}.chrts`;
 			const file = new File([JSON.stringify(documentState)], fileName, {type: "application/json"});
 			const url = "/api/upload?directory=Charts";
-			let ok = false;
+			let ok;
 			if (window.StandardUploads?.uploadFile) ok = !!(await window.StandardUploads.uploadFile(file, url, {label: `Saving ${fileName}`}))?.ok;
 			else {
 				const body = new FormData();
@@ -173,12 +171,14 @@
 		const bottom = Math.max(...documentState.items.map(item => (Number(item.y) || 0) + (Number(item.h) || 0))) + padding;
 		return {left, top, width: Math.max(1, right - left), height: Math.max(1, bottom - top)};
 	};
+
 	const chartVertexPoint = (item, vertex) => ({
 		top: {x: item.x + item.w / 2, y: item.y},
 		right: {x: item.x + item.w, y: item.y + item.h / 2},
 		bottom: {x: item.x + item.w / 2, y: item.y + item.h},
 		left: {x: item.x, y: item.y + item.h / 2}
 	}[vertex]);
+
 	const chartConnectorPath = connector => {
 		const fromItem = documentState.items.find(item => item.id === connector.from?.itemId);
 		const toItem = documentState.items.find(item => item.id === connector.to?.itemId);
@@ -194,6 +194,7 @@
 		}
 		return `M${from.x},${from.y} L${to.x},${to.y}`;
 	};
+
 	const wrapChartText = (value, width, fontSize) => {
 		const maximumCharacters = Math.max(1, Math.floor(width / Math.max(4, fontSize * .58)));
 		return String(value || "").split(/\r?\n/).flatMap(paragraph => {
@@ -206,6 +207,7 @@
 			return lines;
 		});
 	};
+
 	const chartSvg = bounds => {
 		const shapeMarkup = documentState.items.map(item => {
 			const style = {...defaultStyle(), ...(item.style || {})};
@@ -238,6 +240,7 @@
 		}).join("");
 		return `<svg xmlns="http://www.w3.org/2000/svg" width="${bounds.width}" height="${bounds.height}" viewBox="${bounds.left} ${bounds.top} ${bounds.width} ${bounds.height}"><defs><marker id="chart-print-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#657089"/></marker></defs><rect x="${bounds.left}" y="${bounds.top}" width="${bounds.width}" height="${bounds.height}" fill="${esc(documentState.background || "#f5f6f8")}"/>${connectors}${shapeMarkup}</svg>`;
 	};
+
 	const renderChartCanvas = async () => {
 		const bounds = chartBounds();
 		if (!bounds) throw new Error("Add something to the chart before printing");
@@ -258,6 +261,7 @@
 			URL.revokeObjectURL(source);
 		}
 	};
+
 	const concatBytes = parts => {
 		const length = parts.reduce((total, part) => total + part.length, 0), output = new Uint8Array(length);
 		let offset = 0;
@@ -267,6 +271,7 @@
 		});
 		return output;
 	};
+
 	const pdfBlobFromCanvas = canvas => {
 		const encoder = new TextEncoder(), text = value => encoder.encode(value);
 		const jpegBytes = Uint8Array.from(atob(canvas.toDataURL("image/jpeg", .94).split(",")[1]), character => character.charCodeAt(0));
@@ -290,6 +295,7 @@
 		parts.push(text(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map(offset => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\ntrailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`));
 		return new Blob([concatBytes(parts)], {type: "application/pdf"});
 	};
+
 	const waitForChartPreviewMethod = async lookup => {
 		let method = lookup();
 		if (typeof method === "function") return method;
@@ -359,7 +365,7 @@
 			button.__chartsPrintMenu = true;
 			button.contextmenu([
 				{label: "Print", icon: modular.icons.print, action: printChart},
-				{label: "Preview as PDF", icon: PDF_ICON, action: () => previewChartPdf(button)},
+				{label: "Preview as PDF", icon: modular.icons.pdf, action: () => previewChartPdf(button)},
 				{label: "Preview as PNG", icon: PNG_ICON, action: () => previewChartPng(button)}
 			]);
 		}
@@ -414,8 +420,8 @@
             <input data-style="textColor" type="color" value="#172033" title="Text color"><input data-style="fill" type="color" value="#ffffff" title="Shape fill"><input data-style="stroke" type="color" value="#657089" title="Border color">
             <button class="naked" data-action="align" title="Text alignment">${ALIGN_ICONS.center}</button>
             <span class="charts-toolbar-separator"></span>
-            <button class="naked charts-tool-button" data-action="shape" title="Draw shape">${SHAPE_ICON}</button>
-            <button class="naked charts-tool-button" data-action="text" title="Draw text box">${TEXT_ICON}</button><button class="naked charts-tool-button" data-action="image" title="Insert image">${IMAGE_ICON}</button>
+            <button class="naked charts-tool-button" data-action="shape" title="Draw shape">${modular.icons.shapes}</button>
+            <button class="naked charts-tool-button" data-action="text" title="Draw text box">${TEXT_ICON}</button><button class="naked charts-tool-button" data-action="image" title="Insert image">${modular.icons.image}</button>
             <select data-action="connector-style" title="Chart connector style"><option value="straight">Straight</option><option value="vertexed">Vertexed</option><option value="curved">Curved</option></select>
             <label class="charts-bg-label" title="Chart background">Canvas <input data-action="background" type="color" value="#f5f6f8"></label>
           </div>
@@ -764,7 +770,12 @@
 					}
 				},
 				"separator",
-				{label: "Delete", icon: DELETE_ICON, destructive: true, action: () => deleteItem(item)}
+				{
+					label: "Delete",
+					icon: modular.icons.delete,
+					destructive: true,
+					action: () => deleteItem(item)
+				}
 			];
 		};
 		if (typeof stage.contextmenu === "function") stage.contextmenu((_, target) => {

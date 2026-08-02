@@ -82,6 +82,7 @@ img {-webkit-user-drag:none;user-select:none}
 .text-violet {color:var(--violet) !important}
 .text-pink {color:var(--pink) !important}
 .text-foreground {color:var(--fg) !important;stroke:var(--fg) !important}
+.text-white {color:white !important}
 
 .align-left {text-align:left !important}
 .center, .align-center {text-align:center;justify-content:center}

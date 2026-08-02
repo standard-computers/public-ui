@@ -1,14 +1,16 @@
 (() => {
+
     const SERVICE_ID = "com.standard.editor.code";
     const SUI_FILE_PATTERN = /\.sui$/i;
     const SUI_CLICK_DELAY_MS = 250;
     const SUI_TYPE_DELAY_MS = 24;
-    const CODE_EDITOR_RUN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>`;
     const CODE_EDITOR_MOON_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>`;
     const CODE_EDITOR_SUN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/></svg>`;
+
     const CODE_EDITOR_SETTINGS = {
         dark_mode: {label: "Dark mode", type: "boolean", default: false}
     };
+
     const CODE_EDITOR_KEYWORDS = new Set([
         "abstract", "alias", "and", "as", "asm", "assert", "async", "await", "auto", "base", "begin", "bool", "boolean", "break", "by", "byte", "case", "catch", "char", "checked", "class", "const",
         "constructor", "continue", "crate", "data", "debugger", "declare", "def", "default", "defer", "delete", "del", "do", "double", "dynamic", "echo", "elif", "else", "elseif", "end", "ensure",
@@ -19,27 +21,35 @@
         "template", "then", "this", "throw", "throws", "trait", "transient", "true", "try", "type", "typedef", "typeof", "unchecked", "union", "unless", "unsafe", "unsigned", "until", "use",
         "using", "val", "var", "virtual", "void", "volatile", "when", "where", "while", "with", "yield"
     ]);
+
     const CODE_EDITOR_BUILTINS = new Set([
         "array", "bigint", "binary", "bool", "boolean", "buffer", "byte", "date", "datetime", "decimal", "dict", "document", "element", "error", "exception", "false", "float", "int", "integer", "json",
         "list", "map", "nan", "none", "null", "number", "object", "promise", "regex", "regexp", "result", "self", "set", "some", "string", "symbol", "table", "this", "true", "undefined", "vec", "void", "window"
     ]);
+
     const CODE_EDITOR_LINE_COMMENT_STARTS = ["//", "#", "--", ";", "%"];
+
     const CODE_EDITOR_BLOCK_COMMENTS = [
         {start: "/*", end: "*/"},
         {start: "<!--", end: "-->"},
         {start: "{-", end: "-}"},
         {start: "=begin", end: "=end"}
     ];
+
     const CODE_EDITOR_LINE_COMMENT_BY_EXTENSION = {
         ahk: ";", bat: "rem", c: "//", cc: "//", cjs: "//", cmd: "rem", conf: "#", cpp: "//", cs: "//", css: "/*", cxx: "//", dart: "//", dockerfile: "#",
         env: "#", gitignore: "#", go: "//", h: "//", hpp: "//", hs: "--", html: "<!--", ini: ";", java: "//", js: "//", json: "//", jsx: "//", kt: "//",
         less: "//", lua: "--", mjs: "//", md: "<!--", php: "//", pl: "#", ps1: "#", py: "#", rb: "#", rs: "//", sass: "//", scala: "//", scss: "//",
         sh: "#", sql: "--", swift: "//", toml: "#", ts: "//", tsx: "//", vue: "//", xml: "<!--", yaml: "#", yml: "#"
     };
+
     const CODE_EDITOR_LINE_COMMENT_END_BY_EXTENSION = {css: "*/", html: "-->", md: "-->", xml: "-->"};
+
     const CODE_EDITOR_NAME_KEYWORDS = new Set(["class", "def", "fn", "func", "function", "interface", "module", "namespace", "struct", "trait", "type"]);
+
     const normalizeCodeFilePath = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
     const getCodeFileName = (rawPath = "") => String(rawPath || "").split("/").pop() || "code.js";
+
     const getCodeEditorLineCommentSyntax = (rawPath = "") => {
         const fileName = getCodeFileName(rawPath).toLowerCase();
         const extension = fileName.includes(".") ? fileName.split(".").pop() : fileName;
@@ -48,25 +58,31 @@
             end: CODE_EDITOR_LINE_COMMENT_END_BY_EXTENSION[extension] || ""
         };
     };
+
     const sanitizeNewCodeFileName = (rawName = "") => {
         const trimmedName = String(rawName || "").trim().replace(/\\/g, "/");
         const baseName = trimmedName.split("/").pop() || "";
         return baseName.replace(/^\.+/, "");
     };
+
     const escapeCodeMarkup = (value = "") => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
     const wrapCodeToken = (type = "", value = "") => {
         const safeValue = escapeCodeMarkup(value);
         if (!safeValue) return "";
         return type ? `<span class="editor-code-token editor-code-token-${type}">${safeValue}</span>` : safeValue;
     };
+
     const isIdentifierStart = (char = "") => /[A-Za-z_$@]/.test(char);
     const isIdentifierPart = (char = "") => /[A-Za-z0-9_$@:-]/.test(char);
     const isNumberStart = (char = "", nextChar = "") => /\d/.test(char) || (char === "." && /\d/.test(nextChar));
+
     const isEscaped = (content = "", index = 0) => {
         let slashCount = 0;
         for (let cursor = index - 1; cursor >= 0 && content[cursor] === "\\"; cursor -= 1) slashCount += 1;
         return (slashCount % 2) === 1;
     };
+
     const detectCodeEditorLanguage = (path = "", content = "") => {
         const extension = getCodeFileName(path).split(".").pop()?.toLowerCase?.() || "";
         if (["html", "htm", "xml", "svg"].includes(extension)) return "markup";
@@ -79,6 +95,7 @@
         if (/^\s*[{[]/.test(trimmedContent) && /"\s*:/.test(trimmedContent)) return "data";
         return "code";
     };
+
     const tryReadBlockComment = (content = "", index = 0) => {
         for (const blockComment of CODE_EDITOR_BLOCK_COMMENTS) {
             if (!content.startsWith(blockComment.start, index)) continue;
@@ -88,6 +105,7 @@
         }
         return null;
     };
+
     const isLikelyLineComment = (content = "", index = 0, start = "") => {
         if (!content.startsWith(start, index)) return false;
         if (start === "#") {
@@ -100,6 +118,7 @@
         }
         return true;
     };
+
     const tryReadLineComment = (content = "", index = 0) => {
         for (const start of CODE_EDITOR_LINE_COMMENT_STARTS) {
             if (!isLikelyLineComment(content, index, start)) continue;
@@ -109,6 +128,7 @@
         }
         return null;
     };
+
     const tryReadStringToken = (content = "", index = 0) => {
         const quote = content[index];
         if (!["\"", "'", "`"].includes(quote)) return null;
@@ -132,6 +152,7 @@
         }
         return {type: "string", value: content.slice(index, cursor), end: cursor};
     };
+
     const tryReadNumberToken = (content = "", index = 0) => {
         const firstChar = content[index] || "";
         const nextChar = content[index + 1] || "";
@@ -140,6 +161,7 @@
         if (!numberMatch) return null;
         return {type: "number", value: numberMatch[0], end: index + numberMatch[0].length};
     };
+
     const tryReadMarkupToken = (content = "", index = 0) => {
         if (content[index] !== "<") return null;
         const tagMatch = content.slice(index).match(/^<\/?[A-Za-z][\w:-]*(?:\s+[^<>]*?)?\s*\/?>/);
@@ -149,6 +171,7 @@
         if (!matchedValue) return null;
         return {type: "tag", value: matchedValue, end: index + matchedValue.length};
     };
+
     const classifyIdentifierToken = (value = "", previousSignificantType = "", previousSignificantValue = "", nextSignificantChar = "") => {
         const normalizedValue = value.toLowerCase();
         if (CODE_EDITOR_KEYWORDS.has(normalizedValue)) return "keyword";
@@ -158,6 +181,7 @@
         if (/^[A-Z][A-Za-z0-9_$]*$/.test(value)) return "type";
         return "";
     };
+
     const tokenizeCodeContent = (content = "", options = {}) => {
         const language = detectCodeEditorLanguage(options.path, content);
         const tokens = [];
@@ -247,11 +271,13 @@
         }
         return tokens;
     };
+
     const renderCodeEditorHighlighting = (content = "", options = {}) => {
         const tokens = tokenizeCodeContent(content, options);
         const markup = tokens.map(token => wrapCodeToken(token.type, token.value)).join("");
         return markup || "&nbsp;";
     };
+
     const getPortalCodeState = (portal) => {
         const state = portal?.windowState?.() || {};
         return {
@@ -259,6 +285,7 @@
             cachedContent: typeof state?.cachedContent === "string" ? state.cachedContent : ""
         };
     };
+
     const getPortalRememberedCodePath = (portal) => {
         const statePath = getPortalCodeState(portal).directive;
         if (statePath) return statePath;
@@ -266,6 +293,7 @@
         const textareaNode = getPortalCodeEditorInput(portal);
         return normalizeCodeFilePath(windowNode?.dataset?.codeFilePath || textareaNode?.dataset?.codeFilePath || "");
     };
+
     const syncPortalRememberedCodePath = (portal, rawPath = "") => {
         const normalizedPath = normalizeCodeFilePath(rawPath);
         const windowNode = portal?.window?.();
@@ -275,16 +303,19 @@
         syncCodeEditorRunTool(portal);
         return normalizedPath;
     };
+
     const setPortalCodeState = (portal, nextState = {}, options = {}) => {
         if (!portal || typeof portal.setWindowState !== "function") return getPortalCodeState(portal);
         portal.setWindowState(nextState, options);
         if (Object.prototype.hasOwnProperty.call(nextState || {}, "directive")) syncPortalRememberedCodePath(portal, nextState?.directive || "");
         return getPortalCodeState(portal);
     };
+
     const getPortalCodeEditorInput = (portal) => portal?.window?.()?.querySelector?.("#editor-code-content") || null;
     const getPortalCodeLineNumbers = (portal) => portal?.window?.()?.querySelector?.("#editor-code-lines") || null;
     const getPortalCodeHighlight = (portal) => portal?.window?.()?.querySelector?.("#editor-code-highlight") || null;
     const getPortalCodeStage = (portal) => portal?.window?.()?.querySelector?.("#editor-code-stage") || null;
+
     const setCodeEditorThemeToolIcon = (tool, darkMode) => {
         if (!tool) return;
         const title = darkMode ? "Light mode" : "Dark mode";
@@ -295,6 +326,7 @@
         tool.setAttribute("aria-label", title);
         tool.dataset.portalToolTitle = title.toLowerCase();
     };
+
     const applyCodeEditorDarkMode = (darkMode) => {
         const enabled = darkMode === true;
         document.querySelectorAll(".editor-code-shell").forEach(shell => {
@@ -305,12 +337,14 @@
             });
         });
     };
+
     const loadCodeEditorDarkMode = async () => {
         const settings = await window.StandardAppSettings?.values?.(SERVICE_ID);
         const darkMode = settings?.dark_mode === true;
         applyCodeEditorDarkMode(darkMode);
         return darkMode;
     };
+
     const toggleCodeEditorDarkMode = async (_event, context) => {
         const settingsApi = context?.settings;
         const currentSettings = await settingsApi?.values?.() || await window.StandardAppSettings?.values?.(SERVICE_ID) || {};
@@ -320,11 +354,14 @@
             || window.StandardAppSettings?.save?.(SERVICE_ID, {...currentSettings, dark_mode: darkMode}));
         if (!saved) modular.error("Unable to save code editor theme");
     };
+
     const syncCodeEditorRunTool = (portal) => {
         const runTool = portal?.window?.()?.querySelector?.('[data-portal-tool-title="run"]');
         if (runTool) runTool.hidden = !SUI_FILE_PATTERN.test(getPortalRememberedCodePath(portal));
     };
+
     const isCodeEditorGoToLineShortcut = (event) => event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.key?.toLowerCase?.() === "g";
+
     const focusCodeEditorAtEnd = (portal) => {
         const focusEditor = () => {
             const codeEditorInput = getPortalCodeEditorInput(portal);
@@ -337,6 +374,7 @@
         };
         requestAnimationFrame(() => requestAnimationFrame(focusEditor));
     };
+
     const syncCodeEditorPresentation = (portal) => {
         const codeEditorInput = getPortalCodeEditorInput(portal);
         const codeHighlight = getPortalCodeHighlight(portal);
@@ -351,6 +389,7 @@
         lineNumberContainer.scrollTop = codeEditorInput.scrollTop;
         codeStage.dataset.empty = content ? "0" : "1";
     };
+
     const hydrateCodeEditorFromState = (portal) => {
         const codeEditorInput = getPortalCodeEditorInput(portal);
         if (!codeEditorInput) return;
@@ -360,12 +399,15 @@
         refreshCodeEditorLineNumbers(portal);
         syncCodeEditorPresentation(portal);
     };
+
     const updateCodeEditorPortalTitle = (portal) => {
         if (!portal?.setTitle) return;
         const directive = getPortalRememberedCodePath(portal);
         portal.setTitle(directive ? getCodeFileName(directive) : "Code");
     };
+
     const getCodeEditorLineCount = (content = "") => Math.max(1, String(content).split("\n").length);
+
     const refreshCodeEditorLineNumbers = (portal) => {
         const lineNumberContainer = getPortalCodeLineNumbers(portal);
         const codeEditorInput = getPortalCodeEditorInput(portal);
@@ -378,6 +420,7 @@
         lineNumberContainer.innerHTML = children(lineMarkup);
         lineNumberContainer.scrollTop = codeEditorInput.scrollTop;
     };
+
     const insertCodeEditorText = (textArea = null, text = "", offset = 0) => {
         if (!textArea) return;
         const selectionStart = textArea.selectionStart;
@@ -387,6 +430,7 @@
         textArea.selectionStart = cursorPosition;
         textArea.selectionEnd = cursorPosition;
     };
+
     const getDuplicateLineDownEdit = (value = "", selectionStart = 0, selectionEnd = selectionStart) => {
         const content = String(value ?? "");
         const start = Math.max(0, Math.min(Number(selectionStart) || 0, content.length));
@@ -408,6 +452,7 @@
             selectionEnd: duplicateStart + Math.min(caretColumn, duplicatedText.length)
         };
     };
+
     const duplicateCodeEditorLineDown = (textArea = null) => {
         if (!textArea) return false;
         const edit = getDuplicateLineDownEdit(textArea.value, textArea.selectionStart, textArea.selectionEnd);
@@ -416,6 +461,7 @@
         textArea.selectionEnd = edit.selectionEnd;
         return true;
     };
+
     const toggleCodeEditorLineComment = (textArea = null, commentSyntax = {}) => {
         if (!textArea) return false;
         const commentToken = String(commentSyntax?.start || "//");
@@ -443,7 +489,9 @@
         textArea.selectionEnd = Math.max(textArea.selectionStart, end + (nextText.length - (lineEnd - lineStart)));
         return true;
     };
+
     const getCodeEditorLineFromOffset = (content = "", offset = 0) => String(content ?? "").slice(0, Math.max(0, offset)).split("\n").length;
+
     const getCodeEditorOffsetForLine = (content = "", lineNumber = 1) => {
         const targetLine = Math.max(1, Number.parseInt(lineNumber, 10) || 1);
         let offset = 0;
@@ -454,6 +502,7 @@
         }
         return offset;
     };
+
     const goToCodeEditorLine = (portal, rawLineNumber = "") => {
         const codeEditorInput = getPortalCodeEditorInput(portal);
         if (!codeEditorInput) return false;
@@ -472,6 +521,7 @@
         syncCodeEditorPresentation(portal);
         return true;
     };
+
     const showCodeEditorGoToLineDialogue = (portal) => {
         const codeEditorInput = getPortalCodeEditorInput(portal);
         if (!codeEditorInput) return false;
@@ -483,6 +533,7 @@
         });
         return true;
     };
+
     const createCodeEditorSearchMatches = (query = "", portal = null) => {
         const codeEditorInput = getPortalCodeEditorInput(portal);
         const content = codeEditorInput?.value || "";
@@ -507,6 +558,7 @@
         }
         return matches;
     };
+
     const scrollToCodeEditorSearchMatch = (match = null, portal = null) => {
         const codeEditorInput = getPortalCodeEditorInput(portal);
         if (!codeEditorInput || !match || !Number.isFinite(match.index)) return false;
@@ -520,6 +572,7 @@
         syncCodeEditorPresentation(portal);
         return true;
     };
+
     const showCodeEditorSearchDialogue = (portal = null, anchorNode = null) => {
         const codeEditorInput = getPortalCodeEditorInput(portal);
         if (!codeEditorInput) return false;
@@ -539,6 +592,7 @@
             onNoMatch: () => modular.error("No matches found")
         });
     };
+
     const bindCodeEditorInteractions = (portal) => {
         const codeEditorInput = getPortalCodeEditorInput(portal);
         if (!codeEditorInput || codeEditorInput.dataset.bound === "1") {
@@ -611,6 +665,7 @@
         refreshCodeEditorLineNumbers(portal);
         syncCodeEditorPresentation(portal);
     };
+
     const saveCodeEditorContentToPath = async (portal, targetPath = "") => {
         const normalizedPath = normalizeCodeFilePath(targetPath);
         if (!normalizedPath) {
@@ -633,6 +688,7 @@
         modular.success(`Saved ${normalizedPath} (${response.byteCount} bytes)`);
         return true;
     };
+
     const saveNewCodeFileToDocuments = (portal) => {
         inputDialogue({title: "File name", placeholder: "code.js", value: "code.js", confirmation: async (_, inputFileName) => {
                 if (!modular.validateFileName(inputFileName)) return;
@@ -641,6 +697,7 @@
             }
         });
     };
+
     const saveLoadedCodeFile = async (portal) => {
         const directive = getPortalRememberedCodePath(portal);
         if (!directive) {
@@ -649,6 +706,7 @@
         }
         await saveCodeEditorContentToPath(portal, directive);
     };
+
     const parseSuiServiceInstruction = (instruction = "") => {
         const normalizedInstruction = String(instruction || "").trim();
         const routedMatch = normalizedInstruction.match(/^(com\..+?)-(\d+)(?:-(\d+))?$/);
@@ -659,11 +717,13 @@
             routeIndex: routedMatch[3] === undefined ? null : Number.parseInt(routedMatch[3], 10)
         };
     };
+
     const waitForSuiPortalRender = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const waitForSuiClick = async () => {
         await waitForSuiPortalRender();
         await new Promise(resolve => setTimeout(resolve, SUI_CLICK_DELAY_MS));
     };
+
     const typeSuiInputValue = async (input, value = "") => {
         const nextValue = String(value ?? "");
         input.value = "";
@@ -676,6 +736,7 @@
             await new Promise(resolve => setTimeout(resolve, SUI_TYPE_DELAY_MS));
         }
     };
+
     const getSuiKeyboardKey = (value = "") => {
         const normalizedKey = String(value || "").trim();
         const namedKeys = {
@@ -698,6 +759,7 @@
         };
         return namedKeys[normalizedKey.toUpperCase()] || (normalizedKey.length === 1 ? normalizedKey.toLowerCase() : normalizedKey);
     };
+
     const getSuiKeyboardCode = (key = "") => {
         if (/^[a-z]$/i.test(key)) return `Key${key.toUpperCase()}`;
         if (/^\d$/.test(key)) return `Digit${key}`;
@@ -719,6 +781,7 @@
         };
         return namedCodes[key] || key;
     };
+
     const dispatchSuiKeyboardEvent = (type, key, modifiers = {}) => {
         const target = document.activeElement || document.body || document;
         const event = new KeyboardEvent(type, {
@@ -734,6 +797,7 @@
         });
         return !target.dispatchEvent(event);
     };
+
     const runSuiModifiedShortcut = async (modifier = "", shortcut = "", lineNumber = 0) => {
         const normalizedShortcut = String(shortcut || "").trim();
         if (!normalizedShortcut) throw new Error(`Line ${lineNumber}: shortcut key is required`);
@@ -752,6 +816,7 @@
         }
         return true;
     };
+
     const activateSuiPortalRoute = async (portal, routeIndex = null, lineNumber = 0) => {
         if (routeIndex === null) return;
         await waitForSuiClick();
@@ -760,6 +825,7 @@
         if (!routeNode) throw new Error(`Line ${lineNumber}: route ${routeIndex} does not exist`);
         routeNode.click();
     };
+
     const resolveSuiHandleInstruction = (instruction = "") => {
         const normalizedInstruction = String(instruction || "").trim();
         const handles = [...new Set(Array.from(document.querySelectorAll("[handle]"))
@@ -774,6 +840,7 @@
                 : null
         };
     };
+
     const clickSuiHandle = async (instruction = "", lineNumber = 0) => {
         const normalizedInstruction = String(instruction || "").trim();
         if (!normalizedInstruction) throw new Error(`Line ${lineNumber}: handle is required`);
@@ -796,6 +863,7 @@
         target.click();
         return true;
     };
+
     const executeSuiLine = async (line = "", lineNumber = 0) => {
         const instruction = String(line || "").trim();
         if (!instruction) return false;
@@ -811,6 +879,7 @@
         if (instruction.startsWith("ALT ")) return runSuiModifiedShortcut("ALT", instruction.slice(4), lineNumber);
         return false;
     };
+
     const executeSuiSource = async (source = "") => {
         const lines = String(source || "").replace(/\r\n?/g, "\n").split("\n");
         let executedLineCount = 0;
@@ -819,6 +888,7 @@
         }
         return executedLineCount;
     };
+
     const runSuiCode = async (portal) => {
         const directive = getPortalRememberedCodePath(portal);
         if (!SUI_FILE_PATTERN.test(directive)) return false;
@@ -836,6 +906,7 @@
             return false;
         }
     };
+
     const openFreshCodeEditor = () => {
         const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
         if (portal) {
@@ -846,6 +917,7 @@
         }
         return true;
     };
+
     window.StandardCodeEditor = window.StandardCodeEditor || {};
     window.StandardCodeEditor.openFreshCodeEditor = openFreshCodeEditor;
     window.StandardCodeEditor.openCodeFilePath = (rawPath = "", content = "") => {
@@ -859,6 +931,7 @@
         }
         return true;
     };
+
     modular.register(new Service(SERVICE_ID, [
         new Portal({
             title: "Code",
@@ -868,7 +941,7 @@
             horizontal_nav: true,
             centered_nav: true,
             tools: [
-                {title: "Run", icon: CODE_EDITOR_RUN_ICON, onclick: (_, context) => runSuiCode(context?.portal)},
+                {title: "Run", icon: modular.icons.play, onclick: (_, context) => runSuiCode(context?.portal)},
                 {title: "Dark mode", icon: CODE_EDITOR_MOON_ICON, onclick: toggleCodeEditorDarkMode},
                 {title: "Save", icon: modular.icons.save, onclick: (_, context) => saveLoadedCodeFile(context?.portal)},
                 {title: "Search", icon: modular.icons.search, onclick: (event, context) => showCodeEditorSearchDialogue(context?.portal, event?.currentTarget)}

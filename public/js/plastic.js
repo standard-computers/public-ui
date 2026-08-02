@@ -206,6 +206,7 @@ Element.prototype.popoutmenu = function (items, selector = null) {
  * Items may be strings or {label, value, description} objects.
  */
 Element.prototype.autocompleteMenu = function (options = {}) {
+
 	const input = this;
 	const menu = document.createElement("div");
 	const listId = options.id || `autocomplete-menu-${Math.random().toString(36).slice(2)}`;
@@ -224,6 +225,7 @@ Element.prototype.autocompleteMenu = function (options = {}) {
 		label: `${item?.label ?? item?.value ?? ""}`,
 		value: `${item?.value ?? item?.label ?? ""}`
 	};
+
 	const positionMenu = () => {
 		if (!open) return;
 		const rect = input.getBoundingClientRect();
@@ -241,6 +243,7 @@ Element.prototype.autocompleteMenu = function (options = {}) {
 		const preferAbove = options.placement === "above";
 		menu.style.top = `${preferAbove || below + menu.offsetHeight > window.innerHeight - viewportMargin ? Math.max(viewportMargin, above) : below}px`;
 	};
+
 	const updateSelection = index => {
 		if (!items.length) {
 			selectedIndex = -1;
@@ -258,6 +261,7 @@ Element.prototype.autocompleteMenu = function (options = {}) {
 			}
 		});
 	};
+
 	const hide = () => {
 		open = false;
 		menu.classList.add("hidden");
@@ -265,6 +269,7 @@ Element.prototype.autocompleteMenu = function (options = {}) {
 		input.setAttribute("aria-expanded", "false");
 		input.removeAttribute("aria-activedescendant");
 	};
+
 	const select = (index = selectedIndex) => {
 		if (!items.length) return false;
 		const item = items[index < 0 ? 0 : index];
@@ -274,6 +279,7 @@ Element.prototype.autocompleteMenu = function (options = {}) {
 		input.focus();
 		return true;
 	};
+
 	const render = () => {
 		menu.innerHTML = "";
 		items.forEach((item, index) => {
@@ -301,6 +307,7 @@ Element.prototype.autocompleteMenu = function (options = {}) {
 			menu.appendChild(option);
 		});
 	};
+
 	const setItems = nextItems => {
 		items = (nextItems || []).map(normalizeItem).filter(item => item.value);
 		if (!items.length) {
@@ -315,6 +322,7 @@ Element.prototype.autocompleteMenu = function (options = {}) {
 		updateSelection(0);
 		requestAnimationFrame(positionMenu);
 	};
+
 	const handleKeydown = event => {
 		if (!open) return false;
 		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -333,9 +341,11 @@ Element.prototype.autocompleteMenu = function (options = {}) {
 		}
 		return false;
 	};
+
 	const handleDocumentPointer = event => {
 		if (event.target !== input && !menu.contains(event.target)) hide();
 	};
+
 	const destroy = () => {
 		hide();
 		menu.remove();
@@ -634,12 +644,7 @@ let openDropdown = null;
 let openDropdownMenu = null;
 let openDropdownOptionIndex = -1;
 function escapeHtml(value) {
-	return String(value ?? "")
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;")
-		.replace(/'/g, "&#39;");
+	return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function hideDropdownMenu({focus = false} = {}) {
@@ -750,6 +755,7 @@ function hideSearchboxOptions(searchboxId) {
 }
 
 document.addEventListener("click", (event) => {
+
 	const dropdownOption = event.target.closest('[data-plastic-dropdown-option]');
 	if (dropdownOption && openDropdownMenu?.contains(dropdownOption)) {
 		event.preventDefault();
@@ -757,13 +763,16 @@ document.addEventListener("click", (event) => {
 		selectDropdownOption(openDropdown, Number(dropdownOption.getAttribute("data-plastic-dropdown-option")));
 		return;
 	}
+
 	const dropdown = event.target.closest('[data-plastic-dropdown-id]');
 	if (dropdown) {
 		event.preventDefault();
 		showDropdownMenu(dropdown);
 		return;
 	}
+
 	hideDropdownMenu();
+
 	const searchboxOption = event.target.closest('[data-searchbox-option-id]');
 	if (searchboxOption) {
 		const searchboxId = searchboxOption.getAttribute("data-searchbox-option-id");
@@ -779,6 +788,7 @@ document.addEventListener("click", (event) => {
 		}
 		return;
 	}
+
 	const target = event.target.closest('[data-onclick-id]');
 	if (target) {
 		const handlerId = target.getAttribute('data-onclick-id');
@@ -787,6 +797,7 @@ document.addEventListener("click", (event) => {
 			handler(event);
 		}
 	}
+
 	document.querySelectorAll("input[data-searchbox-id]").forEach((input) => {
 		if (!input.contains(event.target)) {
 			const searchboxId = input.getAttribute("data-searchbox-id");
@@ -794,6 +805,7 @@ document.addEventListener("click", (event) => {
 		}
 	});
 });
+
 document.addEventListener("dblclick", (event) => {
 	const target = event.target.closest('[data-ondblclick-id]');
 	if (!target) return;
@@ -803,6 +815,7 @@ document.addEventListener("dblclick", (event) => {
 		handler(event);
 	}
 });
+
 document.addEventListener("contextmenu", (event) => {
 	const target = event.target.closest('[data-oncontextmenu-id]');
 	if (!target) return;
@@ -812,6 +825,7 @@ document.addEventListener("contextmenu", (event) => {
 		handler(event);
 	}
 });
+
 document.addEventListener("input", (event) => {
 	const formattedInput = event.target.closest('input[data-plastic-input]');
 	if (formattedInput) {
@@ -822,11 +836,13 @@ document.addEventListener("input", (event) => {
 	if (!target) return;
 	renderSearchboxOptions(target, target.value);
 });
+
 document.addEventListener("focusin", (event) => {
 	const target = event.target.closest('input[data-searchbox-id]');
 	if (!target) return;
 	renderSearchboxOptions(target, target.value);
 });
+
 document.addEventListener("keydown", (event) => {
 	const dropdown = event.target.closest('[data-plastic-dropdown-id]');
 	if (dropdown) {
@@ -854,6 +870,7 @@ document.addEventListener("keydown", (event) => {
 		hideSearchboxOptions(searchboxId);
 	}
 });
+
 document.addEventListener("change", (event) => {
 	const target = event.target.closest('[data-onchange-id]');
 	if (!target) return;
@@ -1099,36 +1116,35 @@ function inputDialogue(n) {
 }
 
 function searchDialogue(n = {}) {
+
 	document.querySelectorAll(".dialogue, .search-dialogue-popout").forEach(d => d.remove());
 	const anchorNode = n.anchor instanceof Element ? n.anchor : null;
 	const isPopout = !!anchorNode;
 	if (!isPopout) document.getElementById("cover").in();
 	let matches = [];
 	let activeIndex = -1;
+
 	const dialogue = createMarkupNode(div({
 		style: `${isPopout ? "custom-context-menu search-dialogue-popout" : "dialogue"} padded search-dialogue`,
 		content: children([
 			label({content: n.title || "Search"}),
-			input({
-				style: "undecorated search-dialogue-input",
-				placeholder: n.placeholder || "Search",
-				value: n.value || "",
-				autofocus: true
-			}),
+			input({style: "undecorated search-dialogue-input", placeholder: n.placeholder || "Search", value: n.value || "", autofocus: true}),
 			div({style: "search-dialogue-results", content: ""}),
-			div({
-				style: "float-right search-dialogue-actions", content: children([
+			div({style: "float-right search-dialogue-actions",
+				content: children([
 					button({style: "undecorated space-right", content: "Cancel"}),
 					button({style: "primary", content: n.confirmText || "Confirm"})
 				])
 			})
 		])
 	}));
+
 	const inputNode = dialogue.querySelector("input");
 	const resultsNode = dialogue.querySelector(".search-dialogue-results");
 	const buttons = dialogue.querySelectorAll("button");
 	const cancelButton = buttons[0] || null;
 	const confirmButton = buttons[1] || null;
+
 	const closeDialogue = () => {
 		document.removeEventListener("keydown", dialogueKeydownHandler, true);
 		document.removeEventListener("mousedown", outsideClickHandler, true);
@@ -1136,6 +1152,7 @@ function searchDialogue(n = {}) {
 		if (!isPopout) document.getElementById("cover").out();
 		dialogue.remove();
 	};
+
 	const positionPopout = () => {
 		if (!isPopout || !dialogue.isConnected) return;
 		const rect = anchorNode.getBoundingClientRect();
@@ -1151,10 +1168,12 @@ function searchDialogue(n = {}) {
 			}
 		});
 	};
+
 	const outsideClickHandler = (event) => {
 		if (!isPopout || dialogue.contains(event.target) || anchorNode.contains(event.target)) return;
 		closeDialogue();
 	};
+
 	const setActiveIndex = (nextIndex = -1) => {
 		const visibleMatchCount = Math.min(matches.length, n.maxVisible || 8);
 		activeIndex = visibleMatchCount ? Math.max(0, Math.min(nextIndex, visibleMatchCount - 1)) : -1;
@@ -1162,18 +1181,12 @@ function searchDialogue(n = {}) {
 			row.classList.toggle("active", index === activeIndex);
 		});
 	};
+
 	const renderMatches = () => {
 		resultsNode.innerHTML = "";
 		const query = inputNode?.value || "";
 		matches = typeof n.matches === "function" ? (n.matches(query) || []) : [];
-		// if (!query.trim()) {
-		//     const emptyNode = document.createElement("div");
-		//     emptyNode.className = "search-dialogue-empty";
-		//     emptyNode.textContent = n.emptyText || "Start typing to search.";
-		//     resultsNode.appendChild(emptyNode);
-		//     setActiveIndex(-1);
-		//     return;
-		// }
+
 		if (!matches.length) {
 			const emptyNode = document.createElement("div");
 			emptyNode.className = "search-dialogue-empty";
@@ -1182,6 +1195,7 @@ function searchDialogue(n = {}) {
 			setActiveIndex(-1);
 			return;
 		}
+
 		matches.slice(0, n.maxVisible || 8).forEach((match, index) => {
 			const row = document.createElement("button");
 			row.type = "button";
@@ -1205,6 +1219,7 @@ function searchDialogue(n = {}) {
 		});
 		setActiveIndex(activeIndex >= 0 ? activeIndex : 0);
 	};
+
 	const dialogueKeydownHandler = (event) => {
 		if (!dialogue.isConnected) return;
 		if (event.key === "Escape") {
@@ -1227,6 +1242,7 @@ function searchDialogue(n = {}) {
 			confirmButton?.click();
 		}
 	};
+
 	cancelButton?.addEventListener("click", closeDialogue);
 	confirmButton?.addEventListener("click", () => {
 		const query = inputNode?.value || "";
@@ -1234,11 +1250,13 @@ function searchDialogue(n = {}) {
 		closeDialogue();
 		if (typeof n.confirmation === "function") n.confirmation(query, selectedMatch, matches);
 	});
+
 	inputNode?.addEventListener("input", () => {
 		activeIndex = -1;
 		renderMatches();
 		if (typeof n.input === "function") n.input(inputNode.value, matches);
 	});
+
 	document.querySelector("body").append(dialogue);
 	positionPopout();
 	document.addEventListener("keydown", dialogueKeydownHandler, true);
@@ -1251,20 +1269,24 @@ function searchDialogue(n = {}) {
 
 function confirmationDialogue(n) {
 	document.getElementById("cover").in()
-	document.querySelector("body").append(div({
-		style: "dialogue padded center medium-padding",
-		content: children([label({content: n.title}), blockquote({content: n.content}), button({
-			style: "secondary space-right hover-zoom", content: "Cancel", onclick: () => {
-				document.querySelectorAll(".dialogue").forEach(d => d.out());
-				document.getElementById("cover").out()
-			}
-		}), button({
-			style: "primary hover-shadowed hover-zoom", content: "Confirm", onclick: () => {
-				document.querySelectorAll(".dialogue").forEach(d => d.out());
-				document.getElementById("cover").out()
-				n.confirmation();
-			}
-		})])
+	document.querySelector("body").append(div({style: "dialogue padded center medium-padding",
+		content: children([
+			h({level: 2, content: n.title}),
+			blockquote({style: "margin-bottom", content: n.content}),
+			button({style: "primary hover-shadowed brick fill fat small-margin-bottom " + (n.destructive ? "background-red border-red color-white faded" : ""),
+				content: "Confirm", onclick: () => {
+					document.querySelectorAll(".dialogue").forEach(d => d.out());
+					document.getElementById("cover").out()
+					n.confirmation();
+				}
+			}),
+			button({style: "secondary space-right brick fill fat",
+				content: "Cancel", onclick: () => {
+					document.querySelectorAll(".dialogue").forEach(d => d.out());
+					document.getElementById("cover").out()
+				}
+			})
+		])
 	}));
 }
 
@@ -1272,8 +1294,7 @@ function colorPicker(n = {}) {
 	const colors = Array.isArray(n.colors) ? n.colors : [];
 	const styleClasses = (n.style || "").trim();
 	const mergedStyle = `colors ${styleClasses}`.trim();
-	return div({
-		style: mergedStyle, id: n.id, content: () => {
+	return div({style: mergedStyle, id: n.id, content: () => {
 			let cos = [];
 			for (let i = 0; i < colors.length; i++) {
 				const o = colors[i];

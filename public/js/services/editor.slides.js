@@ -1,4 +1,5 @@
 (() => {
+
     const SERVICE_ID = "com.standard.editor.slides";
     const SLIDE_GRID_SIZE = 20;
     const SLIDE_BORDER_DRAG_HIT_SIZE = 8;
@@ -8,6 +9,13 @@
     const SLIDE_CHART_DEFAULT_HEIGHT = 240;
     const SLIDE_CHART_MIN_WIDTH = 180;
     const SLIDE_CHART_MIN_HEIGHT = 140;
+
+    const SLIDE_EDITOR_SETTINGS = {
+        default_background: {label: "Default slide background", type: "text", default: ""},
+        show_grid: {label: "Show grid by default", type: "boolean", default: true},
+        snap_to_grid: {label: "Snap to grid", type: "boolean", default: true}
+    };
+
     const SLIDE_CHART_TYPES = [
         {label: "Column", value: "bar"},
         {label: "Line", value: "line"},
@@ -15,13 +23,14 @@
         {label: "Scatter", value: "scatter"},
         {label: "Pie", value: "pie"}
     ];
+
     const SLIDE_CHART_DEFAULT_DATA = [
         {label: "Q1", value: 24},
         {label: "Q2", value: 38},
         {label: "Q3", value: 31},
         {label: "Q4", value: 46}
     ];
-    const SLIDE_CHART_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z"/></svg>`;
+
     const SLIDE_TEXT_COLORS = [
         {label: "Default", value: ""},
         {label: "Ink", value: "var(--fg)"},
@@ -30,6 +39,7 @@
         {label: "Orange", value: "var(--orange)"},
         {label: "Red", value: "var(--red)"}
     ];
+
     const SLIDE_BACKGROUND_COLORS = [
         {label: "None", value: ""},
         {label: "Paper", value: "var(--bg)"},
@@ -38,11 +48,13 @@
         {label: "Green", value: "#dcfce7"},
         {label: "Yellow", value: "#fef3c7"}
     ];
+
     const SLIDE_ALIGN_ICONS = {
-        left: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M4 10.5h10M4 14.5h16M4 18.5h10"/></svg>`,
-        center: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M7 10.5h10M4 14.5h16M7 18.5h10"/></svg>`,
-        right: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M10 10.5h10M4 14.5h16M10 18.5h10"/></svg>`
+        left: modular.icons.left,
+        center: modular.icons.center,
+        right: modular.icons.right
     };
+
     let activeSlideDeck = [{id: 1, title: "Slide 1", blocks: []}];
     let activeSlideId = 1;
     let selectedSlideBlockId = null;
@@ -55,6 +67,13 @@
     let slideBackgroundMenuOpen = false;
     let slideOptionsMenuOpen = false;
     let slideGridVisible = true;
+    let slideSnapToGrid = true;
+    let slideDefaultBackground = null;
+    let slideGridDefaultPending = true;
+    let slideSnapDefaultPending = true;
+    let slideBackgroundDefaultPending = true;
+    let slideForceViewDefaults = false;
+    let slideForceDefaultBackground = false;
     let slidePresentationActive = false;
     let slidePresentationIndex = 0;
     let savedSlideSelectionOffsets = null;
@@ -160,6 +179,15 @@
         const normalizedBackground = normalizeSlideBackground(background);
         if (normalizedBackground) slide.background = normalizedBackground;
         else delete slide.background;
+    };
+    const normalizeDefaultSlideBackground = (rawBackground = "") => {
+        const value = String(rawBackground || "").trim();
+        return value ? {type: "color", value} : null;
+    };
+    const createSlideRecord = (id = 1, title = `Slide ${id}`) => {
+        const slide = {id, title, blocks: []};
+        setSlideBackground(slide, slideDefaultBackground);
+        return slide;
     };
     const getSlideBackgroundDownloadUrl = (filePath = "") => {
         const normalizedPath = normalizeSlidesFilePath(filePath);
@@ -689,6 +717,7 @@
         if (!slidePath) return false;
         parseSlidesPayload(payload && typeof payload === "object" ? payload : {});
         activeSlideDeckFilePath = slidePath;
+        slideForceViewDefaults = true;
         const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
         prioritizePortalDomForLegacyLookups(portal);
         saveSlidePortalState(portal);
@@ -721,13 +750,18 @@
         slideDeckCounter = 2;
         slideBlockCounter = 1;
         activeSlideDeckFilePath = "";
+        slideForceViewDefaults = true;
+        slideForceDefaultBackground = true;
         modular.show(SERVICE_ID, 0, {newInstance: true});
         saveSlidePortalState();
         renderSlideEditor();
         updateSlidesPortalTitle();
         return true;
     };
-    const snapSlideValue = (value = 0) => Math.max(0, Math.round(Number(value || 0) / SLIDE_GRID_SIZE) * SLIDE_GRID_SIZE);
+    const snapSlideValue = (value = 0) => {
+        const numericValue = Math.max(0, Number(value) || 0);
+        return slideSnapToGrid ? Math.round(numericValue / SLIDE_GRID_SIZE) * SLIDE_GRID_SIZE : numericValue;
+    };
     const captureSlideListRects = () => {
         const list = document.getElementById("editor-slide-list");
         if (!list) return new Map();
@@ -766,12 +800,18 @@
             selectedSlideBlockId,
             slideDeckCounter,
             slideBlockCounter,
-            slideGridVisible
+            slideGridVisible,
+            slideSnapToGrid
         });
         updateSlidesPortalTitle(portal);
     };
     const restoreSlidePortalState = (portal = findSlidesPortal()) => {
         const state = portal?.windowState?.() || {};
+        slideGridDefaultPending = slideForceViewDefaults || !Object.prototype.hasOwnProperty.call(state, "slideGridVisible");
+        slideSnapDefaultPending = slideForceViewDefaults || !Object.prototype.hasOwnProperty.call(state, "slideSnapToGrid");
+        slideBackgroundDefaultPending = slideForceDefaultBackground || !(Array.isArray(state.deck) && state.deck.length);
+        slideForceViewDefaults = false;
+        slideForceDefaultBackground = false;
         if (Array.isArray(state.deck) && state.deck.length) {
             activeSlideDeck = state.deck;
             activeSlideId = state.activeSlideId || state.deck[0]?.id || 1;
@@ -780,10 +820,31 @@
             slideBlockCounter = Number.isFinite(state.slideBlockCounter) ? state.slideBlockCounter : 1;
         }
         slideGridVisible = state.slideGridVisible !== false;
+        slideSnapToGrid = state.slideSnapToGrid !== false;
         activeSlideDeckFilePath = normalizeSlidesFilePath(state?.directive || "");
         ensureDeckIntegrity();
         updateSlidesPortalTitle(portal);
     };
+    const loadSlideAppSettings = async (portal = findSlidesPortal()) => {
+        const settings = await window.StandardAppSettings?.values?.(SERVICE_ID) || {};
+        slideDefaultBackground = normalizeDefaultSlideBackground(settings.default_background);
+        if (slideGridDefaultPending) slideGridVisible = settings.show_grid !== false;
+        if (slideSnapDefaultPending) slideSnapToGrid = settings.snap_to_grid !== false;
+        if (slideBackgroundDefaultPending && activeSlideDeck.length === 1 && !(activeSlideDeck[0]?.blocks || []).length && !activeSlideDeck[0]?.background) {
+            setSlideBackground(activeSlideDeck[0], slideDefaultBackground);
+        }
+        slideGridDefaultPending = false;
+        slideSnapDefaultPending = false;
+        slideBackgroundDefaultPending = false;
+        renderSlideEditor();
+        saveSlidePortalState(portal);
+    };
+    const syncSavedSlideAppSettings = (event) => {
+        if (event?.detail?.serviceId !== SERVICE_ID) return;
+        slideDefaultBackground = normalizeDefaultSlideBackground(event.detail?.values?.default_background);
+    };
+    document.addEventListener("standard-app-settings-saved", syncSavedSlideAppSettings);
+    document.addEventListener("standard-app-settings-reset", syncSavedSlideAppSettings);
     const getSlideCanvasBounds = () => {
         const canvas = document.getElementById("editor-slide-canvas");
         return {canvas, width: canvas?.clientWidth || 0, height: canvas?.clientHeight || 0};
@@ -836,7 +897,11 @@
                     hideSlideContextMenu();
                     return;
                 }
-                confirmationDialogue({title: "Delete slide", content: `Delete "${slide.title}"?`, confirmation: () => {
+                confirmationDialogue({
+                    title: "Delete slide",
+                    destructive: true,
+                    content: `Delete "${slide.title}"?`,
+                    confirmation: () => {
                         activeSlideDeck = activeSlideDeck.filter((item) => item.id !== slideId);
                         if (activeSlideId === slideId) activeSlideId = activeSlideDeck[0]?.id || activeSlideId;
                         selectedSlideBlockId = null;
@@ -991,24 +1056,40 @@
     const syncSlideOptionsMenuState = () => {
         const gridToggle = document.getElementById("editor-slide-grid-toggle");
         if (gridToggle instanceof HTMLInputElement) gridToggle.checked = slideGridVisible;
+        const snapToggle = document.getElementById("editor-slide-snap-toggle");
+        if (snapToggle instanceof HTMLInputElement) snapToggle.checked = slideSnapToGrid;
     };
     const ensureSlideOptionsMenu = () => {
         if (document.getElementById("editor-slide-options-menu")) return;
         const menu = document.createElement("div");
         menu.id = "editor-slide-options-menu";
         menu.className = "editor-slide-options-menu secondary-bordered radius shadowed";
-        menu.innerHTML = div({
-            style: "editor-slide-option-row",
-            content: children([
-                switcher({id: "editor-slide-grid-toggle", style: "editor-slide-option-switch float-right", checked: true}),
-                `<span class="editor-slide-option-label">Grid</span>`
-            ])
-        });
+        menu.innerHTML = children([
+            div({
+                style: "editor-slide-option-row",
+                content: children([
+                    switcher({id: "editor-slide-grid-toggle", style: "editor-slide-option-switch float-right", checked: true}),
+                    `<span class="editor-slide-option-label">Grid</span>`
+                ])
+            }),
+            div({
+                style: "editor-slide-option-row",
+                content: children([
+                    switcher({id: "editor-slide-snap-toggle", style: "editor-slide-option-switch float-right", checked: true}),
+                    `<span class="editor-slide-option-label">Snap to Grid</span>`
+                ])
+            })
+        ]);
         document.body.appendChild(menu);
         const gridToggle = menu.querySelector("#editor-slide-grid-toggle");
         gridToggle?.addEventListener("change", (event) => {
             slideGridVisible = !!event.target?.checked;
             renderSlideCanvas();
+            saveSlidePortalState();
+        });
+        const snapToggle = menu.querySelector("#editor-slide-snap-toggle");
+        snapToggle?.addEventListener("change", (event) => {
+            slideSnapToGrid = !!event.target?.checked;
             saveSlidePortalState();
         });
         document.addEventListener("mousedown", (event) => {
@@ -1034,7 +1115,7 @@
         menu.style.left = "0px";
         menu.style.top = "0px";
         const width = menu.offsetWidth || 180;
-        const height = menu.offsetHeight || 56;
+        const height = menu.offsetHeight || 104;
         const maxX = Math.max(8, window.innerWidth - width - 8);
         const maxY = Math.max(8, window.innerHeight - height - 8);
         menu.style.left = `${Math.min(maxX, Math.max(8, rect.left))}px`;
@@ -1697,7 +1778,7 @@
         if (addSlideButton && addSlideButton.dataset.bound !== "1") {
             addSlideButton.dataset.bound = "1";
             addSlideButton.addEventListener("click", () => {
-                const slide = {id: slideDeckCounter, title: `Slide ${slideDeckCounter}`, blocks: []};
+                const slide = createSlideRecord(slideDeckCounter, `Slide ${slideDeckCounter}`);
                 slideDeckCounter += 1;
                 activeSlideDeck.push(slide);
                 activeSlideId = slide.id;
@@ -1858,28 +1939,29 @@
                         div({style: "editor-slide-workspace", content: children([
                             div({style: "editor-slide-toolbar secondary-bordered radius shadowed", content: children([
                                 button({id: "editor-slide-add", style: "editor-slide-add-button float-right", content: "+ Slide"}),
-                                button({id: "editor-slide-add-text", style: "naked align-bottom small-margin-right inner-radius", title: "Add text", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 11.984375 2.9863281 A 1.0001 1.0001 0 0 0 11.841797 3 L 4.25 3 A 1.0001 1.0001 0 0 0 3.2578125 3.875 L 3.0078125 5.875 A 1.0001 1.0001 0 1 0 4.9921875 6.125 L 5.1328125 5 L 11 5 L 11 19 L 9 19 A 1.0001 1.0001 0 1 0 9 21 L 11.832031 21 A 1.0001 1.0001 0 0 0 12.158203 21 L 15 21 A 1.0001 1.0001 0 1 0 15 19 L 13 19 L 13 5 L 18.867188 5 L 19.007812 6.125 A 1.0001 1.0001 0 1 0 20.992188 5.875 L 20.742188 3.875 A 1.0001 1.0001 0 0 0 19.75 3 L 12.167969 3 A 1.0001 1.0001 0 0 0 11.984375 2.9863281 z"/></svg>`}),
-                                button({id: "editor-slide-add-image", style: "naked align-bottom small-margin-right inner-radius", title: "Add image", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>`}),
-                                button({id: "editor-slide-add-chart", style: "naked align-bottom small-margin-right inner-radius", title: "Chart", icon: SLIDE_CHART_ICON}),
+                                button({id: "editor-slide-add-text", style: "naked align-bottom small-margin-right inner-radius", title: "Add Text", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 11.984375 2.9863281 A 1.0001 1.0001 0 0 0 11.841797 3 L 4.25 3 A 1.0001 1.0001 0 0 0 3.2578125 3.875 L 3.0078125 5.875 A 1.0001 1.0001 0 1 0 4.9921875 6.125 L 5.1328125 5 L 11 5 L 11 19 L 9 19 A 1.0001 1.0001 0 1 0 9 21 L 11.832031 21 A 1.0001 1.0001 0 0 0 12.158203 21 L 15 21 A 1.0001 1.0001 0 1 0 15 19 L 13 19 L 13 5 L 18.867188 5 L 19.007812 6.125 A 1.0001 1.0001 0 1 0 20.992188 5.875 L 20.742188 3.875 A 1.0001 1.0001 0 0 0 19.75 3 L 12.167969 3 A 1.0001 1.0001 0 0 0 11.984375 2.9863281 z"/></svg>`}),
+                                button({id: "editor-slide-add-image", style: "naked align-bottom small-margin-right inner-radius", title: "Add Image", icon: modular.icons.image}),
+                                button({id: "editor-slide-add-chart", style: "naked align-bottom small-margin-right inner-radius", title: "Add Chart", icon: modular.icons.chart}),
                                 select({id: "editor-slide-font-size", style: "small-margin-right inner-radius", value: "", options: [{label: "Size", value: ""}, ...SLIDE_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))]}),
-                                button({id: "editor-slide-style-bold", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`}),
-                                button({id: "editor-slide-style-italic", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.2558594 22.003906 L 14.0058594 22.003906 L 14.0058594 20.503906 L 13.2558594 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`}),
+                                button({id: "editor-slide-style-bold", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: modular.icons.bold}),
+                                button({id: "editor-slide-style-italic", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: modular.icons.italic}),
                                 button({id: "editor-slide-style-color", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
                                 button({id: "editor-slide-style-background", style: "naked align-bottom small-margin-right inner-radius", title: "Fill", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
                                 button({id: "editor-slide-style-align", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: SLIDE_ALIGN_ICONS.left}),
                                 button({id: "editor-slide-background-button", style: "naked align-bottom small-margin-right inner-radius", title: "Slide background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42"/></svg>`}),
                                 button({id: "editor-slide-present-button", style: "naked align-bottom small-margin-right inner-radius", title: "Present", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>`}),
-                                button({id: "editor-slide-more-options", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg>`})
+                                button({id: "editor-slide-more-options", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: modular.icons.ellipses})
                             ])}),
                             div({id: "editor-slide-canvas", style: "editor-slide-canvas secondary-bordered shadowed radius"})
                         ])})
                     ])})
                 ])});
             },
-            afterRender: () => {
+            afterRender: function () {
                 bindSlideInteractions();
                 saveSlidePortalState();
+                void loadSlideAppSettings(this.portal);
             }
         })
-    ]));
+    ], SLIDE_EDITOR_SETTINGS));
 })();

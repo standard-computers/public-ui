@@ -1,23 +1,8 @@
 (async () => {
+
     const SERVICE_ID = "com.standard.editor.text";
     const TEXT_FONT_FAMILIES = window.StandardUI?.fontFamilies || ["Inter", "Georgia", "Times New Roman", "Courier New", "Verdana"];
     const TEXT_FONT_SIZES = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72"];
-    const TEXT_TEXT_COLORS = [
-        {label: "Default", value: ""},
-        {label: "Ink", value: "var(--fg)"},
-        {label: "Blue", value: "var(--blue)"},
-        {label: "Green", value: "var(--green)"},
-        {label: "Orange", value: "var(--orange)"},
-        {label: "Red", value: "var(--red)"}
-    ];
-    const TEXT_BACKGROUND_COLORS = [
-        {label: "None", value: ""},
-        {label: "Paper", value: "var(--bg)"},
-        {label: "Soft", value: "var(--secondary-bg)"},
-        {label: "Blue", value: "#dbeafe"},
-        {label: "Green", value: "#dcfce7"},
-        {label: "Yellow", value: "#fef3c7"}
-    ];
     const TEXT_HIGHLIGHT_COLOR = "#fef08a";
     const TEXT_DOCUMENT_CONTENT_PREFIX = "__STD_TEXT_EDITOR_B64__:";
     const TEXT_DOCUMENT_VIEW_SETTINGS_KEY = "std.textEditor.documentViewSettings";
@@ -31,38 +16,58 @@
     const TEXT_INPUT_SYNC_DEBOUNCE_MS = 120;
     const TEXT_INDENT_STEP_PX = 48;
     const TEXT_OBJECT_SELECTION_SELECTOR = ".editor-text-image-frame, .editor-text-shape-frame, .editor-text-table";
-    const TEXT_LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" style="fill:none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path fill="none" style="fill:none" stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/></svg>`;
     const TEXT_TABLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5v13.5H3.75V5.25Zm0 4.5h16.5M3.75 14.25h16.5M9.25 5.25v13.5M14.75 5.25v13.5"/></svg>`;
     const TEXT_SHAPE_ICON = `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3.75" y="4.5" width="7.5" height="7.5" rx="1.25"/><circle cx="16.75" cy="8.25" r="3.75"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 19.5h12l-6-6-6 6Z"/></svg>`;
     const TEXT_INDENT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>`;
     const TEXT_INDENT_RIGHT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.49 12 3.75 3.75m0 0-3.75 3.75m3.75-3.75H3.74V4.499"/></svg>`;
     const TEXT_INDENT_LEFT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m7.49 12-3.75 3.75m0 0 3.75 3.75m-3.75-3.75h16.5V4.499"/></svg>`;
+
+    const TEXT_TEXT_COLORS = [
+        {label: "Default", value: ""},
+        {label: "Ink", value: "var(--fg)"},
+        {label: "Blue", value: "var(--blue)"},
+        {label: "Green", value: "var(--green)"},
+        {label: "Orange", value: "var(--orange)"},
+        {label: "Red", value: "var(--red)"}
+    ];
+
+    const TEXT_BACKGROUND_COLORS = [
+        {label: "None", value: ""},
+        {label: "Paper", value: "var(--bg)"},
+        {label: "Soft", value: "var(--secondary-bg)"},
+        {label: "Blue", value: "#dbeafe"},
+        {label: "Green", value: "#dcfce7"},
+        {label: "Yellow", value: "#fef3c7"}
+    ];
+
     const TEXT_SHAPE_OPTIONS = [{
         type: "rectangle",
         label: "Rectangle",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>`
+        icon: modular.icons.rectangle
     }, {
         type: "rounded-rectangle",
         label: "Rounded Rectangle",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="4"/></svg>`
+        icon: modular.icons.rounded_rectangle
     }, {
         type: "ellipse",
         label: "Ellipse",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><ellipse cx="12" cy="12" rx="8" ry="5.5"/></svg>`
+        icon: modular.icons.ellipse
     }, {
         type: "triangle",
         label: "Triangle",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 4 21 20H3L12 4Z"/></svg>`
+        icon: modular.icons.triangle
     }, {
         type: "diamond",
         label: "Diamond",
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 3 21 12 12 21 3 12 12 3Z"/></svg>`
+        icon: modular.icons.diamond
     }];
+
     const TEXT_ALIGN_ICONS = {
-        left: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M4 10.5h10M4 14.5h16M4 18.5h10"/></svg>`,
-        center: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M7 10.5h10M4 14.5h16M7 18.5h10"/></svg>`,
-        right: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" d="M4 6.5h16M10 10.5h10M4 14.5h16M10 18.5h10"/></svg>`
+        left: modular.icons.left,
+        center: modular.icons.center,
+        right: modular.icons.right,
     };
+
     let activeTextEditorFilePath = "";
     let activeTextEditorContent = "";
     let savedTextSelectionRange = null;
@@ -82,9 +87,11 @@
     let textEditorDeferredSyncTimer = null;
     const resolvedTextColorCache = new Map();
     const findTextPortal = () => [...Array.from(document.querySelectorAll(".draggable-window"))].reverse().find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID)?.portal;
+
     const findTextPortalNode = (portal = findTextPortal(), selector = "") => {
         return portal?.window?.()?.querySelector?.(selector) || document.querySelector(selector);
     };
+
     const prioritizePortalDomForLegacyLookups = (portal = null) => {
         const windowNode = portal?.window?.();
         const parentNode = windowNode?.parentElement;
@@ -92,6 +99,7 @@
         parentNode.insertBefore(windowNode, parentNode.firstElementChild);
         if (typeof modular?.bringToFront === "function") modular.bringToFront(windowNode);
     };
+
     const findTextEditorNode = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-content");
     const findTextEditorStage = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-stage");
     const findTextEditorPageBackdrop = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-page-backdrop");
@@ -99,26 +107,32 @@
     const findTextEditorRulerLayer = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-ruler-layer");
     const normalizeTextFilePath = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
     const getTextFileName = (rawPath = "") => String(rawPath || "").split("/").pop() || "Text";
+
     const getTextFileExtension = (rawPath = "") => {
         const fileName = getTextFileName(rawPath).toLowerCase();
         return fileName.includes(".") ? fileName.split(".").pop() : "";
     };
+
     const isPlainTextFilePath = (rawPath = "") => getTextFileExtension(rawPath) === "txt";
     const getDefaultTextDocumentPageViewPreference = (rawPath = "") => !isPlainTextFilePath(rawPath);
     const getDefaultTextFooterSettings = () => ({text: "", pageNumbers: false});
+
     const roundTextPageDimension = (value = 0, uom = "in") => {
         const precision = uom === "px" ? 0 : 2;
         const factor = 10 ** precision;
         return Math.round((Number(value) || 0) * factor) / factor;
     };
+
     const textPageDimensionToPx = (value = 0, uom = "in") => {
         const numericValue = Math.max(0, Number(value) || 0);
         return uom === "px" ? numericValue : numericValue * TEXT_PAGE_VIEW_UNIT_PX;
     };
+
     const textPageDimensionFromPx = (value = 0, uom = "in") => {
         const numericValue = Math.max(0, Number(value) || 0);
         return uom === "px" ? numericValue : numericValue / TEXT_PAGE_VIEW_UNIT_PX;
     };
+
     const normalizeTextPageDimensions = (dimensions = {}) => {
         const source = dimensions && typeof dimensions === "object" ? dimensions : {};
         const sourceUom = TEXT_PAGE_DIMENSION_UNITS.includes(String(source.uom || "").toLowerCase())
@@ -134,6 +148,7 @@
             uom: sourceUom
         };
     };
+
     const getTextPageDimensionsPx = (dimensions = activeTextPageDimensions) => {
         const normalizedDimensions = normalizeTextPageDimensions(dimensions);
         return {
@@ -141,6 +156,7 @@
             height: Math.round(textPageDimensionToPx(normalizedDimensions.height, normalizedDimensions.uom))
         };
     };
+
     const getTextPageDimensionsCss = (dimensions = activeTextPageDimensions) => {
         const normalizedDimensions = normalizeTextPageDimensions(dimensions);
         return {
@@ -148,10 +164,13 @@
             height: `${normalizedDimensions.height}${normalizedDimensions.uom}`
         };
     };
+
     const getTextPageContentHeightPx = (dimensions = activeTextPageDimensions) => {
         return Math.max(1, getTextPageDimensionsPx(dimensions).height - (TEXT_PAGE_VIEW_PADDING_PX * 2));
     };
+
     const getTextPagePitchPx = (dimensions = activeTextPageDimensions) => getTextPageDimensionsPx(dimensions).height + TEXT_PAGE_VIEW_GAP_PX;
+
     const areTextPageDimensionsEqual = (left = {}, right = {}) => {
         const normalizedLeft = normalizeTextPageDimensions(left);
         const normalizedRight = normalizeTextPageDimensions(right);
@@ -159,10 +178,12 @@
             && Math.abs(normalizedLeft.width - normalizedRight.width) < 0.01
             && Math.abs(normalizedLeft.height - normalizedRight.height) < 0.01;
     };
+
     const normalizeTextFooterSettings = (settings = {}) => ({
         text: String(settings?.text || ""),
         pageNumbers: !!settings?.pageNumbers
     });
+
     const readStoredTextDocumentViewSettings = () => {
         try {
             const rawSettings = window.localStorage?.getItem(TEXT_DOCUMENT_VIEW_SETTINGS_KEY);
@@ -173,6 +194,7 @@
             return {};
         }
     };
+
     const writeStoredTextDocumentViewSettings = (settings = {}) => {
         try {
             window.localStorage?.setItem(TEXT_DOCUMENT_VIEW_SETTINGS_KEY, JSON.stringify(settings));
@@ -181,6 +203,7 @@
             return false;
         }
     };
+
     const getStoredTextDocumentViewPreference = (rawPath = "", key = "") => {
         const normalizedPath = normalizeTextFilePath(rawPath);
         if (!normalizedPath || !key) return null;
@@ -189,6 +212,7 @@
             ? settings[normalizedPath][key]
             : null;
     };
+
     const getStoredTextDocumentPageViewPreference = (rawPath = "") => getStoredTextDocumentViewPreference(rawPath, "pageViewEnabled");
     const getStoredTextDocumentRulerPreference = (rawPath = "") => getStoredTextDocumentViewPreference(rawPath, "rulerEnabled");
     const persistTextDocumentViewPreference = (rawPath = "", updates = {}) => {
@@ -201,12 +225,15 @@
         };
         return writeStoredTextDocumentViewSettings(settings);
     };
+
     const persistTextDocumentPageViewPreference = (rawPath = "", enabled = activeTextPageViewEnabled) => {
         return persistTextDocumentViewPreference(rawPath, {pageViewEnabled: !!enabled});
     };
+
     const persistTextDocumentRulerPreference = (rawPath = "", enabled = activeTextRulerEnabled) => {
         return persistTextDocumentViewPreference(rawPath, {rulerEnabled: !!enabled});
     };
+
     const getStoredTextDocumentPageDimensions = (rawPath = "") => {
         const normalizedPath = normalizeTextFilePath(rawPath);
         if (!normalizedPath) return null;
@@ -215,9 +242,11 @@
             ? normalizeTextPageDimensions(settings[normalizedPath].pageDimensions)
             : null;
     };
+
     const persistTextDocumentPageDimensions = (rawPath = "", dimensions = activeTextPageDimensions) => {
         return persistTextDocumentViewPreference(rawPath, {pageDimensions: normalizeTextPageDimensions(dimensions)});
     };
+
     const getStoredTextDocumentFooterSettings = (rawPath = "") => {
         const normalizedPath = normalizeTextFilePath(rawPath);
         if (!normalizedPath) return null;
@@ -226,9 +255,11 @@
             ? normalizeTextFooterSettings(settings[normalizedPath].footer)
             : null;
     };
+
     const persistTextDocumentFooterSettings = (rawPath = "", footerSettings = activeTextFooterSettings) => {
         return persistTextDocumentViewPreference(rawPath, {footer: normalizeTextFooterSettings(footerSettings)});
     };
+
     const loadTextDocumentPageViewPreference = (rawPath = "", fallback = false) => {
         if (isPlainTextFilePath(rawPath)) {
             activeTextPageViewEnabled = false;
@@ -238,6 +269,7 @@
         activeTextPageViewEnabled = typeof storedPreference === "boolean" ? storedPreference : !!fallback;
         return activeTextPageViewEnabled;
     };
+
     const loadTextDocumentRulerPreference = (rawPath = "", fallback = false) => {
         if (isPlainTextFilePath(rawPath)) {
             activeTextRulerEnabled = false;
@@ -247,6 +279,7 @@
         activeTextRulerEnabled = typeof storedPreference === "boolean" ? storedPreference : !!fallback;
         return activeTextRulerEnabled;
     };
+
     const loadTextDocumentFooterSettings = (rawPath = "", fallback = getDefaultTextFooterSettings()) => {
         if (isPlainTextFilePath(rawPath)) {
             activeTextFooterSettings = getDefaultTextFooterSettings();
@@ -255,6 +288,7 @@
         activeTextFooterSettings = normalizeTextFooterSettings(getStoredTextDocumentFooterSettings(rawPath) || fallback);
         return activeTextFooterSettings;
     };
+
     const loadTextDocumentPageDimensions = (rawPath = "", fallback = TEXT_PAGE_DEFAULT_DIMENSIONS) => {
         if (isPlainTextFilePath(rawPath)) {
             activeTextPageDimensions = normalizeTextPageDimensions(TEXT_PAGE_DEFAULT_DIMENSIONS);
@@ -263,29 +297,29 @@
         activeTextPageDimensions = normalizeTextPageDimensions(getStoredTextDocumentPageDimensions(rawPath) || fallback);
         return activeTextPageDimensions;
     };
+
     const loadTextDocumentViewPreferences = (rawPath = "", pageFallback = false, rulerFallback = false) => {
         loadTextDocumentPageViewPreference(rawPath, pageFallback);
         loadTextDocumentRulerPreference(rawPath, rulerFallback);
         loadTextDocumentFooterSettings(rawPath);
         loadTextDocumentPageDimensions(rawPath);
     };
+
     const shouldHideTextEditorBar = (rawPath = "") => {
         const extension = getTextFileExtension(rawPath);
         return extension === "txt" || extension === "md";
     };
+
     const isRichTextDocument = (rawPath = activeTextEditorFilePath) => !shouldHideTextEditorBar(rawPath);
-    const escapeTextHtml = (value = "") => `${value ?? ""}`.replace(/[&<>"']/g, (character) => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        "\"": "&quot;",
-        "'": "&#39;"
-    }[character] || character));
+
+    const escapeTextHtml = (value = "") => `${value ?? ""}`.replace(/[&<>"']/g, (character) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[character] || character));
+
     const isSelectionInsideTextEditor = (selection = window.getSelection()) => {
         const editorNode = findTextEditorNode();
         if (!editorNode || !selection?.rangeCount) return false;
         return editorNode.contains(selection.getRangeAt(0).commonAncestorContainer);
     };
+
     const encodeTextDocumentContent = (value = "") => {
         const bytes = new TextEncoder().encode(String(value || ""));
         let binary = "";
@@ -294,6 +328,7 @@
         });
         return `${TEXT_DOCUMENT_CONTENT_PREFIX}${btoa(binary)}`;
     };
+
     const decodeTextDocumentContent = (value = "") => {
         const raw = String(value || "");
         if (!raw.startsWith(TEXT_DOCUMENT_CONTENT_PREFIX)) return raw;
@@ -305,16 +340,19 @@
             return "";
         }
     };
+
     const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
         reader.onerror = () => reject(reader.error || new Error("Failed to read image data"));
         reader.readAsDataURL(file);
     });
+
     const getTextPageBreakSpacers = (rootNode = findTextEditorNode()) => {
         if (!rootNode?.querySelectorAll) return [];
         return Array.from(rootNode.querySelectorAll(".editor-text-page-break-spacer"));
     };
+
     const getTextEditorDefaultLineHeight = (rootNode = findTextEditorNode()) => {
         if (!rootNode) return 0;
         const computedStyle = getComputedStyle(rootNode);
@@ -323,17 +361,21 @@
         const fontSize = parseFloat(computedStyle.fontSize);
         return Number.isFinite(fontSize) && fontSize > 0 ? fontSize * 1.5 : 0;
     };
+
     const clearTextEditorPageBreakSpacers = (rootNode = findTextEditorNode()) => {
         getTextPageBreakSpacers(rootNode).forEach((spacerNode) => spacerNode.remove());
     };
+
     const isTextPageBreakSpacer = (node) => node?.nodeType === Node.ELEMENT_NODE && node.classList?.contains("editor-text-page-break-spacer");
     const isEmptyTextNode = (node) => node?.nodeType === Node.TEXT_NODE && !(node.textContent || "").trim();
+
     const createTextEditorLineBlock = (line = "") => {
         const lineNode = document.createElement("div");
         if (line) lineNode.textContent = line;
         else lineNode.appendChild(document.createElement("br"));
         return lineNode;
     };
+
     const normalizeTextEditorTopLevelTextNodes = (rootNode = findTextEditorNode()) => {
         if (!rootNode) return false;
         let changed = false;
@@ -346,11 +388,13 @@
         });
         return changed;
     };
+
     const normalizeTextEditorPastedContent = (rootNode = findTextEditorNode()) => {
         if (!rootNode) return false;
         clearTextEditorPageBreakSpacers(rootNode);
         return normalizeTextEditorTopLevelTextNodes(rootNode);
     };
+
     const scheduleTextEditorPostPasteSync = (portal = findTextPortal()) => {
         requestAnimationFrame(() => requestAnimationFrame(() => {
             const textArea = findTextEditorNode(portal);
@@ -360,6 +404,7 @@
             scrollTextEditorCaretIntoView(portal, savedTextSelectionRange);
         }));
     };
+
     const scheduleTextEditorLayoutRefresh = (portal = findTextPortal()) => {
         if (textEditorLayoutRefreshScheduled) return;
         textEditorLayoutRefreshScheduled = true;
@@ -369,11 +414,13 @@
             if (textArea && activeTextPageViewEnabled) applyTextEditorPageView(true, textArea, portal);
         }));
     };
+
     const getTextEditorPageBreakSpacerHeight = (currentPageHeight = 0) => {
         const contentHeightPx = getTextPageContentHeightPx();
         const usedPageHeight = Math.max(0, Math.min(contentHeightPx, Number(currentPageHeight) || 0));
         return (contentHeightPx - usedPageHeight) + (TEXT_PAGE_VIEW_PADDING_PX * 2) + TEXT_PAGE_VIEW_GAP_PX;
     };
+
     const getTextEditorNodeVisualHeight = (node, rootNode = findTextEditorNode()) => {
         if (!node || !rootNode) return 0;
         const fallbackLineHeight = getTextEditorDefaultLineHeight(rootNode);
@@ -397,6 +444,7 @@
         }
         return measuredHeight;
     };
+
     const unwrapTextEditorImageFrames = (rootNode) => {
         if (!rootNode?.querySelectorAll) return;
         rootNode.querySelectorAll(".editor-text-image-frame").forEach((frameNode) => {
@@ -415,10 +463,12 @@
             frameNode.replaceWith(cleanImageNode);
         });
     };
+
     const cleanTextEditorTransientSelectionState = (rootNode) => {
         if (!rootNode?.querySelectorAll) return;
         rootNode.querySelectorAll(".editor-text-object-selected").forEach((node) => node.classList.remove("editor-text-object-selected"));
     };
+
     const serializeTextEditorRichContent = (textArea = findTextEditorNode()) => {
         if (!textArea) return activeTextEditorContent;
         const clone = textArea.cloneNode(true);
@@ -436,10 +486,12 @@
         });
         return clone.innerHTML;
     };
+
     const readTextEditorContent = (textArea = findTextEditorNode()) => {
         if (!textArea) return activeTextEditorContent;
         return isRichTextDocument() ? serializeTextEditorRichContent(textArea) : textArea.innerText;
     };
+
     const cleanTextEditorPrintClone = (clone) => {
         if (!clone?.querySelectorAll) return clone;
         clone.querySelectorAll(".editor-text-page-break-spacer, .editor-text-image-handle, .editor-text-table-resize-handle, .editor-text-search-marker").forEach((node) => node.remove());
@@ -461,6 +513,7 @@
         });
         return clone;
     };
+
     const buildTextEditorPrintDocument = (portal = findTextPortal()) => {
         const textArea = findTextEditorNode(portal);
         const state = portal?.windowState?.() || {};
@@ -502,6 +555,7 @@ a { color: #1d4ed8; text-decoration: underline; }
 <body><main class="print-document">${printBody || "<br>"}</main></body>
 </html>`;
     };
+
     const printTextEditorDocument = async (portal = findTextPortal()) => {
         const textArea = findTextEditorNode(portal);
         if (!textArea && !activeTextEditorContent) {
@@ -552,6 +606,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             return false;
         }
     };
+
     const createTextEditorImageHandle = (position = "se") => {
         const handleNode = document.createElement("span");
         const offsets = {
@@ -578,6 +633,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         });
         return handleNode;
     };
+
     const clearActiveTextImageSelection = ({skipSync = false} = {}) => {
         if (!activeTextImageFrame) return;
         activeTextImageFrame.style.outline = "";
@@ -588,6 +644,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         activeTextImageResizeState = null;
         if (!skipSync) syncTextEditorStateFromDom();
     };
+
     const selectTextEditorImageFrame = (frameNode) => {
         if (!frameNode) return;
         if (activeTextImageFrame === frameNode) return;
@@ -600,7 +657,9 @@ a { color: #1d4ed8; text-decoration: underline; }
         ["nw", "ne", "sw", "se"].forEach((position) => frameNode.appendChild(createTextEditorImageHandle(position)));
         updateTextToolbarState();
     };
+
     const isTextEditorShapeOnTop = (frameNode) => frameNode?.dataset?.textWrap === "overlay";
+
     const clearActiveTextShapeSelection = ({skipSync = false} = {}) => {
         if (!activeTextShapeFrame) return;
         activeTextShapeFrame.style.outline = "";
@@ -612,6 +671,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         activeTextShapeMoveState = null;
         if (!skipSync) syncTextEditorStateFromDom();
     };
+
     const selectTextEditorShapeFrame = (frameNode) => {
         if (!frameNode) return;
         if (activeTextShapeFrame === frameNode) return;
@@ -624,6 +684,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         ["nw", "ne", "sw", "se"].forEach((position) => frameNode.appendChild(createTextEditorImageHandle(position)));
         updateTextToolbarState();
     };
+
     const updateTextEditorObjectRangeSelection = (range = getActiveTextSelectionRange(), rootNode = findTextEditorNode()) => {
         if (!rootNode?.querySelectorAll) return false;
         let selectedCount = 0;
@@ -641,20 +702,19 @@ a { color: #1d4ed8; text-decoration: underline; }
         });
         return selectedCount > 0;
     };
+
     const normalizeTextEditorSelectionString = (value = "") => String(value || "").replace(/\r\n/g, "\n").trim();
+
     const isTextEditorFullTextSelection = (range = getActiveTextSelectionRange(), rootNode = findTextEditorNode()) => {
         if (!range || range.collapsed || !rootNode) return false;
         return normalizeTextEditorSelectionString(range.toString())
             === normalizeTextEditorSelectionString(rootNode.innerText || rootNode.textContent || "");
     };
+
     const isTextEditorFullContentRange = (range = getActiveTextSelectionRange(), rootNode = findTextEditorNode()) => {
-        return !!range
-            && !!rootNode
-            && range.startContainer === rootNode
-            && range.startOffset === 0
-            && range.endContainer === rootNode
-            && range.endOffset === rootNode.childNodes.length;
+        return !!range && !!rootNode && range.startContainer === rootNode && range.startOffset === 0 && range.endContainer === rootNode && range.endOffset === rootNode.childNodes.length;
     };
+
     const selectAllTextEditorContents = (textArea = findTextEditorNode()) => {
         const selection = window.getSelection();
         if (!selection || !textArea) return false;
@@ -669,6 +729,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         updateTextToolbarState();
         return true;
     };
+
     const syncTextEditorRangeSelection = (textArea = findTextEditorNode()) => {
         const range = getActiveTextSelectionRange();
         if (isTextEditorFullTextSelection(range, textArea) && !isTextEditorFullContentRange(range, textArea)) {
@@ -676,6 +737,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         return updateTextEditorObjectRangeSelection(range, textArea);
     };
+
     const getTextEditorShapePathMarkup = (shapeType = "rectangle") => {
         if (shapeType === "ellipse") return `<ellipse cx="50" cy="50" rx="46" ry="32"/>`;
         if (shapeType === "triangle") return `<path d="M50 4 L96 96 H4 Z"/>`;
@@ -683,6 +745,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (shapeType === "rounded-rectangle") return `<rect x="5" y="12" width="90" height="76" rx="14"/>`;
         return `<rect x="5" y="16" width="90" height="68" rx="4"/>`;
     };
+
     const normalizeTextEditorShapeFrame = (frameNode) => {
         if (!frameNode) return;
         const width = Math.max(24, Number.parseFloat(frameNode.style.width || frameNode.dataset.shapeWidth || "") || (frameNode.dataset.shapeType === "triangle" || frameNode.dataset.shapeType === "diamond" ? 140 : 170));
@@ -720,6 +783,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             svgNode.style.pointerEvents = "none";
         }
     };
+
     const createTextEditorShapeFrame = (shapeType = "rectangle") => {
         const frameNode = document.createElement("span");
         const width = shapeType === "triangle" || shapeType === "diamond" ? 140 : 170;
@@ -732,10 +796,12 @@ a { color: #1d4ed8; text-decoration: underline; }
         normalizeTextEditorShapeFrame(frameNode);
         return frameNode;
     };
+
     const ensureTextEditorShapeFrames = (rootNode = findTextEditorNode()) => {
         if (!rootNode?.querySelectorAll) return;
         rootNode.querySelectorAll(".editor-text-shape-frame").forEach(normalizeTextEditorShapeFrame);
     };
+
     const applyTextEditorShapeWrapMode = (frameNode, onTop = false) => {
         const textArea = findTextEditorNode();
         if (!frameNode || !textArea) return false;
@@ -754,6 +820,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         syncTextEditorStateFromDom();
         return true;
     };
+
     const setTextEditorShapeColor = (frameNode, property = "fill", color = "") => {
         const svgNode = frameNode?.querySelector?.("svg");
         const nextColor = String(color || "").trim();
@@ -763,12 +830,14 @@ a { color: #1d4ed8; text-decoration: underline; }
         syncTextEditorStateFromDom();
         return true;
     };
+
     const showTextEditorShapeColorDialogue = (frameNode, property = "fill", title = "Shape color", placeholder = "#4c8bf5") => {
         const svgNode = frameNode?.querySelector?.("svg");
         if (!svgNode) return false;
         inputDialogue({title, placeholder, value: svgNode.getAttribute(property) || placeholder, confirmation: (_, rawValue) => setTextEditorShapeColor(frameNode, property, rawValue)});
         return true;
     };
+
     const insertTextEditorShape = (shapeType = "rectangle") => {
         const textArea = findTextEditorNode();
         if (!textArea || !isRichTextDocument()) return false;
@@ -780,6 +849,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         syncTextEditorStateFromDom();
         return true;
     };
+
     const deleteTextEditorShape = (frameNode = activeTextShapeFrame) => {
         if (!frameNode?.classList?.contains("editor-text-shape-frame")) return false;
         if (activeTextShapeFrame === frameNode) clearActiveTextShapeSelection({skipSync: true});
@@ -787,6 +857,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         syncTextEditorStateFromDom();
         return true;
     };
+
     const normalizeTextEditorImageNode = (imageNode) => {
         if (!imageNode) return;
         imageNode.alt = String(imageNode.getAttribute("alt") || "Embedded image").slice(0, 200);
@@ -803,6 +874,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         if (imageNode.complete) scheduleTextEditorLayoutRefresh();
     };
+
     const createTextEditorImageFrame = (imageNode) => {
         if (!imageNode) return null;
         normalizeTextEditorImageNode(imageNode);
@@ -824,13 +896,16 @@ a { color: #1d4ed8; text-decoration: underline; }
         frameNode.appendChild(imageNode);
         return frameNode;
     };
+
     const getTextEditorImageFrameFromTarget = (targetNode) => {
         const textArea = findTextEditorNode();
         const frameNode = targetNode?.closest?.(".editor-text-image-frame") || null;
         return textArea && frameNode && textArea.contains(frameNode) ? frameNode : null;
     };
+
     const getTextEditorImageNodeFromFrame = (frameNode) => frameNode?.querySelector?.("img") || null;
     const hasTextEditorImageContext = (_, targetNode) => !!getTextEditorImageFrameFromTarget(targetNode);
+
     const normalizeTextEditorCssLength = (rawValue = "", {allowAuto = false, allowEmpty = false} = {}) => {
         const value = String(rawValue || "").trim();
         if (!value) return allowEmpty ? "" : null;
@@ -839,6 +914,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (/^\d+(\.\d+)?(px|%|em|rem|in|cm|mm|pt|pc|vh|vw|vmin|vmax)$/i.test(value)) return value;
         return null;
     };
+
     const getTextEditorImageDisplayedLength = (imageNode, property = "width") => {
         if (!imageNode) return "";
         const inlineValue = String(imageNode.style?.[property] || "").trim();
@@ -848,6 +924,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         const measuredValue = property === "height" ? rect?.height : rect?.width;
         return Number.isFinite(measuredValue) && measuredValue > 0 ? `${Math.round(measuredValue)}px` : "";
     };
+
     const setTextEditorImageStyle = (frameNode, styles = {}) => {
         const imageNode = getTextEditorImageNodeFromFrame(frameNode);
         if (!imageNode) return false;
@@ -860,6 +937,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         syncTextEditorStateFromDom();
         return true;
     };
+
     const showTextEditorImageLengthDialogue = (frameNode, property = "width", title = "Image size") => {
         const imageNode = getTextEditorImageNodeFromFrame(frameNode);
         if (!imageNode) return false;
@@ -874,12 +952,14 @@ a { color: #1d4ed8; text-decoration: underline; }
         });
         return true;
     };
+
     const showTextEditorImageBorderColorDialogue = (frameNode) => {
         const imageNode = getTextEditorImageNodeFromFrame(frameNode);
         if (!imageNode) return false;
         inputDialogue({title: "Image border color", placeholder: "#1f2937, red, or transparent", value: imageNode.style.borderColor || "", confirmation: (_, rawValue) => setTextEditorImageStyle(frameNode, {borderColor: String(rawValue || "").trim() || "transparent"})});
         return true;
     };
+
     const showTextEditorImageBorderLengthDialogue = (frameNode, property = "borderWidth", title = "Image border width") => {
         const imageNode = getTextEditorImageNodeFromFrame(frameNode);
         if (!imageNode) return false;
@@ -897,6 +977,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         });
         return true;
     };
+
     const ensureTextEditorImageFrames = (rootNode = findTextEditorNode()) => {
         if (!rootNode?.querySelectorAll) return;
         rootNode.querySelectorAll("img").forEach((imageNode) => {
@@ -908,6 +989,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             if (frameNode) imageNode.replaceWith(frameNode);
         });
     };
+
     const normalizeTextEditorTables = (rootNode = findTextEditorNode()) => {
         if (!rootNode?.querySelectorAll) return;
         rootNode.querySelectorAll("table").forEach((tableNode) => {
@@ -918,6 +1000,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             });
         });
     };
+
     const createTextEditorTable = (rowCount = 3, columnCount = 3) => {
         const rows = Math.max(1, Math.min(Number(rowCount) || 3, 10));
         const columns = Math.max(1, Math.min(Number(columnCount) || 3, 10));
@@ -939,11 +1022,13 @@ a { color: #1d4ed8; text-decoration: underline; }
         tableNode.appendChild(tbodyNode);
         return tableNode;
     };
+
     const placeCaretInTextTable = (tableNode) => {
         const firstCell = tableNode?.querySelector?.("th, td");
         if (!firstCell) return false;
         return placeCaretAtStart(firstCell);
     };
+
     const insertTextEditorTable = (rowCount = 3, columnCount = 3) => {
         const textArea = findTextEditorNode();
         if (!textArea || !isRichTextDocument()) return false;
@@ -973,6 +1058,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         syncTextEditorStateFromDom();
         return true;
     };
+
     const insertNodeAtTextCaret = (targetNode, insertedNode) => {
         if (!targetNode || !insertedNode) return false;
         targetNode.focus();
@@ -1004,6 +1090,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         savedTextSelectionRange = range.cloneRange();
         return true;
     };
+
     const insertImageFileIntoTextEditor = async (file) => {
         const textArea = findTextEditorNode();
         if (!textArea || !file || !isRichTextDocument()) return false;
@@ -1026,16 +1113,18 @@ a { color: #1d4ed8; text-decoration: underline; }
             return false;
         }
     };
+
     const hasEmbeddedTextEditorImage = (content = "") => /<img[\s\S]*?>/i.test(String(content || ""));
+
     const encodeTextEditorContentForSave = (content = "") => {
         const normalizedContent = String(content ?? "");
-        return isRichTextDocument() && hasEmbeddedTextEditorImage(normalizedContent)
-            ? encodeTextDocumentContent(normalizedContent)
-            : normalizedContent;
+        return isRichTextDocument() && hasEmbeddedTextEditorImage(normalizedContent) ? encodeTextDocumentContent(normalizedContent) : normalizedContent;
     };
+
     const decodeTextEditorLoadedContent = (content = "") => {
         return isRichTextDocument() ? decodeTextDocumentContent(String(content ?? "")) : String(content ?? "");
     };
+
     const writeTextEditorContent = (textArea = findTextEditorNode(), content = activeTextEditorContent) => {
         if (!textArea) return;
         const nextContent = String(content ?? "");
@@ -1049,6 +1138,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         if (textArea.textContent !== nextContent) textArea.textContent = nextContent;
     };
+
     const getActiveTextEditorState = () => ({
         directive: activeTextEditorFilePath,
         cachedContent: activeTextEditorContent,
@@ -1057,13 +1147,16 @@ a { color: #1d4ed8; text-decoration: underline; }
         pageDimensions: normalizeTextPageDimensions(activeTextPageDimensions),
         footer: normalizeTextFooterSettings(activeTextFooterSettings)
     });
+
     const setTextEditorPortalState = (portal = findTextPortal(), options = {}) => {
         if (!portal || typeof portal.setWindowState !== "function") return;
         portal.setWindowState(getActiveTextEditorState(), options);
     };
+
     const syncEditorWindowState = (portal = findTextPortal()) => {
         setTextEditorPortalState(portal);
     };
+
     const restoreEditorWindowState = (portal = findTextPortal()) => {
         const state = portal?.windowState?.() || {};
         if (state?.directive) activeTextEditorFilePath = normalizeTextFilePath(state.directive);
@@ -1076,16 +1169,19 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (state?.footer && typeof state.footer === "object") activeTextFooterSettings = normalizeTextFooterSettings(state.footer);
         if (state?.pageDimensions && typeof state.pageDimensions === "object") activeTextPageDimensions = normalizeTextPageDimensions(state.pageDimensions);
     };
+
     const updateTextEditorPortalTitle = (editorPortal = findTextPortal()) => {
         if (editorPortal?.setTitle) {
             editorPortal.setTitle(activeTextEditorFilePath ? getTextFileName(activeTextEditorFilePath) : "Text");
         }
     };
+
     const rememberTextSelection = () => {
         const selection = window.getSelection();
         if (!isSelectionInsideTextEditor(selection)) return;
         savedTextSelectionRange = selection.getRangeAt(0).cloneRange();
     };
+
     const restoreTextSelection = () => {
         const selection = window.getSelection();
         const editorNode = findTextEditorNode();
@@ -1105,6 +1201,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         savedTextSelectionRange = range.cloneRange();
         return true;
     };
+
     const getTextCaretRect = (range) => {
         if (!range) return null;
         const rect = range.getBoundingClientRect();
@@ -1123,6 +1220,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         markerRange.detach?.();
         return markerRect;
     };
+
     const scrollTextEditorCaretIntoView = (portal = findTextPortal(), range = savedTextSelectionRange) => {
         const editorNode = findTextEditorNode(portal);
         const scrollContainer = portal?.body?.() || editorNode?.closest?.(".window-body");
@@ -1152,6 +1250,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         scrollContainer.scrollTo({top: nextTop, left: nextLeft, behavior: "smooth"});
         return true;
     };
+
     const focusTextEditorAtEnd = (portal = findTextPortal()) => {
         const editorNode = findTextEditorNode(portal);
         if (!editorNode) return false;
@@ -1167,6 +1266,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         requestAnimationFrame(() => scrollTextEditorCaretIntoView(portal, savedTextSelectionRange));
         return true;
     };
+
     const getActiveTextSelectionRange = () => {
         const editorNode = findTextEditorNode();
         const selection = window.getSelection();
@@ -1175,8 +1275,10 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (range.collapsed) return null;
         return range;
     };
+
     const hasHighlightedTextSelection = () => !!getActiveTextSelectionRange()?.toString?.().trim();
     const getTextSelectionPlainText = () => String(getActiveTextSelectionRange()?.toString?.() || "");
+
     const normalizeHyperlinkUrl = (rawUrl = "") => {
         const trimmedUrl = String(rawUrl || "").trim();
         if (!trimmedUrl) return "";
@@ -1184,15 +1286,18 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (/^[#/]/.test(trimmedUrl)) return trimmedUrl;
         return `https://${trimmedUrl}`;
     };
+
     const prepareEditorLinkNode = (linkNode) => {
         if (!linkNode) return;
         linkNode.target = "_blank";
         linkNode.rel = "noopener noreferrer";
     };
+
     const prepareEditorLinks = (rootNode = findTextEditorNode()) => {
         if (!rootNode?.querySelectorAll) return;
         rootNode.querySelectorAll("a[href]").forEach(prepareEditorLinkNode);
     };
+
     const applyTextEditorHyperlink = (labelText = "", rawUrl = "") => {
         const textArea = findTextEditorNode();
         const url = normalizeHyperlinkUrl(rawUrl);
@@ -1217,6 +1322,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         syncTextEditorStateFromDom();
         return true;
     };
+
     const showTextEditorHyperlinkDialogue = ({allowEmptyText = false} = {}) => {
         if (!isRichTextDocument()) return false;
         restoreTextSelection();
@@ -1230,6 +1336,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         });
         return true;
     };
+
     const getTextSelectionOffsets = (rootNode = findTextEditorNode()) => {
         if (!(rootNode instanceof HTMLElement)) return null;
         const selection = window.getSelection();
@@ -1244,6 +1351,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         endRange.setEnd(range.endContainer, range.endOffset);
         return {start: startRange.toString().length, end: endRange.toString().length};
     };
+
     const getDuplicateTextLineDownEdit = (value = "", selectionStart = 0, selectionEnd = selectionStart) => {
         const content = String(value ?? "");
         const start = Math.max(0, Math.min(Number(selectionStart) || 0, content.length));
@@ -1262,6 +1370,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         const caretOffset = duplicateStart + Math.min(caretColumn, duplicatedText.length);
         return {value: nextValue, selectionStart: caretOffset, selectionEnd: caretOffset};
     };
+
     const resolveTextSelectionPoint = (rootNode, targetOffset = 0) => {
         const safeOffset = Math.max(0, Number(targetOffset) || 0);
         const walker = document.createTreeWalker(rootNode, NodeFilter.SHOW_ALL, {
@@ -1290,6 +1399,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         return {node: rootNode, offset: rootNode.childNodes.length};
     };
+
     const restoreTextEditorSelectionOffsets = (rootNode, start = 0, end = start) => {
         const selection = window.getSelection();
         if (!selection || !(rootNode instanceof HTMLElement)) return false;
@@ -1303,6 +1413,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         savedTextSelectionRange = range.cloneRange();
         return true;
     };
+
     const buildTextEditorSearchIndex = (rootNode = findTextEditorNode()) => {
         if (!(rootNode instanceof HTMLElement)) return "";
         const walker = document.createTreeWalker(rootNode, NodeFilter.SHOW_ALL, {
@@ -1330,6 +1441,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         return indexedText;
     };
+
     const createTextEditorSearchMatches = (query = "", portal = findTextPortal()) => {
         const textArea = findTextEditorNode(portal);
         const needle = String(query || "").trim();
@@ -1353,6 +1465,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         return matches;
     };
+
     const scrollToTextEditorSearchMatch = (match = null, portal = findTextPortal()) => {
         const textArea = findTextEditorNode(portal);
         if (!textArea || !match || !Number.isFinite(match.index)) return false;
@@ -1376,6 +1489,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }, 700);
         return true;
     };
+
     const showTextEditorSearchDialogue = (portal = findTextPortal(), anchorNode = null) => {
         const textArea = findTextEditorNode(portal);
         if (!textArea) return false;
@@ -1393,6 +1507,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             onNoMatch: () => modular.error("No matches found")
         });
     };
+
     const findTextLineNode = (node, rootNode = findTextEditorNode()) => {
         if (!node || !rootNode) return null;
         let current = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
@@ -1403,6 +1518,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         return rootNode.firstChild || null;
     };
+
     const placeCaretInTextNode = (targetNode, atEnd = false) => {
         if (!targetNode) return false;
         const selection = window.getSelection();
@@ -1419,6 +1535,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         savedTextSelectionRange = range.cloneRange();
         return true;
     };
+
     const duplicateRichTextLineDown = (textArea = findTextEditorNode()) => {
         const selection = window.getSelection();
         if (!textArea || !selection?.rangeCount || !isSelectionInsideTextEditor(selection)) return false;
@@ -1455,6 +1572,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         return true;
     };
+
     const duplicateTextEditorLineDown = (textArea = findTextEditorNode()) => {
         if (!textArea) return false;
         textArea.focus();
@@ -1466,6 +1584,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         restoreTextEditorSelectionOffsets(textArea, edit.selectionStart, edit.selectionEnd);
         return true;
     };
+
     const getTextTableCellAtSelection = () => {
         const selection = window.getSelection();
         const editorNode = findTextEditorNode();
@@ -1478,6 +1597,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         const cellNode = node?.closest?.("th, td") || null;
         return cellNode && editorNode.contains(cellNode) ? cellNode : null;
     };
+
     const isTextTableCellCaretAtEnd = (cellNode) => {
         const selection = window.getSelection();
         if (!cellNode || !selection?.rangeCount) return false;
@@ -1495,6 +1615,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         afterRange.detach?.();
         return remainingText.length === 0;
     };
+
     const getNextTextTableCell = (cellNode) => {
         const rowNode = cellNode?.parentElement;
         const tableNode = cellNode?.closest?.("table");
@@ -1509,6 +1630,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         rowNode.after(newRow);
         return newRow.cells[0] || null;
     };
+
     const moveTextTableCaretToNextCell = () => {
         const cellNode = getTextTableCellAtSelection();
         if (!cellNode || !isTextTableCellCaretAtEnd(cellNode)) return false;
@@ -1517,6 +1639,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         placeCaretAtStart(nextCell);
         return true;
     };
+
     const insertTextEditorTab = (textArea = findTextEditorNode()) => {
         if (!textArea) return false;
         textArea.focus();
@@ -1536,6 +1659,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         savedTextSelectionRange = range.cloneRange();
         return true;
     };
+
     const resolveTextColor = (rawColor = "") => {
         const colorValue = String(rawColor || "").trim();
         if (!colorValue || colorValue === "transparent") return "";
@@ -1551,6 +1675,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         resolvedTextColorCache.set(colorValue, resolvedColor);
         return resolvedColor;
     };
+
     const getTextToolbarContrastColor = (rawColor = "") => {
         const resolvedColor = resolveTextColor(rawColor);
         const match = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/i.exec(resolvedColor);
@@ -1561,16 +1686,19 @@ a { color: #1d4ed8; text-decoration: underline; }
         const brightness = ((red * 299) + (green * 587) + (blue * 114)) / 1000;
         return brightness < 140 ? "#ffffff" : "#111111";
     };
+
     const setTextToolbarButtonState = (buttonNode, isActive = false) => {
         if (!buttonNode) return;
         buttonNode.className = `${isActive ? "tiny primary" : ""} naked align-bottom small-margin-right inner-radius`.trim();
     };
+
     const syncTextToolbarIconColor = (buttonNode) => {
         if (!buttonNode) return;
         buttonNode.querySelectorAll("svg path").forEach((pathNode) => {
             if (!pathNode.hasAttribute("stroke")) pathNode.setAttribute("fill", "currentColor");
         });
     };
+
     const getTextSelectionStyleTarget = () => {
         const editorNode = findTextEditorNode();
         const selection = window.getSelection();
@@ -1581,6 +1709,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (node?.nodeType === Node.TEXT_NODE) node = node.parentElement;
         return node?.nodeType === Node.ELEMENT_NODE ? node : editorNode;
     };
+
     const rangeContainsNodeContents = (range, node) => {
         if (!range || !node) return false;
         const nodeRange = document.createRange();
@@ -1590,6 +1719,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         nodeRange.detach?.();
         return containsStart && containsEnd;
     };
+
     const getSelectedTextTableCells = () => {
         const editorNode = findTextEditorNode();
         const selection = window.getSelection();
@@ -2804,7 +2934,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         });
         textArea.contextmenu([{
             label: "Hyperlink",
-            icon: TEXT_LINK_ICON,
+            icon: modular.icons.link,
             visible: () => hasHighlightedTextSelection() && isRichTextDocument(),
             action: () => showTextEditorHyperlinkDialogue()
         },
@@ -2921,7 +3051,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             visible: (_, target) => !!target?.closest?.(".editor-text-shape-frame"),
             action: (_, __, target) => showTextEditorShapeColorDialogue(target?.closest?.(".editor-text-shape-frame") || activeTextShapeFrame, "stroke", "Border color", "#1f2937")
         }, {
-            icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`,
+            icon: modular.icons.delete,
             label: "Delete",
             destructive: true,
             visible: (_, target) => !!target?.closest?.(".editor-text-shape-frame"),
@@ -3366,9 +3496,9 @@ a { color: #1d4ed8; text-decoration: underline; }
         updateTextEditorPortalTitle(portal);
         updateTextToolbarState();
     };
-    const getTextEditorPortals = () => [...Array.from(document.querySelectorAll(".draggable-window"))]
-        .map((windowNode) => windowNode?.portal)
-        .filter((portal) => portal?.serviceId?.() === SERVICE_ID);
+
+    const getTextEditorPortals = () => [...Array.from(document.querySelectorAll(".draggable-window"))].map((windowNode) => windowNode?.portal).filter((portal) => portal?.serviceId?.() === SERVICE_ID);
+
     const refreshTextEditorPortalsFromState = () => {
         const portals = getTextEditorPortals();
         portals.forEach((portal) => {
@@ -3376,9 +3506,11 @@ a { color: #1d4ed8; text-decoration: underline; }
             updateTextEditorView(portal);
         });
     };
+
     const scheduleTextEditorPortalStateRefresh = () => {
         requestAnimationFrame(() => requestAnimationFrame(refreshTextEditorPortalsFromState));
     };
+
     const sanitizeNewTextFileName = (rawName = "") => {
         const trimmedName = String(rawName || "").trim().replace(/\\/g, "/");
         const baseName = trimmedName.split("/").pop() || "";
@@ -3386,6 +3518,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (!sanitizedName) return "";
         return sanitizedName.includes(".") ? sanitizedName : `${sanitizedName}.wrds`;
     };
+
     const saveTextEditorContentToPath = async (targetPath = "", portal = findTextPortal()) => {
         const normalizedPath = normalizeTextFilePath(targetPath);
         if (!normalizedPath) {
@@ -3424,6 +3557,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         modular.success(`Saved ${normalizedPath} (${response.byteCount} bytes)`);
         return true;
     };
+
     const saveNewTextFileToDocuments = (portal = findTextPortal()) => {
         inputDialogue({title: "File name", placeholder: "standard.wrds", value: "standard.wrds", confirmation: async (_, inputFileName) => {
                 if (!modular.validateFileName(inputFileName)) return;
@@ -3432,6 +3566,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             }
         });
     };
+
     const saveLoadedTextFile = async (portal = findTextPortal()) => {
         const state = portal?.windowState?.() || {};
         const portalPath = normalizeTextFilePath(state?.directive || "");
@@ -3441,6 +3576,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         await saveTextEditorContentToPath(portalPath, portal);
     };
+
     const openFreshTextEditor = (sourceNode = null) => {
         activeTextEditorFilePath = "";
         activeTextEditorContent = "Edit Me";
@@ -3456,6 +3592,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         scheduleTextEditorPortalStateRefresh();
         return true;
     };
+
     window.StandardEditor = window.StandardEditor || {};
     window.StandardEditor.openFreshTextEditor = openFreshTextEditor;
     window.StandardEditor.openTextFilePath = (rawPath = "", content = "", sourceNode = null) => {
@@ -3472,6 +3609,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         scheduleTextEditorPortalStateRefresh();
         return true;
     };
+
     modular.register(new Service(SERVICE_ID, [
         new Portal({
             title: "Text",
@@ -3491,10 +3629,10 @@ a { color: #1d4ed8; text-decoration: underline; }
                     div({id: "editor-text-toolbar", style: "bordered shadowed radius small-padding blurred", content: div({style: "faded", content: children([
                                 searchComboBox({id: "editor-sheet-font-family", altsync: "FF", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: TEXT_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
                                 searchComboBox({id: "editor-sheet-font-size", altsync: "FS", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: TEXT_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
-                                button({id: "editor-sheet-style-bold", altsync: "B", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 5.7519531 2.0039062 A 0.750075 0.750075 0 0 0 5.0019531 2.7539062 L 5.0019531 11.703125 A 0.750075 0.750075 0 0 0 5.0019531 11.757812 L 5.0078125 21.257812 A 0.750075 0.750075 0 0 0 5.7578125 22.007812 L 13.505859 22.007812 C 16.534311 22.007812 19.005859 19.536265 19.005859 16.507812 C 19.005859 14.261755 17.639043 12.332811 15.701172 11.480469 C 17.057796 10.528976 18.005859 9.0314614 18.005859 7.2558594 C 18.005859 4.3643887 15.645377 2.0039063 12.753906 2.0039062 L 5.7519531 2.0039062 z M 6.5019531 3.5039062 L 12.753906 3.5039062 C 14.834436 3.5039063 16.505859 5.17533 16.505859 7.2558594 C 16.505859 9.3363887 14.834436 11.007813 12.753906 11.007812 L 6.5019531 11.007812 L 6.5019531 3.5039062 z M 6.5019531 12.507812 L 12.753906 12.507812 L 13.505859 12.507812 C 15.723408 12.507812 17.505859 14.290264 17.505859 16.507812 C 17.505859 18.725361 15.723408 20.507812 13.505859 20.507812 L 6.5058594 20.507812 L 6.5019531 12.507812 z"/></svg>`}),
-                                button({id: "editor-sheet-style-italic", altsync: "I", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 10 2.0078125 L 10 3.5078125 L 10.75 3.5078125 L 13.119141 3.5078125 L 9.3417969 20.503906 L 6.7558594 20.503906 L 6.0058594 20.503906 L 6.0058594 22.003906 L 6.7558594 22.003906 L 13.2558594 22.003906 L 14.0058594 22.003906 L 14.0058594 20.503906 L 13.2558594 20.503906 L 10.878906 20.503906 L 14.65625 3.5078125 L 17.25 3.5078125 L 18 3.5078125 L 18 2.0078125 L 17.25 2.0078125 L 10.75 2.0078125 L 10 2.0078125 z"/></svg>`}),
-                                button({id: "editor-sheet-style-underline", altsync: "U", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 6.0058594 2 L 6.0058594 2.75 L 6.0058594 12.585938 C 6.0058594 15.618894 8.7446099 18.001953 12.003906 18.001953 C 15.263203 18.001953 18.003906 15.618893 18.003906 12.585938 L 18.003906 2.75 L 18.003906 2 L 16.503906 2 L 16.503906 2.75 L 16.503906 12.585938 C 16.503906 14.706981 14.54261 16.501953 12.003906 16.501953 C 9.4652032 16.501953 7.5058594 14.70698 7.5058594 12.585938 L 7.5058594 2.75 L 7.5058594 2 L 6.0058594 2 z M 4.9980469 20.003906 L 4.9980469 21.503906 L 5.7480469 21.503906 L 18.251953 21.503906 L 19.001953 21.503906 L 19.001953 20.003906 L 18.251953 20.003906 L 5.7480469 20.003906 L 4.9980469 20.003906 z"/></svg>`}),
-                                button({id: "editor-sheet-style-link", altsync: "K", style: "naked align-bottom small-margin-right inner-radius", title: "Hyperlink", icon: TEXT_LINK_ICON}),
+                                button({id: "editor-sheet-style-bold", altsync: "B", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: modular.icons.bold}),
+                                button({id: "editor-sheet-style-italic", altsync: "I", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: modular.icons.italic}),
+                                button({id: "editor-sheet-style-underline", altsync: "U", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: modular.icons.underline}),
+                                button({id: "editor-sheet-style-link", altsync: "K", style: "naked align-bottom small-margin-right inner-radius", title: "Hyperlink", icon: modular.icons.link}),
                                 button({id: "editor-sheet-style-color", altsync: "F", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
                                 button({id: "editor-sheet-style-background", altsync: "BG", style: "naked align-bottom small-margin-right inner-radius", title: "Background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
                                 button({id: "editor-sheet-style-align", altsync: "A", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: TEXT_ALIGN_ICONS.left}),
@@ -3502,9 +3640,9 @@ a { color: #1d4ed8; text-decoration: underline; }
                                 button({id: "editor-sheet-style-highlight", altsync: "H", style: "naked align-bottom small-margin-right inner-radius", title: "Highlight", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.494141 1.1171875 C 12.366141 1.1171875 12.238125 1.1661719 12.140625 1.2636719 L 9.1484375 4.2578125 C 8.0944375 5.3118125 7.299125 6.5957656 6.828125 8.0097656 L 5.5742188 11.775391 C 5.4752187 12.069391 5.3098438 12.338594 5.0898438 12.558594 L 3.3027344 14.345703 C 2.9117344 14.736703 2.9117344 15.369766 3.3027344 15.759766 L 3.8554688 16.3125 L 1.2851562 19.009766 C 0.78015625 19.540766 0.99835938 20.416438 1.6933594 20.648438 L 4.6074219 21.591797 C 4.9524219 21.706797 5.3316094 21.625906 5.5996094 21.378906 L 7.328125 19.783203 L 8.2539062 20.708984 C 8.4489063 20.903984 8.7049375 21.001953 8.9609375 21.001953 C 9.2169375 21.001953 9.4729687 20.903984 9.6679688 20.708984 L 11.455078 18.921875 C 11.675078 18.701875 11.941328 18.5355 12.236328 18.4375 L 16.001953 17.183594 C 17.415953 16.712594 18.700859 15.917281 19.755859 14.863281 L 22.748047 11.869141 C 22.943047 11.674141 22.943047 11.357109 22.748047 11.162109 C 22.552047 10.967109 22.236016 10.967109 22.041016 11.162109 L 19.048828 14.15625 C 19.040972 14.164106 19.031323 14.16991 19.023438 14.177734 L 9.8359375 4.9882812 C 9.8431253 4.981042 9.8482537 4.9720588 9.8554688 4.9648438 L 12.847656 1.9707031 C 13.042656 1.7757031 13.042656 1.4586719 12.847656 1.2636719 C 12.750156 1.1661719 12.622141 1.1171875 12.494141 1.1171875 z M 9.171875 5.7382812 L 18.273438 14.841797 C 17.49882 15.44921 16.624226 15.921729 15.685547 16.234375 L 11.919922 17.490234 C 11.477922 17.637234 11.076094 17.884844 10.746094 18.214844 L 8.9609375 20.001953 L 4.0097656 15.052734 L 5.796875 13.265625 C 6.125875 12.936625 6.3734844 12.533797 6.5214844 12.091797 L 7.7773438 8.3261719 C 8.0908498 7.387136 8.5643624 6.513116 9.171875 5.7382812 z"/></svg>`}),
                                 button({id: "editor-sheet-style-list", altsync: "L", style: "naked align-bottom small-margin-right inner-radius", title: "List", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>`}),
                                 button({id: "editor-sheet-style-shape", altsync: "SH", style: "naked align-bottom small-margin-right inner-radius", title: "Shape", icon: TEXT_SHAPE_ICON}),
-                                button({id: "editor-sheet-style-image", altsync: "IM", style: "naked align-bottom small-margin-right inner-radius", title: "Image", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>`}),
-                                button({id: "editor-sheet-style-table", altsync: "X", style: "naked align-bottom small-margin-right inner-radius", title: "Table", icon: TEXT_TABLE_ICON}),
-                                button({id: "editor-sheet-style-other", altsync: "O", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg>`}),
+                                button({id: "editor-sheet-style-image", altsync: "IM", style: "naked align-bottom small-margin-right inner-radius", title: "Image", icon: modular.icons.image}),
+                                button({id: "editor-sheet-style-table", altsync: "X", style: "naked align-bottom small-margin-right inner-radius", title: "Table", icon: modular.icons.sheets}),
+                                button({id: "editor-sheet-style-other", altsync: "O", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: modular.icons.ellipses}),
                             ])})
                     }),
                     div({id: "editor-text-stage", style: "small-margin-top", content: children([

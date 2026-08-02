@@ -1,4 +1,5 @@
 (async () => {
+
     const NOTE_CONTENT_PREFIX = "__STD_NOTE_B64__:";
     const escapeQuotedValue = value => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     const encodeNoteContent = value => {
@@ -7,23 +8,14 @@
         bytes.forEach(byte => binary += String.fromCharCode(byte));
         return `${NOTE_CONTENT_PREFIX}${btoa(binary)}`;
     };
-    // const decodeNoteContent = value => {
-    //     const raw = String(value || "");
-    //     if (!raw.startsWith(NOTE_CONTENT_PREFIX)) return raw;
-    //     try {
-    //         const binary = atob(raw.slice(NOTE_CONTENT_PREFIX.length));
-    //         const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
-    //         return new TextDecoder().decode(bytes);
-    //     } catch (_) {
-    //         return "";
-    //     }
-    // };
+
     const readFileAsDataUrl = file => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
         reader.onerror = () => reject(reader.error || new Error("Failed to read image data"));
         reader.readAsDataURL(file);
     });
+
     const insertNodeAtCaret = (target, node) => {
         if (!target || !node) return;
         target.focus();
@@ -40,8 +32,9 @@
         selection.removeAllRanges();
         selection.addRange(range);
     };
+
     const sanitizeNoteMarkup = markup => {
-        // const parser = new DOMParser();
+
         const parsed = new DOMParser().parseFromString(`<div>${String(markup || "")}</div>`, "text/html");
         const root = parsed.body.firstElementChild;
         if (!root) return "";
@@ -53,6 +46,7 @@
             if (/^(https?:|mailto:|\/)/i.test(raw)) return raw;
             return "";
         };
+
         const sanitizeNode = node => {
             if (node.nodeType === Node.TEXT_NODE) return parsed.createTextNode(node.textContent || "");
             if (node.nodeType !== Node.ELEMENT_NODE) return null;
@@ -95,6 +89,7 @@
         });
         return wrapper.innerHTML;
     };
+
     const getNoteMarkup = element => sanitizeNoteMarkup(element?.innerHTML || "");
     const serializeNoteContent = value => escapeQuotedValue(encodeNoteContent(sanitizeNoteMarkup(value)));
     const normalizeNoteContent = value => {
@@ -108,6 +103,7 @@
             return "";
         }
     };
+
     const normalizeNoteRecord = (note = {}) => ({
         ...note,
         id: note.id ?? note.ID ?? "",
@@ -116,10 +112,12 @@
         color: note.color ?? note.CLR ?? note.clr ?? "",
         created: note.created ?? note.CRTD ?? note.crtd ?? ""
     });
+
     const readPortalTitle = (context, fallback = "") => {
         const visibleTitle = context?.portal?.window?.()?.querySelector?.(".window-header .title")?.textContent;
         return `${visibleTitle || context?.portal?.title?.() || fallback || ""}`.replace(/\s+/g, " ").trim();
     };
+
     const openNoteImage = async source => {
         const imageSource = String(source || "").trim();
         if (!imageSource) return false;
@@ -133,6 +131,7 @@
         }
         return false;
     };
+
     const bindNoteImageViewer = root => {
         if (!root || root.dataset.noteImageViewerBound === "1") return;
         root.dataset.noteImageViewerBound = "1";
@@ -144,6 +143,7 @@
             openNoteImage(image.getAttribute("src") || "");
         });
     };
+
     const bindNoteComposer = ({editor, portalWindow, colorInput}) => {
         if (!editor || !portalWindow || !colorInput) return;
         editor.addEventListener("paste", async event => {
@@ -169,10 +169,12 @@
         });
         colorInput.addEventListener("input", () => portalWindow.style.background = colorInput.value);
     };
+
     const refreshNotes = () => {
         modular.refresh("com.standard.notes");
         modular.refresh("com.standard.files");
     };
+
     const bindColorPreview = (root, colorInput, portalWindow) => {
         if (!root || !colorInput || !portalWindow) return;
         root.querySelectorAll(".color-option").forEach(co => co.addEventListener("mouseenter", () => {
@@ -181,6 +183,7 @@
             portalWindow.style.background = selectedColor;
         }));
     };
+
     const getNoteTileData = noteTile => {
         if (!noteTile) return null;
         const displayedTitle = noteTile.querySelector(".note-tile-title")?.innerText || noteTile.getAttribute("title") || "";
@@ -192,6 +195,7 @@
             color: noteTile.style.background || window.getComputedStyle(noteTile).getPropertyValue("background-color")
         };
     };
+
     const renderNoNotesState = () => emptyState({
         style: "notes-empty-state",
         icon: "/icons/interfaces/notes.png",
@@ -199,6 +203,7 @@
         label: "No notes",
         labelStyle: "notes-empty-label"
     });
+
     const noteColors = [
         {name: "Red", color: "rgba(240, 173, 176, 0.5)", secondary: "rgba(240, 173, 176, 0.5)"},
         {name: "Orange", color: "rgba(245, 194, 171, 0.5)", secondary: "rgba(245, 194, 171, 0.5)"},
@@ -209,6 +214,7 @@
         {name: "Normal", color: "rgba(255, 255, 255, 0.5)", secondary: "rgba(238, 238, 238, 0.5)"},
         {name: "Dark Gray", color: "rgba(211, 211, 211, 0.5)", secondary: "rgba(211, 211, 211, 0.5)"}
     ];
+
     const removeDeletedNoteTile = (noteId, tile = null) => {
         const deletedTile = tile?.closest?.(".note-tile");
         if (deletedTile) {
@@ -221,31 +227,37 @@
             }
         });
     };
+
     const deleteNote = (noteId, onSuccess = () => {}, tile = null) => {
         if (!noteId) return;
-        confirmationDialogue({title: "Delete Note", content: "You're sure you want to delete this note?",
-            confirmation: () => {
-                CLI.send(`[notes] - <id ${noteId}>`).then(response => {
-                    if (response !== 0) {
-                        removeDeletedNoteTile(noteId, tile);
-                        onSuccess();
-                        modular.success("Deleted note");
-                    } else {
-                        modular.error("Unable to delete note");
-                    }
-                }).catch(() => {
+        confirmationDialogue({
+            title: "Delete Note",
+            destructive: true,
+            content: "You're sure you want to delete this note?",
+            confirmation: () => CLI.send(`[notes] - <id ${noteId}>`).then(response => {
+                if (response !== 0) {
+                    removeDeletedNoteTile(noteId, tile);
+                    onSuccess();
+                    modular.success("Deleted note");
+                } else {
                     modular.error("Unable to delete note");
-                });
-            }
+                }
+            }).catch(() => {
+                modular.error("Unable to delete note");
+            })
         });
     };
+
     const openNote = (note = {}) => {
         note = normalizeNoteRecord(note);
         const noteContent = normalizeNoteContent(note.content || "");
         const noteColor = note.color || "";
         const noteCreated = note.title || note.created || "View Note";
         const notePortal = new Portal({
-            title: noteCreated, dimensions: [380, 270], navigation: false, tools: [
+            title: noteCreated,
+            dimensions: [380, 270],
+            navigation: false,
+            tools: [
                 {
                     title: "Delete",
                     icon: modular.icons.delete,
@@ -260,7 +272,7 @@
                     }
                 }
             ],
-            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>`,
+            icon: modular.icons.note,
             route: () => div({
                 style: "padded large-padding-top",
                 content: `<div class="note-view-content">${sanitizeNoteMarkup(noteContent)}</div>`
@@ -272,6 +284,7 @@
         });
         notePortal.show();
     };
+
     const openNoteEditor = (note = {}) => {
         note = normalizeNoteRecord(note);
         const noteId = note.id;
@@ -281,9 +294,7 @@
         const noteEditorPortal = new Portal({
             title: updatedTitle || "Edit Note",
             title_editable: true,
-            on_title_change: title => {
-                updatedTitle = title;
-            },
+            on_title_change: title => updatedTitle = title,
             dimensions: [380, 300], navigation: false, tools: [
                 {
                     title: "Delete",
@@ -312,15 +323,13 @@
                     }
                 }
             ],
-            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"/></svg>`,
-            route: () => div({
-                style: "large-padding-top editor-portal-shell",
-                content: children([input({type: "hidden", id: "edit-note-color"}), div({
-                    id: "edit-note-content",
-                    contenteditable: true,
-                    style: "undecorated fill padded",
-                    content: sanitizeNoteMarkup(noteContent)
-                }), colorPicker({id: "edit-note-foreground", colors: noteColors})])
+            icon: modular.icons.note,
+            route: () => div({style: "large-padding-top editor-portal-shell",
+                content: children([
+                    input({type: "hidden", id: "edit-note-color"}),
+                    div({id: "edit-note-content", contenteditable: true, style: "undecorated fill padded", content: sanitizeNoteMarkup(noteContent)}),
+                    colorPicker({id: "edit-note-foreground", colors: noteColors})
+                ])
             }),
             afterRender: win => {
                 const editContent = document.getElementById("edit-note-content");
@@ -336,22 +345,21 @@
         });
         noteEditorPortal.show();
     };
+
     window.StandardNotes = {openNote, openNoteEditor};
     let newNoteTitle = "";
     const createNotePortal = new Portal({
         title: "Create Note",
         title_editable: true,
-        on_title_change: title => {
-            newNoteTitle = title;
-        },
-        onDispose: () => {
-            newNoteTitle = "";
-        },
+        on_title_change: title => newNoteTitle = title,
+        onDispose: () => newNoteTitle = "",
         hints: ["create note", "new note", "make a note"],
         dimensions: [380, 300],
         navigation: false,
         tools: [{
-            title: "Save", icon: modular.icons.save, onclick: (_, context) => {
+            title: "Save",
+            icon: modular.icons.save,
+            onclick: (_, context) => {
                 const userId = modular.user.id();
                 const content = getNoteMarkup(document.getElementById("new-note-content"));
                 const color = document.getElementById("new-note-color").value;
@@ -368,7 +376,7 @@
                 });
             }
         }],
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>`,
+        icon: modular.icons.note,
         route: _ => div({
             style: "large-padding-top editor-portal-shell",
             content: children([input({type: "hidden", id: "new-note-color"}), div({
@@ -399,7 +407,7 @@
                 icon: modular.icons.create,
                 onclick: _ => modular.show("com.standard.notes", 1)
             }],
-            svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>`,
+            svg_icon: modular.icons.note,
             icon: "/icons/interfaces/notes.png",
             route: () => div({
                 style: "large-padding-top padding-right", content: children([

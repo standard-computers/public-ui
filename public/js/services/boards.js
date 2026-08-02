@@ -250,7 +250,10 @@
 		if (!boardPath) return;
 		const boardName = sanitizeBoardName(getBoardFileName(boardPath)) || "this board";
 		confirmationDialogue({
-			title: "Delete board", content: `You're sure you want to delete ${boardName}?`, confirmation: async () => {
+			title: "Delete board",
+			destructive: true,
+			content: `You're sure you want to delete ${boardName}?`,
+			confirmation: async () => {
 				try {
 					await CLI.send(CLI.buildFilesCommand("remove", boardPath));
 					if (typeof refreshBoardsList === "function") refreshBoardsList();
@@ -275,27 +278,27 @@
 		{
 			type: "rectangle",
 			label: "Rectangle",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>`
+			icon: modular.icons.rectangle
 		},
 		{
 			type: "rounded-rectangle",
 			label: "Rounded Rectangle",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="4"/></svg>`
+			icon: modular.icons.rounded_rectangle
 		},
 		{
 			type: "ellipse",
 			label: "Ellipse",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><ellipse cx="12" cy="12" rx="8" ry="5.5"/></svg>`
+			icon: modular.icons.ellipse
 		},
 		{
 			type: "triangle",
 			label: "Triangle",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 4 21 20H3L12 4Z"/></svg>`
+			icon: modular.icons.triangle
 		},
 		{
 			type: "diamond",
 			label: "Diamond",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linejoin="round" d="M12 3 21 12 12 21 3 12 12 3Z"/></svg>`
+			icon: modular.icons.diamond
 		}
 	];
 
@@ -384,12 +387,12 @@
 				icon: modular.icons.create,
 				onclick: (event, routeContext) => openNewBoardMenu(event, routeContext)
 			}],
-			svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42"/></svg>`,
+			svg_icon: modular.icons.brush,
 			icon: "/icons/interfaces/whiteboard.png",
 			routes: [
 				{
 					text: "Edit",
-					icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42"/></svg>`,
+					icon: modular.icons.modify,
 					route: () => div({
 						style: "relative hidden large-padding-top", id: "boards-editor-root", content: children([
 							div({
@@ -482,7 +485,7 @@
 										style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top",
 										altsync: "D",
 										data: "action-clear",
-										icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`
+										icon: modular.icons.delete
 									}),
 									button({
 										style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top",
@@ -519,7 +522,7 @@
 										style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button",
 										altsync: "B",
 										data: "tool-draw",
-										icon: `<svg class="small-icon text-color" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42"/></svg>`
+										icon: modular.icons.brush
 									}),
 									button({
 										style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button",
@@ -1392,21 +1395,21 @@
 					}
 				}, {
 					text: "Boards",
-					icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>`,
+					icon: modular.icons.brush,
 					route: () => div({
 						style: "small-padding large-padding-top",
 						content: children([div({style: "gridded", id: "boards-list", content: () => renderBoards()})])
 					}),
 					afterRender: () => {
 						document.querySelectorAll("#boards-list").forEach(list => list.contextmenu([{
-							icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"/></svg>`,
+							icon: modular.icons.modify,
 							label: "Rename",
 							action: (_, __, target) => {
 								const path = target?.getAttribute("directive");
 								renameBoardFile(path);
 							}
 						}, {
-							icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`,
+							icon: modular.icons.delete,
 							label: "Delete",
 							destructive: true,
 							action: (_, __, target) => {

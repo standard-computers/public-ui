@@ -590,7 +590,7 @@ async function sendArticleCliCommand(command = "", {signal = null} = {}) {
 }
 function buildArticlePortal(article = {}) {
     const title = `${article?.title || ""}`.trim() || "Untitled Article";
-    return {title, svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25A8.966 8.966 0 0 1 18 3.75c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg>`, recordMatches: [{command: "articles", id: article?.id, primaryLabel: title, secondaryLabel: `${article?.description || article?.link || article?.source || ""}`.trim(), record: article}]};
+    return {title, svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75h1.5m9 0h-9"/></svg>`, recordMatches: [{command: "articles", id: article?.id, primaryLabel: title, secondaryLabel: `${article?.description || article?.link || article?.source || ""}`.trim(), record: article}]};
 }
 function enhanceArticleSearchResultIcon(result, article = {}, requestVersion = 0) {
     const articleId = `${article?.id || ""}`.trim();
@@ -676,11 +676,11 @@ async function openPortal(portal, sourceNode = null) {
     const primaryRecordMatch = Array.isArray(portal?.recordMatches) ? portal.recordMatches[0] : null;
     if (primaryRecordMatch?.command === "articles") {
         const article = primaryRecordMatch?.record || {};
-        if (typeof window.StandardInternals?.openArticle === "function") {
-            window.StandardInternals.openArticle(article);
+        if (typeof window.StandardArticles?.openArticle === "function") {
+            window.StandardArticles.openArticle(article);
         } else {
-            modular.start("com.standard.internals");
-            setTimeout(() => window.StandardInternals?.openArticle?.(article), 100);
+            modular.start("com.standard.articles");
+            setTimeout(() => window.StandardArticles?.openArticle?.(article), 100);
         }
         return;
     }

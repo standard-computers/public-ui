@@ -1,10 +1,12 @@
 (async () => {
+
 	let cmdHist = [];
 	let histInd = -1;
 	let pending = "";
 	let histLoad = false;
 	let pendRes = 0;
 	const autocompleteDelay = 180;
+
 	const cliCommands = [
 		{value: "$config: ", label: "$config:", description: "Change a runtime configuration property"},
 		{value: "clear", description: "Clear CLI output"},
@@ -48,19 +50,16 @@
 		{value: "launch ", label: "launch", description: "Launch an installed package"},
 		{value: "exit", description: "Close the CLI window"}
 	];
-	const escapeHtml = (value = "") => `${value}`.replace(/[&<>"']/g, character => ({
-		"&": "&amp;",
-		"<": "&lt;",
-		">": "&gt;",
-		"\"": "&quot;",
-		"'": "&#39;"
-	}[character] || character));
+
+	const escapeHtml = (value = "") => `${value}`.replace(/[&<>"']/g, character => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[character] || character));
+
 	const renderCliBlock = (value = "", variant = "result") => {
 		const mono = `ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`;
 		const bs = variant === "command" ? `margin:0;padding:2px 6px;background:#08ac05;color:#1f1b1b;font-family:${mono};white-space:pre-wrap;word-break:break-word;display:block;width:100%;box-sizing:border-box;` : `margin:0;color:#08ac05;font-family:${mono};white-space:pre-wrap;word-break:break-word;`;
 		const bc = variant === "command" ? "brick" : "";
 		return `<pre class="${bc}" style="${bs}">${escapeHtml(value)}</pre>`;
 	};
+
 	const getScrollableAncestor = element => {
 		let c = element?.parentElement || null;
 		while (c) {
@@ -71,6 +70,7 @@
 		}
 		return null;
 	};
+
 	const scrollCliToBottom = () => {
 		const recipient = document.getElementById("append-cli-reciprocate");
 		const sc = recipient?.closest(".window-body") || getScrollableAncestor(recipient) || recipient;
@@ -83,10 +83,12 @@
 			sc.scrollTop = sc.scrollHeight;
 		});
 	};
+
 	const appendCliBlock = (value = "", variant = "result") => document.getElementById("append-cli-reciprocate").append(div({
 		style: "brick",
 		content: renderCliBlock(value, variant)
 	}));
+
 	const setCliLoading = isLoading => {
 		const sts = document.getElementById("cli-status");
 		if (!sts || typeof sts.isLoading !== "function") return;
@@ -99,6 +101,7 @@
 		pendRes = Math.max(0, pendRes - 1);
 		if (pendRes === 0) sts.isLoading(false);
 	};
+
 	const loadHistory = async cache => {
 		if (histLoad) return;
 		histLoad = true;
@@ -109,23 +112,28 @@
 			cmdHist = [];
 		}
 	};
+
 	const saveHistory = async cache => {
 		try {
 			await cache.create("history", cmdHist.slice(-100));
 		} catch (_) {
 		}
 	};
+
 	const moveCaretToEnd = input => input.selectionStart = input.selectionEnd = input.value.length;
+
 	const isEditableElement = element => {
 		if (!element) return false;
 		if (element.isContentEditable) return true;
 		const tagName = `${element.tagName || ""}`.toLowerCase();
 		return tagName === "input" || tagName === "textarea" || tagName === "select";
 	};
+
 	const showHistoryEntry = (cmdr, i) => {
 		cmdr.value = cmdHist[i] || "";
 		moveCaretToEnd(cmdr);
 	};
+
 	const executeCliValue = (cliv, context) => {
 		if (cliv === "clear") {
 			document.getElementById("append-cli-reciprocate").empty();
@@ -146,6 +154,7 @@
 			scrollCliToBottom();
 		}).finally(() => setCliLoading(false));
 	};
+
 	modular.register(new Service("com.standard.cli", [new Portal({
 		title: "CLI",
 		hints: ["cli", "terminal"],
@@ -176,9 +185,11 @@
 			})
 		}),
 		afterRender: async (_, context) => {
+
 			await loadHistory(context.cache);
 			const cmdr = document.getElementById("cli-commander");
 			let autocompleteTimer = null;
+
 			const autocomplete = cmdr.autocompleteMenu({
 				id: "cli-autocomplete-menu",
 				className: "cli-autocomplete-menu",
@@ -191,6 +202,7 @@
 					pending = "";
 				}
 			});
+
 			const updateAutocomplete = () => {
 				const query = cmdr.value.trimStart().toLowerCase();
 				if (!query) {
@@ -205,10 +217,12 @@
 					.map(candidate => candidate.item);
 				autocomplete.setItems(matches);
 			};
+
 			const queueAutocomplete = () => {
 				clearTimeout(autocompleteTimer);
 				autocompleteTimer = setTimeout(updateAutocomplete, autocompleteDelay);
 			};
+
 			if (window.standardCliAutocomplete) window.standardCliAutocomplete.destroy();
 			window.standardCliAutocomplete = autocomplete;
 			cmdr.addEventListener("input", queueAutocomplete);
@@ -216,7 +230,9 @@
 				cmdr.focus();
 				moveCaretToEnd(cmdr);
 			};
+
 			focusCommandInput();
+
 			cmdr.onkeydown = e => {
 				if (autocomplete.handleKeydown(e)) return;
 				if (e.key === "ArrowUp") {
@@ -258,6 +274,7 @@
 					autocomplete.hide();
 				}
 			};
+
 			const handleCliShortcut = event => {
 				if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
 				if (document.activeElement === cmdr || isEditableElement(document.activeElement)) return;

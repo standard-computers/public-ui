@@ -1,6 +1,6 @@
 (() => {
+
 	const SERVICE_ID = "com.standard.timers";
-	const CACHE_KEY = "timers";
 	const CACHE_OPTIONS = {format: "json", contentType: "application/json", label: "Timers"};
 	const TIMER_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l3 2.25M9.75 3.75h4.5M12 21a8.25 8.25 0 1 0 0-16.5 8.25 8.25 0 0 0 0 16.5Z"/></svg>`;
 	const DURATION_PATTERN = /(\d+(?:\.\d+)?)\s*(hours?|hrs?|hr|h|minutes?|mins?|min|m|seconds?|secs?|sec|s)\b/gi;
@@ -12,13 +12,7 @@
 
 	const cache = () => window.StandardBrowserCache?.createAdapter?.(SERVICE_ID);
 	const now = () => Date.now();
-	const escapeHtml = (value = "") => String(value ?? "").replace(/[&<>"']/g, character => ({
-		"&": "&amp;",
-		"<": "&lt;",
-		">": "&gt;",
-		"\"": "&quot;",
-		"'": "&#039;"
-	})[character]);
+	const escapeHtml = (value = "") => String(value ?? "").replace(/[&<>"']/g, character => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;"})[character]);
 	const escapeSelectorValue = value => typeof window.CSS?.escape === "function" ? window.CSS.escape(String(value ?? "")) : String(value ?? "").replace(/"/g, "\\\"");
 	const createId = () => `${now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 	const finiteNumber = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -79,7 +73,7 @@
 		saveQueue = saveQueue.catch(() => undefined).then(async () => {
 			const adapter = cache();
 			if (!adapter) throw new Error("Browser cache is unavailable");
-			await adapter.set(CACHE_KEY, snapshot(), CACHE_OPTIONS);
+			await adapter.set("timers", snapshot(), CACHE_OPTIONS);
 		}).catch(error => console.error("Failed to save timers", error));
 		return saveQueue;
 	};
@@ -307,7 +301,7 @@
 
 	const loadPromise = (async () => {
 		try {
-			const payload = await cache()?.get?.(CACHE_KEY, {format: "json"});
+			const payload = await cache()?.get?.("timers", {format: "json"});
 			timers = (Array.isArray(payload?.timers) ? payload.timers : []).map(normalizeTimer).filter(Boolean);
 		} catch (error) {
 			console.error("Failed to load timers", error);

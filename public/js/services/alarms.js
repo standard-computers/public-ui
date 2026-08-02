@@ -11,7 +11,6 @@
 	};
 
 	const padTimeUnit = value => `${Number.isFinite(value) ? value : 0}`.padStart(2, "0");
-
 	const escapeCliQuotedValue = (value = "") => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 	const to12HourTimestamp = (h, m) => {

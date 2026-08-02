@@ -649,7 +649,7 @@
         if (pathLabel) pathLabel.textContent = activeVideoFilePath || "No file selected";
         updatePortalTitle(2, activeVideoFilePath);
     };
-    const updatePdfPreview = (portal = findInternalsWindow(7)?.portal) => {
+    const updatePdfPreview = (portal = findInternalsWindow(5)?.portal) => {
         const root = portal?.window?.() || document;
         const pdfPreview = root.querySelector("#internals-pdf-preview");
         if (!pdfPreview) return;
@@ -657,9 +657,9 @@
         pdfPreview.title = activePdfFilePath || "PDF preview";
         const pathLabel = root.querySelector("#internals-pdf-preview-path");
         if (pathLabel) pathLabel.textContent = activePdfFilePath || "No file selected";
-        updatePortalTitle(7, activePdfFilePath, portal);
+        updatePortalTitle(5, activePdfFilePath, portal);
     };
-    const printActivePdf = (portal = findInternalsWindow(7)?.portal) => {
+    const printActivePdf = (portal = findInternalsWindow(5)?.portal) => {
         const state = portal?.windowState?.() || {};
         const pdfPath = String(state?.directive || activePdfFilePath || "");
         if (!pdfPath) {
@@ -749,7 +749,7 @@
     const articleTextField = (id = "", labelText = "", value = "", {textareaField = false} = {}) => {
         return div({content: children([div({style: "bold small-padding", content: labelText}), div({style: "padded", content: textareaField ? textarea({id, style: "undecorated no-padding internals-article-edit-textarea fill", value: String(value ?? "")}) : input({id, style: "undecorated no-padding fill", value: String(value ?? "")})})])});
     };
-    const getSettingsPortalState = (portal = findInternalsWindow(6)?.portal) => {
+    const getSettingsPortalState = (portal = findInternalsWindow(4)?.portal) => {
         const state = portal?.windowState?.() || {};
         return {serviceId: String(state.serviceId || ""), title: String(state.title || state.serviceId || "App Settings")};
     };
@@ -780,7 +780,7 @@
         const inputType = type === "number" ? "number" : "text";
         return `<input id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="${escapeHtml(type)}" type="${inputType}" class="undecorated no-padding fill" value="${escapeHtml(normalizedValue)}">`;
     };
-    const renderAppSettingsPortal = async (portal = findInternalsWindow(6)?.portal) => {
+    const renderAppSettingsPortal = async (portal = findInternalsWindow(4)?.portal) => {
         const root = portal?.window?.() || document;
         const host = root.querySelector("#internals-app-settings-host");
         if (!host) return;
@@ -806,7 +806,7 @@
         }).join("");
         host.innerHTML = `<div class="internals-app-settings" data-settings-service="${escapeHtml(serviceId)}">${rows}</div>`;
     };
-    const collectAppSettingsValues = (portal = findInternalsWindow(6)?.portal) => {
+    const collectAppSettingsValues = (portal = findInternalsWindow(4)?.portal) => {
         const root = portal?.window?.() || document;
         const values = {};
         root.querySelectorAll("[data-setting-name]").forEach((field) => {
@@ -818,7 +818,7 @@
         return values;
     };
     const saveAppSettingsFromPortal = async (_event, context = {}) => {
-        const portal = context?.portal || findInternalsWindow(6)?.portal;
+        const portal = context?.portal || findInternalsWindow(4)?.portal;
         const {serviceId, title} = getSettingsPortalState(portal);
         if (!serviceId) return;
         const saved = await window.StandardAppSettings?.save?.(serviceId, collectAppSettingsValues(portal));
@@ -830,7 +830,7 @@
         }
     };
     const deleteAppSettingsFromPortal = (_event, context = {}) => {
-        const portal = context?.portal || findInternalsWindow(6)?.portal;
+        const portal = context?.portal || findInternalsWindow(4)?.portal;
         const {serviceId, title} = getSettingsPortalState(portal);
         if (!serviceId) return;
         confirmationDialogue({title: "Reset Settings", content: `Delete saved settings for ${title || serviceId} and restore defaults?`, confirmation: async () => {
@@ -1029,7 +1029,11 @@
             return;
         }
         const articleTitle = String(activeArticleRecord?.title || "this article").trim() || "this article";
-        confirmationDialogue({title: "Delete Article", content: `You're sure you want to delete ${articleTitle}?`, confirmation: async () => {
+        confirmationDialogue({
+            title: "Delete Article",
+            destructive: true,
+            content: `Confirm deleting ${articleTitle}?`,
+            confirmation: async () => {
                 try {
                     const response = await CLI.send(`[articles] - <id ${articleId}>`);
                     if (response === 0) {
@@ -1101,7 +1105,7 @@
         activeVideoLastSavedTime = -1;
         if (activeVideoFilePath) void loadActiveVideoProgress(activeVideoFilePath);
     };
-    const restorePdfStateFromPortal = (portal = findInternalsWindow(7)?.portal) => {
+    const restorePdfStateFromPortal = (portal = findInternalsWindow(5)?.portal) => {
         const state = portal?.windowState?.() || {};
         if (state?.directive) activePdfFilePath = String(state.directive);
         activePdfFileSource = typeof state?.cachedContent?.source === "string" && state.cachedContent.source.trim() ? state.cachedContent.source : (activePdfFilePath ? pdfPreviewUrl(activePdfFilePath) : "");
@@ -1262,8 +1266,8 @@
         activePdfObjectUrl = "";
         activePdfFilePath = filePath;
         activePdfFileSource = pdfPreviewUrl(filePath);
-        const portal = modular.show("com.standard.internals", 7, {newInstance: true});
-        syncPortalWindowState(7, {directive: filePath, cachedContent: {source: activePdfFileSource}}, portal);
+        const portal = modular.show("com.standard.internals", 5, {newInstance: true});
+        syncPortalWindowState(5, {directive: filePath, cachedContent: {source: activePdfFileSource}}, portal);
         updatePdfPreview(portal);
         return true;
     };
@@ -1274,8 +1278,8 @@
         activePdfFilePath = String(title || "PDF Preview");
         activePdfFileSource = pdfSource;
         activePdfObjectUrl = options?.isObjectUrl ? pdfSource : "";
-        const portal = modular.show("com.standard.internals", 7, {newInstance: true});
-        syncPortalWindowState(7, {directive: activePdfFilePath, cachedContent: {source: activePdfFileSource}}, portal);
+        const portal = modular.show("com.standard.internals", 5, {newInstance: true});
+        syncPortalWindowState(5, {directive: activePdfFilePath, cachedContent: {source: activePdfFileSource}}, portal);
         updatePdfPreview(portal);
         return true;
     };
@@ -1303,8 +1307,8 @@
         const normalizedServiceId = String(serviceId || "").trim();
         if (!normalizedServiceId) return false;
         const title = String(options?.title || normalizedServiceId).trim();
-        const portal = modular.show("com.standard.internals", 6, {newInstance: true});
-        syncPortalWindowState(6, {serviceId: normalizedServiceId, title, sourcePortalIndex: options?.sourcePortalIndex ?? 0, sourceInstanceId: options?.sourceInstanceId || "default"}, portal);
+        const portal = modular.show("com.standard.internals", 4, {newInstance: true});
+        syncPortalWindowState(4, {serviceId: normalizedServiceId, title, sourcePortalIndex: options?.sourcePortalIndex ?? 0, sourceInstanceId: options?.sourceInstanceId || "default"}, portal);
         void renderAppSettingsPortal(portal);
         return true;
     };
@@ -1339,7 +1343,6 @@
         if (activePdfObjectUrl) URL.revokeObjectURL(activePdfObjectUrl);
     });
     window.StandardInternals.openStandardData = (standardReference = "", payload = {}, options = {}) => openStandardData(standardReference, payload, options?.sourceNode || null);
-    window.StandardInternals.openArticle = (article = {}, options = {}) => openArticle(article, options?.sourceNode || null);
     window.StandardInternals.openAppSettings = openAppSettings;
     window.StandardInternals.openFilePath = (rawPath = "", sourceNode = null) => {
         if (IMAGE_FILE_PATTERN.test(String(rawPath || ""))) return openImageFilePath(rawPath, sourceNode);
@@ -1397,37 +1400,6 @@
             }
         }),
         new Portal({
-            title: "Article",
-            internal: true,
-            dimensions: [680, 560],
-            navigation: false,
-            tools: [{title: "Edit", icon: modular.icons.modify, onclick: (event) => openModifyArticleFromView(event?.target)}],
-            route: () => div({style: "large-padding-top small-padding", content: div({id: "internals-article-preview", style: "internals-article-preview"})}),
-            afterRender: function () {
-                restoreArticleStateFromPortal(this.portal);
-                updateArticlePreview(this.portal);
-            }
-        }),
-        new Portal({
-            title: "Modify Article",
-            internal: true,
-            dimensions: [520, 620],
-            navigation: false,
-            tools: [{title: "Save", icon: modular.icons.save, onclick: saveModifiedArticle}, {title: "Delete", icon: modular.icons.delete, onclick: deleteModifiedArticle}],
-            route: () => div({style: "large-padding-top small-padding", content: children([
-                div({style: "internals-article-modify-header", content: children([
-                    img({id: "modify-article-icon", style: "article-icon internals-article-modify-icon inline", src: articleIconSrc(activeArticleRecord, {preferPreview: true})}),
-                    div({style: "internals-article-modify-title-fields", content: children([articleTextField("modify-article-title", "Title", activeArticleRecord?.title)])})
-                ])}),
-                articleTextField("modify-article-link", "Link", activeArticleRecord?.link),
-                articleTextField("modify-article-description", "Description", activeArticleRecord?.description),
-                div({style: "internals-article-edit-full", content: articleTextField("modify-article-content", "Content", activeArticleRecord?.content, {textareaField: true})}),
-                articleTextField("modify-article-source", "Source", activeArticleRecord?.source),
-                articleTextField("modify-article-priority", "Priority", activeArticleRecord?.priority)
-            ])}),
-            afterRender: bindArticleModifyPortal
-        }),
-        new Portal({
             title: "App Settings",
             internal: true,
             dimensions: [520, 500],
@@ -1443,7 +1415,7 @@
             internal: true,
             dimensions: [820, 640],
             navigation: false,
-            tools: [{title: "Print", icon: modular.icons.print, onclick: (event, context) => printActivePdf(context?.portal || getPortalFromSource(event?.target, 7))}],
+            tools: [{title: "Print", icon: modular.icons.print, onclick: (event, context) => printActivePdf(context?.portal || getPortalFromSource(event?.target, 5))}],
             route: () => div({style: "large-padding-top fill internals-pdf-viewer-shell", content: `<iframe id="internals-pdf-preview" class="internals-pdf-preview radius" src="${activePdfFileSource || "about:blank"}" title="${escapeHtml(activePdfFilePath || "PDF preview")}"></iframe>`}),
             afterRender: function () {
                 restorePdfStateFromPortal(this.portal);

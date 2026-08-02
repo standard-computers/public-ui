@@ -1,5 +1,7 @@
 (() => {
+
 	const escapeQuotedValue = v => `${v || ""}`.replaceAll('"', '\\"');
+
 	const toTimestampString = v => {
 		if (!v) return "";
 		const parsedDate = new Date(v);
@@ -10,6 +12,7 @@
 		if (!year || !month || !day) return "";
 		return `${month.padStart(2, "0")}/${day.padStart(2, "0")}/${year} ${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}:00`;
 	};
+
 	const toDateTimeLocalValue = (v, h, m = 0) => {
 		const d = new Date(v);
 		if (Number.isNaN(d.getTime())) return "";
@@ -17,6 +20,7 @@
 		const pad = part => `${part}`.padStart(2, "0");
 		return `${localDate.getFullYear()}-${pad(localDate.getMonth() + 1)}-${pad(localDate.getDate())}T${pad(localDate.getHours())}:${pad(localDate.getMinutes())}`;
 	};
+
 	const toDateTimeLabel = v => {
 		const parsedDate = toDateObject(v);
 		if (!parsedDate) return "";
@@ -28,12 +32,14 @@
 			minute: "2-digit"
 		});
 	};
+
 	const getCategoriesList = r => {
 		if (!r || typeof r !== "object") return [];
 		if (Array.isArray(r.categories)) return r.categories;
 		if (Array.isArray(r.cats)) return r.cats;
 		return [];
 	};
+
 	const getEventsList = r => {
 		if (Array.isArray(r)) return r;
 		if (!r || typeof r !== "object") return [];
@@ -41,6 +47,7 @@
 		if (Array.isArray(r.data)) return r.data;
 		return [];
 	};
+
 	const getEventBoundary = (e, b) => {
 		if (!e || typeof e !== "object") return null;
 		const preferredKeys = b === "start" ? ["start", "start_at", "startAt", "from", "date_start", "start_date", "datetime_start"] : ["end", "end_at", "endAt", "to", "date_end", "end_date", "datetime_end"];
@@ -50,7 +57,9 @@
 		}
 		return null;
 	};
+
 	const normalizeRecordId = value => `${value ?? ""}`.trim().replace(/^['"]+|['"]+$/g, "").replace(/^@+/, "").trim();
+
 	const getSelectedEventCategoryId = event => {
 		if (!event || typeof event !== "object") return "";
 		const candidateValues = [
@@ -64,6 +73,7 @@
 		const matchedValue = candidateValues.find(value => value !== undefined && value !== null && `${value}`.trim() !== "");
 		return matchedValue === undefined ? "" : normalizeRecordId(matchedValue);
 	};
+
 	const toDateObject = value => {
 		if (value === undefined || value === null || value === "") return null;
 		if (typeof value === "string") {
@@ -77,6 +87,7 @@
 		const parsedDate = Number.isNaN(numericValue) ? new Date(value) : new Date(numericValue);
 		return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 	};
+
 	const toLocalDateKey = value => {
 		const parsedDate = value instanceof Date ? value : toDateObject(value);
 		if (!parsedDate) return "";
@@ -84,6 +95,7 @@
 		const date = `${parsedDate.getDate()}`.padStart(2, "0");
 		return `${parsedDate.getFullYear()}-${month}-${date}`;
 	};
+
 	const toCalendarTitleDate = value => {
 		const parsedDate = toDateObject(value);
 		return parsedDate ? parsedDate.toLocaleDateString([], {
@@ -92,12 +104,14 @@
 			day: "numeric"
 		}) : "Untitled";
 	};
+
 	const getOrderedDateRange = (start, end) => {
 		const parsedStart = toDateObject(start);
 		const parsedEnd = toDateObject(end);
 		if (!parsedStart || !parsedEnd) return {start: null, end: null};
 		return parsedStart <= parsedEnd ? {start: parsedStart, end: parsedEnd} : {start: parsedEnd, end: parsedStart};
 	};
+
 	const isDateKeyInRange = (dateKey, start, end) => {
 		if (!dateKey || !start || !end) return false;
 		const startKey = toLocalDateKey(start);
@@ -105,6 +119,7 @@
 		if (!startKey || !endKey) return false;
 		return dateKey >= startKey && dateKey <= endKey;
 	};
+
 	const updateSelectedDateFromTarget = target => {
 		const tile = target?.closest?.('[data]');
 		const dateKey = tile?.getAttribute?.('data') || '';
@@ -118,6 +133,7 @@
 		selectedDateRangeEnd = parsedDate;
 		clearCreateEventDateTimeRange();
 	};
+
 	const getCreateEventDateRange = () => {
 		const {
 			start,
@@ -126,6 +142,7 @@
 		if (!start || !end) return {start: selectedDate, end: selectedDate};
 		return {start, end};
 	};
+
 	const getCreateEventPortalTitle = () => {
 		const {start, end} = getCreateEventDateRange();
 		const startKey = toLocalDateKey(start);
@@ -133,22 +150,27 @@
 		if (!startKey || !endKey || startKey === endKey) return toCalendarTitleDate(start || selectedDate);
 		return `${toCalendarTitleDate(start)} - ${toCalendarTitleDate(end)}`;
 	};
+
 	const DAY_IN_MS = 86400000;
+
 	const getStartOfWeek = value => {
 		const parsedDate = toDateObject(value);
 		if (!parsedDate) return null;
 		return new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate() - parsedDate.getDay());
 	};
+
 	const getWeekDates = value => {
 		const startOfWeek = getStartOfWeek(value);
 		if (!startOfWeek) return [];
 		return Array.from({length: 7}, (_, index) => new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + index));
 	};
+
 	const isSameLocalDay = (left, right) => {
 		const leftKey = toLocalDateKey(left);
 		const rightKey = toLocalDateKey(right);
 		return leftKey !== "" && leftKey === rightKey;
 	};
+
 	const compareEventEntries = (left, right) => {
 		const leftStart = left?.startDate?.getTime?.() || 0;
 		const rightStart = right?.startDate?.getTime?.() || 0;
@@ -158,6 +180,7 @@
 		if (leftEnd !== rightEnd) return leftEnd - rightEnd;
 		return `${left?.event?.name || ""}`.localeCompare(`${right?.event?.name || ""}`);
 	};
+
 	const getCalendarEventEntries = eventsResponse => getEventsList(eventsResponse).map(event => {
 		const startDate = toDateObject(getEventBoundary(event, "start"));
 		const endDate = toDateObject(getEventBoundary(event, "end") || getEventBoundary(event, "start"));
@@ -172,14 +195,17 @@
 			endKey: toLocalDateKey(orderedEnd)
 		};
 	}).filter(Boolean).sort(compareEventEntries);
+
 	const getEventEntriesForDate = (eventEntries, date) => {
 		const dateKey = toLocalDateKey(date);
 		return eventEntries.filter(entry => isDateKeyInRange(dateKey, entry.startDate, entry.endDate));
 	};
+
 	const toTimeLabel = value => {
 		const parsedDate = toDateObject(value);
 		return parsedDate ? parsedDate.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"}) : "";
 	};
+
 	const getEventTimeSummary = (eventEntry, date) => {
 		const dateKey = toLocalDateKey(date);
 		if (!dateKey || !eventEntry) return "";
@@ -188,6 +214,7 @@
 		if (eventEntry.endKey === dateKey) return `Until ${toTimeLabel(eventEntry.endDate)}`;
 		return "All day";
 	};
+
 	const WEEKDAY_OPTIONS = [
 		{value: "0", label: "Sun"},
 		{value: "1", label: "Mon"},
@@ -197,6 +224,7 @@
 		{value: "5", label: "Fri"},
 		{value: "6", label: "Sat"}
 	];
+
 	const MONTH_OPTIONS = [
 		{value: "1", label: "Jan"},
 		{value: "2", label: "Feb"},
@@ -211,6 +239,7 @@
 		{value: "11", label: "Nov"},
 		{value: "12", label: "Dec"}
 	];
+
 	const ORDINAL_OPTIONS = [
 		{value: "1", label: "first"},
 		{value: "2", label: "second"},
@@ -218,25 +247,31 @@
 		{value: "4", label: "fourth"},
 		{value: "-1", label: "last"}
 	];
+
 	const PATTERN_LABELS = {daily: "day", weekly: "week", monthly: "month", yearly: "year"};
+
 	const clampNumber = (value, fallback, min, max) => {
 		const parsed = Number(value);
 		if (!Number.isFinite(parsed)) return fallback;
 		return Math.min(max, Math.max(min, Math.trunc(parsed)));
 	};
+
 	const getLastDayOfMonth = (year, monthIndex) => new Date(year, monthIndex + 1, 0).getDate();
 	const sameLocalDateTime = (left, right) => left && right && left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate() && left.getHours() === right.getHours() && left.getMinutes() === right.getMinutes();
 	const copyTimeToDate = (date, source) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), source.getHours(), source.getMinutes(), source.getSeconds(), source.getMilliseconds());
+
 	const addMonthsClamped = (date, months) => {
 		const next = new Date(date.getFullYear(), date.getMonth() + months, 1, date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
 		next.setDate(Math.min(date.getDate(), getLastDayOfMonth(next.getFullYear(), next.getMonth())));
 		return next;
 	};
+
 	const addYearsClamped = (date, years) => {
 		const next = new Date(date.getFullYear() + years, date.getMonth(), 1, date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
 		next.setDate(Math.min(date.getDate(), getLastDayOfMonth(next.getFullYear(), next.getMonth())));
 		return next;
 	};
+
 	const getNthWeekdayOfMonth = (year, monthIndex, ordinal, weekday) => {
 		if (ordinal === -1) {
 			const last = new Date(year, monthIndex + 1, 0);
@@ -249,6 +284,7 @@
 		if (day > getLastDayOfMonth(year, monthIndex)) return null;
 		return new Date(year, monthIndex, day);
 	};
+
 	const getWeekRouteTitle = value => {
 		const weekDates = getWeekDates(value);
 		if (weekDates.length === 0) return "Week";
@@ -262,6 +298,7 @@
 			year: "numeric"
 		})} - ${weekEnd.toLocaleDateString([], {month: "short", day: "numeric", year: "numeric"})}`;
 	};
+
 	const getDayRouteTitle = value => {
 		const parsedDate = toDateObject(value);
 		return parsedDate ? parsedDate.toLocaleDateString([], {
@@ -271,12 +308,15 @@
 			year: "numeric"
 		}) : "Day";
 	};
+
 	let selectedCreateStartDateTime = null;
 	let selectedCreateEndDateTime = null;
+
 	const clearCreateEventDateTimeRange = () => {
 		selectedCreateStartDateTime = null;
 		selectedCreateEndDateTime = null;
 	};
+
 	const getCreateEventDateTimeRange = () => {
 		const selectedStart = toDateObject(selectedCreateStartDateTime);
 		const selectedEnd = toDateObject(selectedCreateEndDateTime);
@@ -290,6 +330,7 @@
 			end: end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 17, 0, 0, 0) : null
 		};
 	};
+
 	const selectCalendarDate = (value, options = {}) => {
 		const parsedDate = toDateObject(value);
 		if (!parsedDate) return;
@@ -299,6 +340,7 @@
 		selectedDateRangeEnd = parsedEndDate;
 		if (options.clearCreateTimeRange !== false) clearCreateEventDateTimeRange();
 	};
+
 	const openCreateEventPortalForDateTime = (start, end = null) => {
 		const parsedStart = toDateObject(start);
 		if (!parsedStart) return;
@@ -310,16 +352,19 @@
 		selectedDateRangeEnd = parsedStart;
 		openCreateEventPortal();
 	};
+
 	const openSelectedEventPortal = (event, date = null) => {
 		if (!event) return;
 		if (date) selectCalendarDate(date);
 		selectedEvent = event;
 		modular.show("com.standard.calendar", 5);
 	};
+
 	window.StandardCalendar = window.StandardCalendar || {};
 	window.StandardCalendar.openEvent = (event, date = null) => openSelectedEventPortal(event, date);
 	const calendarEventPreviewEntries = new Map();
 	let calendarEventPreviewIndex = 0;
+
 	const buildCalendarEventPreview = () => {
 		const preview = document.createElement("div");
 		preview.className = "calendar-event-hover-preview";
@@ -373,18 +418,21 @@
 		document.body.appendChild(preview);
 		return preview;
 	};
+
 	const calendarEventPreview = {
 		element: null,
 		activeChip: null,
 		pendingEvent: null,
 		frame: null
 	};
+
 	const ensureCalendarEventPreview = () => {
 		if (!calendarEventPreview.element || !document.body.contains(calendarEventPreview.element)) {
 			calendarEventPreview.element = buildCalendarEventPreview();
 		}
 		return calendarEventPreview.element;
 	};
+
 	const updateCalendarEventPreviewContent = (eventEntry, date) => {
 		const preview = ensureCalendarEventPreview();
 		const event = eventEntry?.event || {};
@@ -402,6 +450,7 @@
 		setText(".calendar-event-hover-preview-end", `End: ${endLabel}`);
 		preview.style.borderColor = event?.category?.color || "var(--border)";
 	};
+
 	const moveCalendarEventPreview = event => {
 		const preview = ensureCalendarEventPreview();
 		const margin = 12;
@@ -414,6 +463,7 @@
 		preview.style.left = `${Math.max(margin, left)}px`;
 		preview.style.top = `${Math.max(margin, top)}px`;
 	};
+
 	const scheduleCalendarEventPreviewMove = event => {
 		calendarEventPreview.pendingEvent = event;
 		if (calendarEventPreview.frame) return;
@@ -423,6 +473,7 @@
 			moveCalendarEventPreview(calendarEventPreview.pendingEvent);
 		});
 	};
+
 	const showCalendarEventPreview = (chip, event) => {
 		if (!chip) return;
 		const previewData = calendarEventPreviewEntries.get(chip.id);
@@ -433,6 +484,7 @@
 		preview.style.display = "block";
 		moveCalendarEventPreview(event);
 	};
+
 	const hideCalendarEventPreview = () => {
 		if (calendarEventPreview.frame) cancelAnimationFrame(calendarEventPreview.frame);
 		calendarEventPreview.frame = null;
@@ -440,17 +492,20 @@
 		calendarEventPreview.activeChip = null;
 		if (calendarEventPreview.element) calendarEventPreview.element.style.display = "none";
 	};
+
 	document.addEventListener("mouseover", event => {
 		const chip = event.target.closest?.(".calendar-event-chip");
 		if (!chip || chip === calendarEventPreview.activeChip) return;
 		showCalendarEventPreview(chip, event);
 	});
+
 	document.addEventListener("mousemove", event => {
 		if (!calendarEventPreview.activeChip) return;
 		const chip = event.target.closest?.(".calendar-event-chip");
 		if (chip !== calendarEventPreview.activeChip) return;
 		scheduleCalendarEventPreviewMove(event);
 	});
+
 	document.addEventListener("mouseout", event => {
 		if (!calendarEventPreview.activeChip) return;
 		const relatedTarget = event.relatedTarget;
@@ -458,8 +513,10 @@
 		const leavingChip = event.target.closest?.(".calendar-event-chip");
 		if (leavingChip === calendarEventPreview.activeChip) hideCalendarEventPreview();
 	});
+
 	window.addEventListener("blur", hideCalendarEventPreview);
 	window.addEventListener("scroll", hideCalendarEventPreview, true);
+
 	const renderCalendarEventChip = (eventEntry, date, options = {}) => {
 		const categoryColor = eventEntry?.event?.category?.color || "#7B61FF";
 		const eventName = eventEntry?.event?.name || "Untitled";
@@ -486,6 +543,7 @@
 			}
 		});
 	};
+
 	const buildCalendarRangeControls = ({previous, next, label}) => div({
 		style: "line small-padding-bottom",
 		content: children([
@@ -510,13 +568,16 @@
 			div({style: "float-right strong small-padding-top", content: label})
 		])
 	});
+
 	const openCreateEventPortal = () => {
 		setCalendarPortalTitle(4, getCreateEventPortalTitle());
 		modular.show("com.standard.calendar", 4);
 	};
+
 	const selectToday = () => {
 		selectCalendarDate(new Date());
 	};
+
 	const withOpenCalendarPortals = (callback, portalIndexes = null) => {
 		const allowedPortalIndexes = portalIndexes === null ? null : new Set((Array.isArray(portalIndexes) ? portalIndexes : [portalIndexes]).map(index => Number(index)));
 		document.querySelectorAll(".draggable-window").forEach(windowDiv => {
@@ -527,20 +588,24 @@
 			callback(portal, windowDiv);
 		});
 	};
+
 	const withCalendarPortal = (portalIndex, callback) => {
 		withOpenCalendarPortals(callback, portalIndex);
 	};
+
 	const hideCalendarPortal = portalIndex => {
 		withCalendarPortal(portalIndex, portal => {
 			if (typeof portal.hide === "function") portal.hide();
 		});
 	};
+
 	const refreshCalendarPortals = (...portalIndexes) => {
 		const normalizedIndexes = portalIndexes.length === 0 ? null : portalIndexes;
 		withOpenCalendarPortals(portal => {
 			if (typeof portal.refresh === "function") portal.refresh();
 		}, normalizedIndexes);
 	};
+
 	const setCalendarPortalTitle = (portalIndex, title) => {
 		const nextTitle = `${title || ""}`.trim() || "Untitled";
 		withCalendarPortal(portalIndex, (_, windowDiv) => {
@@ -548,6 +613,7 @@
 			if (headerTitle) headerTitle.textContent = nextTitle;
 		});
 	};
+
 	const getLastCalendarPortalWindow = portalIndex => {
 		let matchingWindow = null;
 		withCalendarPortal(portalIndex, (_, windowDiv) => {
@@ -555,6 +621,7 @@
 		});
 		return matchingWindow;
 	};
+
 	const getScrollableAncestor = element => {
 		let current = element?.parentElement || null;
 		while (current) {
@@ -565,6 +632,7 @@
 		}
 		return null;
 	};
+
 	const scrollChildIntoContainerView = (container, child) => {
 		if (!container || !child) return;
 		const containerRect = container.getBoundingClientRect();
@@ -579,6 +647,7 @@
 		}
 		container.scrollTop = nextScrollTop;
 	};
+
 	const scrollTileIntoViewWhenReady = (container, selector, attempts = 24) => {
 		if (!container || attempts <= 0) return;
 		const tile = container.querySelector(selector);
@@ -589,16 +658,22 @@
 		const scrollContainer = container.closest(".window-body") || getScrollableAncestor(container) || container;
 		scrollChildIntoContainerView(scrollContainer, tile);
 	};
+
 	const refreshMainCalendarPortal = () => refreshCalendarPortals(0);
+
 	const disposePortalAndRefreshCalendar = portalIndex => {
 		hideCalendarPortal(portalIndex);
 		refreshMainCalendarPortal();
 	};
+
 	const deleteSelectedEvent = portalIndex => {
 		const eventId = `${selectedEvent?.id || ""}`.trim();
 		if (eventId === "") return;
 		confirmationDialogue({
-			title: "Delete Event", content: "You're sure you want to delete this event?", confirmation: () => {
+			title: "Delete Event",
+			destructive: true,
+			content: "You're sure you want to delete this event?",
+			confirmation: () => {
 				CLI.send(`[events] - <id ${eventId}>`).then(response => {
 					if (response !== 1) return;
 					selectedEvent = null;
@@ -607,11 +682,15 @@
 			}
 		});
 	};
+
 	const deleteSelectedCategory = portalIndex => {
 		const categoryId = `${selectedCategory?.id || ""}`.trim();
 		if (categoryId === "") return;
 		confirmationDialogue({
-			title: "Delete Category", content: "You're sure you want to delete this category?", confirmation: () => {
+			title: "Delete Category",
+			destructive: true,
+			content: "You're sure you want to delete this category?",
+			confirmation: () => {
 				CLI.send(`[cats] - <id ${categoryId}>`).then(response => {
 					if (response !== 1) return;
 					selectedCategory = null;
@@ -622,6 +701,7 @@
 			}
 		});
 	};
+
 	const saveSelectedCategory = portalIndex => {
 		const categoryId = `${selectedCategory?.id || ""}`.trim();
 		const name = (document.getElementById("edit-calendar-category-name")?.value || "").trim();
@@ -641,12 +721,16 @@
 			}
 		});
 	};
+
 	const recurrencePrefix = portalIndex => portalIndex === 6 ? "edit" : "create";
+
 	const getRecurrenceField = (prefix, id) => document.getElementById(`${prefix}-recurrence-${id}`);
+
 	const getSelectedRecurrenceWeekdays = (prefix, fallbackDay = new Date().getDay()) => {
 		const selected = Array.from(document.querySelectorAll(`[data-recurrence-prefix="${prefix}"][data-recurrence-weekday]:checked`)).map(input => Number(input.value)).filter(value => Number.isFinite(value));
 		return selected.length > 0 ? selected : [fallbackDay];
 	};
+
 	const getRecurrenceSettingsFromPortal = (portalIndex, baseStart) => {
 		const prefix = recurrencePrefix(portalIndex);
 		if (getRecurrenceField(prefix, "enabled")?.checked !== true) return {enabled: false};
@@ -672,6 +756,7 @@
 			yearlyDay
 		};
 	};
+
 	const buildEventOccurrence = (startDate, durationMs) => {
 		const endDate = new Date(startDate.getTime() + durationMs);
 		return {
@@ -679,6 +764,7 @@
 			end: toTimestampString(toDateTimeLocalValue(endDate, endDate.getHours(), endDate.getMinutes()))
 		};
 	};
+
 	const calculateRecurringEventOccurrences = (baseStart, baseEnd, recurrence, options = {}) => {
 		if (!recurrence?.enabled) return [buildEventOccurrence(baseStart, baseEnd.getTime() - baseStart.getTime())];
 		const durationMs = Math.max(0, baseEnd.getTime() - baseStart.getTime());
@@ -726,16 +812,19 @@
 		}
 		return occurrences.slice(0, recurrence.occurrences).map(startDate => buildEventOccurrence(startDate, durationMs));
 	};
+
 	const createEventRecord = ({owner, category, name, start, end}) => {
 		const escapedName = escapeQuotedValue(name);
 		const escapedStart = escapeQuotedValue(start);
 		const escapedEnd = escapeQuotedValue(end);
 		return CLI.send(`[events] + (@${owner}, @${category}, "${escapedName}", "${escapedStart}", "${escapedEnd}", [], [])`, false);
 	};
+
 	const isSuccessfulCalendarWrite = response => {
 		const normalizedResponse = `${response ?? ""}`.trim();
 		return normalizedResponse !== "" && normalizedResponse !== "0";
 	};
+
 	const buildWeekdaySelector = (prefix, selectedDays) => div({
 		style: "calendar-recurrence-weekdays",
 		content: children(WEEKDAY_OPTIONS.map(day => label({
@@ -751,6 +840,7 @@
 			])
 		})))
 	});
+
 	const buildRecurrenceControls = (prefix, baseStart) => {
 		const startDate = toDateObject(baseStart) || new Date();
 		const selectedWeekday = startDate.getDay();
@@ -907,7 +997,9 @@
 			])
 		});
 	};
+
 	const bindRecurrenceControls = (prefix, startInput = null) => {
+
 		const enabledInput = getRecurrenceField(prefix, "enabled");
 		const panel = getRecurrenceField(prefix, "panel");
 		const patternSelect = getRecurrenceField(prefix, "pattern");
@@ -922,6 +1014,7 @@
 		if (windowNode && !windowNode.dataset.calendarRecurrenceBaseHeight) {
 			windowNode.dataset.calendarRecurrenceBaseHeight = `${Math.ceil(windowNode.getBoundingClientRect().height || windowNode.offsetHeight || 0)}`;
 		}
+
 		const updatePattern = () => {
 			const pattern = patternSelect.value || "weekly";
 			if (unit) unit.textContent = `${PATTERN_LABELS[pattern] || "week"}(s) on:`;
@@ -929,7 +1022,9 @@
 			if (monthlySection) monthlySection.style.display = pattern === "monthly" ? "block" : "none";
 			if (yearlySection) yearlySection.style.display = pattern === "yearly" ? "block" : "none";
 		};
+
 		let closeTimer = null;
+
 		const setWindowExpanded = expanded => {
 			const targetWindow = panel.closest(".draggable-window");
 			if (!targetWindow) return;
@@ -942,6 +1037,7 @@
 			}
 			targetWindow.style.height = `${baseHeight}px`;
 		};
+
 		const updateEnabled = () => {
 			const expanded = enabledInput.checked === true;
 			if (closeTimer) {
@@ -962,16 +1058,19 @@
 				closeTimer = null;
 			}, 280);
 		};
+
 		enabledInput.addEventListener("change", updateEnabled);
 		patternSelect.addEventListener("change", () => {
 			updatePattern();
 			if (enabledInput.checked === true) requestAnimationFrame(() => setWindowExpanded(true));
 		});
+
 		document.querySelectorAll(`[data-recurrence-month-mode="${prefix}"]`).forEach(inputNode => {
 			inputNode.addEventListener("change", () => {
 				if (inputNode.checked) getRecurrenceField(prefix, "month-mode").value = inputNode.value;
 			});
 		});
+
 		startInput?.addEventListener("change", () => {
 			const startDate = toDateObject(startInput.value);
 			if (!startDate) return;
@@ -983,6 +1082,7 @@
 		updatePattern();
 		updateEnabled();
 	};
+
 	const createEventFromPortal = portalIndex => {
 		const owner = `${modular.user.id()}`.trim();
 		const categoryInput = document.getElementById("event-category");
@@ -1013,6 +1113,7 @@
 			modular.error("Failed to create event");
 		});
 	};
+
 	const saveSelectedEvent = portalIndex => {
 		const eventId = `${selectedEvent?.id || ""}`.trim();
 		const name = (document.getElementById("edit-event-name")?.value || "").trim();
@@ -1059,6 +1160,7 @@
 			}
 		});
 	};
+
 	const eventCategoryLookup = {};
 	let selectedEvent = null;
 	let selectedCategory = null;
@@ -1071,10 +1173,8 @@
 	let selectedDate = new Date(currentYear, currentMonth, currentDay);
 	let selectedDateRangeStart = selectedDate;
 	let selectedDateRangeEnd = selectedDate;
-	let disposeRangeSelectionListeners = () => {
-	};
-	let disposeDayTimeSelectionListeners = () => {
-	};
+	let disposeRangeSelectionListeners = () => {};
+	let disposeDayTimeSelectionListeners = () => {};
 	let suppressDaySlotClickUntil = 0;
 	let lastDayDragCompletionAt = 0;
 	const yearStart = new Date(currentYear, 0, 1);
@@ -1096,7 +1196,7 @@
 				}
 			}, {
 				title: "Categories",
-				icon: `<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><style>.s0{fill:none;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width: 1 } </style><path class="s0" d="m10 5h-3.29q-0.34 0-0.65 0.13-0.32 0.13-0.56 0.37-0.24 0.24-0.37 0.56-0.13 0.31-0.13 0.65v3.29c0 0.45 0.18 0.89 0.5 1.21l7.3 7.3c0.53 0.53 1.35 0.66 1.98 0.25q0.59-0.39 1.14-0.84 0.55-0.45 1.05-0.95 0.5-0.5 0.95-1.05 0.45-0.55 0.84-1.14c0.41-0.63 0.28-1.45-0.25-1.98l-7.3-7.3q-0.12-0.12-0.26-0.21-0.14-0.09-0.29-0.16-0.16-0.06-0.33-0.1-0.16-0.03-0.33-0.03z"/><path class="s0" d="m7.28 7.28h0.01v0.01h-0.01z"/></svg>`,
+				icon: modular.icons.tag,
 				onclick: () => modular.show("com.standard.calendar", 1)
 			}],
 			svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z"/></svg>`,
@@ -1206,7 +1306,7 @@
 									openCreateEventPortal();
 								}
 							}, {
-								icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 17V9M16 13.0011L8 13M7 3V5M17 3V5M6.2 21H17.8C18.9201 21 19.4802 21 19.908 20.782C20.2843 20.5903 20.5903 20.2843 20.782 19.908C21 19.4802 21 18.9201 21 17.8V8.2C21 7.07989 21 6.51984 20.782 6.09202C20.5903 5.71569 20.2843 5.40973 19.908 5.21799C19.4802 5 18.9201 5 17.8 5H6.2C5.0799 5 4.51984 5 4.09202 5.21799C3.71569 5.40973 3.40973 5.71569 3.21799 6.09202C3 6.51984 3 7.07989 3 8.2V17.8C3 18.9201 3 19.4802 3.21799 19.908C3.40973 20.2843 3.71569 20.5903 4.09202 20.782C4.51984 21 5.07989 21 6.2 21Z" stroke="black" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+								icon: modular.icons.tag,
 								label: "Categories",
 								action: () => modular.show("com.standard.calendar", 1)
 							}
@@ -1338,7 +1438,7 @@
 									openCreateEventPortal();
 								}
 							}, {
-								icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 17V9M16 13.0011L8 13M7 3V5M17 3V5M6.2 21H17.8C18.9201 21 19.4802 21 19.908 20.782C20.2843 20.5903 20.5903 20.2843 20.782 19.908C21 19.4802 21 18.9201 21 17.8V8.2C21 7.07989 21 6.51984 20.782 6.09202C20.5903 5.71569 20.2843 5.40973 19.908 5.21799C19.4802 5 18.9201 5 17.8 5H6.2C5.0799 5 4.51984 5 4.09202 5.21799C3.71569 5.40973 3.40973 5.71569 3.21799 6.09202C3 6.51984 3 7.07989 3 8.2V17.8C3 18.9201 3 19.4802 3.21799 19.908C3.40973 20.2843 3.71569 20.5903 4.09202 20.782C4.51984 21 5.07989 21 6.2 21Z" stroke="black" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+								icon: modular.icons.tag,
 								label: "Categories",
 								action: () => modular.show("com.standard.calendar", 1)
 							}
@@ -1550,7 +1650,7 @@
 				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>`,
 				onclick: () => modular.show("com.standard.calendar", 2)
 			}],
-			icon: `<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><style>.s0{fill:none;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width: 1 } </style><path class="s0" d="m10 5h-3.29q-0.34 0-0.65 0.13-0.32 0.13-0.56 0.37-0.24 0.24-0.37 0.56-0.13 0.31-0.13 0.65v3.29c0 0.45 0.18 0.89 0.5 1.21l7.3 7.3c0.53 0.53 1.35 0.66 1.98 0.25q0.59-0.39 1.14-0.84 0.55-0.45 1.05-0.95 0.5-0.5 0.95-1.05 0.45-0.55 0.84-1.14c0.41-0.63 0.28-1.45-0.25-1.98l-7.3-7.3q-0.12-0.12-0.26-0.21-0.14-0.09-0.29-0.16-0.16-0.06-0.33-0.1-0.16-0.03-0.33-0.03z"/><path class="s0" d="m7.28 7.28h0.01v0.01h-0.01z"/></svg>`,
+			icon: modular.icons.tag,
 			route: () => div({
 				style: "large-padding-top", content: children([
 					div({
@@ -1615,9 +1715,8 @@
 				}
 			}],
 			resizable: false,
-			icon: `<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><style>.s0{fill:none;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width: 1 } </style><path class="s0" d="m10 5h-3.29q-0.34 0-0.65 0.13-0.32 0.13-0.56 0.37-0.24 0.24-0.37 0.56-0.13 0.31-0.13 0.65v3.29c0 0.45 0.18 0.89 0.5 1.21l7.3 7.3c0.53 0.53 1.35 0.66 1.98 0.25q0.59-0.39 1.14-0.84 0.55-0.45 1.05-0.95 0.5-0.5 0.95-1.05 0.45-0.55 0.84-1.14c0.41-0.63 0.28-1.45-0.25-1.98l-7.3-7.3q-0.12-0.12-0.26-0.21-0.14-0.09-0.29-0.16-0.16-0.06-0.33-0.1-0.16-0.03-0.33-0.03z"/><path class="s0" d="m7.28 7.28h0.01v0.01h-0.01z"/></svg>`,
-			route: () => div({
-				style: "large-padding-top", content: children([
+			icon: modular.icons.tag,
+			route: () => div({style: "large-padding-top", content: children([
 					div({
 						content: children([
 							div({style: "small-padding bold", content: "Name"}),
@@ -1688,7 +1787,7 @@
 				icon: modular.icons.delete,
 				onclick: () => deleteSelectedCategory(3)
 			}, {title: "Save", icon: modular.icons.save, onclick: () => saveSelectedCategory(3)}],
-			icon: `<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><style>.s0{fill:none;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width: 1 } </style><path class="s0" d="m10 5h-3.29q-0.34 0-0.65 0.13-0.32 0.13-0.56 0.37-0.24 0.24-0.37 0.56-0.13 0.31-0.13 0.65v3.29c0 0.45 0.18 0.89 0.5 1.21l7.3 7.3c0.53 0.53 1.35 0.66 1.98 0.25q0.59-0.39 1.14-0.84 0.55-0.45 1.05-0.95 0.5-0.5 0.95-1.05 0.45-0.55 0.84-1.14c0.41-0.63 0.28-1.45-0.25-1.98l-7.3-7.3q-0.12-0.12-0.26-0.21-0.14-0.09-0.29-0.16-0.16-0.06-0.33-0.1-0.16-0.03-0.33-0.03z"/><path class="s0" d="m7.28 7.28h0.01v0.01h-0.01z"/></svg>`,
+			icon: modular.icons.tag,
 			route: () => {
 				if (!selectedCategory) return div({style: "faded padded center", content: "Select a category first."});
 				setCalendarPortalTitle(3, selectedCategory?.name || "Edit Category");
@@ -1911,44 +2010,40 @@
 			title: "View Event",
 			dimensions: [350, 310],
 			navigation: false,
-			tools: [{
-				title: "Edit",
-				icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><g transform="scale(0.9) translate(1.333 1.333) translate(0.25 0.6)"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75a2.121 2.121 0 1 1 3 3L9 17.25 4.5 18.75 6 14.25 16.5 3.75Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 5.25l3 3"/></g></svg>`,
-				onclick: () => {
-					if (!selectedEvent) return;
-					hideCalendarPortal(5);
-					modular.show("com.standard.calendar", 6)
+			tools: [
+				{
+					title: "Edit",
+					icon: modular.icons.modify,
+					onclick: () => {
+						if (!selectedEvent) return;
+						hideCalendarPortal(5);
+						modular.show("com.standard.calendar", 6)
+					}
+				},
+				{
+					title: "Delete",
+					icon: modular.icons.delete,
+					onclick: () => deleteSelectedEvent(5)
 				}
-			}, {
-				title: "Delete",
-				icon: modular.icons.delete,
-				onclick: () => deleteSelectedEvent(5)
-			}],
+			],
 			icon: "/icons/interfaces/calendar.png",
 			route: () => {
-				if (!selectedEvent) return div({
-					style: "faded padded center",
-					content: "Select an event from the calendar."
-				});
+				if (!selectedEvent) return div({style: "faded padded center", content: "Select an event from the calendar."});
 				setCalendarPortalTitle(5, selectedEvent?.name || "Untitled");
 				const startLabel = toDateTimeLabel(getEventBoundary(selectedEvent, "start")) || "Not set";
 				const endLabel = toDateTimeLabel(getEventBoundary(selectedEvent, "end")) || "Not set";
-				return div({
-					style: "large-padding-top", content: children([
-						div({
-							content: children([
+				return div({style: "large-padding-top", content: children([
+						div({content: children([
 								div({style: "faded small-padding bold", content: "Category"}),
 								div({style: "padded", content: selectedEvent?.category?.name || "Uncategorized"})
 							])
 						}),
-						div({
-							content: children([
+						div({content: children([
 								div({style: "faded small-padding bold", content: "Start"}),
 								div({style: "padded", content: startLabel})
 							])
 						}),
-						div({
-							content: children([
+						div({content: children([
 								div({style: "faded small-padding bold", content: "End"}),
 								div({style: "padded", content: endLabel})
 							])
@@ -1962,18 +2057,20 @@
 			instanceId: "edit-event-recurrence-v3",
 			dimensions: [380, 360],
 			navigation: false,
-			tools: [{
-				title: "Delete",
-				icon: modular.icons.delete,
-				onclick: () => deleteSelectedEvent(6)
-			}, {
-				title: "Save",
-				icon: modular.icons.save,
-				onclick: () => saveSelectedEvent(6)
-			}],
+			tools: [
+				{
+					title: "Delete",
+					icon: modular.icons.delete,
+					onclick: () => deleteSelectedEvent(6)
+				},
+				{
+					title: "Save",
+					icon: modular.icons.save,
+					onclick: () => saveSelectedEvent(6)
+				}
+			],
 			icon: "/icons/interfaces/calendar.png",
-			route: () => div({
-				style: "no-scrollbars large-padding-top", content: () => {
+			route: () => div({style: "no-scrollbars large-padding-top", content: () => {
 					if (!selectedEvent) return div({
 						style: "faded padded center",
 						content: "Select an event from the calendar first."
@@ -2012,9 +2109,7 @@
 							div({
 								content: children([
 									div({style: "small-padding", content: "Event Name"}),
-									div({
-										style: "padded",
-										content: input({
+									div({style: "padded", content: input({
 											id: "edit-event-name",
 											style: "undecorated no-padding",
 											placeholder: "",
@@ -2026,15 +2121,7 @@
 							div({
 								content: children([
 									div({style: "small-padding", content: "Start"}),
-									div({
-										style: "padded", content: input({
-											id: "edit-start-timestamp",
-											type: "datetime-local",
-											style: "undecorated no-padding",
-											placeholder: "",
-											value: startDate ? toDateTimeLocalValue(startDate, startDate.getHours(), startDate.getMinutes()) : ""
-										})
-									})
+									div({style: "padded", content: input({id: "edit-start-timestamp", type: "datetime-local", style: "undecorated no-padding", placeholder: "", value: startDate ? toDateTimeLocalValue(startDate, startDate.getHours(), startDate.getMinutes()) : ""})})
 								])
 							}),
 							div({

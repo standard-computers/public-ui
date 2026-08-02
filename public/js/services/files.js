@@ -1,14 +1,21 @@
 (async () => {
     const FILES_SERVICE_ID = "com.standard.files";
     const FILES_SETTINGS = {
-        display_style: {label: "Display style", type: "text", default: "rows", restrictions: ["rows", "tiles", "details"]}
+        display_style: {
+            label: "Display style",
+            type: "text",
+            default: "rows",
+            restrictions: ["rows", "tiles", "details"]
+        }
     };
     const NOTE_CONTENT_PREFIX = "__STD_NOTE_B64__:";
+
     let photoCascadeObserver = null;
     let photoDisplayStyle = "cascade";
     const photoObjectUrls = new Set();
     const PHOTO_GRID_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>`;
     const PHOTO_CASCADE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 7.125C2.25 6.504 2.754 6 3.375 6h6c.621 0 1.125.504 1.125 1.125v3.75c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 0 1-1.125-1.125v-3.75ZM14.25 8.625c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v8.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 0 1-1.125-1.125v-8.25ZM3.75 16.125c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 0 1-1.125-1.125v-2.25Z"/></svg>`;
+
     const decodeNoteContent = value => {
         const raw = String(value || "");
         if (!raw.startsWith(NOTE_CONTENT_PREFIX)) return raw;
@@ -20,7 +27,9 @@
             return "";
         }
     };
+
     const normalizeNoteContent = value => decodeNoteContent(value);
+
     const normalizeNoteRecord = (note = {}) => ({
         ...note,
         id: note.id ?? note.ID ?? "",
@@ -29,6 +38,7 @@
         color: note.color ?? note.CLR ?? note.clr ?? "",
         created: note.created ?? note.CRTD ?? note.crtd ?? ""
     });
+
     const sanitizeNoteMarkup = markup => {
         const parser = new DOMParser();
         const parsed = parser.parseFromString(`<div>${String(markup || "")}</div>`, "text/html");
@@ -366,7 +376,11 @@
     const deleteNoteFromNotesSection = (noteId, note = {}, tile = null) => {
         if (!noteId) return;
         const noteLabel = String(note?.created || "note").trim() || "note";
-        confirmationDialogue({title: "Delete note", content: `Are you sure you want to delete ${noteLabel}?`, confirmation: () => {
+        confirmationDialogue({
+            title: "Delete note",
+            destructive: true,
+            content: `Are you sure you want to delete ${noteLabel}?`,
+            confirmation: () => {
                 CLI.send(`[notes] - <id ${noteId}>`).then(response => {
                     if (response === 1) {
                         removeDeletedNoteTile(noteId, tile);
@@ -390,7 +404,8 @@
     const isWhiteboardFilePath = (rawPath = "") => /\.wtb$/i.test(String(rawPath || ""));
     const isChartFilePath = (rawPath = "") => /\.chrts$/i.test(String(rawPath || ""));
     const isSlidesFilePath = (rawPath = "") => /\.slds$/i.test(String(rawPath || ""));
-    const isSpreadsheetFilePath = (rawPath = "") => /\.sprdshts$/i.test(String(rawPath || ""));
+    const isSpreadsheetFilePath = (rawPath = "") => /\.(?:sprdshts|xlsx)$/i.test(String(rawPath || ""));
+    const isXlsxFilePath = (rawPath = "") => /\.xlsx$/i.test(String(rawPath || ""));
     const isCodeFilePath = (rawPath = "") => /\.(std|stds|sui)$/i.test(String(rawPath || ""));
     const isTextFilePath = (rawPath = "") => /\.txt$/i.test(String(rawPath || ""));
     const isImageFilePath = (rawPath = "") => /\.(png|ico|gif|jpeg|jpg|svg|tiff|bm|avif|webp)$/i.test(String(rawPath || ""));
@@ -489,9 +504,13 @@
         return openSlidePayload(download.path, JSON.parse(await download.blob.text()), sourceNode);
     };
     const openSheetInSheetsApp = async (rawPath = "", sourceNode = null) => {
+        const download = await downloadFileForOpen(rawPath);
+        if (isXlsxFilePath(download.path)) {
+            const openXlsxBuffer = await waitForServiceMethod(() => window.StandardSheets?.openXlsxBuffer, "com.standard.editor.sheet");
+            return openXlsxBuffer ? openXlsxBuffer(download.path, await download.blob.arrayBuffer(), sourceNode) : false;
+        }
         const openSheetPayload = await waitForServiceMethod(() => window.StandardSheets?.openSheetPayload, "com.standard.editor.sheet");
         if (!openSheetPayload) return false;
-        const download = await downloadFileForOpen(rawPath);
         return openSheetPayload(download.path, JSON.parse(await download.blob.text()), sourceNode);
     };
     const openCodeFileInCodeEditor = async (rawPath = "", sourceNode = null) => {
@@ -533,6 +552,10 @@
             return openSlidePayload ? openSlidePayload(fileName, JSON.parse(await blob.text()), sourceNode) : false;
         }
         if (isSpreadsheetFilePath(fileName)) {
+            if (isXlsxFilePath(fileName)) {
+                const openXlsxBuffer = await waitForServiceMethod(() => window.StandardSheets?.openXlsxBuffer, "com.standard.editor.sheet");
+                return openXlsxBuffer ? openXlsxBuffer(fileName, await blob.arrayBuffer(), sourceNode) : false;
+            }
             const openSheetPayload = await waitForServiceMethod(() => window.StandardSheets?.openSheetPayload, "com.standard.editor.sheet");
             return openSheetPayload ? openSheetPayload(fileName, JSON.parse(await blob.text()), sourceNode) : false;
         }
@@ -823,14 +846,14 @@
         }
     };
     const createFileMenuItems = () => [{
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg>`,
+        icon: modular.icons.open,
         label: "Open",
         action: (b, e, el) => {
             const path = el.closest(".file-folder")?.getAttribute("directive");
             openFilePath(path, el);
         }
     }, {
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"/></svg>`,
+        icon: modular.icons.modify,
         label: "Rename",
         action: (b, e, el) => {
             const path = el.closest(".file-folder")?.getAttribute("directive");
@@ -851,7 +874,7 @@
             triggerFileDownload(path);
         }
     }, {
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`,
+        icon: modular.icons.delete,
         label: "Delete",
         destructive: true,
         action: (b, e, el) => {
@@ -860,11 +883,13 @@
             deleteFile(path, tile);
         }
     }];
+
     const getImageSourceFromTile = sourceNode => {
         const tile = sourceNode?.closest?.(".file-folder") || sourceNode;
         const image = sourceNode?.matches?.("img") ? sourceNode : tile?.querySelector?.("img");
         return String(image?.currentSrc || image?.src || image?.getAttribute?.("src") || "").trim();
     };
+
     const openPhotoInImageViewer = async (rawPath = "", sourceNode = null) => {
         const openRenderedPhoto = () => {
             const renderedSource = getImageSourceFromTile(sourceNode);
@@ -880,6 +905,7 @@
         if (typeof window.StandardInternals?.openImageFilePath === "function") return window.StandardInternals.openImageFilePath(rawPath, sourceNode);
         return false;
     };
+
     const revokePhotoObjectUrls = () => {
         photoObjectUrls.forEach(url => {
             try {
@@ -889,6 +915,7 @@
         });
         photoObjectUrls.clear();
     };
+
     const getPhotoCacheKey = (photo = {}) => {
         const rawPath = typeof photo === "string" ? photo : (photo?.path || photo?.name || "");
         const normalizedPath = getFilePathForRemoveCommand(rawPath);
@@ -1242,50 +1269,57 @@
         }, {
             text: "Notes",
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5A3.375 3.375 0 0 0 6.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0 0 15 2.25h-1.5a2.251 2.251 0 0 0-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 0 0-9-9Z"/></svg>`,
-            route: () => div({
-                style: "small-padding-right", content: children([div({
-                    style: "masonry", id: "notes", content: () => {
-                        return CLI.send("[notes]").then(d => {
-                            const noteRecords = d === 0 ? [] : (d.notes || d.NTS);
-                            if (!Array.isArray(noteRecords)) throw new Error("Invalid notes response");
-                            const notes = noteRecords.map(normalizeNoteRecord);
-                            if (notes.length === 0) return renderNoNotesState();
-                            let as = []
-                            for (let i = 0; i < notes.length; i++) {
-                                as.push(div({
-                                    style: "note-tile hidden padded secondary-tile secondary-bordered radius hover-shadowed hover-zoom",
-                                    directive: notes[i].id,
-                                    background: notes[i].color,
-                                    onclick: event => {
-                                        if (event.target.closest("button") || event.target.closest("img")) return;
-                                        openNoteInNotesApp(notes[i]);
-                                    },
-                                    content: children([button({style: "naked inner-radius float-right expose no-padding small-padding",
-                                        icon: `<svg class="tiny-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"/></svg>`,
-                                        onclick: () => openNoteEditorInNotesApp(notes[i])
-                                    }), button({style: "naked inner-radius float-right expose no-padding small-padding",
-                                        icon: `<svg class="tiny-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`,
-                                        onclick: event => deleteNoteFromNotesSection(notes[i].id, notes[i], event.target)
-                                    }), strong({style: "note-tile-title", content: escapeHtml(notes[i].title || notes[i].created || "Untitled Note")}), div({style: "note-tile-content", content: sanitizeNoteMarkup(normalizeNoteContent(notes[i].content))}), notes[i].title ? em({
-                                        style: "smaller faded no-wrap",
-                                        content: notes[i].created
-                                    }) : ""])
-                                }))
-                            }
-                            return children(as);
-                        })
-                    }
-                }), button({
-                    style: "secondary primary-action round hover-zoom",
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>`,
-                    onclick: () => modular.show("com.standard.notes", 1)
-                }),])
+            route: () => div({style: "small-padding-right", content: children([
+                div({style: "masonry", id: "notes", content: () => {
+                            return CLI.send("[notes]").then(d => {
+                                const noteRecords = d === 0 ? [] : (d.notes || d.NTS);
+                                if (!Array.isArray(noteRecords)) throw new Error("Invalid notes response");
+                                const notes = noteRecords.map(normalizeNoteRecord);
+                                if (notes.length === 0) return renderNoNotesState();
+                                let as = []
+                                for (let i = 0; i < notes.length; i++) {
+                                    as.push(div({
+                                        style: "note-tile hidden padded secondary-tile secondary-bordered radius hover-shadowed hover-zoom",
+                                        directive: notes[i].id,
+                                        background: notes[i].color,
+                                        onclick: event => {
+                                            if (event.target.closest("button") || event.target.closest("img")) return;
+                                            openNoteInNotesApp(notes[i]);
+                                        },
+                                        content: children([
+                                            button({style: "naked inner-radius float-right expose no-padding small-padding",
+                                                icon: modular.icons.modify,
+                                                onclick: () => openNoteEditorInNotesApp(notes[i])
+                                            }),
+                                            button({style: "naked inner-radius float-right expose no-padding small-padding",
+                                                icon: modular.icons.delete,
+                                                onclick: event => deleteNoteFromNotesSection(notes[i].id, notes[i], event.target)
+                                            }),
+                                            strong({style: "note-tile-title", content: escapeHtml(notes[i].title || notes[i].created || "Untitled Note")}),
+                                            div({style: "note-tile-content", content: sanitizeNoteMarkup(normalizeNoteContent(notes[i].content))}),
+                                            notes[i].title ? em({
+                                                style: "smaller faded no-wrap",
+                                                content: notes[i].created
+                                            }) : ""
+                                        ])
+                                    }))
+                                }
+                                return children(as);
+                            })
+                        }
+                    }),
+                    button({
+                        style: "secondary primary-action round hover-zoom",
+                        icon: modular.icons.create,
+                        onclick: () => modular.show("com.standard.notes", 1)
+                    })
+                ])
             }),
             afterRender: () => {
                 const notesRoot = document.getElementById("notes");
                 bindNoteImageViewer(notesRoot);
                 document.querySelectorAll("#notes").forEach((el) => el.contextmenu([{
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg>`,
+                    icon: modular.icons.open,
                     label: "Open",
                     action: (b, e, target) => {
                         const note = getNoteFromTile(target);
@@ -1296,7 +1330,7 @@
                         openNoteInNotesApp(note);
                     }
                 }, {
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"/></svg>`,
+                    icon: modular.icons.modify,
                     label: "Edit",
                     action: (b, e, target) => {
                         const note = getNoteFromTile(target);
@@ -1307,7 +1341,7 @@
                         openNoteEditorInNotesApp(note);
                     }
                 }, {
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`,
+                    icon: modular.icons.delete,
                     label: "Delete",
                     destructive: true,
                     action: (b, e, target) => {
@@ -1406,7 +1440,7 @@
                     photoCascadeObserver.observe(photosRoot, {childList: true, subtree: true});
                 }
                 document.querySelectorAll("#photos").forEach((el) => el.contextmenu([{
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"/></svg>`,
+                    icon: modular.icons.modify,
                     label: "Rename",
                     action: (b, e, target) => {
                         const path = target.closest(".file-folder")?.getAttribute("directive");
@@ -1420,7 +1454,7 @@
                         triggerFileDownload(path);
                     }
                 }, {
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`,
+                    icon: modular.icons.delete,
                     label: "Delete",
                     destructive: true,
                     action: (b, e, target) => {
@@ -1474,14 +1508,14 @@
             afterRender: () => {
                 setActiveUploadDirectory("Videos");
                 document.querySelectorAll("#videos").forEach((el) => el.contextmenu([{
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg>`,
+                    icon: modular.icons.open,
                     label: "Open",
                     action: (b, e, target) => {
                         const path = target.closest(".file-folder")?.getAttribute("directive");
                         openVideoInVideoViewer(path, target);
                     }
                 }, {
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"/></svg>`,
+                    icon: modular.icons.modify,
                     label: "Rename",
                     action: (b, e, target) => {
                         const path = target.closest(".file-folder")?.getAttribute("directive");
@@ -1495,7 +1529,7 @@
                         triggerFileDownload(path);
                     }
                 }, {
-                    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`,
+                    icon: modular.icons.delete,
                     label: "Delete",
                     destructive: true,
                     action: (b, e, target) => {
@@ -1509,23 +1543,29 @@
             text: "Upload",
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18"/></svg>`,
             route: div({style: "padded",
-                content: children([h({level: 3, content: "Upload Files"}), div({style: "spacer"}), div({
-                    content: children([button({
-                        content: "Browse Device", onclick: _ => {
-                            const uploadInput = document.createElement("input");
-                            uploadInput.type = "file";
-                            uploadInput.multiple = true;
-                            uploadInput.style.display = "none";
-                            uploadInput.onchange = async event => {
-                                const files = event?.target?.files;
-                                await uploadSelectedFiles(files);
-                                uploadInput.remove();
-                            };
-                            document.body.appendChild(uploadInput);
-                            uploadInput.click();
-                        }
-                    })])
-                }), div({style: "spacer"}), em({style: "faded", content: "Max file upload size is 1 GB"})])
+                content: children([
+                    h({level: 3, content: "Upload Files"}),
+                    div({style: "spacer"}),
+                    div({content: children([
+                            button({content: "Browse Device", onclick: _ => {
+                                    const uploadInput = document.createElement("input");
+                                    uploadInput.type = "file";
+                                    uploadInput.multiple = true;
+                                    uploadInput.style.display = "none";
+                                    uploadInput.onchange = async event => {
+                                        const files = event?.target?.files;
+                                        await uploadSelectedFiles(files);
+                                        uploadInput.remove();
+                                    };
+                                    document.body.appendChild(uploadInput);
+                                    uploadInput.click();
+                                }
+                            })
+                        ])
+                    }),
+                    div({style: "spacer"}),
+                    em({style: "faded", content: "Max file upload size is 1 GB"})
+                ])
             })
         }]
     })], FILES_SETTINGS));

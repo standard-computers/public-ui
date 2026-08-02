@@ -86,7 +86,6 @@
         });
     };
 
-    const STANDARD_SHEETS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon brick" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5"/></svg>`;
     const INTERFACES_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>`;
 
     const getPlatformInterfaces = () => {
@@ -536,7 +535,7 @@
                 return;
             }
             listRoot.innerHTML = standards.map(({name, reference}, index) => div({style: "brick bordered radius padded small-margin-bottom shadowed", content: children([
-                button({style: "tiny float-right inner-radius small-margin-left no-margin-top", title: "View as sheet", icon: STANDARD_SHEETS_ICON, onclick: event => openStandardDataInSheets(reference, name, event?.target)}),
+                button({style: "tiny float-right inner-radius small-margin-left no-margin-top", title: "View as sheet", icon: modular.icons.sheets, onclick: event => openStandardDataInSheets(reference, name, event?.target)}),
                 button({style: "tiny float-right no-margin inner-radius", content: "Data", onclick: event => openStandardDataInInternals(reference, event?.target)}),
                 div({style: "inline margin-bottom", content: div({style: "brick", content: `<strong>${escapeHtml(name)}</strong><span class="faded"> ${escapeHtml(reference)}</span>`})}),
                 div({id: `home-standards-detail-${index}`, style: "faded small-padding", content: "Loading details..."})
@@ -664,7 +663,7 @@
             let savedToDocuments = false;
             let workflowError = null;
             try {
-                const response = await window.StandardUploads.saveFile(standard.content, relativePath, {label: `Creating ${standard.name}`});
+                const response = await window.StandardUploads.saveFile(standard.content, hostPath, {label: `Creating ${standard.name}`});
                 if (!response?.ok) throw new Error("Unable to save the Standard file");
                 savedToDocuments = true;
                 const importResponse = await CLI.send(`import "${hostPath}"`, false);
@@ -1284,6 +1283,7 @@
         const displayName = buildPeopleDisplayName(selectedPeopleUserRecord || {});
         confirmationDialogue({
             title: "Delete Person",
+            destructive: true,
             content: `You're sure you want to delete ${displayName}?`,
             confirmation: async () => {
                 const recordId = sanitizeUserRecordId(selectedPeopleUserRecord?.id);
@@ -1798,8 +1798,12 @@
             internal: true,
             dimensions: [620, 420],
             navigation: false,
-            hints: ["create a standard"],
-            tools: [{title: "Create", icon: modular.icons.save, onclick: saveCreatedStandard}],
+            hints: ["create a standard", "create standard"],
+            tools: [{
+                title: "Save",
+                icon: modular.icons.save,
+                onclick: saveCreatedStandard
+            }],
             route: () => div({style: "large-padding-top padded", content: children([
                     div({style: "standard-maker-basics", content: children([
                         div({content: children([
@@ -1834,7 +1838,13 @@
             auto_height: true,
             navigation: false,
             resizable: false,
-            tools: [{title: "Modify", icon: modular.icons.modify, onclick: openModifyPersonPortal}],
+            tools: [
+                {
+                    title: "Modify",
+                    icon: modular.icons.modify,
+                    onclick: openModifyPersonPortal
+                }
+            ],
             icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25"/></svg>`,
             route: renderPeopleUserPortal,
             afterRender: function () {
@@ -1847,8 +1857,16 @@
             dimensions: [420, 620],
             navigation: false,
             tools: [
-                {title: "Delete", icon: modular.icons.delete, onclick: deleteModifiedPerson},
-                {title: "Save", icon: modular.icons.save, onclick: saveModifiedPerson}
+                {
+                    title: "Delete",
+                    icon: modular.icons.delete,
+                    onclick: deleteModifiedPerson
+                },
+                {
+                    title: "Save",
+                    icon: modular.icons.save,
+                    onclick: saveModifiedPerson
+                }
             ],
             route: () => div({
                 style: "large-padding-top small-padding fill",

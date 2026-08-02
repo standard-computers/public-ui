@@ -1,4 +1,5 @@
 (async () => {
+
     let selected_contact = {firstname: ""};
     let addContactImageFile = null;
     let editContactImageFile = null;
@@ -6,26 +7,33 @@
     const contactImageCacheKeys = {};
     const contactServiceIcon = "/icons/interfaces/contacts.png";
     const defaultContactImage = "/images/blank_contact.png";
+
     const getContactImageCacheKey = (contactId) => {
         const cacheKey = contactImageCacheKeys[String(contactId)];
         return cacheKey ?? "cached";
     };
+
     const bumpContactImageCacheKey = (contactId) => {
         if (!contactId) return;
         contactImageCacheKeys[String(contactId)] = Date.now();
     };
+
     const contactImageUrl = (contactId) => contactId ? `/api/records/images/${contactId}?cb=${contactId}-${getContactImageCacheKey(contactId)}` : defaultContactImage;
+
     const setContactImageFallback = (imageEl) => {
         if (!imageEl || imageEl.src.endsWith(defaultContactImage)) return;
         imageEl.src = defaultContactImage;
     };
+
     document.addEventListener("error", (event) => {
         const target = event.target;
         if (!(target instanceof HTMLImageElement) || !target.classList.contains("contact-image")) return;
         setContactImageFallback(target);
     }, true);
+
     const contactPreviewContacts = new Map();
     const renderNoContactsState = () => emptyState({style: "contacts-empty-state", icon: contactServiceIcon, iconStyle: "contacts-empty-icon", label: "No contacts", labelStyle: "contacts-empty-label"});
+
     const renderNoContactsStateInto = (container) => {
         if (!container) return;
         const emptyStateMarkup = renderNoContactsState();
@@ -38,6 +46,7 @@
         }
         container.innerHTML = emptyStateMarkup;
     };
+
     const removeContactTile = (contactTile) => {
         if (!contactTile) return;
         const contactIdText = String(contactTile.getAttribute("data") || "");
@@ -47,6 +56,7 @@
         if (contactPreview.activeTile === contactTile) hideContactPreview();
         if (listContainer && !listContainer.querySelector(".contact.tile")) renderNoContactsStateInto(listContainer);
     };
+
     const removeContactFromVisibleLists = (contactId) => {
         const contactIdText = String(contactId || "");
         document.querySelectorAll(".contact.tile").forEach((contactTile) => {
@@ -55,6 +65,7 @@
         contactPreviewContacts.delete(contactIdText);
         if (contactPreview.activeTile?.getAttribute("data") === contactIdText) hideContactPreview();
     };
+
     const setContactImageBackground = (element, imageUrl = defaultContactImage) => {
         if (!element) return;
         element.dataset.contactImageSource = imageUrl;
@@ -63,6 +74,7 @@
         element.style.backgroundPosition = "center";
         element.style.backgroundRepeat = "no-repeat";
     };
+
     const applyContactImageBackground = (element, imageUrl = defaultContactImage) => {
         const resolvedImageUrl = imageUrl || defaultContactImage;
         setContactImageBackground(element, resolvedImageUrl);
@@ -73,6 +85,7 @@
         };
         probe.src = resolvedImageUrl;
     };
+
     const buildContactPreview = () => {
         const preview = document.createElement("div");
         preview.className = "contacts-hover-preview";
@@ -105,12 +118,16 @@
         document.body.appendChild(preview);
         return preview;
     };
+
     const contactPreview = {element: null, activeTile: null, pendingEvent: null, frame: null};
+
     const ensureContactPreview = () => {
         if (!contactPreview.element || !document.body.contains(contactPreview.element)) contactPreview.element = buildContactPreview();
         return contactPreview.element;
     };
+
     const formatContactName = (contact = {}) => [contact.firstname, contact.middlename, contact.lastname].filter(Boolean).join(" ").trim() || "Unnamed Contact";
+
     const updateContactPreviewContent = (tile, contact = {}) => {
         const preview = ensureContactPreview();
         const previewPhoto = preview.querySelector(".contacts-hover-preview-photo");
@@ -133,6 +150,7 @@
         setText(".contacts-hover-preview-email", contact.email);
         setText(".contacts-hover-preview-address", contact.address);
     };
+
     const moveContactPreview = (event) => {
         const preview = ensureContactPreview();
         const margin = 12;
@@ -145,6 +163,7 @@
         preview.style.left = `${Math.max(margin, left)}px`;
         preview.style.top = `${Math.max(margin, top)}px`;
     };
+
     const scheduleContactPreviewMove = (event) => {
         contactPreview.pendingEvent = event;
         if (contactPreview.frame) return;
@@ -154,6 +173,7 @@
             moveContactPreview(contactPreview.pendingEvent);
         });
     };
+
     const showContactPreview = (tile, event) => {
         if (!tile) return;
         const contact = contactPreviewContacts.get(String(tile.getAttribute("data") || ""));
@@ -164,6 +184,7 @@
         preview.style.display = "block";
         moveContactPreview(event);
     };
+
     const hideContactPreview = () => {
         if (contactPreview.frame) cancelAnimationFrame(contactPreview.frame);
         contactPreview.frame = null;
@@ -171,17 +192,20 @@
         contactPreview.activeTile = null;
         if (contactPreview.element) contactPreview.element.style.display = "none";
     };
+
     document.addEventListener("mouseover", (event) => {
         const tile = event.target.closest?.(".contact.tile");
         if (!tile || tile === contactPreview.activeTile) return;
         showContactPreview(tile, event);
     });
+
     document.addEventListener("mousemove", (event) => {
         if (!contactPreview.activeTile) return;
         const tile = event.target.closest?.(".contact.tile");
         if (tile !== contactPreview.activeTile) return;
         scheduleContactPreviewMove(event);
     });
+
     document.addEventListener("mouseout", (event) => {
         if (!contactPreview.activeTile) return;
         const relatedTarget = event.relatedTarget;
@@ -189,6 +213,7 @@
         const leavingTile = event.target.closest?.(".contact.tile");
         if (leavingTile === contactPreview.activeTile) hideContactPreview();
     });
+
     window.addEventListener("blur", hideContactPreview);
     window.addEventListener("scroll", hideContactPreview, true);
     const deleteContact = (contact = {}, onSuccess = () => {}) => {
@@ -197,7 +222,11 @@
             return;
         }
         const fullName = [contact.firstname, contact.lastname].filter(Boolean).join(" ").trim() || "this contact";
-        confirmationDialogue({title: "Delete Contact", content: `You're sure you want to delete ${fullName}?`, confirmation: async () => {
+        confirmationDialogue({
+            title: "Delete Contact",
+            destructive: true,
+            content: `You're sure you want to delete ${fullName}?`,
+            confirmation: async () => {
                 try {
                     const response = await CLI.send(`[contacts] - <id ${contact.id}>`);
                     if (response !== 0) {
@@ -217,6 +246,7 @@
             }
         });
     };
+
     const closeCreateContactPortal = () => {
         const openPortalWindow = typeof modular?.findPortalWindow === "function" ? modular.findPortalWindow("com.standard.contacts", 1) : null;
         if (typeof openPortalWindow?.portal?.close === "function") {
@@ -229,6 +259,7 @@
         }
         return false;
     };
+
     const closeEditContactPortal = () => {
         const openPortalWindow = typeof modular?.findPortalWindow === "function" ? modular.findPortalWindow("com.standard.contacts", 2) : null;
         if (typeof openPortalWindow?.portal?.close === "function") {
@@ -241,6 +272,7 @@
         }
         return false;
     };
+
     const resetPhotoPickerBinding = (photoEl, bindingKey) => {
         if (!photoEl) return null;
         const previousBinding = photoEl[bindingKey];
@@ -256,6 +288,7 @@
         photoEl[bindingKey] = binding;
         return binding;
     };
+
     const createContact = async () => {
         const fname = document.getElementById("first-name").value.trim();
         const mname = document.getElementById("middle-name").value.trim();
@@ -292,10 +325,8 @@
                 }
             } else if (addContactImageFile && !createdContactId) {
                 //TODO
-                console.log("[contacts:create] Image file selected but upload skipped because contact id was not parsed");
             } else {
                 //TODO
-                console.log("[contacts:create] No image selected for upload");
             }
             if ((response !== 0) || createdContactId) {
                 addContactImageFile = null;
@@ -309,6 +340,7 @@
             modular.error("Failed to create contact or upload image");
         }
     };
+
     const saveSelectedContact = async () => {
         const contactId = selected_contact?.id;
         if (!contactId) {
@@ -369,6 +401,7 @@
             modular.success("Saved contact");
         }
     };
+
     const openContact = (contact = {}) => {
         const fullName = [contact.firstname, contact.middlename, contact.lastname].filter(Boolean).join(" ").trim() || "View Contact";
         const contactValue = (value) => String(value || "").trim();
@@ -376,18 +409,19 @@
         const email = contactValue(contact.email);
         const contactActions = [
             phone && button({
-                style: "naked small-padding round background-secondary margin-right",
+                style: "naked small-padding round background-secondary" + (email ? " margin-right" : ""),
                 title: `Call ${fullName}`,
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102A1.125 1.125 0 0 0 5.872 2.25H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z"/></svg>`,
+                icon: modular.icons.phone,
                 onclick: () => window.location.href = `tel:${phone}`
             }),
             email && button({
                 style: "naked small-padding round background-secondary",
                 title: `Email ${fullName}`,
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>`,
+                icon: modular.icons.email,
                 onclick: () => window.location.href = `mailto:${email}`
             })
         ].filter(Boolean);
+
         const contactDetails = [
             contactValue(contact.company) && div({style: "small-padding faded", content: contactValue(contact.company)}),
             phone && div({style: "small-padding faded", content: phone}),
@@ -395,26 +429,30 @@
             contactValue(contact.address) && div({style: "small-padding", content: contactValue(contact.address).replace(/\s*,\s*/g, "<br>")}),
             contactValue(contact.birthday) && div({style: "small-padding faded", content: contactValue(contact.birthday)})
         ].filter(Boolean);
+
         const detailsPortal = new Portal({title: fullName, dimensions: [350, 400], auto_height: true, navigation: false, resizable: false,
-            tools: [{
-                title: "Edit",
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><g transform="scale(0.9) translate(1.333 1.333) translate(0.25 0.6)"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75a2.121 2.121 0 1 1 3 3L9 17.25 4.5 18.75 6 14.25 16.5 3.75Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 5.25l3 3"/></g></svg>`,
-                onclick: () => {
-                    selected_contact = {...contact};
-                    detailsPortal.close();
-                    modular.show("com.standard.contacts", 2);
-                }
-            }, {
-                title: "Delete",
-                icon: modular.icons.delete,
-                onclick: () => {
-                    deleteContact(contact, () => {
-                        removeContactFromVisibleLists(contact.id);
+            tools: [
+                {
+                    title: "Edit",
+                    icon: modular.icons.modify,
+                    onclick: () => {
+                        selected_contact = {...contact};
                         detailsPortal.close();
-                    });
+                        modular.show("com.standard.contacts", 2);
+                    }
+                },
+                {
+                    title: "Delete",
+                    icon: modular.icons.delete,
+                    onclick: () => {
+                        deleteContact(contact, () => {
+                            removeContactFromVisibleLists(contact.id);
+                            detailsPortal.close();
+                        });
+                    }
                 }
-            }],
-            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25"/></svg>`,
+            ],
+            icon: modular.icons.at,
             route: () => div({content: children([
                     div({style: "center large-margin-top large-margin-bottom", content: children([
                         img({style: "contact-image real-large-icon round inline", src: contactImageUrl(contact.id)}),
@@ -427,138 +465,186 @@
         });
         detailsPortal.show();
     };
+
     window.StandardContacts = window.StandardContacts || {};
     window.StandardContacts.openContact = contact => openContact(contact);
-    const contactsPortal = new Portal({title: "Contacts", hints: ["contacts"], dimensions: [400, 500], navigation: false, resizable: false,
-            tools: [{
-                title: "New Contact",
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>`,
-                onclick: _ => modular.show("com.standard.contacts", 1),
-            }],
-            svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25"/></svg>`,
-            icon: "/icons/interfaces/contacts.png",
-            route: () => div({ style: "large-padding-top", content: children([
-                    div({ style : "notes-list", content: div({
-                            style: "padded", content: () => {
-                                return CLI.send("[contacts]").then(d => {
-                                    const contacts = d === 0 ? [] : d.contacts;
-                                    if (!Array.isArray(contacts)) throw new Error("Invalid contacts response");
-                                    if (contacts.length === 0) return renderNoContactsState();
-                                    const sortedContacts = [...contacts].sort((left, right) => {
-                                        const leftName = String(left?.firstname || "").trim();
-                                        const rightName = String(right?.firstname || "").trim();
-                                        return leftName.localeCompare(rightName, undefined, {sensitivity: "base"});
-                                    });
-                                    let as = []
-                                    for (let i = 0; i < sortedContacts.length; i++) {
-                                        const contact = sortedContacts[i];
-                                        contactPreviewContacts.set(String(contact.id), contact);
-                                        as.push(div({style: "padded secondary-tile brick line small-spaced hover-shadowed contact tile", data: contact.id, onclick: (e) => {
-                                                if (e.target.closest("button")) return;
-                                                openContact(contact);
-                                            }, content: children([
-                                                button({style: "naked inner-radius float-right expose small-padding round",
-                                                    icon: `<svg class="small-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`,
-                                                    onclick: (e) => {
-                                                        e.stopPropagation();
-                                                        deleteContact(contact, () => removeContactTile(e.target.closest(".contact.tile")));
-                                                    }
-                                                }),
-                                                img({style: "contact-image icon float-left round space-right cover", src: contactImageUrl(contact.id)}),
-                                                label({content: contact.firstname}),
-                                                div({style: "faded", content: contact.lastname}),
-                                            ])
-                                        }))
-                                    }
-                                    return children(as);
-                                })
-                            }
-                        })
-                    })
-                ])
-            }),
-            afterRender: () => {}
-    });
-    const addContactPortal = new Portal({title: "Add Contact", hints: ["create contact", "add contact", "add new contact", "create new contact"], dimensions: [350, 450], navigation: false, resizable: false,
-            tools: [{
-                title: "Save",
-                icon: modular.icons.save,
-                onclick: createContact
-            }],
-            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25"/></svg>`,
-            route: () => div({content: children([
-                    div({style: "center medium-margin-top margin-bottom", content: children([
-                            div({style: "background-secondary round real-large-icon inline medium-margin-top margin-bottom" , id: "add-contact-photo"})
-                        ])
-                    }),
-                    div({content: children([
-                            div({style: "bold small-padding", content: "First Name"}),
-                            div({style: "padded", content: input({id: "first-name", style: "undecorated no-padding", placeholder: ""})})
-                        ])
-                    }),
-                    div({content: children([
-                            div({style: "bold small-padding", content: "Middle"}),
-                            div({style: "padded", content: input({id: "middle-name", style: "undecorated no-padding", placeholder: ""})})
-                        ])
-                    }),
-                    div({content: children([
-                            div({style: "bold small-padding", content: "Last"}),
-                            div({style: "padded", content: input({id: "last-name", style: "undecorated no-padding", placeholder: ""})})
-                        ])
-                    }),
-                    div({content: children([
-                            div({style: "bold small-padding", content: "Birthday"}),
-                            div({style: "padded", content: dateInput({id: "birthday", style: "undecorated no-padding"})})
-                        ])
-                    }),
-                    div({content: children([
-                            div({style: "bold small-padding", content: "Address"}),
-                            div({style: "padded", content: input({id: "address", style: "undecorated no-padding", placeholder: ""})})
-                        ])
-                    }),
-                    div({content: children([
-                            div({style: "bold small-padding", content: "Phone"}),
-                            div({style: "padded", content: phoneInput({id: "phone", style: "undecorated no-padding"})})
-                        ])
-                    }),
-                    div({content: children([
-                            div({style: "bold small-padding", content: "Email"}),
-                            div({style: "padded", content: input({id: "email", style: "undecorated no-padding", placeholder: ""})})
-                        ])
-                    }),
-                    div({content: children([
-                            div({style: "bold small-padding", content: "Company"}),
-                            div({style: "padded", content: input({id: "company", style: "undecorated no-padding", placeholder: "Standard Computers LLC"})})
-                        ])
-                    }),
-                    div({style: "spacer"})
-                ])
-            }),
-            afterRender: () => {
-                const photoEl = document.getElementById("add-contact-photo");
-                if (!photoEl) return;
-                applyContactImageBackground(photoEl, defaultContactImage);
-                const binding = resetPhotoPickerBinding(photoEl, "__addContactPhotoPicker");
-                const fileInput = binding?.input;
-                if (!fileInput) return;
-                photoEl.style.cursor = "pointer";
-                photoEl.onclick = () => fileInput.click();
-                fileInput.onchange = () => {
-                    const file = fileInput.files && fileInput.files[0];
-                    if (!file) return;
-                    if (!file.type || !file.type.startsWith("image/")) {
-                        addContactImageFile = null;
-                        fileInput.value = "";
-                        return;
-                    }
-                    addContactImageFile = file;
-                    if (binding.objectUrl) URL.revokeObjectURL(binding.objectUrl);
-                    binding.objectUrl = URL.createObjectURL(file);
-                    applyContactImageBackground(photoEl, binding.objectUrl);
-                    fileInput.value = "";
-                };
+    const getContactFromTile = (tile) => contactPreviewContacts.get(String(tile?.getAttribute("data") || ""));
+    const bindContactsListContextMenu = () => {
+        const contactsList = document.getElementById("contacts-list");
+        if (!contactsList || contactsList.dataset.contextMenuBound === "1") return;
+        contactsList.dataset.contextMenuBound = "1";
+        contactsList.addEventListener("contextmenu", hideContactPreview);
+        const hasContactTarget = (_root, target) => !!target?.closest?.(".contact.tile");
+        contactsList.contextmenu([{
+            icon: modular.icons.open,
+            label: "Open",
+            visible: hasContactTarget,
+            action: (_root, _event, tile) => {
+                const contact = getContactFromTile(tile);
+                if (contact) openContact(contact);
             }
+        }, {
+            icon: modular.icons.modify,
+            label: "Edit",
+            visible: hasContactTarget,
+            action: (_root, _event, tile) => {
+                const contact = getContactFromTile(tile);
+                if (!contact) return;
+                selected_contact = {...contact};
+                modular.show("com.standard.contacts", 2);
+            }
+        }, {
+            icon: modular.icons.delete,
+            label: "Delete",
+            destructive: true,
+            visible: hasContactTarget,
+            action: (_root, _event, tile) => {
+                const contact = getContactFromTile(tile);
+                if (contact) deleteContact(contact, () => removeContactTile(tile));
+            }
+        }], ".contact.tile");
+    };
+    const contactsPortal = new Portal({
+        title: "Contacts",
+        hints: ["contacts"],
+        dimensions: [400, 500],
+        navigation: false,
+        resizable: false,
+        tools: [{
+            title: "New Contact",
+            icon: modular.icons.create,
+            onclick: _ => modular.show("com.standard.contacts", 1),
+        }],
+        svg_icon: modular.icons.at,
+        icon: "/icons/interfaces/contacts.png",
+        route: () => div({ style: "large-padding-top", content: children([
+                div({ id: "contacts-list", style : "notes-list", content: div({
+                        style: "padded", content: () => {
+                            return CLI.send("[contacts]").then(d => {
+                                const contacts = d === 0 ? [] : d.contacts;
+                                if (!Array.isArray(contacts)) throw new Error("Invalid contacts response");
+                                if (contacts.length === 0) return renderNoContactsState();
+                                const sortedContacts = [...contacts].sort((left, right) => {
+                                    const leftName = String(left?.firstname || "").trim();
+                                    const rightName = String(right?.firstname || "").trim();
+                                    return leftName.localeCompare(rightName, undefined, {sensitivity: "base"});
+                                });
+                                let as = []
+                                for (let i = 0; i < sortedContacts.length; i++) {
+                                    const contact = sortedContacts[i];
+                                    contactPreviewContacts.set(String(contact.id), contact);
+                                    as.push(div({style: "padded secondary-tile brick line small-spaced hover-shadowed contact tile", data: contact.id, onclick: (e) => {
+                                            if (e.target.closest("button")) return;
+                                            openContact(contact);
+                                        }, content: children([
+                                            button({style: "naked inner-radius float-right expose small-padding round", icon: modular.icons.delete,
+                                                onclick: (e) => {
+                                                    e.stopPropagation();
+                                                    deleteContact(contact, () => removeContactTile(e.target.closest(".contact.tile")));
+                                                }
+                                            }),
+                                            img({style: "contact-image icon float-left round space-right cover", src: contactImageUrl(contact.id)}),
+                                            label({content: contact.firstname}),
+                                            div({style: "faded", content: contact.lastname}),
+                                        ])
+                                    }))
+                                }
+                                return children(as);
+                            })
+                        }
+                    })
+                })
+            ])
+        }),
+        afterRender: bindContactsListContextMenu
     });
+
+    const addContactPortal = new Portal({
+        title: "Add Contact",
+        hints: ["create contact", "add contact", "add new contact", "create new contact"],
+        dimensions: [350, 450],
+        navigation: false,
+        resizable: false,
+        tools: [{
+            title: "Save",
+            icon: modular.icons.save,
+            onclick: createContact
+        }],
+        icon: modular.icons.at,
+        route: () => div({content: children([
+                div({style: "center medium-margin-top margin-bottom", content: children([
+                        div({style: "background-secondary round real-large-icon inline medium-margin-top margin-bottom" , id: "add-contact-photo"})
+                    ])
+                }),
+                div({content: children([
+                        div({style: "bold small-padding", content: "First Name"}),
+                        div({style: "padded", content: input({id: "first-name", style: "undecorated no-padding", placeholder: ""})})
+                    ])
+                }),
+                div({content: children([
+                        div({style: "bold small-padding", content: "Middle"}),
+                        div({style: "padded", content: input({id: "middle-name", style: "undecorated no-padding", placeholder: ""})})
+                    ])
+                }),
+                div({content: children([
+                        div({style: "bold small-padding", content: "Last"}),
+                        div({style: "padded", content: input({id: "last-name", style: "undecorated no-padding", placeholder: ""})})
+                    ])
+                }),
+                div({content: children([
+                        div({style: "bold small-padding", content: "Birthday"}),
+                        div({style: "padded", content: dateInput({id: "birthday", style: "undecorated no-padding"})})
+                    ])
+                }),
+                div({content: children([
+                        div({style: "bold small-padding", content: "Address"}),
+                        div({style: "padded", content: input({id: "address", style: "undecorated no-padding", placeholder: ""})})
+                    ])
+                }),
+                div({content: children([
+                        div({style: "bold small-padding", content: "Phone"}),
+                        div({style: "padded", content: phoneInput({id: "phone", style: "undecorated no-padding"})})
+                    ])
+                }),
+                div({content: children([
+                        div({style: "bold small-padding", content: "Email"}),
+                        div({style: "padded", content: input({id: "email", style: "undecorated no-padding", placeholder: ""})})
+                    ])
+                }),
+                div({content: children([
+                        div({style: "bold small-padding", content: "Company"}),
+                        div({style: "padded", content: input({id: "company", style: "undecorated no-padding", placeholder: "Standard Computers LLC"})})
+                    ])
+                }),
+                div({style: "spacer"})
+            ])
+        }),
+        afterRender: () => {
+            const photoEl = document.getElementById("add-contact-photo");
+            if (!photoEl) return;
+            applyContactImageBackground(photoEl, defaultContactImage);
+            const binding = resetPhotoPickerBinding(photoEl, "__addContactPhotoPicker");
+            const fileInput = binding?.input;
+            if (!fileInput) return;
+            photoEl.style.cursor = "pointer";
+            photoEl.onclick = () => fileInput.click();
+            fileInput.onchange = () => {
+                const file = fileInput.files && fileInput.files[0];
+                if (!file) return;
+                if (!file.type || !file.type.startsWith("image/")) {
+                    addContactImageFile = null;
+                    fileInput.value = "";
+                    return;
+                }
+                addContactImageFile = file;
+                if (binding.objectUrl) URL.revokeObjectURL(binding.objectUrl);
+                binding.objectUrl = URL.createObjectURL(file);
+                applyContactImageBackground(photoEl, binding.objectUrl);
+                fileInput.value = "";
+            };
+        }
+    });
+
     const editContactPortal = new Portal({
         title: "Edit Contact",
             dimensions: [350, 450],
@@ -578,7 +664,7 @@
                 icon: modular.icons.save,
                 onclick: saveSelectedContact
             }],
-            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 1 0-2.636 6.364M16.5 12V8.25"/></svg>`,
+            icon: modular.icons.at,
             route: () => div({content: children([
                     div({style: "center medium-margin-top margin-bottom", content: children([
                             div({style: "background-secondary round real-large-icon inline medium-margin-top margin-bottom" , id: "edit-contact-photo"})

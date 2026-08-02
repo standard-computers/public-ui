@@ -1,5 +1,4 @@
 (() => {
-	console.log("[weather] initializing");
 	const DEFAULT_COORDINATES = {lat: 39.103699, lon: -84.513611};
 	const WEATHER_SERVICE_ID = "com.standard.weather";
 	const WEATHER_INTERFACE_ICON = "/icons/interfaces/weather.png";
@@ -30,15 +29,18 @@
 		}
 		return null;
 	};
+
 	const toPercent = (...values) => {
 		const numeric = toNumber(...values);
 		if (!Number.isFinite(numeric)) return null;
 		return numeric <= 1 ? Math.round(numeric * 100) : Math.round(numeric);
 	};
+
 	const formatTemperature = value => Number.isFinite(value) ? `${Math.round(value)}\u00B0F` : "--\u00B0F";
 	const formatPercent = value => Number.isFinite(value) ? `${Math.round(value)}%` : "--";
 	const formatWind = value => Number.isFinite(value) ? `${Math.round(value)} mph` : "--";
 	const isGenericLocationLabel = value => typeof value === "string" && /^current\s+location$/i.test(value.trim());
+
 	const formatResolvedLocation = location => {
 		const name = pickValue(location?.name, location?.label, location?.city);
 		const region = pickValue(location?.region, location?.state, location?.admin1);
@@ -47,12 +49,14 @@
 		if (!name) return "";
 		return suffix && name !== suffix ? `${name}, ${suffix}` : name;
 	};
+
 	const formatTimestamp = value => {
 		if (!value) return "Updated just now";
 		const date = new Date(value);
 		if (Number.isNaN(date.getTime())) return "Updated just now";
 		return `Updated ${date.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})}`;
 	};
+
 	const formatDayLabel = (value, fallbackIndex = 0) => {
 		if (typeof value === "string" && value.trim()) return value;
 		if (!value) return fallbackIndex === 0 ? "Today" : `Day ${fallbackIndex + 1}`;
@@ -60,12 +64,14 @@
 		if (Number.isNaN(date.getTime())) return fallbackIndex === 0 ? "Today" : `Day ${fallbackIndex + 1}`;
 		return date.toLocaleDateString([], {weekday: "short"});
 	};
+
 	const formatHourLabel = (value, fallbackIndex = 0) => {
 		if (typeof value === "string" && /\d/.test(value) && /am|pm/i.test(value)) return value;
 		const date = value ? new Date(value) : null;
 		if (date && !Number.isNaN(date.getTime())) return date.toLocaleTimeString([], {hour: "numeric"});
 		return fallbackIndex === 0 ? "Now" : `+${fallbackIndex}h`;
 	};
+
 	const resolveWeatherIcon = (...values) => {
 		for (const value of values) {
 			if (typeof value !== "string") continue;
@@ -77,7 +83,9 @@
 		}
 		return "";
 	};
+
 	const buildWeatherEndpoint = coords => `https://standardcomputers.net/api/weather?lat=${encodeURIComponent(coords.lat)}&lon=${encodeURIComponent(coords.lon)}`;
+
 	const parseCoordinateInput = value => {
 		const match = `${value || ""}`.trim().match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
 		if (!match) return null;
@@ -86,6 +94,7 @@
 		if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
 		return {lat, lon};
 	};
+
 	const lookupWeatherLocation = async params => {
 		const url = new URL("/api/weather/current", window.location.origin);
 		Object.entries(params || {}).forEach(([key, value]) => {
@@ -95,6 +104,7 @@
 		if (!response.ok) throw new Error(`Location lookup failed (${response.status})`);
 		return response.json();
 	};
+
 	const resolveLocationInput = async locationInput => {
 		const trimmed = `${locationInput || ""}`.trim();
 		const coordinateInput = parseCoordinateInput(trimmed);
@@ -118,6 +128,7 @@
 			usingBrowserLocation: false,
 		};
 	};
+
 	const resolveBrowserLocationLabel = async coords => {
 		if (!coords?.usingBrowserLocation) return "";
 		try {
@@ -128,6 +139,7 @@
 			return "";
 		}
 	};
+
 	const resolveFetchLocation = async () => {
 		const customLocation = `${state.customLocation || ""}`.trim();
 		if (customLocation) {
@@ -144,12 +156,14 @@
 			usingBrowserLocation: Boolean(coords.usingBrowserLocation),
 		};
 	};
+
 	const normalizeLocation = payload => {
 		const location = payload?.location || payload?.metadata?.location || {};
 		const name = pickValue(location?.name, location?.label, location?.city, payload?.city, state.locationLabel, "Cincinnati, OH");
 		const region = pickValue(location?.region, location?.state, location?.admin1, payload?.state, payload?.region, location?.country, payload?.country);
 		return {name: region && name !== region ? `${name}, ${region}` : name};
 	};
+
 	const normalizeCurrent = payload => {
 		const current = payload?.current || payload?.currently || payload?.observation || payload?.now || {};
 		const currentWeather = firstWeatherEntry(current?.weather);
@@ -163,6 +177,7 @@
 			updatedAt: pickValue(current?.updatedAt, current?.timestamp, payload?.updatedAt, payload?.generatedAt, new Date().toISOString()),
 		};
 	};
+
 	const normalizeDailyForecast = payload => {
 		const rawDaily = payload?.forecast?.daily || payload?.daily || payload?.days || payload?.forecastDaily || [];
 		return rawDaily.slice(0, 6).map((entry, index) => {
@@ -177,6 +192,7 @@
 			});
 		});
 	};
+
 	const normalizeHourlyForecast = payload => {
 		const rawHourly = payload?.forecast?.hourly || payload?.hourly || payload?.hours || payload?.forecastHourly || [];
 		return rawHourly.slice(0, 8).map((entry, index) => {
@@ -190,6 +206,7 @@
 			});
 		});
 	};
+
 	const normalizeWeatherResponse = payload => ({
 		location: normalizeLocation(payload),
 		current: normalizeCurrent(payload),
@@ -197,6 +214,7 @@
 		hourlyForecast: normalizeHourlyForecast(payload),
 		raw: payload,
 	});
+
 	const notify = () => {
 		const snapshot = {
 			...state,
@@ -211,10 +229,12 @@
 			}
 		});
 	};
+
 	const setState = nextState => {
 		Object.assign(state, nextState);
 		notify();
 	};
+
 	const ensureCoordinates = () => {
 		if (geolocationAttempt) return geolocationAttempt;
 		geolocationAttempt = new Promise(resolve => {
@@ -240,8 +260,8 @@
 		});
 		return geolocationAttempt;
 	};
+
 	const fetchWeather = async ({force = false} = {}) => {
-		console.log("[weather] fetchWeather", {force});
 		if (inFlightRequest && !force) return inFlightRequest;
 		setState({loading: true, error: null});
 		inFlightRequest = resolveFetchLocation().then(location => {
@@ -275,11 +295,13 @@
 		});
 		return inFlightRequest;
 	};
+
 	const setWeatherLocation = locationInput => {
 		const customLocation = `${locationInput || ""}`.trim();
 		setState({customLocation});
 		return fetchWeather({force: true});
 	};
+
 	const openFallbackLocationDialogue = currentLocation => {
 		document.querySelectorAll(".weather-location-dialogue").forEach(dialogue => dialogue.remove());
 		const dialogue = document.createElement("div");
@@ -324,6 +346,7 @@
 		inputNode?.focus();
 		inputNode?.select();
 	};
+
 	const promptForWeatherLocation = () => {
 		const currentLocation = state.customLocation || state.locationLabel || "";
 		if (typeof inputDialogue === "function") {
@@ -337,12 +360,14 @@
 		}
 		openFallbackLocationDialogue(currentLocation);
 	};
+
 	const initializeWeather = () => {
 		if (!refreshTimer) {
 			refreshTimer = window.setInterval(() => fetchWeather({force: true}), 10 * 60 * 1000);
 		}
 		return fetchWeather();
 	};
+
 	window.standardWeather = {
 		initialize: initializeWeather,
 		refresh: () => fetchWeather({force: true}),
@@ -356,6 +381,7 @@
 		},
 		state: () => ({...state, data: state.data ? {...state.data} : null, coords: {...state.coords}}),
 	};
+
 	const weatherPortalMarkup = () => div({
 		style: "weather-portal padded large-padding-top", content: children([
 			div({
@@ -429,6 +455,7 @@
 			})
 		])
 	});
+
 	const renderPortal = (windowNode, routeContext, snapshot) => {
 		if (!(windowNode instanceof HTMLElement)) return;
 		const locationNode = windowNode.querySelector(".weather-location");
@@ -499,6 +526,7 @@
 			content: "Extended forecast unavailable."
 		});
 	};
+
 	const subscribePortal = (windowNode, routeContext) => {
 		if (!(windowNode instanceof HTMLElement)) return;
 		const previousUnsub = windowNode.__weatherPortalUnsub;
@@ -506,6 +534,7 @@
 		windowNode.__weatherPortalUnsub = window.standardWeather.subscribe(snapshot => renderPortal(windowNode, routeContext, snapshot));
 		window.standardWeather.initialize();
 	};
+
 	const registerWeatherService = () => {
 		modular.register(new Service(WEATHER_SERVICE_ID, [new Portal({
 			title: "Weather",
@@ -530,6 +559,7 @@
 		})]));
 		console.info("[weather] service registered");
 	};
+
 	const waitForWeatherDependencies = (attempt = 0) => {
 		const ready = typeof modular !== "undefined" && typeof Service !== "undefined" && typeof Portal !== "undefined" && typeof div === "function" && typeof children === "function" && typeof h === "function";
 		if (ready) {
@@ -539,5 +569,6 @@
 		if (attempt >= 100) return;
 		window.setTimeout(() => waitForWeatherDependencies(attempt + 1), 50);
 	};
+
 	waitForWeatherDependencies();
 })();

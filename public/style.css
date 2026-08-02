@@ -61,7 +61,7 @@ h1, h2, h3, h4, h5, h6 {padding:0;margin:0}
 label {font-weight:700;font-size:calc(var(--fs) + 2px);display:block;cursor:pointer}
 a {transition:all 100ms;color:var(--fg);text-decoration:1px solid underline var(--border)}
 a:hover {text-decoration:1px solid underline var(--fg)}
-blockquote {font-family:"Open Sans", sans-serif;font-weight:normal;font-size:calc(var(--fs) + 4);line-height:28px;margin:0;padding:10px 0 10px 0}
+blockquote {font-family:"Inter", sans-serif;font-weight:normal;font-size:calc(var(--fs) + 4);line-height:28px;margin:0;padding:10px 0 10px 0}
 canvas {outline:none !important}
 li {list-style:none}
 #editor-text-content ul, #editor-text-content ol {margin:0 0 0 1.5em;padding-left:1.5em}
