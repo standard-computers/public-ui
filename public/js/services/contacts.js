@@ -298,10 +298,14 @@
         const phone = document.getElementById("phone").value.trim();
         const email = document.getElementById("email").value.trim();
         const company = document.getElementById("company").value.trim();
+        const escapeCommandValue = value => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
         try {
-            const response = await CLI.send(`[contacts] + ("${fname}", "${mname}", "${lname}", "${bday}", "${address}", "${phone}", "${email}", "${company}")`, false);
-            const createdContactId = response;
-            if (!createdContactId) modular.error("Contact was created but no record ID was parsed; image upload skipped");
+            const response = await CLI.send(`[contacts] + ("${escapeCommandValue(fname)}", "${escapeCommandValue(mname)}", "${escapeCommandValue(lname)}", "${escapeCommandValue(bday)}", "${escapeCommandValue(address)}", "${escapeCommandValue(phone)}", "${escapeCommandValue(email)}", "${escapeCommandValue(company)}")`, false);
+            const createdContactId = String(response ?? "").trim();
+            if (!createdContactId || createdContactId === "0") {
+                modular.error("Failed to create contact");
+                return;
+            }
             if (addContactImageFile && createdContactId) {
                 const formData = new FormData();
                 formData.append("file", addContactImageFile);
@@ -323,19 +327,11 @@
                     bumpContactImageCacheKey(createdContactId);
                     modular.success("Image uploaded and linked to contact");
                 }
-            } else if (addContactImageFile && !createdContactId) {
-                //TODO
-            } else {
-                //TODO
             }
-            if ((response !== 0) || createdContactId) {
-                addContactImageFile = null;
-                closeCreateContactPortal();
-                modular.refresh("com.standard.contacts");
-                modular.success("Created contact");
-            } else {
-                modular.error("Failed to create contact");
-            }
+            addContactImageFile = null;
+            closeCreateContactPortal();
+            modular.refresh("com.standard.contacts");
+            modular.success("Created contact");
         } catch (error) {
             modular.error("Failed to create contact or upload image");
         }

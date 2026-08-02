@@ -68,7 +68,8 @@ const demoProvider = isDemoMode ? new DemoProvider({
     maxSessions: DEMO_MAX_SESSIONS
 }) : null;
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(origin => origin.trim()).filter(Boolean);
-const LOCAL_HOSTNAME = (process.env.LOCAL_HOSTNAME || "standard").replace(/\.local$/i, "").trim();
+const configuredLocalHostname = process.env.LOCAL_HOSTNAME;
+const LOCAL_HOSTNAME = (configuredLocalHostname === undefined ? "standard" : configuredLocalHostname).replace(/\.local$/i, "").trim();
 const shouldAdvertiseLocalHostname = !isRelayMode && !isDemoMode && Boolean(LOCAL_HOSTNAME);
 const corsOptions = {
     origin: (origin, callback) => {
@@ -102,6 +103,7 @@ const AUTO_UPLOAD_FOLDERS_BY_MIME_PREFIX = {
 let recordImageQueue = Promise.resolve();
 let bonjour = null;
 let bonjourService = null;
+let bonjourPublishTimer = null;
 const wsRequestQueue = [];
 let activeWsRequest = null;
 let wsRequestSequence = 0;
@@ -1573,21 +1575,47 @@ function advertiseLocalHostname() {
         const protocol = getServerProtocol();
         if (!(listeningPort > 0)) return;
         bonjour = new Bonjour();
-        bonjourService = bonjour.publish({
+        const pendingService = bonjour.publish({
             name: LOCAL_HOSTNAME,
             host: `${LOCAL_HOSTNAME}.local`,
             type: "http",
             port: listeningPort
         });
-        console.log(`mDNS advertisement enabled: ${protocol}://${LOCAL_HOSTNAME}.local:${listeningPort}`);
+        bonjourService = pendingService;
+        pendingService.once("up", () => {
+            if (bonjourPublishTimer) {
+                clearTimeout(bonjourPublishTimer);
+                bonjourPublishTimer = null;
+            }
+            console.log(`mDNS advertisement enabled: ${protocol}://${LOCAL_HOSTNAME}.local:${listeningPort}`);
+        });
+        bonjourPublishTimer = setTimeout(() => {
+            bonjourPublishTimer = null;
+            if (pendingService.published) return;
+            console.error(`Failed to publish mDNS service for ${LOCAL_HOSTNAME}.local`);
+            pendingService.stop?.(() => {
+                if (bonjourService === pendingService) bonjourService = null;
+                if (bonjour) {
+                    bonjour.destroy();
+                    bonjour = null;
+                }
+            });
+        }, 2500);
+        bonjourPublishTimer.unref?.();
     } catch (err) {
         console.error("Failed to publish mDNS service:", err.message);
     }
 }
 
 function stopLocalHostnameAdvertisement() {
+    if (bonjourPublishTimer) {
+        clearTimeout(bonjourPublishTimer);
+        bonjourPublishTimer = null;
+    }
     if (bonjourService) bonjourService.stop(() => {});
     if (bonjour) bonjour.destroy();
+    bonjourService = null;
+    bonjour = null;
 }
 
 app.get("/login", (req, res) => {

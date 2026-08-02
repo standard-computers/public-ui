@@ -2,6 +2,7 @@
 
     const ARTICLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75h1.5m9 0h-9"/></svg>`;
     const DEFAULT_ARTICLE_ICON = "/icons/interfaces/articles.svg";
+    const articleListRecords = new Map();
     const escapeQuoted = value => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     const safeUrl = value => /^(https?:\/\/|mailto:)/i.test(String(value || "").trim()) ? String(value).trim() : "";
     const articleImage = article => article.id ? `/api/records/images/${encodeURIComponent(article.id)}?cb=${Date.now()}` : DEFAULT_ARTICLE_ICON;
@@ -72,6 +73,7 @@
         document.querySelectorAll('.article-tile[data]').forEach(tile => {
             if (tile.getAttribute("data") === normalizedId) tile.remove();
         });
+        articleListRecords.delete(normalizedId);
     };
 
     const beginDeleteProgress = article => window.StandardDownloads?.beginOpenProgress?.(`Deleting ${article.title || "article"}`) || 0;
@@ -95,8 +97,8 @@
     };
 
     const deleteArticle = (article, portal = null) => confirmationDialogue({
-        title: "Delete Article?",
-        content: "Confirm deleting" + escapeHtml(article.title || "this article"),
+        title: "Delete Article",
+        content: `You're sure you want to delete ${escapeHtml(article.title || "this article")}?`,
         destructive: true,
         confirmation: async () => {
             const progressToken = beginDeleteProgress(article);
@@ -182,10 +184,9 @@
 
     window.StandardArticles = {openArticle, openEditor};
 
-    const renderArticleSearchResults = payload => {
-        const articles = recordsFrom(payload).sort((a, b) => Number(b.priority) - Number(a.priority) || String(b.created).localeCompare(String(a.created)));
-        if (!articles.length) return emptyState({icon: DEFAULT_ARTICLE_ICON, label: "No articles"});
-        return div({style: "articles-list", content: children(articles.map(article => div({
+    const renderArticleList = articles => div({style: "articles-list", content: children(articles.map(article => {
+        articleListRecords.set(String(article.id || ""), article);
+        return div({
             style: "article-tile padded secondary-tile line small-spaced hover-shadowed radius", data: String(article.id || ""), onclick: event => {
                 if (event.target.closest("button")) return;
                 openArticle(article);
@@ -197,7 +198,47 @@
                 div({style: "smaller faded", content: escapeHtml(article.description || "")}),
                 div({style: "tiny faded", content: `Priority ${escapeHtml(article.priority)} · ${escapeHtml(article.created || "")}`})
             ])
-        })))});
+        });
+    }))});
+
+    const renderArticleSearchResults = payload => {
+        const articles = recordsFrom(payload).sort((a, b) => Number(b.priority) - Number(a.priority) || String(b.created).localeCompare(String(a.created)));
+        if (!articles.length) return emptyState({icon: DEFAULT_ARTICLE_ICON, label: "No articles"});
+        return renderArticleList(articles);
+    };
+
+    const bindArticleListContextMenu = root => {
+        const resultsHost = root?.querySelector?.("#articles-list-results");
+        if (!resultsHost || resultsHost.dataset.contextMenuBound === "1") return;
+        resultsHost.dataset.contextMenuBound = "1";
+        const hasArticleTarget = (_root, target) => !!target?.closest?.(".article-tile");
+        const getArticleFromTile = tile => articleListRecords.get(String(tile?.getAttribute("data") || ""));
+        resultsHost.contextmenu([{
+            icon: modular.icons.open,
+            label: "Open",
+            visible: hasArticleTarget,
+            action: (_root, _event, tile) => {
+                const article = getArticleFromTile(tile);
+                if (article) openArticle(article);
+            }
+        }, {
+            icon: modular.icons.modify,
+            label: "Edit",
+            visible: hasArticleTarget,
+            action: (_root, _event, tile) => {
+                const article = getArticleFromTile(tile);
+                if (article) openEditor(article);
+            }
+        }, {
+            icon: modular.icons.delete,
+            label: "Delete",
+            destructive: true,
+            visible: hasArticleTarget,
+            action: (_root, _event, tile) => {
+                const article = getArticleFromTile(tile);
+                if (article) deleteArticle(article);
+            }
+        }], ".article-tile");
     };
 
     const bindArticleSearch = root => {
@@ -248,21 +289,12 @@
             route: () => div({style: "large-padding-top small-padding", content: div({id: "articles-list-results", content: () => CLI.send("[articles] <LIMIT 25>").then(payload => {
                 const articles = recordsFrom(payload).sort((a, b) => Number(b.priority) - Number(a.priority) || String(b.created).localeCompare(String(a.created)));
                 if (!articles.length) return emptyState({icon: DEFAULT_ARTICLE_ICON, label: "No articles"});
-                return div({style: "articles-list", content: children(articles.map(article => div({
-                    style: "article-tile padded secondary-tile line small-spaced hover-shadowed radius", data: String(article.id || ""), onclick: event => {
-                        if (event.target.closest("button")) return;
-                        openArticle(article);
-                    }, content: children([
-                        button({style: "naked inner-radius float-right expose small-padding", icon: modular.icons.modify, onclick: () => openEditor(article)}),
-                        button({style: "naked inner-radius float-right expose small-padding", icon: modular.icons.delete, onclick: () => deleteArticle(article)}),
-                        img({style: "article-icon articles-list-icon inline", src: articleImage(article)}),
-                        strong({content: escapeHtml(article.title || "Untitled Article")}),
-                        div({style: "smaller faded", content: escapeHtml(article.description || "")}),
-                        div({style: "tiny faded", content: `Priority ${escapeHtml(article.priority)} · ${escapeHtml(article.created || "")}`})
-                    ])
-                })))})
+                return renderArticleList(articles);
             }).catch(() => emptyState({icon: DEFAULT_ARTICLE_ICON, label: "Unable to load articles"}))})}),
-            afterRender: bindArticleSearch
+            afterRender: root => {
+                bindArticleSearch(root);
+                bindArticleListContextMenu(root);
+            }
         }),
         createPortal
     ]));

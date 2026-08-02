@@ -9,7 +9,19 @@
         <link href="/root.css" rel="stylesheet"/>
         <link href="/style.css" rel="stylesheet"/>
         <style>
-            .core-login {padding:15% 40% 100px 40%}
+            .core-login {
+                box-sizing: border-box;
+                width: min(420px, calc(100% - 32px));
+                margin: 0 auto;
+                padding: 15vh 0 100px;
+            }
+            .core-login input {
+                box-sizing: border-box;
+                width: 100%;
+            }
+            @media (max-width: 560px) {
+                .core-login {padding-top: 48px}
+            }
         </style>
     </head>
     <body>

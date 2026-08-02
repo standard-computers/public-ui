@@ -53,6 +53,7 @@ npm run start:desktop
 - `RELAY_COOKIE_SECRET`: required in relay mode
 - `OPENWEATHER_API_KEY`: optional server-side weather integration
 - `MAPBOX_ACCESS_TOKEN`: optional token used by the browser UI for maps
+- `LOCAL_HOSTNAME`: local mDNS hostname; set it to an empty value to disable advertising
 
 ## Security Notes
 
