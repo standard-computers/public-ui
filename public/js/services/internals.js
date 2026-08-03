@@ -58,6 +58,10 @@
         if (sourcePortal?.serviceId?.() === "com.standard.internals" && sourcePortal?.portalIndex?.() === portalIndex) return sourcePortal;
         return findInternalsWindow(portalIndex)?.portal || null;
     };
+    const refreshFilesAppIfOpen = () => {
+        const filesAppIsOpen = Array.from(document.querySelectorAll(".draggable-window")).some(windowNode => windowNode?.portal?.serviceId?.() === "com.standard.files");
+        if (filesAppIsOpen) modular.refresh("com.standard.files");
+    };
     const updatePortalTitle = (portalIndex, filePath = "", portal = null) => {
         portal = portal || findInternalsWindow(portalIndex)?.portal;
         if (portal && typeof portal.setTitle === "function") portal.setTitle(getFileName(filePath));
@@ -408,6 +412,39 @@
         const pathLabel = root.querySelector("#internals-image-preview-path");
         if (pathLabel) pathLabel.textContent = activeImageFilePath || "No file selected";
         updatePortalTitle(1, activeImageFilePath, portal);
+    };
+    const deleteImageFromPortal = (portal = findInternalsWindow(1)?.portal) => {
+        const state = portal?.windowState?.() || {};
+        const filePath = getPathForDownload(state.directive || activeImageFilePath);
+        const fileName = getFileName(filePath || state.directive || activeImageFilePath);
+        if (!filePath || state?.deletable === false) {
+            modular.error("This image is not a deletable file");
+            return;
+        }
+        confirmationDialogue({
+            title: "Delete Image",
+            content: `You're sure you want to delete ${escapeHtml(fileName)}?`,
+            destructive: true,
+            confirmation: async () => {
+                const progressToken = beginInternalsProgress(`Deleting ${fileName}`);
+                try {
+                    const response = await CLI.send(CLI.buildFilesCommand("remove", filePath));
+                    if (response === 0 || response === "false" || response === false) {
+                        window.StandardDownloads?.hideOpenProgress?.(progressToken);
+                        modular.error(`Failed to delete ${fileName}`);
+                        return;
+                    }
+                    updateInternalsProgress(progressToken, `Deleted ${fileName}`, 100);
+                    hideInternalsProgress(progressToken);
+                    modular.success(`Deleted ${fileName}`);
+                    refreshFilesAppIfOpen();
+                    portal?.close?.();
+                } catch (_) {
+                    window.StandardDownloads?.hideOpenProgress?.(progressToken);
+                    modular.error(`Failed to delete ${fileName}`);
+                }
+            }
+        });
     };
     const imageDownloadUrl = (filePath = "", cacheBust = false) => {
         if (!filePath) return "";
@@ -1207,7 +1244,7 @@
         activeImageIntrinsicSize = activeImageIsSvg ? getSvgIntrinsicSize(getSvgMarkupFromSource(imageSource) || rawImageSource) : null;
         activeImageNeedsWindowAutosize = true;
         const portal = modular.show("com.standard.internals", 1, {newInstance: true});
-        syncPortalWindowState(1, {directive: activeImageFilePath, cachedContent: imageSource}, portal);
+        syncPortalWindowState(1, {directive: activeImageFilePath, cachedContent: imageSource, deletable: !!options?.path}, portal);
         updateImagePreview({autoSizeWindow: true, portal});
         return true;
     };
@@ -1222,7 +1259,7 @@
         activeImageIsSvg = SVG_FILE_PATTERN.test(filePath);
         activeImageNeedsWindowAutosize = true;
         const portal = modular.show("com.standard.internals", 1, {newInstance: true});
-        syncPortalWindowState(1, {directive: filePath}, portal);
+        syncPortalWindowState(1, {directive: filePath, deletable: true}, portal);
         updateImagePreview({autoSizeWindow: true, portal});
         void refreshImageCacheInBackground(filePath, activeImageFetchToken, portal);
         return true;
@@ -1368,6 +1405,7 @@
             internal: true,
             dimensions: [720, 540],
             navigation: false,
+            tools: [{title: "Delete", icon: modular.icons.delete, onclick: (event, context) => deleteImageFromPortal(context?.portal || getPortalFromSource(event?.target, 1))}],
             route: () => div({id: "internals-image-preview-shell", style: "large-padding-top fill", content: children([
                 `<div style="height:calc(100% - 24px);box-sizing:border-box;display:flex;align-items:center;justify-content:center;overflow:hidden"><div id="internals-image-preview-host" class="internals-image-preview-host radius"></div></div>`,
                 `<div id="internals-image-stats" style="height:22px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 5px 0 5px;bottom:0;font-size:11px;line-height:16px" class="no-wrap faded"><span id="internals-image-stats-dimensions">Current - x - | Original - x -</span><span id="internals-image-stats-coordinates">x -, y -</span></div>`
