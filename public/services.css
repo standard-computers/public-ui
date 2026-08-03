@@ -215,10 +215,10 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .widget-window .window-header {opacity:0;padding:3px !important;margin:0 !important}
 .widget-window:hover .window-header {opacity:0.75}
 .widget-window:hover .window-header:hover {opacity:1}
-.window-content-barred {z-index:2;box-shadow:var(--shadow);border:1px solid var(--light-border);border-radius:calc(var(--radius) - 2px);margin:5px;display:grid;padding:36px 5px 5px 5px;grid-template-columns:175px minmax(0, 1fr);column-gap:14px;backdrop-filter:blur(var(--blur))}
+.window-content-barred {z-index:2;box-shadow:var(--shadow);border:1px solid var(--light-border);border-radius:calc(var(--radius) - 2px);margin:5px;display:grid;height:calc(100% - 10px);box-sizing:border-box;padding:36px 5px 5px 5px;grid-template-columns:175px minmax(0, 1fr);column-gap:14px;backdrop-filter:blur(var(--blur))}
 .window-content {box-shadow:var(--shadow);padding:5px;border-radius:var(--radius);margin:5px;background-color:var(--background)}
 .window-body {overflow-y:auto;overflow-x:hidden}
-.window-content-barred > .window-sidebar {min-width:0}
+.window-content-barred > .window-sidebar {min-width:0;height:calc(100% - 5px);box-sizing:border-box}
 .window-content-barred > .window-body {min-width:0;width:100%;max-width:100%;box-sizing:border-box}
 .window-content-barred > .window-body > * {max-width:100%;min-width:0;box-sizing:border-box}
 .window-body .has-small-space {margin-top:20px}
