@@ -41,8 +41,19 @@ button.secondary:hover {box-shadow:var(--shadow);border-color:var(--secondary-bo
 button.secondary svg {color:var(--fg);width:25px;height:25px;display:block}
 .plastic-dropdown {align-items:center;display:inline-flex;gap:12px;justify-content:space-between;text-align:left}
 .plastic-dropdown svg {flex:0 0 auto;height:16px !important;width:16px !important}
+.plastic-dropdown .plastic-dropdown-caret {margin-left:auto}
 .plastic-dropdown-menu {box-sizing:border-box;max-height:min(320px,50vh);overflow-y:auto}
 .plastic-dropdown-menu .context-menu-item.selected {opacity:1;transform:scale(var(--zoom));box-shadow:var(--shadow);background-color:var(--secondary-bg)}
+.plastic-segmented {box-sizing:border-box;display:grid;grid-template-columns:repeat(var(--plastic-segment-count),minmax(0,1fr));gap:4px;width:100%;min-width:0;padding:5px;border:1px solid var(--secondary-border);border-radius:var(--radius);background:var(--secondary-bg);background:color-mix(in srgb,var(--bg) 25%,var(--secondary-bg));color:var(--fg)}
+.plastic-segment {box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;margin:0;padding:8px 12px;border:1px solid transparent;border-radius:calc(var(--radius) - 4px);background:transparent;color:inherit;box-shadow:none}
+.plastic-segment.has-icon {flex-direction:column}
+.plastic-segment:hover:not(:disabled) {border-color:transparent;background:var(--transparent-bg)}
+.plastic-segment.selected,.plastic-segment.selected:hover {border-color:var(--light-border);background:var(--secondary-bg);box-shadow:var(--shadow)}
+.plastic-segment:focus-visible {outline:2px solid var(--primary);outline-offset:-2px}
+.plastic-segment:disabled {cursor:default !important;opacity:.45}
+.plastic-segment-icon {display:flex;align-items:center;justify-content:center;width:22px;height:22px;flex:0 0 auto}
+.plastic-segment-icon svg,.plastic-segment-icon img {display:block;width:22px;height:22px;max-width:100%;max-height:100%}
+.plastic-segment-label {display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 button.plain {border:1px solid rgba(0,0,0,0);padding:5px;background-color:rgba(0,0,0,0)}
 button.plain:hover {background-color:var(--secondary-bg);border:1px solid var(--border);box-shadow:var(--shadow)}
 button.plain svg {color:var(--fg);width:25px;height:25px;display:block}

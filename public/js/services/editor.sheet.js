@@ -3014,12 +3014,13 @@
             route: () => div({style: "large-padding-top editor-portal-shell editor-sheet-chart-portal", content: children([
                 div({style: "padded", content: children([
                     label({content: "Chart type"}),
-                    div({style: "editor-sheet-chart-type-grid", content: children(SHEET_CHART_TYPES.map((chartType) => button({
-                        style: `editor-sheet-chart-type${chartType.value === initialType ? " selected" : ""}`,
-                        type: "button",
-                        value: chartType.value,
-                        content: chartType.label
-                    })))}),
+                    segmented({
+                        id: "editor-sheet-chart-type",
+                        style: "editor-chart-type-segmented",
+                        ariaLabel: "Chart type",
+                        value: initialType,
+                        options: SHEET_CHART_TYPES
+                    }),
                     chartSource.hasSelectionData ? div({style: "small-margin-top faded", content: `Data: ${chartSource.range}`}) : div({style: "small-margin-top", content: children([
                         label({input: "editor-sheet-chart-range", content: "Range"}),
                         input({id: "editor-sheet-chart-range", style: "fill", placeholder: "A1:B6", value: ""})
@@ -3039,17 +3040,13 @@
                 ])})
             ])}),
             afterRender: (windowNode, routeContext) => {
-                windowNode.querySelectorAll(".editor-sheet-chart-type").forEach((typeButton) => {
-                    if (typeButton.dataset.bound === "1") return;
-                    typeButton.dataset.bound = "1";
-                    typeButton.addEventListener("click", (event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        selectedType = typeButton.value || initialType;
-                        windowNode.querySelectorAll(".editor-sheet-chart-type").forEach((node) => node.classList.remove("selected"));
-                        typeButton.classList.add("selected");
+                const chartTypeControl = windowNode.querySelector("#editor-sheet-chart-type");
+                if (chartTypeControl && chartTypeControl.dataset.bound !== "1") {
+                    chartTypeControl.dataset.bound = "1";
+                    chartTypeControl.addEventListener("change", (event) => {
+                        selectedType = event.detail?.value || chartTypeControl.getAttribute("value") || initialType;
                     });
-                });
+                }
                 const cancelButton = windowNode.querySelector("#editor-sheet-chart-cancel");
                 if (cancelButton && cancelButton.dataset.bound !== "1") {
                     cancelButton.dataset.bound = "1";

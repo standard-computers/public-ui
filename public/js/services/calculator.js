@@ -1,9 +1,29 @@
 (() => {
 
 	const SERVICE_ID = "com.standard.calculator";
+	const CALCULATOR_SETTINGS = {
+		default_state: {
+			label: "Default state",
+			type: "text",
+			default: "Regular",
+			restrictions: ["Regular", "Scientific", "Converter"]
+		}
+	};
 	const OPERATOR_LABELS = {"/": "÷", "*": "×", "-": "−", "+": "+", "^": "xʸ"};
 	const SCIENTIFIC_MODE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.745 3A23.933 23.933 0 0 0 3 12c0 3.183.62 6.22 1.745 9M19.5 3c.967 2.78 1.5 5.817 1.5 9s-.533 6.22-1.5 9M8.25 8.885l1.444-.89a.75.75 0 0 1 1.105.402l2.402 7.206a.75.75 0 0 0 1.104.401l1.445-.889m-8.25.75.213.09a1.687 1.687 0 0 0 2.062-.617l4.45-6.676a1.688 1.688 0 0 1 2.062-.618l.213.09"/></svg>`;
+	const CONVERTER_MODE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>`;
 	const MAX_INPUT_LENGTH = 15;
+	const CONVERSION_GROUPS = {
+		length: {label: "Length", units: [["Metres", "m", 1], ["Kilometres", "km", 1000], ["Centimetres", "cm", .01], ["Millimetres", "mm", .001], ["Miles", "mi", 1609.344], ["Yards", "yd", .9144], ["Feet", "ft", .3048], ["Inches", "in", .0254]]},
+		mass: {label: "Mass", units: [["Kilograms", "kg", 1], ["Grams", "g", .001], ["Milligrams", "mg", .000001], ["Metric tonnes", "t", 1000], ["Pounds", "lb", .45359237], ["Ounces", "oz", .028349523125]]},
+		temperature: {label: "Temperature", units: [["Celsius", "c"], ["Fahrenheit", "f"], ["Kelvin", "k"]]},
+		area: {label: "Area", units: [["Square metres", "m2", 1], ["Square kilometres", "km2", 1000000], ["Hectares", "ha", 10000], ["Square feet", "ft2", .09290304], ["Acres", "acre", 4046.8564224]]},
+		volume: {label: "Volume", units: [["Litres", "l", 1], ["Millilitres", "ml", .001], ["Cubic metres", "m3", 1000], ["US gallons", "gal", 3.785411784], ["US quarts", "qt", .946352946], ["US cups", "cup", .2365882365]]},
+		speed: {label: "Speed", units: [["Metres/second", "ms", 1], ["Kilometres/hour", "kmh", .277777777777778], ["Miles/hour", "mph", .44704], ["Knots", "kn", .514444444444444], ["Feet/second", "fts", .3048]]},
+		time: {label: "Time", units: [["Seconds", "s", 1], ["Minutes", "min", 60], ["Hours", "hr", 3600], ["Days", "day", 86400], ["Weeks", "wk", 604800]]},
+		data: {label: "Data", units: [["Bytes", "b", 1], ["Kilobytes", "kb", 1000], ["Megabytes", "mb", 1000000], ["Gigabytes", "gb", 1000000000], ["Terabytes", "tb", 1000000000000], ["Kibibytes", "kib", 1024], ["Mebibytes", "mib", 1048576], ["Gibibytes", "gib", 1073741824]]},
+		currency: {label: "Currency", units: [["US Dollar", "USD"], ["Euro", "EUR"], ["British Pound", "GBP"], ["Japanese Yen", "JPY"], ["Canadian Dollar", "CAD"], ["Australian Dollar", "AUD"], ["Swiss Franc", "CHF"], ["Chinese Yuan", "CNY"], ["Indian Rupee", "INR"], ["South Korean Won", "KRW"], ["Brazilian Real", "BRL"], ["Mexican Peso", "MXN"], ["South African Rand", "ZAR"], ["Swedish Krona", "SEK"], ["Norwegian Krone", "NOK"], ["New Zealand Dollar", "NZD"], ["Singapore Dollar", "SGD"], ["Hong Kong Dollar", "HKD"]]}
+	};
 	let displayValue = "0";
 	let accumulator = null;
 	let pendingOperator = null;
@@ -13,6 +33,18 @@
 	let expression = "";
 	let scientificMode = false;
 	let angleMode = "rad";
+	let converterMode = false;
+	let converterCategory = "length";
+	let converterFrom = "m";
+	let converterTo = "ft";
+	let converterInput = "1";
+	let currencyRate = null;
+	let currencyRatePair = "";
+	let currencyRateDate = "";
+	let currencyTimer = null;
+	let currencyRequest = 0;
+	let modeChangeVersion = 0;
+	const initializedDefaultStatePortals = new WeakSet();
 
 	const getCalculatorWindow = () => modular.findPortalWindow?.(SERVICE_ID, 0) || null;
 
@@ -47,7 +79,15 @@
 			lastOperand,
 			expression,
 			scientificMode,
-			angleMode
+			angleMode,
+			converterMode,
+			converterCategory,
+			converterFrom,
+			converterTo,
+			converterInput,
+			currencyRate,
+			currencyRatePair,
+			currencyRateDate
 		});
 	};
 
@@ -63,6 +103,31 @@
 		expression = typeof state.expression === "string" ? state.expression : "";
 		scientificMode = state.scientificMode === true;
 		angleMode = state.angleMode === "deg" ? "deg" : "rad";
+		converterMode = state.converterMode === true;
+		if (CONVERSION_GROUPS[state.converterCategory]) converterCategory = state.converterCategory;
+		const groupUnits = CONVERSION_GROUPS[converterCategory].units.map(unit => unit[1]);
+		converterFrom = groupUnits.includes(state.converterFrom) ? state.converterFrom : groupUnits[0];
+		converterTo = groupUnits.includes(state.converterTo) ? state.converterTo : groupUnits[Math.min(1, groupUnits.length - 1)];
+		converterInput = typeof state.converterInput === "string" ? state.converterInput : "1";
+		currencyRate = Number.isFinite(state.currencyRate) ? state.currencyRate : null;
+		currencyRatePair = typeof state.currencyRatePair === "string" ? state.currencyRatePair : "";
+		currencyRateDate = typeof state.currencyRateDate === "string" ? state.currencyRateDate : "";
+		if (converterMode) scientificMode = false;
+	};
+
+	const loadDefaultState = async settingsApi => {
+		let settings = {};
+		try {
+			settings = await settingsApi?.values?.() || await window.StandardAppSettings?.values?.(SERVICE_ID) || {};
+		} catch (_) {
+			settings = {};
+		}
+		return String(settings.default_state || "Regular").trim().toLowerCase();
+	};
+
+	const setCalculatorMode = mode => {
+		scientificMode = mode === "scientific";
+		converterMode = mode === "converter";
 	};
 
 	const renderDisplay = (root = getCalculatorWindow()) => {
@@ -258,6 +323,124 @@
 		commit();
 	};
 
+	const temperatureToCelsius = (value, unit) => unit === "f" ? (value - 32) * 5 / 9 : unit === "k" ? value - 273.15 : value;
+	const celsiusToTemperature = (value, unit) => unit === "f" ? value * 9 / 5 + 32 : unit === "k" ? value + 273.15 : value;
+
+	const findConversionUnit = (category, value) => CONVERSION_GROUPS[category]?.units.find(unit => unit[1] === value);
+
+	const formatConvertedNumber = value => {
+		if (!Number.isFinite(value)) return "—";
+		const absolute = Math.abs(value);
+		if ((absolute >= 1e12) || (absolute > 0 && absolute < 1e-7)) return value.toExponential(6).replace(/\.0+e/, "e");
+		return new Intl.NumberFormat(undefined, {maximumFractionDigits: 8}).format(Number(value.toPrecision(12)));
+	};
+
+	const escapeAttribute = value => String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+	const converterOptions = (units, includeCode = false) => units.map(unit => ({
+		label: `${unit[0]}${includeCode ? ` (${unit[1]})` : ""}`,
+		value: unit[1]
+	}));
+
+	const converterDropdown = ({id, role, value, units, ariaLabel, includeCode = false}) => {
+		const wrapper = document.createElement("div");
+		wrapper.innerHTML = dropdown({
+			id,
+			style: "calculator-converter-dropdown fill",
+			ariaLabel,
+			value,
+			options: converterOptions(units, includeCode)
+		});
+		const control = wrapper.firstElementChild;
+		control?.setAttribute?.("data-converter-role", role);
+		return control?.outerHTML || "";
+	};
+
+	const converterMarkup = () => {
+		const group = CONVERSION_GROUPS[converterCategory];
+		const categories = Object.entries(CONVERSION_GROUPS).map(([value, definition]) => [definition.label, value]);
+		return `<div class="calculator-converter" aria-label="Unit converter">
+			<label class="calculator-converter-label" for="calculator-converter-category">Convert</label>
+			${converterDropdown({id: "calculator-converter-category", role: "category", value: converterCategory, units: categories, ariaLabel: "Conversion category"})}
+			<div class="calculator-converter-row">
+				<input id="calculator-converter-input" data-converter-role="input" type="number" inputmode="decimal" step="any" value="${escapeAttribute(converterInput)}" aria-label="Value to convert">
+				${converterDropdown({role: "from", value: converterFrom, units: group.units, ariaLabel: "Convert from", includeCode: converterCategory === "currency"})}
+			</div>
+			<button type="button" class="calculator-converter-swap hover-zoom" data-converter-action="swap" title="Swap units" aria-label="Swap units">${CONVERTER_MODE_ICON}</button>
+			<div class="calculator-converter-row calculator-converter-result-row">
+				<output id="calculator-converter-result" aria-live="polite">—</output>
+				${converterDropdown({role: "to", value: converterTo, units: group.units, ariaLabel: "Convert to", includeCode: converterCategory === "currency"})}
+			</div>
+			<div id="calculator-converter-status" class="faded calculator-converter-status" aria-live="polite"></div>
+		</div>`;
+	};
+
+	const showConversion = (result, status = "") => {
+		const root = getCalculatorWindow();
+		const output = root?.querySelector?.("#calculator-converter-result");
+		const statusElement = root?.querySelector?.("#calculator-converter-status");
+		if (output) output.textContent = result;
+		if (statusElement) statusElement.textContent = status;
+	};
+
+	const updateCurrencyConversion = async (value, request) => {
+		const from = converterFrom;
+		const to = converterTo;
+		const pair = `${from}/${to}`;
+		if (from === to) {
+			showConversion(formatConvertedNumber(value), "Same currency");
+			return;
+		}
+		if (currencyRatePair === pair && Number.isFinite(currencyRate)) {
+			showConversion(formatConvertedNumber(value * currencyRate), currencyRateDate ? `Rate from ${currencyRateDate}` : "Latest saved rate");
+		}
+		else showConversion("—", "Updating exchange rate…");
+		try {
+			const response = await fetch(`https://api.frankfurter.dev/v2/rate/${encodeURIComponent(from)}/${encodeURIComponent(to)}`);
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			const data = await response.json();
+			if (request !== currencyRequest || !converterMode || converterCategory !== "currency" || pair !== `${converterFrom}/${converterTo}`) return;
+			if (!Number.isFinite(Number(data.rate))) throw new Error("Invalid rate");
+			currencyRate = Number(data.rate);
+			currencyRatePair = pair;
+			currencyRateDate = typeof data.date === "string" ? data.date : "";
+			showConversion(formatConvertedNumber(value * currencyRate), currencyRateDate ? `Rate from ${currencyRateDate}` : "Latest rate");
+			syncPortalState();
+		} catch (error) {
+			if (request !== currencyRequest) return;
+			if (currencyRatePair === pair && Number.isFinite(currencyRate)) showConversion(formatConvertedNumber(value * currencyRate), `Offline · saved rate${currencyRateDate ? ` from ${currencyRateDate}` : ""}`);
+			else showConversion("—", "Exchange rate unavailable");
+		}
+	};
+
+	const updateConversion = () => {
+		if (!converterMode) return;
+		clearTimeout(currencyTimer);
+		const request = ++currencyRequest;
+		const value = Number(converterInput);
+		if (converterInput.trim() === "" || !Number.isFinite(value)) {
+			showConversion("—", "Enter a value");
+			return;
+		}
+		if (converterCategory === "currency") {
+			currencyTimer = setTimeout(() => updateCurrencyConversion(value, request), 250);
+			return;
+		}
+		const from = findConversionUnit(converterCategory, converterFrom);
+		const to = findConversionUnit(converterCategory, converterTo);
+		if (!from || !to) return;
+		const result = converterCategory === "temperature"
+			? celsiusToTemperature(temperatureToCelsius(value, converterFrom), converterTo)
+			: value * from[2] / to[2];
+		showConversion(formatConvertedNumber(result));
+	};
+
+	const resetConverterUnits = () => {
+		const units = CONVERSION_GROUPS[converterCategory].units;
+		converterFrom = units[0][1];
+		converterTo = units[Math.min(1, units.length - 1)][1];
+	};
+
 	const handleAction = (action, value = "") => {
 		if (action === "digit") inputDigit(value);
 		else if (action === "decimal") inputDecimal();
@@ -272,6 +455,7 @@
 
 	const handleKeyboard = event => {
 		if (!getCalculatorWindow()) return;
+		if (converterMode || ["INPUT", "SELECT"].includes(event.target?.tagName)) return;
 		const key = event.key;
 		if (/^\d$/.test(key)) handleAction("digit", key);
 		else if (key === ".") handleAction("decimal");
@@ -318,52 +502,111 @@
 
 	const keypadMarkup = () => `${scientificMode ? `<div class="calculator-scientific-pad">${scientificButtons()}</div>` : ""}<div class="calculator-basic-pad">${calculatorButtons()}</div>`;
 
-	const applyScientificMode = root => {
+	const calculatorMarkup = () => converterMode ? converterMarkup() : `<div class="padded calculator-display-panel" style="text-align:right;overflow:hidden;background:none">
+		<div id="calculator-history" class="faded no-wrap" style="min-height:20px;overflow:hidden;text-overflow:ellipsis">${expression || "\u00a0"}</div>
+		<div id="calculator-display" aria-live="polite" style="font-size:40px;font-weight:700;line-height:1.25;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums">${displayValue}</div>
+	</div>
+	<div id="calculator-keypad" class="spacer calculator-keypad">${keypadMarkup()}</div>`;
+
+	const applyCalculatorMode = root => {
 		if (!root) return;
 		root.classList.add("calculator-window");
 		root.classList.toggle("calculator-scientific", scientificMode);
-		const targetWidth = scientificMode ? Math.min(650, Math.max(340, window.innerWidth - 20)) : 340;
+		root.classList.toggle("calculator-converter-mode", converterMode);
+		const preferredWidth = scientificMode ? 650 : converterMode ? 430 : 340;
+		const targetWidth = Math.min(preferredWidth, Math.max(340, window.innerWidth - 20));
 		root.style.width = `${targetWidth}px`;
-		if (scientificMode) {
+		if (scientificMode || converterMode) {
 			const currentLeft = root.getBoundingClientRect?.().left ?? 0;
 			if (currentLeft + targetWidth > window.innerWidth - 8) root.style.left = `${Math.max(8, window.innerWidth - targetWidth - 8)}px`;
 		}
-		const keypad = root.querySelector?.("#calculator-keypad");
-		if (keypad) keypad.innerHTML = keypadMarkup();
-		const tool = root.querySelector?.('[data-portal-tool-title="scientific calculator mode"]');
-		tool?.classList?.toggle("active", scientificMode);
-		tool?.setAttribute?.("aria-pressed", scientificMode ? "true" : "false");
+		const content = root.querySelector?.("#calculator-content");
+		if (content) content.innerHTML = calculatorMarkup();
+		const scientificTool = root.querySelector?.('[data-portal-tool-title="scientific calculator mode"]');
+		scientificTool?.classList?.toggle("active", scientificMode);
+		scientificTool?.setAttribute?.("aria-pressed", scientificMode ? "true" : "false");
+		const converterTool = root.querySelector?.('[data-portal-tool-title="converter mode"]');
+		converterTool?.classList?.toggle("active", converterMode);
+		converterTool?.setAttribute?.("aria-pressed", converterMode ? "true" : "false");
+		if (converterMode) updateConversion();
 	};
 
 	const toggleScientificMode = (event, context) => {
+		modeChangeVersion += 1;
 		scientificMode = !scientificMode;
-		applyScientificMode(context?.window || getCalculatorWindow());
+		if (scientificMode) converterMode = false;
+		applyCalculatorMode(context?.window || getCalculatorWindow());
+		syncPortalState(context?.portal);
+	};
+
+	const toggleConverterMode = (event, context) => {
+		modeChangeVersion += 1;
+		converterMode = !converterMode;
+		if (converterMode) scientificMode = false;
+		else {
+			clearTimeout(currencyTimer);
+			currencyRequest += 1;
+		}
+		applyCalculatorMode(context?.window || getCalculatorWindow());
 		syncPortalState(context?.portal);
 	};
 
 	const bindCalculator = function () {
 		restoreState(this.portal);
 		const root = this.portal?.window?.() || getCalculatorWindow();
-		const keypad = root?.querySelector?.("#calculator-keypad");
-		applyScientificMode(root);
-		if (keypad) {
-			keypad.onclick = event => {
-				const target = event.target?.closest?.("[data-calculator-action]");
-				if (!target) return;
-				handleAction(target.dataset.calculatorAction, target.dataset.calculatorValue || "");
-			};
-		}
+		applyCalculatorMode(root);
+		syncPortalState(this.portal);
+		if (root) root.onclick = event => {
+			const calculatorTarget = event.target?.closest?.("[data-calculator-action]");
+			if (calculatorTarget) handleAction(calculatorTarget.dataset.calculatorAction, calculatorTarget.dataset.calculatorValue || "");
+			const converterTarget = event.target?.closest?.("[data-converter-action]");
+			if (converterTarget?.dataset.converterAction === "swap") {
+				[converterFrom, converterTo] = [converterTo, converterFrom];
+				applyCalculatorMode(root);
+				syncPortalState();
+			}
+		};
+		if (root) root.oninput = event => {
+			if (event.target?.dataset?.converterRole !== "input") return;
+			converterInput = event.target.value;
+			updateConversion();
+			syncPortalState();
+		};
+		if (root) root.onchange = event => {
+			const role = event.target?.dataset?.converterRole;
+			if (!role || role === "input") return;
+			if (role === "category") {
+				converterCategory = event.target.value;
+				resetConverterUnits();
+				applyCalculatorMode(root);
+			} else {
+				if (role === "from") converterFrom = event.target.value;
+				if (role === "to") converterTo = event.target.value;
+				updateConversion();
+			}
+			syncPortalState();
+		};
 		root?.setAttribute?.("tabindex", "0");
 		if (root) root.onkeydown = handleKeyboard;
 		root?.focus?.();
 		renderDisplay(root);
+		if (!initializedDefaultStatePortals.has(this.portal)) {
+			initializedDefaultStatePortals.add(this.portal);
+			const startupModeVersion = modeChangeVersion;
+			void loadDefaultState(this.settings).then(defaultState => {
+				if (startupModeVersion !== modeChangeVersion || !root?.isConnected) return;
+				setCalculatorMode(defaultState);
+				applyCalculatorMode(root);
+				syncPortalState(this.portal);
+			});
+		}
 	};
 
 	window.StandardCalculator = window.StandardCalculator || {clear, equals, inputDigit, inputOperator};
 
 	modular.register(new Service(SERVICE_ID, [new Portal({
 		title: "Calculator",
-		hints: ["calculator", "calculate", "math", "arithmetic"],
+		hints: ["calculator", "calculate", "math", "arithmetic", "converter", "convert", "currency", "units"],
 		internal: true,
 		dimensions: [340, 390],
 		navigation: false,
@@ -372,15 +615,13 @@
 			title: "Scientific calculator mode",
 			icon: SCIENTIFIC_MODE_ICON,
 			onclick: toggleScientificMode
+		}, {
+			title: "Converter mode",
+			icon: CONVERTER_MODE_ICON,
+			onclick: toggleConverterMode
 		}],
 		svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3.75h10.5a2.25 2.25 0 0 1 2.25 2.25v12a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 18V6a2.25 2.25 0 0 1 2.25-2.25Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 7.5h9M8.25 11.25h.008v.008H8.25v-.008Zm3.75 0h.008v.008H12v-.008Zm3.75 0h.008v.008h-.008v-.008ZM8.25 15h.008v.008H8.25V15Zm3.75 0h.008v.008H12V15Zm3.75 0h.008v.008h-.008V15Z"/></svg>`,
-		route: () => `<div class="large-padding-top padding-left padding-right">
-            <div class="padded" style="text-align:right;overflow:hidden;background:none">
-                <div id="calculator-history" class="faded no-wrap" style="min-height:20px;overflow:hidden;text-overflow:ellipsis">${expression || "\u00a0"}</div>
-                <div id="calculator-display" aria-live="polite" style="font-size:40px;font-weight:700;line-height:1.25;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums">${displayValue}</div>
-            </div>
-			<div id="calculator-keypad" class="spacer calculator-keypad">${keypadMarkup()}</div>
-        </div>`,
+		route: () => `<div id="calculator-content" class="large-padding-top padding-left padding-right">${calculatorMarkup()}</div>`,
 		afterRender: bindCalculator
-	})]));
+	})], CALCULATOR_SETTINGS));
 })();

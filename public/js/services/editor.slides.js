@@ -1454,12 +1454,13 @@
                     ])}),
                     div({id: "editor-slide-chart-type-panel", style: "editor-slide-chart-panel", content: children([
                         label({content: "Chart type"}),
-                        div({style: "editor-sheet-chart-type-grid", content: children(SLIDE_CHART_TYPES.map((chartType) => button({
-                            style: `editor-sheet-chart-type${chartType.value === selectedType ? " selected" : ""}`,
-                            type: "button",
-                            value: chartType.value,
-                            content: chartType.label
-                        })))})
+                        segmented({
+                            id: "editor-slide-chart-type",
+                            style: "editor-chart-type-segmented",
+                            ariaLabel: "Chart type",
+                            value: selectedType,
+                            options: SLIDE_CHART_TYPES
+                        })
                     ])}),
                     div({id: "editor-slide-chart-data-panel", style: "editor-slide-chart-panel hidden", content: children([
                         label({input: "editor-slide-chart-title", content: "Title"}),
@@ -1508,19 +1509,16 @@
                         syncTabs();
                     });
                 });
-                windowNode.querySelectorAll(".editor-sheet-chart-type").forEach((typeButton) => {
-                    if (typeButton.dataset.bound === "1") return;
-                    typeButton.dataset.bound = "1";
-                    typeButton.addEventListener("click", (event) => {
-                        event.preventDefault();
-                        selectedType = typeButton.value || "bar";
-                        windowNode.querySelectorAll(".editor-sheet-chart-type").forEach((node) => node.classList.remove("selected"));
-                        typeButton.classList.add("selected");
+                const chartTypeControl = windowNode.querySelector("#editor-slide-chart-type");
+                if (chartTypeControl && chartTypeControl.dataset.bound !== "1") {
+                    chartTypeControl.dataset.bound = "1";
+                    chartTypeControl.addEventListener("change", (event) => {
+                        selectedType = event.detail?.value || chartTypeControl.getAttribute("value") || "bar";
                         const dataInput = windowNode.querySelector("#editor-slide-chart-data");
                         if (dataInput instanceof HTMLTextAreaElement) dataInput.placeholder = getSlideChartDataPlaceholder(selectedType);
                         renderPreview();
                     });
-                });
+                }
                 ["#editor-slide-chart-title", "#editor-slide-chart-data", "#editor-slide-chart-label-values"].forEach((selector) => {
                     const inputNode = windowNode.querySelector(selector);
                     if (!inputNode || inputNode.dataset.bound === "1") return;

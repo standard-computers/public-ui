@@ -640,6 +640,7 @@ const searchboxPayloads = {};
 let searchboxIndex = 0;
 const dropdownPayloads = {};
 let dropdownIndex = 0;
+let segmentedIndex = 0;
 let openDropdown = null;
 let openDropdownMenu = null;
 let openDropdownOptionIndex = -1;
@@ -691,6 +692,29 @@ function selectDropdownOption(dropdown, optionIndex) {
 	dropdown.querySelector(".plastic-dropdown-label").textContent = option.label;
 	hideDropdownMenu({focus: true});
 	dropdown.dispatchEvent(new Event("change", {bubbles: true}));
+}
+
+function selectSegmentedOption(control, option, {focus = true, notify = true} = {}) {
+	if (!control || !option || option.disabled || control.getAttribute("aria-disabled") === "true") return false;
+	const options = Array.from(control.querySelectorAll(".plastic-segment"));
+	const changed = option.getAttribute("aria-selected") !== "true";
+	options.forEach((candidate) => {
+		const selected = candidate === option;
+		candidate.classList.toggle("selected", selected);
+		candidate.setAttribute("aria-selected", `${selected}`);
+		candidate.tabIndex = selected ? 0 : -1;
+	});
+	const value = option.getAttribute("data-plastic-segment-value") ?? "";
+	control.setAttribute("value", value);
+	control.value = value;
+	if (focus) option.focus();
+	if (notify && changed) {
+		control.dispatchEvent(new CustomEvent("change", {
+			bubbles: true,
+			detail: {value, index: options.indexOf(option)}
+		}));
+	}
+	return true;
 }
 
 function showDropdownMenu(dropdown) {
@@ -755,6 +779,15 @@ function hideSearchboxOptions(searchboxId) {
 }
 
 document.addEventListener("click", (event) => {
+	const segment = event.target.closest('[data-plastic-segment-value]');
+	if (segment) {
+		const control = segment.closest('[data-plastic-segmented]');
+		if (control) {
+			event.preventDefault();
+			selectSegmentedOption(control, segment);
+			return;
+		}
+	}
 
 	const dropdownOption = event.target.closest('[data-plastic-dropdown-option]');
 	if (dropdownOption && openDropdownMenu?.contains(dropdownOption)) {
@@ -844,6 +877,21 @@ document.addEventListener("focusin", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+	const segment = event.target.closest('[data-plastic-segment-value]');
+	if (segment && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+		const control = segment.closest('[data-plastic-segmented]');
+		const options = Array.from(control?.querySelectorAll(".plastic-segment:not(:disabled)") || []);
+		if (control && options.length) {
+			event.preventDefault();
+			const currentIndex = options.indexOf(segment);
+			let nextIndex = currentIndex;
+			if (event.key === "Home") nextIndex = 0;
+			else if (event.key === "End") nextIndex = options.length - 1;
+			else nextIndex = (currentIndex + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + options.length) % options.length;
+			selectSegmentedOption(control, options[nextIndex]);
+			return;
+		}
+	}
 	const dropdown = event.target.closest('[data-plastic-dropdown-id]');
 	if (dropdown) {
 		if (event.key === "Escape") {
@@ -989,12 +1037,71 @@ function dropdown(n = {}) {
 	labelNode.className = "plastic-dropdown-label";
 	labelNode.textContent = selectedOption.label;
 	const chevron = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+	chevron.classList.add("plastic-dropdown-caret");
 	chevron.setAttribute("viewBox", "0 0 20 20");
 	chevron.setAttribute("aria-hidden", "true");
 	chevron.innerHTML = '<path d="m5 7.5 5 5 5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>';
 	el.append(labelNode, chevron);
 	dropdownPayloads[dropdownId] = {options};
 	return el.outerHTML;
+}
+
+/**
+ * Equal-width segmented selection control.
+ * Options accept {label, value, icon, title, disabled}; icon may be SVG markup.
+ */
+function segmentedSelection(n = {}) {
+	const control = document.createElement("div");
+	const options = Array.isArray(n.options) ? n.options : [];
+	const requestedValue = `${n.value ?? ""}`;
+	let selectedIndex = options.findIndex(item => `${item?.value ?? item?.label ?? ""}` === requestedValue && !item?.disabled);
+	if (selectedIndex < 0) selectedIndex = options.findIndex(item => !item?.disabled);
+
+	applyCommonAttributes(control, n);
+	control.className = `${n.style || ""} plastic-segmented`.trim();
+	control.id = n.id || `plastic-segmented-${segmentedIndex++}`;
+	control.setAttribute("data-plastic-segmented", "");
+	control.setAttribute("role", "tablist");
+	control.style.setProperty("--plastic-segment-count", Math.max(options.length, 1));
+	if (n.ariaLabel) control.setAttribute("aria-label", n.ariaLabel);
+	if (n.disabled) control.setAttribute("aria-disabled", "true");
+	registerElementHandler(control, "onchange", n.onchange || n.onChange);
+
+	options.forEach((item, optionIndex) => {
+		const value = `${item?.value ?? item?.label ?? ""}`;
+		const selected = optionIndex === selectedIndex;
+		const option = document.createElement("button");
+		option.type = "button";
+		option.className = `plastic-segment${item?.icon ? " has-icon" : ""}${selected ? " selected" : ""}`;
+		option.setAttribute("role", "tab");
+		option.setAttribute("aria-selected", `${selected}`);
+		option.setAttribute("data-plastic-segment-value", value);
+		option.tabIndex = selected ? 0 : -1;
+		option.disabled = Boolean(n.disabled || item?.disabled);
+		if (item?.title) option.title = item.title;
+		if (item?.ariaLabel) option.setAttribute("aria-label", item.ariaLabel);
+		if (item?.icon) {
+			const icon = document.createElement("span");
+			icon.className = "plastic-segment-icon";
+			icon.setAttribute("aria-hidden", "true");
+			icon.innerHTML = item.icon;
+			option.appendChild(icon);
+		}
+		const label = document.createElement("span");
+		label.className = "plastic-segment-label";
+		label.textContent = item?.label ?? value;
+		option.appendChild(label);
+		control.appendChild(option);
+	});
+
+	const selectedOption = options[selectedIndex];
+	const selectedValue = selectedOption ? `${selectedOption?.value ?? selectedOption?.label ?? ""}` : "";
+	control.setAttribute("value", selectedValue);
+	return control.outerHTML;
+}
+
+function segmented(n = {}) {
+	return segmentedSelection(n);
 }
 
 function searchbox(n = {}) {
@@ -1840,3 +1947,5 @@ window.StandardPlastic.scatterChart = scatterChart;
 window.StandardPlastic.pieChart = pieChart;
 window.StandardPlastic.chart = chart;
 window.StandardPlastic.renderChart = renderChart;
+window.StandardPlastic.segmented = segmented;
+window.StandardPlastic.segmentedSelection = segmentedSelection;
