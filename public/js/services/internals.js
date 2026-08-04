@@ -798,7 +798,14 @@
         const normalizedValue = value ?? setting?.default ?? "";
         if (type === "boolean") {
             const checked = normalizedValue === true || normalizedValue === "true" || normalizedValue === 1 || normalizedValue === "1";
-            return `<input id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="boolean" type="checkbox" ${checked ? "checked" : ""}>`;
+            const wrapper = document.createElement("div");
+            wrapper.innerHTML = switcher({id: fieldId, checked});
+            const control = wrapper.firstElementChild;
+            const field = control.querySelector("input[type='checkbox']");
+            field.setAttribute("data-setting-name", name);
+            field.setAttribute("data-setting-type", type);
+            field.setAttribute("aria-label", String(setting?.label || name));
+            return control.outerHTML;
         }
         if (restrictions.length) {
             const wrapper = document.createElement("div");
@@ -835,13 +842,19 @@
             const type = escapeHtml(setting?.type || "text");
             const restrictions = window.StandardAppSettings?.restrictionValues?.(setting) || [];
             const meta = restrictions.length && String(setting?.type || "").toLowerCase() !== "boolean" ? `${type} - ${restrictions.map(escapeHtml).join(", ")}` : type;
-            return `<label class="internals-app-setting-row bordered inner-radius small-padding" data-setting-row="${escapeHtml(name)}">
-                <span class="internals-app-setting-label">${escapeHtml(setting?.label || name)}</span>
+            return `<div class="internals-app-setting-row bordered inner-radius padded margin-bottom" data-setting-row="${escapeHtml(name)}">
+                <label class="internals-app-setting-label" for="${getSettingsFieldId(name)}" style="display:inline">${escapeHtml(setting?.label || name)}</label>
                 <span class="internals-app-setting-meta faded">${escapeHtml(meta)}</span>
                 <span class="internals-app-setting-control padded">${renderSettingControl(name, setting, values?.[name])}</span>
-            </label>`;
+            </div>`;
         }).join("");
         host.innerHTML = `<div class="internals-app-settings" data-settings-service="${escapeHtml(serviceId)}">${rows}</div>`;
+        const settingsRoot = host.querySelector(".internals-app-settings");
+        settingsRoot?.addEventListener("change", (event) => {
+            const field = event.target?.closest?.("[data-setting-name]");
+            if (!field || !settingsRoot.contains(field)) return;
+            void persistAppSettingsFromPortal(portal);
+        });
     };
     const collectAppSettingsValues = (portal = findInternalsWindow(4)?.portal) => {
         const root = portal?.window?.() || document;
@@ -854,17 +867,21 @@
         });
         return values;
     };
-    const saveAppSettingsFromPortal = async (_event, context = {}) => {
-        const portal = context?.portal || findInternalsWindow(4)?.portal;
+    const persistAppSettingsFromPortal = async (portal = findInternalsWindow(4)?.portal, {announce = false, rerender = false} = {}) => {
         const {serviceId, title} = getSettingsPortalState(portal);
-        if (!serviceId) return;
+        if (!serviceId) return false;
         const saved = await window.StandardAppSettings?.save?.(serviceId, collectAppSettingsValues(portal));
         if (saved) {
-            modular.success(`Saved ${title || serviceId} settings`);
-            await renderAppSettingsPortal(portal);
+            if (announce) modular.success(`Saved ${title || serviceId} settings`);
+            if (rerender) await renderAppSettingsPortal(portal);
         } else {
             modular.error("Unable to save app settings");
         }
+        return saved;
+    };
+    const saveAppSettingsFromPortal = async (_event, context = {}) => {
+        const portal = context?.portal || findInternalsWindow(4)?.portal;
+        await persistAppSettingsFromPortal(portal, {announce: true, rerender: true});
     };
     const deleteAppSettingsFromPortal = (_event, context = {}) => {
         const portal = context?.portal || findInternalsWindow(4)?.portal;
@@ -1442,7 +1459,17 @@
             internal: true,
             dimensions: [520, 500],
             navigation: false,
-            tools: [{title: "Save", icon: modular.icons.save, onclick: saveAppSettingsFromPortal}, {title: "Delete", icon: modular.icons.delete, onclick: deleteAppSettingsFromPortal}],
+            tools: [
+                {
+                    title: "Delete",
+                    icon: modular.icons.delete,
+                    onclick: deleteAppSettingsFromPortal
+                }, {
+                    title: "Save",
+                    icon: modular.icons.save,
+                    onclick: saveAppSettingsFromPortal
+                }
+            ],
             route: () => div({style: "large-padding-top small-padding fill", content: div({id: "internals-app-settings-host", style: "internals-app-settings-host padded"})}),
             afterRender: function () {
                 void renderAppSettingsPortal(this.portal);

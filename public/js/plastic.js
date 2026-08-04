@@ -1037,7 +1037,7 @@ function dropdown(n = {}) {
 	labelNode.className = "plastic-dropdown-label";
 	labelNode.textContent = selectedOption.label;
 	const chevron = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-	chevron.classList.add("plastic-dropdown-caret");
+	chevron.classList.add("plastic-dropdown-caret", "float-right");
 	chevron.setAttribute("viewBox", "0 0 20 20");
 	chevron.setAttribute("aria-hidden", "true");
 	chevron.innerHTML = '<path d="m5 7.5 5 5 5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>';

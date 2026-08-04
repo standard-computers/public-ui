@@ -1326,15 +1326,14 @@
     const checkPeopleProfileImageExists = async (recordId = "") => {
         const profileImageUrl = buildProfileImageUrl(recordId);
         if (!profileImageUrl) return false;
-        try {
-            const response = await fetch(profileImageUrl, {credentials: "same-origin", cache: "no-store"});
-            return response.ok;
-        } catch (_) {
-            return false;
-        }
+        return new Promise(resolve => {
+            const profileImage = new Image();
+            profileImage.onload = () => resolve(profileImage.naturalWidth > 0 && profileImage.naturalHeight > 0);
+            profileImage.onerror = () => resolve(false);
+            profileImage.src = profileImageUrl;
+        });
     };
-
-    const buildPeopleFallbackPhoto = (size = 56) => `<svg class="text-foreground" xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" fill="none" viewBox="0 0 24 24" stroke-width="1.35" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75a17.933 17.933 0 0 1-7.499-1.632Z"/></svg>`;
+    const buildPeopleFallbackPhoto = (size = 56) => `<span class="round cover" aria-hidden="true" style="display:block;width:${size}px;height:${size}px;background-image:url('/images/blank_contact.png');background-position:center;background-repeat:no-repeat;background-size:cover"></span>`;
 
     const renderPeopleUserTile = async (userRecord = {}) => {
         const recordId = sanitizeUserRecordId(userRecord?.id);
@@ -1350,12 +1349,12 @@
             },
             content: children([
             button({
-                style: `people-user-photo-button naked no-margin ${hasProfileImage ? "" : "background-secondary"} round`,
+                style: `people-user-photo-button naked no-margin ${hasProfileImage ? "" : "people-user-photo-default background-secondary"} round`,
                 data: recordId,
                 title: `Change ${displayName}'s photo`,
                 content: hasProfileImage
                     ? img({src: buildProfileImageUrl(recordId), style: "people-user-photo-image round cover", alt: displayName, width: 48, height: 48})
-                    : buildPeopleFallbackPhoto(48),
+                    : "",
                 width: 48,
                 height: 48
             }),

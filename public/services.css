@@ -451,6 +451,18 @@ input.calendar-recurrence-number {width:46px;padding:5px 6px;text-align:center}
 .maps-location-item strong {font-size:1em}
 .maps-location-item span {font-size:.85em;opacity:.72}
 .maps-locations-empty {padding:28px 12px;text-align:center}
+.maps-location-editor {display:flex;flex-direction:column;gap:4px;box-sizing:border-box}
+.maps-location-field {flex:1;min-width:0}
+.maps-location-field-row {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.maps-location-view {display:flex;flex-direction:column;gap:16px;box-sizing:border-box}
+.maps-location-view-heading {display:flex;align-items:center;gap:12px;padding:8px}
+.maps-location-view-heading h2 {margin:0;overflow-wrap:anywhere}
+.maps-location-pin {display:grid;place-items:center;width:44px;height:44px;flex:0 0 44px;border-radius:50%;background:var(--secondary-bg)}
+.maps-location-pin svg {width:24px;height:24px}
+.maps-location-details {display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.maps-location-detail {display:grid;grid-template-columns:minmax(110px,.42fr) minmax(0,1fr);gap:12px;padding:11px 12px;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.maps-location-detail:last-child {border-bottom:0}
+.maps-location-detail-label {font-weight:600;opacity:.7}
 
 /*SPREADSHEETS*/
 .editor-portal-shell {display:flex;flex-direction:column;min-height:100%;height:100%;min-width:0;box-sizing:border-box;overflow:hidden}
@@ -691,6 +703,7 @@ body.editor-sheet-resizing-rows {cursor:row-resize}
 
 .settings-people-user-tile {display:flex;align-items:center;gap:12px;min-height:48px;box-sizing:border-box}
 button.people-user-photo-button {display:flex;align-items:center;justify-content:center;flex:0 0 48px;width:48px;height:48px;min-width:48px;min-height:48px;margin:0;padding:0 !important;overflow:hidden;box-sizing:border-box}
+button.people-user-photo-default,button.people-user-photo-default:hover {background-image:url("/images/blank_contact.png") !important;background-position:center !important;background-repeat:no-repeat !important;background-size:cover !important}
 button.people-user-photo-button svg,.people-user-photo-image {display:block;width:48px !important;height:48px !important;max-width:48px;max-height:48px;object-fit:cover}
 .settings-people-user-copy {min-width:0}
 

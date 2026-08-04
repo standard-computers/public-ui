@@ -8,8 +8,11 @@
     let locationsFetchPromise = null;
     let focusSavedLocation = null;
     let locationsSourcePortal = null;
+    let locationPortalIndex = 0;
     const MAPS_CACHE_KEY = "recent-searches";
     const MAPS_CACHE_LIMIT = 10;
+
+    const escapeCliQuotedValue = (value = "") => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
     const firstLocationValue = (location, keys, fallback = "") => {
         for (const key of keys) {
@@ -27,19 +30,28 @@
         const longitude = Number(rawLongitude);
         if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
         const name = `${firstLocationValue(location, ["name", "title", "label"], "Location")}`.trim() || "Location";
+        const street = `${firstLocationValue(location, ["street", "address", "address1"])}`.trim();
+        const territory = `${firstLocationValue(location, ["territory", "state", "province", "region"])}`.trim();
         const addressParts = [
-            firstLocationValue(location, ["address", "street", "address1"]),
+            street,
             firstLocationValue(location, ["city"]),
-            firstLocationValue(location, ["state", "province", "region"]),
+            territory,
             firstLocationValue(location, ["postal", "postal_code", "zip"])
         ].map(value => `${value || ""}`.trim()).filter(Boolean);
         return {
             ...location,
             id: firstLocationValue(location, ["id", "uuid", "_id"], `location-${index}`),
             name,
+            description: `${firstLocationValue(location, ["description"])}`.trim(),
+            street,
+            city: `${firstLocationValue(location, ["city"])}`.trim(),
+            territory,
+            country: `${firstLocationValue(location, ["country"])}`.trim(),
+            postal: `${firstLocationValue(location, ["postal", "postal_code", "zip"])}`.trim(),
             address: addressParts.join(", "),
             latitude,
-            longitude
+            longitude,
+            timezone: `${firstLocationValue(location, ["timezone"])}`.trim()
         };
     };
 
@@ -94,6 +106,182 @@
             item.append(title, detail);
             container.appendChild(item);
         });
+    };
+
+    const locationField = (id, fieldLabel, value = "", type = "text") => div({
+        style: "maps-location-field",
+        content: children([
+            fieldLabel && label({style: "bold small-padding", input: id, content: escapeHtml(fieldLabel)}),
+            div({style: "padded", content: input({id, type, style: "undecorated no-padding fill", value: String(value ?? "")})})
+        ])
+    });
+
+    const locationEditorRoute = (location, prefix) => div({style: "maps-location-editor large-padding-top small-padding", content: children([
+        locationField(`${prefix}-name`, "Name", location.name),
+        locationField(`${prefix}-description`, "Description", location.description),
+        locationField(`${prefix}-street`, "Street", location.street),
+        div({style: "maps-location-field-row", content: children([
+            locationField(`${prefix}-city`, "City", location.city),
+            locationField(`${prefix}-territory`, "State / Territory", location.territory)
+        ])}),
+        div({style: "maps-location-field-row", content: children([
+            locationField(`${prefix}-postal`, "Postal Code", location.postal),
+            locationField(`${prefix}-country`, "Country", location.country)
+        ])}),
+        div({style: "maps-location-field-row", content: children([
+            locationField(`${prefix}-latitude`, "Latitude", location.latitude, "number"),
+            locationField(`${prefix}-longitude`, "Longitude", location.longitude, "number")
+        ])}),
+        locationField(`${prefix}-timezone`, "Timezone", location.timezone)
+    ])});
+
+    const readLocationEditor = (root, prefix, location) => {
+        const value = field => root?.querySelector(`#${prefix}-${field}`)?.value?.trim() || "";
+        return normalizeLocationRecord({
+            ...location,
+            name: value("name") || "Location",
+            description: value("description"),
+            street: value("street"),
+            city: value("city"),
+            territory: value("territory"),
+            postal: value("postal"),
+            country: value("country"),
+            latitude: value("latitude"),
+            longitude: value("longitude"),
+            timezone: value("timezone")
+        }, 0);
+    };
+
+    const deleteLocation = (location, portal = null) => {
+        if (!location?.id) return modular.error("Missing location ID");
+        confirmationDialogue({
+            title: "Delete Location",
+            content: `You're sure you want to delete ${escapeHtml(location.name || "this location")}?`,
+            destructive: true,
+            confirmation: async () => {
+                try {
+                    const response = await CLI.send(`[locations] - <id ${location.id}>`);
+                    if (response === 0) return modular.error("Failed to delete location");
+                    savedLocations = savedLocations.filter(savedLocation => `${savedLocation.id}` !== `${location.id}`);
+                    notifyLocationsChanged();
+                    portal?.close?.();
+                    modular.success("Deleted location");
+                } catch (error) {
+                    console.error("Failed to delete location:", error);
+                    modular.error("Failed to delete location");
+                }
+            }
+        });
+    };
+
+    const openLocationEditor = location => {
+        location = normalizeLocationRecord(location, 0);
+        if (!location) return modular.error("Invalid location");
+        const prefix = `maps-location-edit-${locationPortalIndex++}`;
+        let editorPortal = null;
+        const saveLocation = async context => {
+            const portalWindow = context?.portal?.window?.() || editorPortal?.window?.();
+            const nextLocation = readLocationEditor(portalWindow, prefix, location);
+            if (!nextLocation) return modular.error("Latitude and longitude must be valid numbers");
+            if (Math.abs(nextLocation.latitude) > 90 || Math.abs(nextLocation.longitude) > 180) {
+                return modular.error("Latitude must be between -90 and 90, and longitude between -180 and 180");
+            }
+            const stringFields = ["name", "description", "street", "city", "territory", "country", "postal", "timezone"];
+            const commands = stringFields.map(field => CLI.send(`[locations] ${field} "${escapeCliQuotedValue(nextLocation[field])}" <id ${location.id}>`));
+            commands.push(CLI.send(`[locations] latitude ${nextLocation.latitude} <id ${location.id}>`));
+            commands.push(CLI.send(`[locations] longitude ${nextLocation.longitude} <id ${location.id}>`));
+            try {
+                const responses = await Promise.all(commands);
+                if (responses.some(response => response === 0)) return modular.error("Failed to save location");
+                savedLocations = savedLocations.map(savedLocation => `${savedLocation.id}` === `${location.id}` ? nextLocation : savedLocation);
+                notifyLocationsChanged();
+                editorPortal.close();
+                openLocation(nextLocation);
+                modular.success("Saved location");
+            } catch (error) {
+                console.error("Failed to save location:", error);
+                modular.error("Failed to save location");
+            }
+        };
+        editorPortal = new Portal({
+            title: `Edit ${location.name}`,
+            dimensions: [520, 620],
+            navigation: false,
+            icon: "/icons/interfaces/maps.png",
+            svg_icon: modular.icons.globe,
+            tools: [
+                {title: "Delete", icon: modular.icons.delete, onclick: () => deleteLocation(location, editorPortal)},
+                {title: "Save", icon: modular.icons.save, onclick: (_, context) => saveLocation(context)}
+            ],
+            route: () => locationEditorRoute(location, prefix),
+            afterRender: win => {
+                win.querySelectorAll('input[type="number"]').forEach(field => field.step = "any");
+                const latitudeField = win.querySelector(`#${prefix}-latitude`);
+                const longitudeField = win.querySelector(`#${prefix}-longitude`);
+                if (latitudeField) {
+                    latitudeField.min = "-90";
+                    latitudeField.max = "90";
+                }
+                if (longitudeField) {
+                    longitudeField.min = "-180";
+                    longitudeField.max = "180";
+                }
+                win.querySelector(`#${prefix}-name`)?.focus();
+            }
+        });
+        editorPortal.show();
+        return editorPortal;
+    };
+
+    const openLocation = location => {
+        location = normalizeLocationRecord(location, 0);
+        if (!location) return modular.error("Invalid location");
+        const details = [
+            ["Description", location.description],
+            ["Street", location.street],
+            ["City", location.city],
+            ["State / Territory", location.territory],
+            ["Postal Code", location.postal],
+            ["Country", location.country],
+            ["Coordinates", `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`],
+            ["Timezone", location.timezone]
+        ].filter(([, value]) => `${value || ""}`.trim());
+        const locationPortal = new Portal({
+            title: location.name,
+            dimensions: [440, 480],
+            auto_height: true,
+            navigation: false,
+            icon: "/icons/interfaces/maps.png",
+            svg_icon: modular.icons.globe,
+            tools: [
+                {
+                    title: "Delete", icon: modular.icons.delete,
+                    onclick: () => deleteLocation(location, locationPortal)
+                },
+                {
+                    title: "Edit", icon: modular.icons.modify,
+                    onclick: () => {
+                        locationPortal.close();
+                        openLocationEditor(location);
+                    }
+                }
+            ],
+            route: () => div({style: "maps-location-view large-padding-top small-padding", content: children([
+                div({style: "maps-location-view-heading", content: children([
+                    div({style: "maps-location-pin", content: modular.icons.globe}),
+                    h({level: 2, content: escapeHtml(location.name)})
+                ])}),
+                div({style: "maps-location-details", content: children(details.map(([label, value]) => div({
+                    style: "maps-location-detail",
+                    content: children([
+                        div({style: "maps-location-detail-label", content: escapeHtml(label)}),
+                        div({content: escapeHtml(value)})
+                    ])
+                })))})
+            ])})
+        });
+        locationPortal.show();
+        return locationPortal;
     };
 
     const MAP_STYLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3"/></svg>`;
@@ -876,6 +1064,37 @@
             afterRender: async () => {
                 const list = document.getElementById("maps-locations-list");
                 renderLocationsList(list);
+                if (list && list.dataset.contextMenuBound !== "1") {
+                    list.dataset.contextMenuBound = "1";
+                    const hasLocationTarget = (_root, target) => !!target?.closest?.(".maps-location-item");
+                    const getLocationFromItem = item => savedLocations[Number(item?.dataset?.locationIndex)];
+                    list.contextmenu([{
+                        icon: modular.icons.open,
+                        label: "Open",
+                        visible: hasLocationTarget,
+                        action: (_root, _event, item) => {
+                            const location = getLocationFromItem(item);
+                            if (location) openLocation(location);
+                        }
+                    }, {
+                        icon: modular.icons.modify,
+                        label: "Edit",
+                        visible: hasLocationTarget,
+                        action: (_root, _event, item) => {
+                            const location = getLocationFromItem(item);
+                            if (location) openLocationEditor(location);
+                        }
+                    }, {
+                        icon: modular.icons.delete,
+                        label: "Delete",
+                        destructive: true,
+                        visible: hasLocationTarget,
+                        action: (_root, _event, item) => {
+                            const location = getLocationFromItem(item);
+                            if (location) deleteLocation(location);
+                        }
+                    }], ".maps-location-item");
+                }
                 const locations = await fetchSavedLocations();
                 renderLocationsList(list, locations);
                 list?.addEventListener("click", event => {
