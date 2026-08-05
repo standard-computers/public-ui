@@ -9,6 +9,7 @@
     const SLIDE_CHART_DEFAULT_HEIGHT = 240;
     const SLIDE_CHART_MIN_WIDTH = 180;
     const SLIDE_CHART_MIN_HEIGHT = 140;
+    const SLIDE_PRESENT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>`;
 
     const SLIDE_EDITOR_SETTINGS = {
         default_background: {label: "Default slide background", type: "text", default: ""},
@@ -1876,14 +1877,6 @@
                 toggleSlideBackgroundMenu();
             });
         }
-        const presentButton = document.getElementById("editor-slide-present-button");
-        if (presentButton && presentButton.dataset.bound !== "1") {
-            presentButton.dataset.bound = "1";
-            presentButton.addEventListener("click", (event) => {
-                event.stopPropagation();
-                showSlidePresentation();
-            });
-        }
         const moreOptionsButton = document.getElementById("editor-slide-more-options");
         if (moreOptionsButton && moreOptionsButton.dataset.bound !== "1") {
             moreOptionsButton.dataset.bound = "1";
@@ -1919,11 +1912,17 @@
             dimensions: [1200, 800],
             horizontal_nav: true,
             centered_nav: true,
-            tools: [{
-                title: "Save",
-                icon: modular.icons.save,
-                onclick: () => saveLoadedSlidesDeck()
-            }],
+            tools: [
+                {
+                    title: "Present",
+                    icon: SLIDE_PRESENT_ICON,
+                    onclick: () => showSlidePresentation()
+                }, {
+                    title: "Save",
+                    icon: modular.icons.save,
+                    onclick: () => saveLoadedSlidesDeck()
+                }
+            ],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6"/></svg>`,
             icon: "/icons/pwrpnt.png",
             route: function () {
@@ -1947,7 +1946,6 @@
                                 button({id: "editor-slide-style-background", style: "naked align-bottom small-margin-right inner-radius", title: "Fill", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
                                 button({id: "editor-slide-style-align", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: SLIDE_ALIGN_ICONS.left}),
                                 button({id: "editor-slide-background-button", style: "naked align-bottom small-margin-right inner-radius", title: "Slide background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42"/></svg>`}),
-                                button({id: "editor-slide-present-button", style: "naked align-bottom small-margin-right inner-radius", title: "Present", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>`}),
                                 button({id: "editor-slide-more-options", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: modular.icons.ellipses})
                             ])}),
                             div({id: "editor-slide-canvas", style: "editor-slide-canvas secondary-bordered shadowed radius"})

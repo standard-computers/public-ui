@@ -6,6 +6,12 @@
             type: "text",
             default: "rows",
             restrictions: ["rows", "tiles", "details"]
+        },
+        photo_display_style: {
+            label: "Photo display style",
+            type: "text",
+            default: "cascade",
+            restrictions: ["cascade", "grid"]
         }
     };
     const NOTE_CONTENT_PREFIX = "__STD_NOTE_B64__:";
@@ -178,6 +184,7 @@
     }];
     let fileDisplayStyleIndex = 0;
     let fileDisplaySettingsPromise = null;
+    let photoDisplaySettingsPromise = null;
     const getFileDisplayStyle = () => FILE_DISPLAY_STYLES[fileDisplayStyleIndex];
     const getFileDisplayRootClass = () => `files-display files-display-${getFileDisplayStyle().id}`;
     const setFileDisplayStyle = (styleId = "rows") => {
@@ -205,6 +212,66 @@
         const saved = await window.StandardAppSettings?.save?.(FILES_SERVICE_ID, {...currentSettings, display_style: styleId});
         if (!saved) modular.error("Unable to save Files display style");
         return saved;
+    };
+    const setPhotoDisplayStyle = (styleId = FILES_SETTINGS.photo_display_style.default) => {
+        photoDisplayStyle = FILES_SETTINGS.photo_display_style.restrictions.includes(styleId)
+            ? styleId
+            : FILES_SETTINGS.photo_display_style.default;
+        return photoDisplayStyle;
+    };
+    const loadPhotoDisplayStyleSetting = ({force = false} = {}) => {
+        if (!photoDisplaySettingsPromise || force) {
+            photoDisplaySettingsPromise = Promise.resolve(window.StandardAppSettings?.values?.(FILES_SERVICE_ID, {force}) || {})
+                .then(values => setPhotoDisplayStyle(values?.photo_display_style || FILES_SETTINGS.photo_display_style.default))
+                .catch(error => {
+                    console.error("Failed to load Photos display style", error);
+                    return setPhotoDisplayStyle(FILES_SETTINGS.photo_display_style.default);
+                });
+        }
+        return photoDisplaySettingsPromise;
+    };
+    const savePhotoDisplayStyleSetting = async styleId => {
+        const currentSettings = await window.StandardAppSettings?.values?.(FILES_SERVICE_ID) || {};
+        const saved = await window.StandardAppSettings?.save?.(FILES_SERVICE_ID, {...currentSettings, photo_display_style: styleId});
+        if (!saved) modular.error("Unable to save Photos display style");
+        return saved;
+    };
+    const applyPhotoDisplayStyle = () => {
+        const photosRoot = document.getElementById("photos");
+        const displayStyleButton = document.getElementById("photos-display-style");
+        const isGrid = photoDisplayStyle === "grid";
+        if (photosRoot) {
+            photosRoot.style.display = isGrid ? "grid" : "block";
+            photosRoot.style.gridTemplateColumns = isGrid ? "repeat(auto-fill, minmax(150px, 1fr))" : "";
+            photosRoot.style.gap = isGrid ? "0.75rem" : "";
+            photosRoot.style.columnCount = isGrid ? "auto" : "3";
+            photosRoot.style.columnGap = "0.75rem";
+        }
+        const photoTiles = photosRoot?.querySelectorAll?.(".file-folder") || [];
+        photoTiles.forEach(tile => {
+            tile.style.display = isGrid ? "block" : "inline-block";
+            tile.style.width = "100%";
+            tile.style.marginBottom = isGrid ? "0" : "0.75rem";
+            tile.style.breakInside = isGrid ? "auto" : "avoid";
+            tile.style.aspectRatio = isGrid ? "1 / 1" : "auto";
+            tile.style.overflow = "hidden";
+            tile.style.borderRadius = "var(--radius)";
+            if (tile.firstElementChild) tile.firstElementChild.style.height = isGrid ? "100%" : "auto";
+        });
+        const photoImages = photosRoot?.querySelectorAll?.(".file-folder img") || [];
+        photoImages.forEach(image => {
+            image.style.height = isGrid ? "100%" : "auto";
+            image.style.objectFit = isGrid ? "cover" : "contain";
+            image.style.display = "block";
+        });
+        if (displayStyleButton) {
+            const currentLabel = isGrid ? "Grid" : "Cascade";
+            const nextLabel = isGrid ? "cascade" : "grid";
+            displayStyleButton.innerHTML = isGrid ? PHOTO_GRID_ICON : PHOTO_CASCADE_ICON;
+            displayStyleButton.title = `Photo display: ${currentLabel}. Switch to ${nextLabel}`;
+            displayStyleButton.setAttribute("aria-label", displayStyleButton.title);
+            displayStyleButton.setAttribute("aria-pressed", String(isGrid));
+        }
     };
     const getFileName = (file = {}) => String(file.name || file.path?.split?.("/")?.pop?.() || "").toLowerCase();
     const getFileType = (file = {}) => {
@@ -599,20 +666,38 @@
             if (getFilePathForRemoveCommand(fileTile.getAttribute("directive")) === normalizedPath) fileTile.remove();
         });
     };
+    const beginDeleteFileProgress = fileName => window.StandardDownloads?.beginOpenProgress?.(`Deleting ${fileName}`) || 0;
+    const finishDeleteFileProgress = (token, fileName) => {
+        window.StandardDownloads?.updateOpenProgress?.({label: `Deleted ${fileName}`, loaded: 1, total: 1, indeterminate: false, token});
+        window.setTimeout(() => window.StandardDownloads?.hideOpenProgress?.(token), 220);
+    };
+    const hideDeleteFileProgress = token => window.StandardDownloads?.hideOpenProgress?.(token);
     const deleteFile = (rawPath, tile = null) => {
         const filePath = getFilePathForRemoveCommand(rawPath);
         if (!filePath) return;
         const fileName = filePath.split("/").pop() || "file";
-        CLI.send(CLI.buildFilesCommand("remove", filePath)).then(async response => {
-            if (response !== 0 && response !== "false" && response !== false) {
-                removeDeletedFileTile(rawPath, tile);
-                await refreshFilesRecordCache();
-                modular.success(`Deleted ${fileName}`);
-            } else {
-                modular.error(`Failed to delete ${fileName}`);
+        confirmationDialogue({
+            title: "Delete file",
+            destructive: true,
+            content: `Are you sure you want to delete ${escapeHtml(fileName)}?`,
+            confirmation: async () => {
+                const progressToken = beginDeleteFileProgress(fileName);
+                try {
+                    const response = await CLI.send(CLI.buildFilesCommand("remove", filePath));
+                    if (response === 0 || response === "false" || response === false) {
+                        hideDeleteFileProgress(progressToken);
+                        modular.error(`Failed to delete ${fileName}`);
+                        return;
+                    }
+                    removeDeletedFileTile(rawPath, tile);
+                    await refreshFilesRecordCache();
+                    finishDeleteFileProgress(progressToken, fileName);
+                    modular.success(`Deleted ${fileName}`);
+                } catch (_) {
+                    hideDeleteFileProgress(progressToken);
+                    modular.error(`Failed to delete ${fileName}`);
+                }
             }
-        }).catch(() => {
-            modular.error(`Failed to delete ${fileName}`);
         });
     };
     const renameFile = async rawPath => {
@@ -1389,48 +1474,16 @@
                 setActiveUploadDirectory("Photos");
                 const photosRoot = document.getElementById("photos");
                 const displayStyleButton = document.getElementById("photos-display-style");
-                const applyPhotoDisplayStyle = () => {
-                    const isGrid = photoDisplayStyle === "grid";
-                    if (photosRoot) {
-                        photosRoot.style.display = isGrid ? "grid" : "block";
-                        photosRoot.style.gridTemplateColumns = isGrid ? "repeat(auto-fill, minmax(150px, 1fr))" : "";
-                        photosRoot.style.gap = isGrid ? "0.75rem" : "";
-                        photosRoot.style.columnCount = isGrid ? "auto" : "3";
-                        photosRoot.style.columnGap = "0.75rem";
-                    }
-                    const photoTiles = photosRoot?.querySelectorAll?.(".file-folder") || [];
-                    photoTiles.forEach(tile => {
-                        tile.style.display = isGrid ? "block" : "inline-block";
-                        tile.style.width = "100%";
-                        tile.style.marginBottom = isGrid ? "0" : "0.75rem";
-                        tile.style.breakInside = isGrid ? "auto" : "avoid";
-                        tile.style.aspectRatio = isGrid ? "1 / 1" : "auto";
-                        tile.style.overflow = "hidden";
-                        tile.style.borderRadius = "var(--radius)";
-                        if (tile.firstElementChild) tile.firstElementChild.style.height = isGrid ? "100%" : "auto";
-                    });
-                    const photoImages = photosRoot?.querySelectorAll?.(".file-folder img") || [];
-                    photoImages.forEach(image => {
-                        image.style.height = isGrid ? "100%" : "auto";
-                        image.style.objectFit = isGrid ? "cover" : "contain";
-                        image.style.display = "block";
-                    });
-                    if (displayStyleButton) {
-                        const currentLabel = isGrid ? "Grid" : "Cascade";
-                        const nextLabel = isGrid ? "cascade" : "grid";
-                        displayStyleButton.innerHTML = isGrid ? PHOTO_GRID_ICON : PHOTO_CASCADE_ICON;
-                        displayStyleButton.title = `Photo display: ${currentLabel}. Switch to ${nextLabel}`;
-                        displayStyleButton.setAttribute("aria-label", displayStyleButton.title);
-                        displayStyleButton.setAttribute("aria-pressed", String(isGrid));
-                    }
-                };
                 if (displayStyleButton) {
-                    displayStyleButton.addEventListener("click", () => {
-                        photoDisplayStyle = photoDisplayStyle === "cascade" ? "grid" : "cascade";
+                    displayStyleButton.addEventListener("click", async () => {
+                        await loadPhotoDisplayStyleSetting();
+                        setPhotoDisplayStyle(photoDisplayStyle === "cascade" ? "grid" : "cascade");
                         applyPhotoDisplayStyle();
+                        await savePhotoDisplayStyleSetting(photoDisplayStyle);
                     });
                 }
                 applyPhotoDisplayStyle();
+                loadPhotoDisplayStyleSetting().then(() => applyPhotoDisplayStyle());
                 if (photoCascadeObserver) {
                     photoCascadeObserver.disconnect();
                     photoCascadeObserver = null;
@@ -1570,6 +1623,16 @@
         }]
     })], FILES_SETTINGS));
     loadFileDisplayStyleSetting();
+    loadPhotoDisplayStyleSetting();
+    const syncFilesAppSettings = event => {
+        if (event?.detail?.serviceId !== FILES_SERVICE_ID) return;
+        const values = event.detail.values || {};
+        setFileDisplayStyle(values.display_style || FILES_SETTINGS.display_style.default);
+        setPhotoDisplayStyle(values.photo_display_style || FILES_SETTINGS.photo_display_style.default);
+        applyPhotoDisplayStyle();
+    };
+    document.addEventListener("standard-app-settings-saved", syncFilesAppSettings);
+    document.addEventListener("standard-app-settings-reset", syncFilesAppSettings);
     window.addEventListener("beforeunload", () => {
         if (photoCascadeObserver) {
             photoCascadeObserver.disconnect();

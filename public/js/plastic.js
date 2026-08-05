@@ -1397,6 +1397,42 @@ function confirmationDialogue(n) {
 	}));
 }
 
+function alertDialogue(n = {}) {
+	const options = typeof n === "string" ? {content: n} : n;
+	document.querySelectorAll(".dialogue").forEach(d => d.remove());
+	const cover = document.getElementById("cover");
+	const previouslyFocused = document.activeElement;
+	cover?.in();
+	const dialogue = createMarkupNode(div({
+		style: "dialogue padded center medium-padding",
+		content: children([
+			options.title ? h({level: 2, content: options.title}) : "",
+			blockquote({style: "margin-bottom", content: options.content || ""}),
+			button({style: "secondary brick fill fat", content: "Dismiss"})
+		])
+	}));
+	dialogue.setAttribute("role", "alertdialog");
+	dialogue.setAttribute("aria-modal", "true");
+	const dismissButton = dialogue.querySelector("button");
+	const closeDialogue = () => {
+		document.removeEventListener("keydown", dialogueKeydownHandler, true);
+		cover?.out();
+		dialogue.remove();
+		if (previouslyFocused?.isConnected) previouslyFocused.focus();
+		if (typeof options.dismissal === "function") options.dismissal();
+	};
+	const dialogueKeydownHandler = (event) => {
+		if (!dialogue.isConnected || event.key !== "Escape") return;
+		event.preventDefault();
+		closeDialogue();
+	};
+	dismissButton?.addEventListener("click", closeDialogue);
+	document.querySelector("body").append(dialogue);
+	document.addEventListener("keydown", dialogueKeydownHandler, true);
+	dismissButton?.focus();
+	return {close: closeDialogue, element: dialogue};
+}
+
 function colorPicker(n = {}) {
 	const colors = Array.isArray(n.colors) ? n.colors : [];
 	const styleClasses = (n.style || "").trim();

@@ -90,7 +90,7 @@
 
     const getPlatformInterfaces = () => {
         const interfaces = typeof window.StandardPlatformInterfaces?.all === "function" ? window.StandardPlatformInterfaces.all() : [];
-        return interfaces.filter(item => item?.serviceId && item?.title);
+        return interfaces.filter(item => item?.serviceId && item?.title && !["com.standard.internals", "com.standard.integrator"].includes(item.serviceId));
     };
 
     const isPlatformInterfaceEnabled = (serviceId) => {
@@ -161,6 +161,10 @@
                 event.stopPropagation();
                 const serviceId = settingsButton.getAttribute("data") || "";
                 const app = getPlatformInterfaces().find(item => item.serviceId === serviceId) || {serviceId};
+                if (typeof window.StandardAppSettings?.hasSettings === "function" && !window.StandardAppSettings.hasSettings(serviceId)) {
+                    alertDialogue({title: "Settings", content: "This interfaces does not have any settings"});
+                    return;
+                }
                 void openInterfaceSettings(app);
             };
         });

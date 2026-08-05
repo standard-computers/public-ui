@@ -426,17 +426,13 @@
             contactValue(contact.birthday) && div({style: "small-padding faded", content: contactValue(contact.birthday)})
         ].filter(Boolean);
 
-        const detailsPortal = new Portal({title: fullName, dimensions: [350, 400], auto_height: true, navigation: false, resizable: false,
+        const detailsPortal = new Portal({
+            title: fullName,
+            dimensions: [350, 400],
+            auto_height: true,
+            navigation: false,
+            resizable: false,
             tools: [
-                {
-                    title: "Edit",
-                    icon: modular.icons.modify,
-                    onclick: () => {
-                        selected_contact = {...contact};
-                        detailsPortal.close();
-                        modular.show("com.standard.contacts", 2);
-                    }
-                },
                 {
                     title: "Delete",
                     icon: modular.icons.delete,
@@ -445,6 +441,15 @@
                             removeContactFromVisibleLists(contact.id);
                             detailsPortal.close();
                         });
+                    }
+                },
+                {
+                    title: "Edit",
+                    icon: modular.icons.modify,
+                    onclick: () => {
+                        selected_contact = {...contact};
+                        detailsPortal.close();
+                        modular.show("com.standard.contacts", 2);
                     }
                 }
             ],
