@@ -25,7 +25,7 @@
         {serviceId: "com.standard.editor.sheet", title: "Sheets", script: "/js/services/editor.sheet.js", icon: "/icons/sprdshts.png"},
         {serviceId: "com.standard.editor.slides", title: "Slides", script: "/js/services/editor.slides.js", icon: "/icons/pwrpnt.png"},
         {serviceId: "com.standard.editor.code", title: "Code Editor", script: "/js/services/editor.code.js", icon: "/icons/code.png"},
-        {serviceId: "com.standard.editor.video", title: "Video Editor", script: "/js/services/editor.video.js", icon: "/icons/interfaces/camera.png"},
+        {serviceId: "com.standard.editor.video", title: "Video Editor", script: "/js/services/editor.video.js", icon: "/icons/mp4.png"},
         {serviceId: "com.standard.cli", title: "CLI", script: "/js/services/cli.js", icon: "/icons/interfaces/cli.png"},
         {serviceId: "com.standard.settings", title: "Settings", script: "/js/services/settings.js", icon: "/icons/interfaces/settings.png", required: true},
     ].filter(({serviceId, desktopOnly}) => (!desktopOnly || window.StandardRuntimeConfig?.desktopSetupEnabled === true)
