@@ -17,6 +17,8 @@
         border_width: 1,
         interface_state: true,
         use_svg_icons: true,
+        use_cursor: true,
+        grid_background: false,
         hide_shortcuts: false,
         kiosk_mode: false,
         disable_bar: false,
@@ -35,13 +37,19 @@
     let latestDeviceInfo = null;
     const defaultDeviceInfo = {serial: "Unknown", config: {}, network: {}, storage: {}, volume: {}};
 
-    const getDeviceInfo = () => CLI.send("status").then((response) => {
-        latestDeviceInfo = response;
-        return response;
-    }).catch(() => {
-        latestDeviceInfo = defaultDeviceInfo;
-        return defaultDeviceInfo;
-    });
+    const getDeviceInfo = () => {
+        const sharedStatus = window.StandardDeviceStatus;
+        const statusPromise = sharedStatus?.data
+            ? Promise.resolve(sharedStatus.data)
+            : sharedStatus?.promise;
+        return Promise.resolve(statusPromise || defaultDeviceInfo).then((response) => {
+            latestDeviceInfo = response || defaultDeviceInfo;
+            return latestDeviceInfo;
+        }).catch(() => {
+            latestDeviceInfo = defaultDeviceInfo;
+            return defaultDeviceInfo;
+        });
+    };
 
     const downloadDeviceInfo = () => {
         if (!latestDeviceInfo) return;
@@ -468,6 +476,11 @@
         });
     };
 
+    const getHistoryInterfaceOptions = () => (modular.running || []).map((service) => {
+        const shortcut = service?.interfaceShortcut?.();
+        return {label: shortcut?.title ?? "", value: shortcut ? service?.name?.() ?? "" : ""};
+    }).filter((option) => option.label && option.value);
+
     const initializeHistoryRoute = () => {
         const interfaceSelect = document.getElementById("home-history-interface-select");
         const modeSelect = document.getElementById("home-history-mode-select");
@@ -479,7 +492,7 @@
         const populateInterfaces = async () => {
             const cachedEntries = await window.StandardBrowserCache?.list?.() || [];
             const cachedInterfaces = Array.from(new Set(cachedEntries.map(entry => entry.interfaceName).filter(Boolean))).sort((left, right) => left.localeCompare(right));
-            const runningOptions = Array.from(interfaceSelect.options || []).map(option => ({label: option.textContent || option.value, value: option.value}));
+            const runningOptions = getHistoryInterfaceOptions();
             const optionMap = new Map();
             optionMap.set("", "All cached interfaces");
             runningOptions.forEach(option => {
@@ -488,7 +501,7 @@
             cachedInterfaces.forEach(interfaceName => {
                 if (!optionMap.has(interfaceName)) optionMap.set(interfaceName, interfaceName);
             });
-            interfaceSelect.innerHTML = Array.from(optionMap.entries()).map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("");
+            setDropdownOptions(interfaceSelect, Array.from(optionMap.entries()).map(([value, label]) => ({value, label})));
         };
         const refreshCacheList = async () => {
             const mode = modeSelect.value;
@@ -1519,7 +1532,7 @@
         new Portal({
             title: "Settings",
             hints: ["settings", "config"],
-            dimensions: [850, 700],
+            dimensions: [700, 600],
             navigation: false,
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>`,
             icon: "/icons/interfaces/settings.png",
@@ -1556,6 +1569,9 @@
                             div({style: "big-spacer"}),
                             switcher({id: "shadows", style: "float-right", checked: ui_settings_options.shadows !== false}),
                             label({style: "faded", content: "Shadows"}),
+                            div({style: "big-spacer"}),
+                            switcher({id: "grid-background", style: "float-right", checked: ui_settings_options.grid_background === true}),
+                            label({style: "faded", content: "Grid Background"}),
                             div({style: "big-spacer"}),
                             switcher({id: "use_svgs", style: "float-right", checked: ui_settings_options.use_svg_icons}),
                             label({style: "faded", content: "Use SVG Icons"}),
@@ -1629,6 +1645,11 @@
                             refreshUITheme();
                             saveSettings();
                         });
+                        document.getElementById("grid-background")?.addEventListener("change", (event) => {
+                            ui_settings_options.grid_background = event.target.checked;
+                            window.StandardUI?.setGridBackground?.(ui_settings_options.grid_background);
+                            saveSettings();
+                        });
                         loadSharedThemes();
                         renderBackgroundImageThumbnail();
                     }
@@ -1639,6 +1660,9 @@
                             div({style: "spacer"}),
                             switcher({id: "interface-state", checked: ui_settings_options.interface_state}),
                             label({style: "faded", content: "Save Interface State"}),
+                            div({style: "big-spacer"}),
+                            switcher({id: "use-cursor", checked: ui_settings_options.use_cursor !== false}),
+                            label({style: "faded", content: "Use Cursor"}),
                             div({style: "big-spacer"}),
                             switcher({id: "hide-shortcuts", checked: ui_settings_options.hide_shortcuts}),
                             label({style: "faded", content: "Hide Shortcuts"}),
@@ -1660,6 +1684,11 @@
                         ])
                     }),
                     afterRender: () => {
+                        document.getElementById("use-cursor").addEventListener("change", event => {
+                            ui_settings_options.use_cursor = event.target?.checked === true;
+                            window.StandardUI?.setUseCursor?.(ui_settings_options.use_cursor);
+                            saveSettings();
+                        });
                         document.getElementById("hide-shortcuts").addEventListener("change", _ => {
                             ui_settings_options.hide_shortcuts = !ui_settings_options.hide_shortcuts;
                             saveSettings();
@@ -1745,14 +1774,11 @@
                     text: "History",
                     icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75h1.5m9 0h-9"/></svg>`,
                     route: () => {
-                        const interfaces = (modular.running || []).map((service) => {
-                            const shortcut = service?.interfaceShortcut?.();
-                            return {label: shortcut?.title ?? "", value: shortcut ? service?.name?.() ?? "" : ""};
-                        }).filter((option) => option.label && option.value);
+                        const interfaces = getHistoryInterfaceOptions();
                         return div({style: "small-padding", content: children([
                             div({style: "margin-bottom", content: children([
-                                select({id: "home-history-interface-select", style: "home-history-select small-margin-right", options: interfaces}),
-                                select({id: "home-history-mode-select", style: "home-history-select small-margin-right", options: [{label: "Cache", value: "Cache"}, {label: "Use", value: "Use"}]}),
+                                dropdown({id: "home-history-interface-select", style: "home-history-select small-margin-right", ariaLabel: "Interface", options: [{label: "All cached interfaces", value: ""}, ...interfaces]}),
+                                dropdown({id: "home-history-mode-select", style: "home-history-select small-margin-right", ariaLabel: "History mode", options: [{label: "Cache", value: "Cache"}, {label: "Use", value: "Use"}]}),
                                 button({id: "home-history-refresh-cache", style: "tiny inner-radius small-margin-right", content: "Refresh"}),
                                 button({id: "home-history-clear-cache", style: "tiny inner-radius", content: "Clear"})
                             ])}),

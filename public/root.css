@@ -185,6 +185,10 @@ img {-webkit-user-drag:none;user-select:none}
 .hover-zoom {transition:all 100ms}
 .hover-zoom:hover {transform:scale(1.05)}
 .blurred {backdrop-filter:blur(var(--blur))}
+.use-custom-cursor,
+.use-custom-cursor *,
+.use-custom-cursor *::before,
+.use-custom-cursor *::after {cursor:url("/images/cursor.png") 0 0, auto !important}
 .pointer {cursor:pointer}
 .events {pointer-events:all}
 .no-events {pointer-events:none}

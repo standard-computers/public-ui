@@ -16,6 +16,7 @@
         {serviceId: "com.standard.email", title: "Email", script: "/js/services/email.js", icon: "/icons/interfaces/email.png"},
         {serviceId: "com.standard.alarms", title: "Alarms", script: "/js/services/alarms.js", icon: "/icons/interfaces/alarms.png"},
         {serviceId: "com.standard.maps", title: "Maps", script: "/js/services/maps.js", icon: "/icons/interfaces/maps.png"},
+        {serviceId: "com.standard.camera", title: "Camera", script: "/js/services/camera.js", icon: "/icons/interfaces/camera.svg"},
         {serviceId: "com.standard.notes", title: "Notes", script: "/js/services/notes.js", icon: "/icons/interfaces/notes.png"},
         {serviceId: "com.standard.weather", title: "Weather", script: "/js/services/weather.js", icon: "/icons/interfaces/weather.png"},
         {serviceId: "com.standard.boards", title: "Boards", script: "/js/services/boards.js", icon: "/icons/interfaces/whiteboard.png"},
@@ -39,9 +40,34 @@
 
     const SERVICE_SCRIPT_CACHE_INTERFACE = "service-loader";
 
-    const SERVICE_SCRIPT_CACHE_VERSION = "v12";
+    const defaultDeviceStatus = {serial: "Unknown", config: {}, network: {}, storage: {}, volume: {}};
+    window.StandardDeviceStatus = window.StandardDeviceStatus || {data: null, promise: null};
+
+    const loadDeviceStatus = () => {
+        if (window.StandardDeviceStatus.promise) return window.StandardDeviceStatus.promise;
+        const cli = typeof window.CLI?.send === "function" ? window.CLI : null;
+        window.StandardDeviceStatus.promise = (cli
+            ? cli.send("status")
+            : Promise.reject(new Error("CLI is unavailable")))
+            .then((deviceStatus) => {
+                const normalizedStatus = deviceStatus && typeof deviceStatus === "object" ? deviceStatus : defaultDeviceStatus;
+                window.StandardDeviceStatus.data = normalizedStatus;
+                window.dispatchEvent(new CustomEvent("standard-device-status", {detail: normalizedStatus}));
+                return normalizedStatus;
+            })
+            .catch((error) => {
+                console.error("Failed to load device status during startup", error);
+                window.StandardDeviceStatus.data = defaultDeviceStatus;
+                window.dispatchEvent(new CustomEvent("standard-device-status", {detail: defaultDeviceStatus}));
+                return defaultDeviceStatus;
+            });
+        return window.StandardDeviceStatus.promise;
+    };
+
+    const SERVICE_SCRIPT_CACHE_VERSION = "v16";
 
     const ENABLED_APPS_CACHE_KEY = "enabled-apps";
+    const DESKTOP_STATE_CACHE_KEY = "desktop-canvas";
 
     const buildServiceScriptCacheKey = (url = "") => `${SERVICE_SCRIPT_CACHE_VERSION}:${url}`;
 
@@ -344,6 +370,65 @@
 
     window.StandardPlatformInterfaces = window.StandardPlatformInterfaces || createEnabledAppsManager();
 
+    const createDesktopStateManager = () => {
+        let state = {version: 1, viewport: {x: 0, y: 0}, shortcuts: []};
+        let loadPromise = null;
+        let saveQueue = Promise.resolve();
+        const finite = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+        const normalizeState = (value = {}) => ({
+            version: 1,
+            viewport: {x: finite(value?.viewport?.x), y: finite(value?.viewport?.y)},
+            shortcuts: Array.isArray(value?.shortcuts) ? value.shortcuts.map(shortcut => ({...shortcut})) : []
+        });
+        const snapshot = (value = state) => JSON.parse(JSON.stringify(normalizeState(value)));
+        const buildFetchCommand = (userRecordId) => `[cache] <user "${userRecordId}", key "${DESKTOP_STATE_CACHE_KEY}">`;
+        const buildCreateCommand = (userRecordId, value) => `[cache] + (@${userRecordId}, "${DESKTOP_STATE_CACHE_KEY}", ${serializeEnabledAppsRecord(normalizeState(value))})`;
+        const buildUpdateCommand = (userRecordId, value, recordId = "") => {
+            const filter = recordId ? `id "${recordId}"` : `user @${userRecordId}, key "${DESKTOP_STATE_CACHE_KEY}"`;
+            return `[cache] value ${serializeEnabledAppsRecord(normalizeState(value))} <${filter}>`;
+        };
+        const load = async ({force = false} = {}) => {
+            if (!loadPromise || force) {
+                loadPromise = (async () => {
+                    const userRecordId = await resolveEnabledAppsUserRecordId();
+                    if (!userRecordId) return snapshot();
+                    const payload = await sendEnabledAppsCommand(buildFetchCommand(userRecordId), true);
+                    const lookup = parseCacheLookupResponse(payload);
+                    state = normalizeState(lookup.exists ? parseEnabledAppsValue(lookup.value) : state);
+                    return snapshot();
+                })().catch(error => {
+                    console.error("Failed to load desktop state", error);
+                    return snapshot();
+                });
+            }
+            await loadPromise;
+            return snapshot();
+        };
+        const save = (nextState = state) => {
+            const nextSnapshot = snapshot(nextState);
+            saveQueue = saveQueue.catch(() => null).then(async () => {
+                await load();
+                const userRecordId = await resolveEnabledAppsUserRecordId();
+                if (!userRecordId) return false;
+                const payload = await sendEnabledAppsCommand(buildFetchCommand(userRecordId), true);
+                const lookup = parseCacheLookupResponse(payload);
+                const command = lookup.exists
+                    ? buildUpdateCommand(userRecordId, nextSnapshot, lookup.recordId)
+                    : buildCreateCommand(userRecordId, nextSnapshot);
+                await sendEnabledAppsCommand(command, false);
+                state = nextSnapshot;
+                return true;
+            }).catch(error => {
+                console.error("Failed to save desktop state", error);
+                return false;
+            });
+            return saveQueue;
+        };
+        return {load, save, state: () => snapshot()};
+    };
+
+    window.StandardDesktopState = window.StandardDesktopState || createDesktopStateManager();
+
     const normalizeUserRecord = (payload) => {
         if (!payload) return null;
         let record = null;
@@ -418,6 +503,7 @@
     };
 
     document.addEventListener("DOMContentLoaded", () => {
+        void loadDeviceStatus();
         const loader = document.getElementById("service-loader");
         const interfaceShortcuts = document.getElementById("interface-shortcuts");
         loader.classList.add("fixed", "bottomed");
@@ -520,7 +606,10 @@
                 return;
             }
 
-            await window.StandardPlatformInterfaces.load();
+            await Promise.all([
+                window.StandardPlatformInterfaces.load(),
+                window.StandardDesktopState.load()
+            ]);
             const enabledServiceScripts = platformInterfaces.filter(({serviceId, required}) => required || window.StandardPlatformInterfaces.isEnabled(serviceId)).map(({script}) => script);
             total = widgetScripts.length + enabledServiceScripts.length;
             for (const url of [...widgetScripts, ...enabledServiceScripts]) {

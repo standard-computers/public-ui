@@ -29,6 +29,7 @@
         <script src="/js/widgets.js" defer></script>
         <script src="/js/portal.js" defer></script>
         <script src="/js/service-loader.js" defer></script>
+        <script src="/js/desktop.js" defer></script>
         <script src="/js/device-status.js" defer></script>
         <script src="/js/push-commands.js" defer></script>
     </head>
@@ -50,17 +51,42 @@
             </form>
             <div class="bordered radius padded inline shadowed blurred">Demo</div>
             {{/if}}
-            <button class="plain float-right" id="launch-interfaces" alt-sync="I" title="Interfaces" aria-label="Interfaces" aria-haspopup="menu">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>
-            </button>
-            <div class="bordered radius padded inline shadowed pointer blurred" id="live-time">3:00 AM</div>
-            <div class="bordered radius status-indicator status-connected" data-status="connected">
-                <div class="status-dot" id="device-status-dot"></div>
-                <span id="device-status">Connected</span>
+            <div class="interface-controls bordered radius shadowed blurred float-right">
+                <button type="button" class="plain" id="desktop-tool-cursor" title="Cursor" aria-label="Cursor tool">
+                    <img src="/images/cursor.png" alt="" aria-hidden="true">
+                </button>
+                <button type="button" class="plain" id="desktop-tool-hand" title="Hand" aria-label="Hand tool">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.05 4.575a1.575 1.575 0 1 0-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 0 1 3.15 0v1.5m-3.15 0 .075 5.925m3.075.75V4.575m0 0a1.575 1.575 0 0 1 3.15 0V15M6.9 7.575a1.575 1.575 0 1 0-3.15 0v8.175a6.75 6.75 0 0 0 6.75 6.75h2.018a5.25 5.25 0 0 0 3.712-1.538l1.732-1.732a5.25 5.25 0 0 0 1.538-3.712l.003-2.024a.668.668 0 0 1 .198-.471 1.575 1.575 0 1 0-2.228-2.228 3.818 3.818 0 0 0-1.12 2.687M6.9 7.575V12m6.27 4.318A4.49 4.49 0 0 1 16.35 15m.002 0h-.002"/></svg>
+                </button>
+                <button type="button" class="plain" id="desktop-tool-new" title="New" aria-label="New tool">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                </button>
+                <button class="plain" id="launch-interfaces" alt-sync="I" title="Interfaces" aria-label="Interfaces" aria-haspopup="menu">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>
+                </button>
             </div>
+            <div class="clock-status-control bordered radius shadowed blurred">
+                <button type="button" class="secondary" id="live-time" aria-expanded="false" aria-controls="control-center">3:00 AM</button>
+                <div class="status-indicator status-connected" data-status="connected">
+                    <div class="status-dot" id="device-status-dot"></div>
+                    <span id="device-status">Connected</span>
+                </div>
+            </div>
+            <section id="control-center" class="control-center bordered radius shadowed blurred" aria-label="Control Center" aria-hidden="true">
+                <button type="button" class="control-center-control" id="control-center-wifi" aria-label="WiFi status">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M2 8c6-4.5 14-4.5 20 0M5 12c4-3 10-3 14 0M8.5 15.5c2.25-1.4 4.75-1.4 7 0M12 19.5h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span><strong>WiFi</strong><small id="control-center-wifi-status">Loading…</small></span>
+                </button>
+                <button type="button" class="control-center-control" id="control-center-bluetooth" aria-label="Bluetooth status">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m6.75 8 10.5 8.5-5.5 5.5V2l5.5 5.5-10.5 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span><strong>Bluetooth</strong><small id="control-center-bluetooth-status">Loading…</small></span>
+                </button>
+            </section>
             <div id="dynamic-options"></div>
         </header>
-        <main>
+        <main id="desktop-viewport" aria-label="Desktop canvas">
+            <div id="desktop-canvas" aria-hidden="false"></div>
+            <div id="desktop-selection-marquee" class="hidden" aria-hidden="true"></div>
             <div class="center-center float" id="search-box-container">
                 <div class="float-left block-loader" id="search-status"></div>
                 <div class="search-box-field">

@@ -694,6 +694,21 @@ function selectDropdownOption(dropdown, optionIndex) {
 	dropdown.dispatchEvent(new Event("change", {bubbles: true}));
 }
 
+function setDropdownOptions(dropdown, items = [], value = dropdown?.value) {
+	const dropdownId = dropdown?.getAttribute("data-plastic-dropdown-id");
+	const payload = dropdownPayloads[dropdownId];
+	if (!dropdown || !payload) return;
+	payload.options = (Array.isArray(items) ? items : []).map(item => ({
+		label: `${item?.label ?? item?.value ?? ""}`,
+		value: `${item?.value ?? item?.label ?? ""}`
+	}));
+	const selectedOption = payload.options.find(option => option.value === `${value ?? ""}`) || payload.options[0] || {label: "", value: ""};
+	dropdown.value = selectedOption.value;
+	const labelNode = dropdown.querySelector(".plastic-dropdown-label");
+	if (labelNode) labelNode.textContent = selectedOption.label;
+	if (openDropdown === dropdown) hideDropdownMenu();
+}
+
 function selectSegmentedOption(control, option, {focus = true, notify = true} = {}) {
 	if (!control || !option || option.disabled || control.getAttribute("aria-disabled") === "true") return false;
 	const options = Array.from(control.querySelectorAll(".plastic-segment"));
@@ -1168,6 +1183,7 @@ function switcher(n = {}) {
 function inputDialogue(n) {
 	document.querySelectorAll(".dialogue").forEach(d => d.remove());
 	document.getElementById("cover").in();
+	const locationPickerEnabled = n.location_picker === true;
 	const dialogue = createMarkupNode(div({
 		style: "dialogue padded",
 		content: children([
@@ -1179,18 +1195,84 @@ function inputDialogue(n) {
 				autofocus: true
 			}) : ""),
 			input({style: "undecorated", placeholder: n.placeholder, value: n.value, autofocus: true}),
+			(locationPickerEnabled ? div({
+				style: "input-dialogue-location small-margin-top margin-bottom",
+				content: children([
+					label({content: "Location"}),
+					div({style: "faded small-margin-top", content: n.location || n.location_root || "Documents"}),
+					div({style: "search-dialogue-results bordered radius padded", content: "Loading folders…"})
+				])
+			}) : ""),
 			div({
-				style: "float-right", content: children([
-					button({style: "undecorated space-right", content: "Cancel"}),
-					button({style: "primary", content: "Confirm"})
+				style: "float-right input-dialogue-actions", content: children([
+					button({style: "undecorated space-right input-dialogue-cancel", content: "Cancel"}),
+					button({style: "primary input-dialogue-confirm", content: "Confirm"})
 				])
 			})
 		])
 	}));
 	document.querySelector("body").append(dialogue);
-	const buttons = dialogue.querySelectorAll("button");
-	const cancelButton = buttons[0] || null;
-	const confirmButton = buttons[1] || null;
+	const cancelButton = dialogue.querySelector(".input-dialogue-cancel");
+	const confirmButton = dialogue.querySelector(".input-dialogue-confirm");
+	const locationRoot = String(n.location_root || "Documents").replace(/^\/home\/standard-system\//, "").replace(/^\/+|\/+$/g, "") || "Documents";
+	let selectedLocation = String(n.location || locationRoot).replace(/^\/home\/standard-system\//, "").replace(/^\/+|\/+$/g, "") || locationRoot;
+	const locationNode = dialogue.querySelector(".input-dialogue-location");
+	const locationLabel = locationNode?.querySelector(".faded");
+	const locationResults = locationNode?.querySelector(".search-dialogue-results");
+	let locationRequest = 0;
+	const isDirectoryRecord = record => {
+		if (Array.isArray(record?.children)) return true;
+		return ["directory", "folder", "dir"].includes(String(record?.type || record?.kind || record?.entryType || "").toLowerCase());
+	};
+	const normalizeLocationPath = rawPath => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+|\/+$/g, "");
+	const renderLocation = async directoryPath => {
+		if (!locationResults || typeof window.CLI?.send !== "function") return;
+		const nextLocation = normalizeLocationPath(directoryPath) || locationRoot;
+		if (nextLocation !== locationRoot && !nextLocation.startsWith(`${locationRoot}/`)) return;
+		selectedLocation = nextLocation;
+		if (locationLabel) locationLabel.textContent = selectedLocation;
+		locationResults.textContent = "Loading folders…";
+		const request = ++locationRequest;
+		try {
+			const directory = await window.CLI.send(`tree ${selectedLocation}`);
+			if (request !== locationRequest || !dialogue.isConnected) return;
+			const folders = (Array.isArray(directory?.children) ? directory.children : [])
+				.filter(isDirectoryRecord)
+				.sort((left, right) => String(left?.name || "").localeCompare(String(right?.name || "")));
+			locationResults.replaceChildren();
+			if (selectedLocation !== locationRoot) {
+				const parentButton = document.createElement("button");
+				parentButton.type = "button";
+				parentButton.className = "search-dialogue-result";
+				const parentButtonContent = document.createElement("span");
+				parentButtonContent.innerHTML = `<svg class="small-icon tiny-margin-right" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"/></svg>`;
+				parentButtonContent.append(document.createTextNode("Parent folder"));
+				parentButton.append(parentButtonContent);
+				parentButton.addEventListener("click", () => renderLocation(selectedLocation.split("/").slice(0, -1).join("/") || locationRoot));
+				locationResults.append(parentButton);
+			}
+			folders.forEach(folder => {
+				const folderPath = normalizeLocationPath(folder?.path) || `${selectedLocation}/${folder?.name || ""}`;
+				const folderButton = document.createElement("button");
+				folderButton.type = "button";
+				folderButton.className = "search-dialogue-result";
+				const folderButtonContent = document.createElement("span");
+				const folderIcon = document.createElement("img");
+				folderIcon.className = "small-icon tiny-margin-right";
+				folderIcon.src = "/icons/folder.png";
+				folderIcon.alt = "";
+				folderIcon.setAttribute("aria-hidden", "true");
+				folderButtonContent.append(folderIcon, document.createTextNode(folder?.name || folderPath.split("/").pop()));
+				folderButton.append(folderButtonContent);
+				folderButton.addEventListener("click", () => renderLocation(folderPath));
+				locationResults.append(folderButton);
+			});
+			if (!locationResults.children.length) locationResults.textContent = "No folders here";
+		} catch (_) {
+			if (request !== locationRequest || !dialogue.isConnected) return;
+			locationResults.textContent = "Unable to load folders";
+		}
+	};
 	const closeDialogue = () => {
 		document.removeEventListener("keydown", dialogueKeydownHandler, true);
 		document.getElementById("cover").out();
@@ -1216,10 +1298,11 @@ function inputDialogue(n) {
 		const input_title = n.title_entry ? (inputs[0]?.value || "") : "";
 		const input_content = n.title_entry ? (inputs[1]?.value || "") : (inputs[0]?.value || "");
 		closeDialogue();
-		n.confirmation(input_title, input_content);
+		n.confirmation(input_title, input_content, selectedLocation);
 	});
 	document.addEventListener("keydown", dialogueKeydownHandler, true);
 	dialogue.querySelector("input")?.focus();
+	if (locationPickerEnabled) renderLocation(selectedLocation);
 }
 
 function searchDialogue(n = {}) {

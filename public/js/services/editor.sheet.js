@@ -623,10 +623,11 @@
         title: "File name",
         placeholder: "spreadsheet.sprdshts",
         value: "spreadsheet.sprdshts",
-        confirmation: async (_, inputFileName) => {
+        location_picker: true,
+        confirmation: async (_, inputFileName, location) => {
             if (!modular.validateFileName(inputFileName)) return;
             const safeFileName = sanitizeSheetFileName(inputFileName) || "spreadsheet.sprdshts";
-            await saveSheetToPath(`Documents/${safeFileName}`);
+            await saveSheetToPath(`${location}/${safeFileName}`);
         }
     });
 

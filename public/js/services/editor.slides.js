@@ -699,10 +699,10 @@
         return true;
     };
     const saveNewSlidesDeckToDocuments = () => {
-        inputDialogue({title: "File name", placeholder: "slideshow.slds", value: "slideshow.slds", confirmation: async (_, inputFileName) => {
+        inputDialogue({title: "File name", placeholder: "slideshow.slds", value: "slideshow.slds", location_picker: true, confirmation: async (_, inputFileName, location) => {
                 if (!modular.validateFileName(inputFileName)) return;
                 const safeFileName = sanitizeSlidesFileName(inputFileName) || "slideshow.slds";
-                await saveSlidesDeckToPath(`Documents/${safeFileName}`);
+                await saveSlidesDeckToPath(`${location}/${safeFileName}`);
             }
         });
     };

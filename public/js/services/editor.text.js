@@ -3559,10 +3559,10 @@ a { color: #1d4ed8; text-decoration: underline; }
     };
 
     const saveNewTextFileToDocuments = (portal = findTextPortal()) => {
-        inputDialogue({title: "File name", placeholder: "standard.wrds", value: "standard.wrds", confirmation: async (_, inputFileName) => {
+        inputDialogue({title: "File name", placeholder: "standard.wrds", value: "standard.wrds", location_picker: true, confirmation: async (_, inputFileName, location) => {
                 if (!modular.validateFileName(inputFileName)) return;
                 const safeFileName = sanitizeNewTextFileName(inputFileName) || "standard.wrds";
-                await saveTextEditorContentToPath(`Documents/${safeFileName}`, portal);
+                await saveTextEditorContentToPath(`${location}/${safeFileName}`, portal);
             }
         });
     };

@@ -127,6 +127,76 @@ if (document.readyState === "loading") {
     setupLaunchInterfacesMenu();
 }
 
+function setupControlCenter() {
+    const clock = document.getElementById("live-time");
+    const controlCenter = document.getElementById("control-center");
+    if (!clock || !controlCenter || controlCenter.dataset.ready === "true") return;
+    controlCenter.dataset.ready = "true";
+
+    const valueFrom = (source, keys) => {
+        for (const key of keys) {
+            const value = key.split(".").reduce((current, part) => current?.[part], source);
+            if (value !== undefined && value !== null && value !== "") return value;
+        }
+        return null;
+    };
+    const describeStatus = (value, fallback = "Unknown") => {
+        if (typeof value === "boolean") return value ? "On" : "Off";
+        if (typeof value === "number") return value ? "On" : "Off";
+        if (typeof value === "string") return value.trim() || fallback;
+        if (value && typeof value === "object") {
+            return describeStatus(value.status ?? value.state ?? value.connected ?? value.enabled ?? value.name ?? value.ssid, fallback);
+        }
+        return fallback;
+    };
+    const isConnected = (value, label) => {
+        if (typeof value === "boolean" || typeof value === "number") return Boolean(value);
+        return /^(on|up|enabled|connected|active|true|1)$/i.test(String(label || "").trim());
+    };
+    const renderControl = (name, value, fallback) => {
+        const button = document.getElementById(`control-center-${name}`);
+        const status = document.getElementById(`control-center-${name}-status`);
+        if (!button || !status) return;
+        const label = describeStatus(value, fallback);
+        const connected = isConnected(value, label) || (name === "wifi" && value != null && !/^(off|down|disabled|disconnected|inactive|false|0|unavailable|unknown)$/i.test(label));
+        status.textContent = label;
+        button.classList.toggle("connected", connected);
+        button.classList.toggle("disconnected", !connected);
+        button.setAttribute("aria-label", `${name === "wifi" ? "WiFi" : "Bluetooth"}: ${label}`);
+        button.setAttribute("aria-pressed", String(connected));
+    };
+    const renderDeviceStatus = (deviceStatus = {}) => {
+        const wifi = valueFrom(deviceStatus, ["network.wifi", "network.wifi_status", "network.wireless", "wifi", "network.active_interface"]);
+        const bluetooth = valueFrom(deviceStatus, ["bluetooth", "network.bluetooth", "bluetooth_status", "config.bluetooth"]);
+        renderControl("wifi", wifi, "Unavailable");
+        renderControl("bluetooth", bluetooth, "Unknown");
+    };
+    const setOpen = (open) => {
+        controlCenter.classList.toggle("open", open);
+        controlCenter.setAttribute("aria-hidden", String(!open));
+        clock.setAttribute("aria-expanded", String(open));
+    };
+
+    clock.addEventListener("click", (event) => {
+        event.stopPropagation();
+        setOpen(!controlCenter.classList.contains("open"));
+    });
+    document.addEventListener("click", (event) => {
+        if (!controlCenter.contains(event.target)) setOpen(false);
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") setOpen(false);
+    });
+    window.addEventListener("standard-device-status", (event) => renderDeviceStatus(event.detail));
+    if (window.StandardDeviceStatus?.data) renderDeviceStatus(window.StandardDeviceStatus.data);
+    else window.StandardDeviceStatus?.promise?.then(renderDeviceStatus);
+}
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupControlCenter, {once: true});
+} else {
+    setupControlCenter();
+}
+
 (function () {
     const frames = ['⣷', '⣯', '⣟', '⡿', '⢿', '⣻', '⣽', '⣾'];
     Element.prototype.isLoading = function (state = true, speed = 80) {
@@ -1119,6 +1189,8 @@ async function applyThemeData(d) {
     const backgroundSource = await resolveThemeBackgroundSource(d.background_image);
     applyResolvedThemeBackground(backgroundSource);
     document.body.dataset.useSvgIcons = d.use_svg_icons === false ? "false" : "true";
+    window.StandardUI.setUseCursor?.(d.use_cursor !== false);
+    window.StandardUI.setGridBackground?.(d.grid_background === true);
     if (d.hide_shortcuts) {
         document.getElementById("interface-shortcuts")?.classList.add("none");
     } else {
@@ -1216,6 +1288,8 @@ const defaultThemeData = {
     border_width: 1,
     interface_state: true,
     use_svg_icons: true,
+    use_cursor: true,
+    grid_background: false,
     hide_shortcuts: false,
     kiosk_mode: false,
     disable_bar: false,
@@ -1224,6 +1298,16 @@ const defaultThemeData = {
 };
 window.StandardUI = window.StandardUI || {};
 window.StandardUI.defaultTheme = window.StandardUI.defaultTheme || {...defaultThemeData};
+window.StandardUI.setUseCursor = (enabled = true) => {
+    const shouldEnable = enabled !== false;
+    document.documentElement.classList.toggle("use-custom-cursor", shouldEnable);
+    return shouldEnable;
+};
+window.StandardUI.setGridBackground = (enabled = false) => {
+    const shouldEnable = enabled === true;
+    document.documentElement.classList.toggle("use-desktop-grid", shouldEnable);
+    return shouldEnable;
+};
 window.StandardUI.setKioskMode = async (enabled = false) => {
     const shouldEnable = enabled === true;
     let electronApplied = false;

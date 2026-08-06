@@ -690,10 +690,10 @@
     };
 
     const saveNewCodeFileToDocuments = (portal) => {
-        inputDialogue({title: "File name", placeholder: "code.js", value: "code.js", confirmation: async (_, inputFileName) => {
+        inputDialogue({title: "File name", placeholder: "code.js", value: "code.js", location_picker: true, confirmation: async (_, inputFileName, location) => {
                 if (!modular.validateFileName(inputFileName)) return;
                 const safeFileName = sanitizeNewCodeFileName(inputFileName) || "code.js";
-                await saveCodeEditorContentToPath(portal, `Documents/${safeFileName}`);
+                await saveCodeEditorContentToPath(portal, `${location}/${safeFileName}`);
             }
         });
     };

@@ -128,6 +128,7 @@
     let current_documents_directory = modular.working_directory;
     let documents_history = [current_documents_directory];
     let current_documents_history_index = 0;
+    let current_rubbish_directory = "Rubbish";
     let active_upload_directory = current_documents_directory;
     const normalizeUploadDirectory = (directoryPath = "") => {
         const normalizedPath = String(directoryPath).trim().replace(/\\/g, "/").replace(/\/+$/, "");
@@ -190,7 +191,7 @@
     const setFileDisplayStyle = (styleId = "rows") => {
         const nextIndex = FILE_DISPLAY_STYLES.findIndex(displayStyle => displayStyle.id === styleId);
         fileDisplayStyleIndex = nextIndex >= 0 ? nextIndex : 0;
-        document.querySelectorAll("#all-files, #documents").forEach(root => {
+        document.querySelectorAll("#all-files, #documents, #rubbish").forEach(root => {
             root.className = getFileDisplayRootClass();
         });
         syncFileDisplayButtons();
@@ -496,7 +497,7 @@
     const uploadSelectedFiles = async (fileList, options = {}) => {
         const files = Array.from(fileList || []);
         if (!files.length) return;
-        const targetDirectory = getDefaultUploadDirectory();
+        const targetDirectory = normalizeUploadDirectory(options?.directory || getDefaultUploadDirectory());
         setActiveUploadDirectory(targetDirectory);
         const multiProgress = options?.multiFileProgress && files.length > 1 && typeof window.StandardUploads?.createMultiFileProgress === "function" ? window.StandardUploads.createMultiFileProgress(files) : null;
         try {
@@ -524,7 +525,7 @@
             if (multiProgress) multiProgress.hide();
         }
         await refreshFilesAfterMutation();
-        modular.success(files.length === 1 ? `Uploaded ${files[0]?.name || "file"}` : `Uploaded ${files.length} files`);
+        if (!options?.suppressSuccess) modular.success(files.length === 1 ? `Uploaded ${files[0]?.name || "file"}` : `Uploaded ${files.length} files`);
     };
     window.StandardFilesUploadSelectedFiles = uploadSelectedFiles;
     window.StandardFiles = window.StandardFiles || {};
@@ -666,9 +667,14 @@
             if (getFilePathForRemoveCommand(fileTile.getAttribute("directive")) === normalizedPath) fileTile.remove();
         });
     };
-    const beginDeleteFileProgress = fileName => window.StandardDownloads?.beginOpenProgress?.(`Deleting ${fileName}`) || 0;
-    const finishDeleteFileProgress = (token, fileName) => {
-        window.StandardDownloads?.updateOpenProgress?.({label: `Deleted ${fileName}`, loaded: 1, total: 1, indeterminate: false, token});
+    const isRubbishPath = rawPath => {
+        const normalizedPath = getFilePathForRemoveCommand(rawPath).replace(/^\/+|\/+$/g, "");
+        return normalizedPath === "Rubbish" || normalizedPath.startsWith("Rubbish/");
+    };
+    const beginDeleteFileProgress = (fileName, permanent) => window.StandardDownloads?.beginOpenProgress?.(`${permanent ? "Deleting" : "Moving"} ${fileName}`) || 0;
+    const finishDeleteFileProgress = (token, fileName, permanent) => {
+        const label = permanent ? `Deleted ${fileName}` : `Moved ${fileName} to Rubbish`;
+        window.StandardDownloads?.updateOpenProgress?.({label, loaded: 1, total: 1, indeterminate: false, token});
         window.setTimeout(() => window.StandardDownloads?.hideOpenProgress?.(token), 220);
     };
     const hideDeleteFileProgress = token => window.StandardDownloads?.hideOpenProgress?.(token);
@@ -676,26 +682,32 @@
         const filePath = getFilePathForRemoveCommand(rawPath);
         if (!filePath) return;
         const fileName = filePath.split("/").pop() || "file";
+        const permanent = isRubbishPath(filePath);
         confirmationDialogue({
-            title: "Delete file",
+            title: permanent ? "Permanently delete file" : "Move file to Rubbish",
             destructive: true,
-            content: `Are you sure you want to delete ${escapeHtml(fileName)}?`,
+            content: permanent
+                ? `Are you sure you want to permanently delete ${escapeHtml(fileName)}? This cannot be undone.`
+                : `Move ${escapeHtml(fileName)} to Rubbish?`,
             confirmation: async () => {
-                const progressToken = beginDeleteFileProgress(fileName);
+                const progressToken = beginDeleteFileProgress(fileName, permanent);
                 try {
-                    const response = await CLI.send(CLI.buildFilesCommand("remove", filePath));
+                    const command = permanent
+                        ? CLI.buildFilesCommand("remove", filePath)
+                        : CLI.buildFilesCommand("move", filePath, getMoveTargetPath(filePath, "Rubbish"));
+                    const response = await CLI.send(command);
                     if (response === 0 || response === "false" || response === false) {
                         hideDeleteFileProgress(progressToken);
-                        modular.error(`Failed to delete ${fileName}`);
+                        modular.error(permanent ? `Failed to delete ${fileName}` : `Failed to move ${fileName} to Rubbish`);
                         return;
                     }
                     removeDeletedFileTile(rawPath, tile);
                     await refreshFilesRecordCache();
-                    finishDeleteFileProgress(progressToken, fileName);
-                    modular.success(`Deleted ${fileName}`);
+                    finishDeleteFileProgress(progressToken, fileName, permanent);
+                    modular.success(permanent ? `Deleted ${fileName}` : `Moved ${fileName} to Rubbish`);
                 } catch (_) {
                     hideDeleteFileProgress(progressToken);
-                    modular.error(`Failed to delete ${fileName}`);
+                    modular.error(permanent ? `Failed to delete ${fileName}` : `Failed to move ${fileName} to Rubbish`);
                 }
             }
         });
@@ -714,8 +726,8 @@
             }
         });
     };
-    const createFolderInCurrentDocumentsDirectory = () => {
-        const baseDirectory = getFilePathForRemoveCommand(current_documents_directory);
+    const createFolderInDirectory = directoryPath => {
+        const baseDirectory = getFilePathForRemoveCommand(directoryPath);
         inputDialogue({title: "New folder", placeholder: "Folder name", confirmation: async (_, folderName) => {
                 const trimmedName = String(folderName || "").trim();
                 if (!trimmedName) return;
@@ -725,6 +737,8 @@
             }
         });
     };
+    const createFolderInCurrentDocumentsDirectory = () => createFolderInDirectory(current_documents_directory);
+    const createFolderInCurrentRubbishDirectory = () => createFolderInDirectory(current_rubbish_directory);
     let activeMoveDestinationMenu = null;
     const isSuccessfulCliResponse = response => response !== 0 && response !== "false" && response !== false;
     const isFolderPath = rawPath => {
@@ -936,6 +950,18 @@
         action: (b, e, el) => {
             const path = el.closest(".file-folder")?.getAttribute("directive");
             openFilePath(path, el);
+        }
+    }, {
+        icon: modular.icons.create,
+        label: "Pin to Desktop",
+        action: (b, e, el) => {
+            const path = el.closest(".file-folder")?.getAttribute("directive");
+            if (!path) return;
+            window.StandardDesktop?.createShortcut?.({
+                type: "file",
+                title: path.split("/").pop() || "File",
+                target: path
+            });
         }
     }, {
         icon: modular.icons.modify,
@@ -1237,6 +1263,21 @@
         }
         return loadDocumentsDirectory(directoryPath);
     };
+    const updateRubbishHeader = () => {
+        const label = document.getElementById("rubbish-title");
+        if (label) label.textContent = getDirectoryLabel(current_rubbish_directory);
+    };
+    const loadRubbishDirectory = directoryPath => {
+        current_rubbish_directory = directoryPath;
+        return CLI.send(`tree ${directoryPath}`).then(rubbish => {
+            working_files = rubbish.children || [];
+            const rubbishRoot = document.getElementById("rubbish");
+            if (rubbishRoot) rubbishRoot.innerHTML = renderFiles({navigateDirectory: navigateRubbishDirectory});
+            updateRubbishHeader();
+            return rubbish;
+        });
+    };
+    const navigateRubbishDirectory = directoryPath => loadRubbishDirectory(directoryPath);
     const openDirectoryPath = async (rawPath = "") => {
         const directoryPath = String(rawPath || "").trim();
         if (!directoryPath) return false;
@@ -1248,7 +1289,7 @@
     window.StandardFiles.openDirectoryPath = (rawPath = "") => openDirectoryPath(rawPath);
     window.StandardFiles.isDirectoryRecord = (file = {}) => isDirectory(file);
     syncUploadDirectory();
-    function renderFiles({openDirectories = true} = {}) {
+    function renderFiles({openDirectories = true, navigateDirectory = navigateDocumentsDirectory} = {}) {
         let as = []
         const files = getSortedWorkingFiles();
         for (let i = 0; i < files.length; i++) {
@@ -1262,7 +1303,7 @@
                         openFilePath(file.path);
                         return;
                     }
-                    navigateDocumentsDirectory(file.path);
+                    navigateDirectory(file.path);
                 }
             }));
         }
@@ -1591,6 +1632,36 @@
                         deleteFile(path, tile);
                     }
                 }]));
+            }
+        }, {
+            text: "Rubbish",
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>`,
+            route: () => div({content: children([
+                    div({content: children([
+                            fileDisplayButton("rubbish-display"), fileSortButton("rubbish-sort"), button({
+                                id: "rubbish-create-folder",
+                                style: "small naked float-right hover-zoom",
+                                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>`,
+                                title: "New folder"
+                            }),
+                            h({level: 3, id: "rubbish-title", style: "very-small-padding-top padding-left", content: "Rubbish"})
+                        ])
+                    }), div({style: "spacer"}), div({
+                        id: "rubbish", style: getFileDisplayRootClass(), content: () => {
+                            return loadRubbishDirectory(current_rubbish_directory).then(rubbish => {
+                                working_files = rubbish.children || [];
+                                return renderFiles({navigateDirectory: navigateRubbishDirectory});
+                            });
+                        }
+                    })])
+            }),
+            afterRender: () => {
+                const createFolderButton = document.getElementById("rubbish-create-folder");
+                if (createFolderButton) createFolderButton.onclick = () => createFolderInCurrentRubbishDirectory();
+                bindFileSortButton("rubbish-sort", "rubbish", {navigateDirectory: navigateRubbishDirectory});
+                bindFileDisplayButton("rubbish-display", "rubbish", {navigateDirectory: navigateRubbishDirectory});
+                updateRubbishHeader();
+                document.querySelectorAll("#rubbish").forEach(el => el.contextmenu(createFileMenuItems()));
             }
         }, {
             text: "Upload",

@@ -165,6 +165,7 @@
     "Photos": {"type": "directory"},
     "Videos": {"type": "directory"},
     "Music": {"type": "directory"},
+    "Rubbish": {"type": "directory"},
     "Boards": {"type": "directory"},
     "Boards/Sample Board.wtb": {
       "contentType": "application/json",

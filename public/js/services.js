@@ -1451,11 +1451,17 @@ class Portal {
         };
         const minimizedIndex = modular.minimized ?? 0;
         modular.minimized = minimizedIndex + 1;
+        const desktopPosition = window.StandardDesktop?.attachMinimizedWindow?.(this.#windowDiv, {
+            screenX: rect.left,
+            screenY: rect.top,
+            desktopX: positionOverride?.desktopX,
+            desktopY: positionOverride?.desktopY
+        });
         this.#applyWindowLayout({
             transition: "all 100ms",
             transform: "scale(0.3)",
-            left: positionOverride?.left ?? "-150px",
-            top: positionOverride?.top ?? `${100 * minimizedIndex}px`,
+            left: desktopPosition ? `${desktopPosition.x}px` : positionOverride?.left ?? `${rect.left}px`,
+            top: desktopPosition ? `${desktopPosition.y}px` : positionOverride?.top ?? `${rect.top}px`,
             overflow: "hidden",
         }, {syncLayout: false});
         this.#windowDiv.classList.add("minimized");
@@ -1464,6 +1470,7 @@ class Portal {
             this.#minimizeHandlerTimer = null;
             if (!this.#windowDiv.classList.contains("minimized")) return;
             const handleClick = _ => {
+                if (window.StandardDesktop?.shouldHandleMinimizedClick?.()) return;
                 this.restoreFromMinimize();
             };
             const handleMouseEnter = _ => {
@@ -1479,6 +1486,7 @@ class Portal {
             this.#windowDiv.addEventListener('mouseenter', handleMouseEnter);
             this.#windowDiv.addEventListener('mouseleave', handleMouseLeave);
         }, 500);
+        this.#persistWindowState({open: true, minimized: true});
     }
     restoreFromMinimize() {
         if (this.#minimizeHandlerTimer !== null) {
@@ -1486,10 +1494,11 @@ class Portal {
             this.#minimizeHandlerTimer = null;
         }
         if (!this.#windowDiv.classList.contains("minimized")) return;
+        const desktopPlacement = window.StandardDesktop?.detachMinimizedWindow?.(this.#windowDiv);
         this.#applyWindowLayout({
             transform: this.#preMinimizeState?.transform ?? "scale(1)",
-            left: this.#preMinimizeState?.left ?? this.#windowDiv.style.left,
-            top: this.#preMinimizeState?.top ?? this.#windowDiv.style.top,
+            left: desktopPlacement?.left ?? this.#preMinimizeState?.left ?? this.#windowDiv.style.left,
+            top: desktopPlacement?.top ?? this.#preMinimizeState?.top ?? this.#windowDiv.style.top,
             overflow: this.#preMinimizeState?.overflow ?? "visible",
         }, {minBodyHeight: 150});
         if (this.#preMinimizeState?.handlers) {
@@ -1523,6 +1532,7 @@ class Portal {
         this.#scheduleAfterRender();
     }
     #maximizeWindow(topMargin = 50) {
+        if (this.#windowDiv.classList.contains("minimized")) this.restoreFromMinimize();
         const bodyMargin = 10;
         const availableHeight = Math.max(window.innerHeight - topMargin - bodyMargin, 200);
         if (!this.#isMaximized) {
@@ -1678,10 +1688,20 @@ class Portal {
         if (state.bodyHeight && this.#windowBody) nextLayout.bodyHeight = state.bodyHeight;
         this.#applyWindowLayout(nextLayout, {minBodyHeight: 150});
         this.#setPinnedState(state.pinned);
+        if (state.minimized && !this.#isMaximizeEnforced()) {
+            requestAnimationFrame(() => {
+                if (!this.#windowDiv?.isConnected || this.#windowDiv.classList.contains("minimized")) return;
+                this.minimize({
+                    desktopX: state.desktopX ?? Number.parseFloat(state.left),
+                    desktopY: state.desktopY ?? Number.parseFloat(state.top)
+                });
+            });
+        }
         if (this.#isMaximizeEnforced()) this.#maximizeWindow();
     }
     #setPinnedState(isPinned) {
         this.#isPinned = Boolean(isPinned);
+        if (this.#windowDiv) this.#windowDiv.dataset.pinned = String(this.#isPinned);
         if (this.#dragState?.handle) {
             this.#dragState.handle.style.cursor = this.#isPinned ? 'default' : 'grab';
         }
@@ -1693,6 +1713,8 @@ class Portal {
     #captureWindowState(extra = {}) {
         if (!this.#windowDiv) return null;
         const rect = this.#windowDiv.getBoundingClientRect();
+        const minimized = this.#windowDiv.classList.contains("minimized");
+        const desktopPosition = minimized ? window.StandardDesktop?.describeMinimizedWindow?.(this.#windowDiv) : null;
         const bodyHeight = this.#windowBody ? (this.#windowBody.style.height || `${this.#windowBody.getBoundingClientRect().height}px`) : undefined;
         const context = windowStateManager?.sanitizeState?.(this.#windowContext ?? {}) ?? {};
         return {
@@ -1700,12 +1722,15 @@ class Portal {
             portalIndex: this.#portalIndex,
             instanceId: this.#instanceId,
             type: "service",
-            left: this.#windowDiv.style.left || `${rect.left}px`,
-            top: this.#windowDiv.style.top || `${rect.top}px`,
+            left: minimized ? this.#preMinimizeState?.left : this.#windowDiv.style.left || `${rect.left}px`,
+            top: minimized ? this.#preMinimizeState?.top : this.#windowDiv.style.top || `${rect.top}px`,
             width: this.#windowDiv.style.width || `${rect.width}px`,
             height: this.#windowDiv.style.height || `${rect.height}px`,
             bodyHeight,
             pinned: this.#isPinned,
+            minimized,
+            desktopX: desktopPosition?.x,
+            desktopY: desktopPosition?.y,
             context,
             open: this.#windowDiv.parentElement !== null, ...extra
         };
