@@ -16,15 +16,16 @@
         {serviceId: "com.standard.email", title: "Email", script: "/js/services/email.js", icon: "/icons/interfaces/email.png"},
         {serviceId: "com.standard.alarms", title: "Alarms", script: "/js/services/alarms.js", icon: "/icons/interfaces/alarms.png"},
         {serviceId: "com.standard.maps", title: "Maps", script: "/js/services/maps.js", icon: "/icons/interfaces/maps.png"},
-        {serviceId: "com.standard.camera", title: "Camera", script: "/js/services/camera.js", icon: "/icons/interfaces/camera.svg"},
+        {serviceId: "com.standard.camera", title: "Camera", script: "/js/services/camera.js", icon: "/icons/interfaces/camera.png"},
         {serviceId: "com.standard.notes", title: "Notes", script: "/js/services/notes.js", icon: "/icons/interfaces/notes.png"},
         {serviceId: "com.standard.weather", title: "Weather", script: "/js/services/weather.js", icon: "/icons/interfaces/weather.png"},
         {serviceId: "com.standard.boards", title: "Boards", script: "/js/services/boards.js", icon: "/icons/interfaces/whiteboard.png"},
-        {serviceId: "com.standard.charts", title: "Charts", script: "/js/services/charts.js", icon: "/icons/interfaces/whiteboard.png"},
+        {serviceId: "com.standard.charts", title: "Charts", script: "/js/services/charts.js", icon: "/icons/interfaces/charts.png"},
         {serviceId: "com.standard.editor.text", title: "Text Editor", script: "/js/services/editor.text.js", icon: "/icons/interfaces/editor.png"},
-        {serviceId: "com.standard.editor.sheet", title: "Sheets", script: "/js/services/editor.sheet.js", icon: "/icons/interfaces/editor.png"},
-        {serviceId: "com.standard.editor.slides", title: "Slides", script: "/js/services/editor.slides.js", icon: "/icons/interfaces/editor.png"},
-        {serviceId: "com.standard.editor.code", title: "Code Editor", script: "/js/services/editor.code.js", icon: "/icons/interfaces/editor.png"},
+        {serviceId: "com.standard.editor.sheet", title: "Sheets", script: "/js/services/editor.sheet.js", icon: "/icons/sprdshts.png"},
+        {serviceId: "com.standard.editor.slides", title: "Slides", script: "/js/services/editor.slides.js", icon: "/icons/pwrpnt.png"},
+        {serviceId: "com.standard.editor.code", title: "Code Editor", script: "/js/services/editor.code.js", icon: "/icons/code.png"},
+        {serviceId: "com.standard.editor.video", title: "Video Editor", script: "/js/services/editor.video.js", icon: "/icons/interfaces/camera.png"},
         {serviceId: "com.standard.cli", title: "CLI", script: "/js/services/cli.js", icon: "/icons/interfaces/cli.png"},
         {serviceId: "com.standard.settings", title: "Settings", script: "/js/services/settings.js", icon: "/icons/interfaces/settings.png", required: true},
     ].filter(({serviceId, desktopOnly}) => (!desktopOnly || window.StandardRuntimeConfig?.desktopSetupEnabled === true)
@@ -64,7 +65,7 @@
         return window.StandardDeviceStatus.promise;
     };
 
-    const SERVICE_SCRIPT_CACHE_VERSION = "v16";
+    const SERVICE_SCRIPT_CACHE_VERSION = "v17";
 
     const ENABLED_APPS_CACHE_KEY = "enabled-apps";
     const DESKTOP_STATE_CACHE_KEY = "desktop-canvas";

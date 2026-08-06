@@ -1,7 +1,7 @@
 (() => {
 
 	const SERVICE_ID = "com.standard.charts";
-	const ICON = "/icons/interfaces/whiteboard.png";
+	const ICON = "/icons/interfaces/charts.png";
 	const NS = "http://www.w3.org/2000/svg";
 
 	const SHAPE_OPTIONS = [

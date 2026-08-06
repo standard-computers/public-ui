@@ -97,6 +97,7 @@ let modular = {
             3: "com.standard.editor.slides",
             4: "com.standard.editor.code",
             5: "com.standard.editor.code",
+            6: "com.standard.editor.video",
         };
         return {serviceId: byPortalIndex[portalIndex] || "com.standard.editor.text", portalIndex: 0};
     },

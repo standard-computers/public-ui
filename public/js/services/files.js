@@ -1289,6 +1289,19 @@
     window.StandardFiles.openDirectoryPath = (rawPath = "") => openDirectoryPath(rawPath);
     window.StandardFiles.isDirectoryRecord = (file = {}) => isDirectory(file);
     syncUploadDirectory();
+    const navigateToFileDirectory = async (file = {}, navigateDirectory = navigateDocumentsDirectory) => {
+        const folderName = String(file?.name || getDirectoryLabel(file?.path) || "folder");
+        const progressToken = window.StandardDownloads?.beginOpenProgress?.(`Fetching contents of ${folderName}`) || 0;
+        try {
+            return await navigateDirectory(file.path);
+        } catch (error) {
+            console.error(`Failed to load folder ${file.path || folderName}`, error);
+            modular.error(`Failed to load ${folderName}`);
+            return false;
+        } finally {
+            window.setTimeout(() => window.StandardDownloads?.hideOpenProgress?.(progressToken), 220);
+        }
+    };
     function renderFiles({openDirectories = true, navigateDirectory = navigateDocumentsDirectory} = {}) {
         let as = []
         const files = getSortedWorkingFiles();
@@ -1303,7 +1316,7 @@
                         openFilePath(file.path);
                         return;
                     }
-                    navigateDirectory(file.path);
+                    navigateToFileDirectory(file, navigateDirectory);
                 }
             }));
         }
