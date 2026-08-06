@@ -413,6 +413,66 @@
         if (pathLabel) pathLabel.textContent = activeImageFilePath || "No file selected";
         updatePortalTitle(1, activeImageFilePath, portal);
     };
+    const shredAndCloseImagePortal = async (portal = findInternalsWindow(1)?.portal) => {
+        const closePortal = () => {
+            if (typeof portal?.close === "function") portal.close();
+            else portal?.hide?.();
+        };
+        const windowNode = portal?.window?.() || findInternalsWindow(1);
+        if (!windowNode || window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+            closePortal();
+            return;
+        }
+        if (windowNode.dataset.imageDeleteShredding === "1") return;
+        const rect = windowNode.getBoundingClientRect();
+        if (!(rect.width > 0) || !(rect.height > 0)) {
+            closePortal();
+            return;
+        }
+        windowNode.dataset.imageDeleteShredding = "1";
+        const stripCount = Math.max(10, Math.min(18, Math.round(rect.width / 42)));
+        const stripWidth = rect.width / stripCount;
+        const animationDuration = 760;
+        const fragment = document.createDocumentFragment();
+        const strips = [];
+        const windowStyles = window.getComputedStyle(windowNode);
+        for (let index = 0; index < stripCount; index++) {
+            const strip = document.createElement("div");
+            const stripContent = windowNode.cloneNode(true);
+            const sliceLeft = index * stripWidth;
+            const sliceWidth = Math.min(rect.width - sliceLeft, stripWidth + 1);
+            const direction = index % 2 === 0 ? -1 : 1;
+            strip.classList.add("internals-image-window-shred-strip");
+            strip.setAttribute("aria-hidden", "true");
+            strip.inert = true;
+            strip.style.setProperty("--shred-break-x", `${direction * (3 + (index % 2) * 2)}px`);
+            strip.style.setProperty("--shred-break-rotate", `${direction * (0.15 + (index % 3) * 0.08)}deg`);
+            strip.style.setProperty("--shred-x", `${direction * (12 + (index % 4) * 4)}px`);
+            strip.style.setProperty("--shred-y", `${Math.max(120, window.innerHeight - rect.top + 45 + (index % 3) * 12)}px`);
+            strip.style.setProperty("--shred-rotate", `${direction * (0.5 + (index % 3) * 0.35)}deg`);
+            strip.style.left = `${rect.left + sliceLeft}px`;
+            strip.style.top = `${rect.top}px`;
+            strip.style.width = `${sliceWidth}px`;
+            strip.style.height = `${rect.height}px`;
+            strip.style.zIndex = `${Math.max(1, Number.parseInt(windowStyles.zIndex, 10) || 1) + 1}`;
+            strip.style.animationDuration = `${animationDuration}ms`;
+            stripContent.classList.add("internals-image-window-shred-content");
+            stripContent.classList.remove("window-focused");
+            stripContent.style.setProperty("left", `${-sliceLeft}px`, "important");
+            stripContent.style.setProperty("top", "0", "important");
+            stripContent.style.setProperty("width", `${rect.width}px`, "important");
+            stripContent.style.setProperty("height", `${rect.height}px`, "important");
+            stripContent.style.setProperty("background-color", windowStyles.backgroundColor, "important");
+            strip.appendChild(stripContent);
+            strips.push(strip);
+            fragment.appendChild(strip);
+        }
+        document.body.appendChild(fragment);
+        windowNode.classList.add("internals-image-window-shred-source");
+        await new Promise(resolve => window.setTimeout(resolve, animationDuration + 80));
+        strips.forEach(strip => strip.remove());
+        closePortal();
+    };
     const deleteImageFromPortal = (portal = findInternalsWindow(1)?.portal) => {
         const state = portal?.windowState?.() || {};
         const filePath = getPathForDownload(state.directive || activeImageFilePath);
@@ -438,7 +498,11 @@
                     hideInternalsProgress(progressToken);
                     modular.success(`Deleted ${fileName}`);
                     refreshFilesAppIfOpen();
-                    portal?.close?.();
+                    await shredAndCloseImagePortal(portal).catch((error) => {
+                        console.warn("Unable to animate deleted image window:", error);
+                        if (typeof portal?.close === "function") portal.close();
+                        else portal?.hide?.();
+                    });
                 } catch (_) {
                     window.StandardDownloads?.hideOpenProgress?.(progressToken);
                     modular.error(`Failed to delete ${fileName}`);

@@ -228,6 +228,7 @@ let modular = {
             }
             container.appendChild(icon);
         });
+        window.StandardDesktop?.refreshShortcutIcons?.();
     },
     refreshPortalIcons: () => {
         document.querySelectorAll(".draggable-window").forEach((windowNode) => {

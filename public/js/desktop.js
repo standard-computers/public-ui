@@ -110,22 +110,57 @@
         node.appendChild(icon);
     }
 
+    function appendImage(node, source, alt = "") {
+        const image = document.createElement("img");
+        image.src = source;
+        image.alt = alt;
+        image.draggable = false;
+        if (!alt) image.setAttribute("aria-hidden", "true");
+        node.appendChild(image);
+    }
+
+    function appShortcutIcon(shortcut) {
+        const serviceId = shortcut.target.split("#")[0];
+        const service = (modular?.running || []).find(candidate => candidate?.name?.() === serviceId);
+        const metadata = service?.interfaceShortcut?.();
+        if (!metadata) return "";
+        const prefersSvg = window.StandardUI?.prefersSvgIcons?.() !== false;
+        return prefersSvg
+            ? metadata.svg_icon || metadata.image_icon || metadata.icon || ""
+            : metadata.image_icon || metadata.svg_icon || metadata.icon || "";
+    }
+
     function shortcutIcon(shortcut, node) {
         if (shortcut.type === "file") {
             const iconPath = window.StandardFiles?.getFileTypeIconPath?.({name: shortcut.target, path: shortcut.target});
             if (iconPath) {
-                const image = document.createElement("img");
-                image.src = iconPath;
-                image.alt = "";
-                image.setAttribute("aria-hidden", "true");
-                image.draggable = false;
-                node.appendChild(image);
+                appendImage(node, iconPath);
                 return;
             }
             appendSvg(node, FILE_ICON);
             return;
         }
+        if (shortcut.type === "app") {
+            const iconSource = appShortcutIcon(shortcut);
+            if (iconSource) {
+                if (iconSource.trim().startsWith("<svg")) appendSvg(node, iconSource);
+                else appendImage(node, iconSource, shortcut.title);
+                return;
+            }
+        }
         appendSvg(node, shortcut.type === "link" ? LINK_ICON : shortcut.type === "app" ? APP_ICON : GO_TO_ICON);
+    }
+
+    function refreshShortcutIcons() {
+        canvas.querySelectorAll(".desktop-shortcut").forEach(node => {
+            const shortcut = state.shortcuts.find(value => value.id === node.dataset.shortcutId);
+            const label = node.querySelector(".desktop-shortcut-label");
+            if (!shortcut || !label) return;
+            node.querySelectorAll(":scope > img, :scope > svg").forEach(icon => icon.remove());
+            label.remove();
+            shortcutIcon(shortcut, node);
+            node.appendChild(label);
+        });
     }
 
     async function waitFor(getter, timeout = 5000) {
@@ -195,11 +230,6 @@
         label.className = "desktop-shortcut-label";
         label.textContent = shortcut.title;
         node.appendChild(label);
-        node.addEventListener("dblclick", event => {
-            event.preventDefault();
-            event.stopPropagation();
-            openShortcut(shortcut, node);
-        });
         node.contextmenu([{
             label: "Open",
             action: () => openShortcut(shortcut, node)
@@ -364,8 +394,10 @@
         } else {
             return;
         }
-        viewport.setPointerCapture?.(event.pointerId);
-        event.preventDefault();
+        if (interaction.kind !== "move") {
+            viewport.setPointerCapture?.(event.pointerId);
+            event.preventDefault();
+        }
     }
 
     function movePointerInteraction(event) {
@@ -377,7 +409,11 @@
             state.viewport.y = interaction.viewport.y + dy;
             applyViewport();
         } else if (interaction.kind === "move") {
-            interaction.moved ||= Math.abs(dx) + Math.abs(dy) > 3;
+            if (!interaction.moved && Math.abs(dx) + Math.abs(dy) <= 3) return;
+            if (!interaction.moved) {
+                interaction.moved = true;
+                viewport.setPointerCapture?.(event.pointerId);
+            }
             interaction.items.forEach(({node, left, top}) => {
                 node.style.left = `${left + dx}px`;
                 node.style.top = `${top + dy}px`;
@@ -408,7 +444,7 @@
             scheduleSave();
         }
         marquee.classList.add("hidden");
-        viewport.releasePointerCapture?.(event.pointerId);
+        if (viewport.hasPointerCapture?.(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
         interaction = null;
     }
 
@@ -476,6 +512,16 @@
         }
     });
     canvas.addEventListener("dblclick", event => {
+        const shortcutNode = event.target.closest?.(".desktop-shortcut");
+        if (activeTool === "cursor" && shortcutNode) {
+            const shortcut = state.shortcuts.find(value => value.id === shortcutNode.dataset.shortcutId);
+            if (shortcut) {
+                event.preventDefault();
+                event.stopPropagation();
+                openShortcut(shortcut, shortcutNode);
+            }
+            return;
+        }
         const minimized = event.target.closest?.(".desktop-canvas-window");
         if (activeTool === "cursor" && minimized) minimized.portal?.restoreFromMinimize?.();
     });
@@ -488,6 +534,7 @@
         clientToWorld,
         worldToClient,
         openPinPanel,
+        refreshShortcutIcons,
         createShortcut: (details = {}) => {
             const point = clientToWorld({x: window.innerWidth / 2, y: window.innerHeight - 150});
             openPinPanel(point, null, details);

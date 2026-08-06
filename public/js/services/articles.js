@@ -3,6 +3,7 @@
     const ARTICLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75h1.5m9 0h-9"/></svg>`;
     const DEFAULT_ARTICLE_ICON = "/icons/interfaces/articles.svg";
     const articleListRecords = new Map();
+    const createArticleIconState = {file: null, objectUrl: ""};
     const escapeQuoted = value => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     const safeUrl = value => /^(https?:\/\/|mailto:)/i.test(String(value || "").trim()) ? String(value).trim() : "";
     const articleImage = article => article.id ? `/api/records/images/${encodeURIComponent(article.id)}?cb=${Date.now()}` : DEFAULT_ARTICLE_ICON;
@@ -48,6 +49,70 @@
         ])
     });
 
+    const resetArticleIconPicker = (icon, state) => {
+        if (!icon || !state) return null;
+        const previousInput = state.input || icon.__articleIconInput;
+        if (previousInput?.remove) previousInput.remove();
+        icon.onclick = null;
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "image/*";
+        fileInput.style.display = "none";
+        document.body.appendChild(fileInput);
+        icon.__articleIconInput = fileInput;
+        state.input = fileInput;
+        return fileInput;
+    };
+
+    const releaseArticleIconPreview = state => {
+        if (!state) return;
+        if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+        if (state.input?.remove) state.input.remove();
+        state.file = null;
+        state.objectUrl = "";
+        state.input = null;
+    };
+
+    const bindArticleIconPicker = (root, article, prefix, state) => {
+        const icon = root?.querySelector?.(`#${prefix}-icon`) || document.getElementById(`${prefix}-icon`);
+        if (!icon) return;
+        icon.alt = `${article?.title || "Article"} icon`;
+        icon.src = state.objectUrl || articleImage(article);
+        icon.onerror = () => {
+            icon.onerror = null;
+            icon.src = DEFAULT_ARTICLE_ICON;
+        };
+        icon.style.cursor = "pointer";
+        const fileInput = resetArticleIconPicker(icon, state);
+        if (!fileInput) return;
+        icon.onclick = () => fileInput.click();
+        fileInput.onchange = () => {
+            const file = fileInput.files?.[0];
+            if (!file) return;
+            if (!file.type?.startsWith("image/")) {
+                fileInput.value = "";
+                modular.error("Please choose an image file");
+                return;
+            }
+            if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+            state.file = file;
+            state.objectUrl = URL.createObjectURL(file);
+            icon.onerror = null;
+            icon.src = state.objectUrl;
+            fileInput.value = "";
+        };
+    };
+
+    const uploadArticleIcon = async (file, articleId) => {
+        if (!file || !articleId) return {ok: true};
+        if (typeof window.StandardUploads?.uploadFile === "function") {
+            return window.StandardUploads.uploadFile(file, `/api/upload/temp/${encodeURIComponent(articleId)}`, {label: `Uploading ${file.name || "article icon"}`});
+        }
+        const formData = new FormData();
+        formData.append("file", file);
+        return fetch(`/api/upload/temp/${encodeURIComponent(articleId)}`, {method: "POST", body: formData}).then(response => ({ok: response.ok, status: response.status}));
+    };
+
     const readForm = prefix => normalizeArticle({
         title: document.getElementById(`${prefix}-title`)?.value?.trim() || "",
         description: document.getElementById(`${prefix}-description`)?.value?.trim() || "",
@@ -58,6 +123,7 @@
     });
 
     const editorRoute = (article = {}, prefix = "article") => div({style: "large-padding-top small-padding", content: children([
+        div({style: "center article-icon-picker-wrap", content: img({id: `${prefix}-icon`, style: "article-icon article-icon-picker", src: articleImage(article), title: "Choose article icon"})}),
         field(`${prefix}-title`, "Title", article.title),
         field(`${prefix}-description`, "Description", article.description),
         field(`${prefix}-link`, "Link", article.link),
@@ -83,13 +149,22 @@
     };
     const hideDeleteProgress = token => window.StandardDownloads?.hideOpenProgress?.(token);
 
-    const saveArticle = async (article, prefix, portal) => {
+    const saveArticle = async (article, prefix, portal, iconState) => {
         const next = {...article, ...readForm(prefix)};
         if (!next.title || !next.description) return modular.error("Title and description are required");
-        const responses = await Promise.all(["title", "description", "link", "content", "source"].map(key =>
-            CLI.send(`[articles] ${key} "${escapeQuoted(next[key])}" <id ${article.id}>`)
-        ).concat(CLI.send(`[articles] priority ${next.priority} <id ${article.id}>`)));
-        if (responses.some(response => response === 0)) return modular.error("Failed to save article");
+        try {
+            const responses = await Promise.all(["title", "description", "link", "content", "source"].map(key =>
+                CLI.send(`[articles] ${key} "${escapeQuoted(next[key])}" <id ${article.id}>`)
+            ).concat(CLI.send(`[articles] priority ${next.priority} <id ${article.id}>`)));
+            if (responses.some(response => response === 0)) return modular.error("Failed to save article");
+            if (iconState?.file) {
+                const uploadResponse = await uploadArticleIcon(iconState.file, article.id);
+                if (!uploadResponse?.ok) return modular.error(`Icon upload failed (${uploadResponse?.status || "unknown error"})`);
+            }
+        } catch (_) {
+            return modular.error("Failed to save article");
+        }
+        releaseArticleIconPreview(iconState);
         portal?.close?.();
         refreshArticles();
         openArticle(next);
@@ -121,14 +196,17 @@
 
     const openEditor = article => {
         article = normalizeArticle(article);
+        const iconState = {file: null, objectUrl: ""};
         const portal = new Portal({
             title: `Edit ${article.title || "Article"}`,
             dimensions: [560, 650], navigation: false, svg_icon: ARTICLE_ICON,
             tools: [
                 {title: "Delete", icon: modular.icons.delete, onclick: () => deleteArticle(article, portal)},
-                {title: "Save", icon: modular.icons.save, onclick: () => saveArticle(article, "edit-article", portal)}
+                {title: "Save", icon: modular.icons.save, onclick: () => saveArticle(article, "edit-article", portal, iconState)}
             ],
-            route: () => editorRoute(article, "edit-article")
+            route: () => editorRoute(article, "edit-article"),
+            afterRender: root => bindArticleIconPicker(root, article, "edit-article", iconState),
+            onDispose: () => releaseArticleIconPreview(iconState)
         });
         portal.show();
         return portal;
@@ -168,8 +246,29 @@
     const createArticle = async portal => {
         const article = readForm("new-article");
         if (!article.title || !article.description) return modular.error("Title and description are required");
-        const response = await CLI.send(`[articles] + ("${escapeQuoted(article.title)}", "${escapeQuoted(article.description)}", "${escapeQuoted(article.link)}", "${escapeQuoted(article.content)}", "${escapeQuoted(article.source)}", ${article.priority}, @)`);
-        if (response === 0) return modular.error("Failed to create article");
+        let articleId = "";
+        try {
+            const response = await CLI.send(`[articles] + ("${escapeQuoted(article.title)}", "${escapeQuoted(article.description)}", "${escapeQuoted(article.link)}", "${escapeQuoted(article.content)}", "${escapeQuoted(article.source)}", ${article.priority}, @)`);
+            articleId = String(response ?? "").trim();
+            if (!articleId || articleId === "0") return modular.error("Failed to create article");
+        } catch (_) {
+            return modular.error("Failed to create article");
+        }
+        if (createArticleIconState.file) {
+            let uploadResponse;
+            try {
+                uploadResponse = await uploadArticleIcon(createArticleIconState.file, articleId);
+            } catch (_) {
+                uploadResponse = {ok: false, status: "network error"};
+            }
+            if (!uploadResponse?.ok) {
+                releaseArticleIconPreview(createArticleIconState);
+                portal?.close?.();
+                refreshArticles();
+                return modular.error(`Article created, but icon upload failed (${uploadResponse?.status || "unknown error"})`);
+            }
+        }
+        releaseArticleIconPreview(createArticleIconState);
         portal?.close?.();
         refreshArticles();
         modular.success("Created article");
@@ -179,7 +278,9 @@
         title: "Create Article", hints: ["create article", "new article", "write article"],
         dimensions: [560, 650], navigation: false, svg_icon: ARTICLE_ICON,
         tools: [{title: "Save", icon: modular.icons.save, onclick: (_, context) => createArticle(context?.portal)}],
-        route: () => editorRoute({}, "new-article")
+        route: () => editorRoute({}, "new-article"),
+        afterRender: root => bindArticleIconPicker(root, {}, "new-article", createArticleIconState),
+        onDispose: () => releaseArticleIconPreview(createArticleIconState)
     });
 
     window.StandardArticles = {openArticle, openEditor};
