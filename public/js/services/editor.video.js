@@ -3,9 +3,6 @@
     const PROJECT_EXTENSION = ".video";
     const DEFAULT_PROJECT_NAME = `untitled${PROJECT_EXTENSION}`;
     const runtimeMedia = new WeakMap();
-
-    const VIDEO_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-2.36a.75.75 0 0 1 1.08.67v6.38a.75.75 0 0 1-1.08.67l-4.72-2.36M4.5 6.75h8.25A3.75 3.75 0 0 1 16.5 10.5v3A3.75 3.75 0 0 1 12.75 17.25H4.5A2.25 2.25 0 0 1 2.25 15V9A2.25 2.25 0 0 1 4.5 6.75Z"/></svg>`;
-
     const normalizePath = (value = "") => String(value || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
     const fileNameFromPath = (value = "") => String(value || "").split("/").pop() || DEFAULT_PROJECT_NAME;
     const ensureProjectExtension = (value = "") => String(value || "").toLowerCase().endsWith(PROJECT_EXTENSION) ? String(value || "") : `${value}${PROJECT_EXTENSION}`;
@@ -117,7 +114,7 @@
         if (preview) {
             preview.innerHTML = media?.url
                 ? `<video controls preload="metadata" src="${media.url}"></video>`
-                : `<div class="editor-video-empty">${VIDEO_ICON}<strong>Bring your first clip into the timeline</strong><p>Import a video to preview it, trim it, and save the edit as a Standard video project.</p><button type="button" class="editor-video-import primary">Import video</button></div>`;
+                : `<div class="editor-video-empty">${modular.icons.video}<strong>Bring your first clip into the timeline</strong><p>Import a video to preview it, trim it, and save the edit as a Standard video project.</p><button type="button" class="editor-video-import primary">Import video</button></div>`;
         }
         const track = root.querySelector(".editor-video-track");
         if (track) track.innerHTML = state.clips.map((clip) => {
@@ -260,7 +257,7 @@
             tools: [
                 {title: "Save", icon: modular.icons.save, onclick: (_, context) => saveProject(context?.portal)}
             ],
-            svg_icon: VIDEO_ICON,
+            svg_icon: modular.icons.video,
             icon: "/icons/mp4.png",
             route: function () {
                 const state = getState(this.portal);

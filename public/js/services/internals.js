@@ -906,10 +906,10 @@
             const type = escapeHtml(setting?.type || "text");
             const restrictions = window.StandardAppSettings?.restrictionValues?.(setting) || [];
             const meta = restrictions.length && String(setting?.type || "").toLowerCase() !== "boolean" ? `${type} - ${restrictions.map(escapeHtml).join(", ")}` : type;
-            return `<div class="internals-app-setting-row bordered inner-radius padded margin-bottom" data-setting-row="${escapeHtml(name)}">
+            return `<div class="internals-app-setting-row bordered radius padded margin-bottom" data-setting-row="${escapeHtml(name)}">
                 <label class="internals-app-setting-label" for="${getSettingsFieldId(name)}" style="display:inline">${escapeHtml(setting?.label || name)}</label>
-                <span class="internals-app-setting-meta faded">${escapeHtml(meta)}</span>
-                <span class="internals-app-setting-control padded">${renderSettingControl(name, setting, values?.[name])}</span>
+                <div class="internals-app-setting-meta faded tiny margin-bottom">${escapeHtml(meta)}</div>
+                <span class="internals-app-setting-control margin-top">${renderSettingControl(name, setting, values?.[name])}</span>
             </div>`;
         }).join("");
         host.innerHTML = `<div class="internals-app-settings" data-settings-service="${escapeHtml(serviceId)}">${rows}</div>`;

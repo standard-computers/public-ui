@@ -69,6 +69,7 @@
 
     const ENABLED_APPS_CACHE_KEY = "enabled-apps";
     const DESKTOP_STATE_CACHE_KEY = "desktop-canvas";
+    const DESKTOP_SHORTCUT_CACHE_PREFIX = "desktop-shortcut:";
 
     const buildServiceScriptCacheKey = (url = "") => `${SERVICE_SCRIPT_CACHE_VERSION}:${url}`;
 
@@ -376,17 +377,38 @@
         let loadPromise = null;
         let saveQueue = Promise.resolve();
         const finite = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+        const normalizeShortcut = (shortcut = {}, index = 0) => ({
+            ...shortcut,
+            id: String(shortcut?.id || "").trim() || `shortcut-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`
+        });
         const normalizeState = (value = {}) => ({
             version: 1,
             viewport: {x: finite(value?.viewport?.x), y: finite(value?.viewport?.y)},
-            shortcuts: Array.isArray(value?.shortcuts) ? value.shortcuts.map(shortcut => ({...shortcut})) : []
+            shortcuts: Array.isArray(value?.shortcuts) ? value.shortcuts.map(normalizeShortcut) : []
         });
         const snapshot = (value = state) => JSON.parse(JSON.stringify(normalizeState(value)));
-        const buildFetchCommand = (userRecordId) => `[cache] <user "${userRecordId}", key "${DESKTOP_STATE_CACHE_KEY}">`;
-        const buildCreateCommand = (userRecordId, value) => `[cache] + (@${userRecordId}, "${DESKTOP_STATE_CACHE_KEY}", ${serializeEnabledAppsRecord(normalizeState(value))})`;
-        const buildUpdateCommand = (userRecordId, value, recordId = "") => {
-            const filter = recordId ? `id "${recordId}"` : `user @${userRecordId}, key "${DESKTOP_STATE_CACHE_KEY}"`;
-            return `[cache] value ${serializeEnabledAppsRecord(normalizeState(value))} <${filter}>`;
+        const shortcutCacheKey = (shortcutId = "") => `${DESKTOP_SHORTCUT_CACHE_PREFIX}${encodeURIComponent(String(shortcutId || ""))}`;
+        const buildFetchCommand = (userRecordId, key = DESKTOP_STATE_CACHE_KEY) => `[cache] <user "${userRecordId}", key "${key}">`;
+        const buildCreateCommand = (userRecordId, key, value) => `[cache] + (@${userRecordId}, "${key}", ${serializeEnabledAppsRecord(value)})`;
+        const buildUpdateCommand = (userRecordId, key, value, recordId = "") => {
+            const filter = recordId ? `id "${recordId}"` : `user @${userRecordId}, key "${key}"`;
+            return `[cache] value ${serializeEnabledAppsRecord(value)} <${filter}>`;
+        };
+        const saveRecord = async (userRecordId, key, value) => {
+            const payload = await sendEnabledAppsCommand(buildFetchCommand(userRecordId, key), true);
+            const lookup = parseCacheLookupResponse(payload);
+            const command = lookup.exists
+                ? buildUpdateCommand(userRecordId, key, value, lookup.recordId)
+                : buildCreateCommand(userRecordId, key, value);
+            await sendEnabledAppsCommand(command, false);
+        };
+        const deleteRecord = async (userRecordId, key) => {
+            const payload = await sendEnabledAppsCommand(buildFetchCommand(userRecordId, key), true);
+            const lookup = parseCacheLookupResponse(payload);
+            if (lookup.exists) {
+                const filter = lookup.recordId ? `id "${lookup.recordId}"` : `user @${userRecordId}, key "${key}"`;
+                await sendEnabledAppsCommand(`[cache] - <${filter}>`, false);
+            }
         };
         const load = async ({force = false} = {}) => {
             if (!loadPromise || force) {
@@ -395,7 +417,26 @@
                     if (!userRecordId) return snapshot();
                     const payload = await sendEnabledAppsCommand(buildFetchCommand(userRecordId), true);
                     const lookup = parseCacheLookupResponse(payload);
-                    state = normalizeState(lookup.exists ? parseEnabledAppsValue(lookup.value) : state);
+                    const storedState = lookup.exists ? parseEnabledAppsValue(lookup.value) : null;
+                    if (storedState?.version === 2 && Array.isArray(storedState.shortcutIds)) {
+                        const shortcuts = await Promise.all(storedState.shortcutIds.map(async shortcutId => {
+                            const shortcutPayload = await sendEnabledAppsCommand(buildFetchCommand(userRecordId, shortcutCacheKey(shortcutId)), true);
+                            const shortcutLookup = parseCacheLookupResponse(shortcutPayload);
+                            return shortcutLookup.exists ? parseEnabledAppsValue(shortcutLookup.value) : null;
+                        }));
+                        state = normalizeState({...storedState, shortcuts: shortcuts.filter(shortcut => shortcut && typeof shortcut === "object")});
+                    } else {
+                        state = normalizeState(storedState || state);
+                        if (lookup.exists) {
+                            const shortcuts = state.shortcuts;
+                            await Promise.all(shortcuts.map(shortcut => saveRecord(userRecordId, shortcutCacheKey(shortcut.id), shortcut)));
+                            await saveRecord(userRecordId, DESKTOP_STATE_CACHE_KEY, {
+                                version: 2,
+                                viewport: state.viewport,
+                                shortcutIds: shortcuts.map(shortcut => String(shortcut.id))
+                            });
+                        }
+                    }
                     return snapshot();
                 })().catch(error => {
                     console.error("Failed to load desktop state", error);
@@ -411,12 +452,15 @@
                 await load();
                 const userRecordId = await resolveEnabledAppsUserRecordId();
                 if (!userRecordId) return false;
-                const payload = await sendEnabledAppsCommand(buildFetchCommand(userRecordId), true);
-                const lookup = parseCacheLookupResponse(payload);
-                const command = lookup.exists
-                    ? buildUpdateCommand(userRecordId, nextSnapshot, lookup.recordId)
-                    : buildCreateCommand(userRecordId, nextSnapshot);
-                await sendEnabledAppsCommand(command, false);
+                const previousIds = new Set(state.shortcuts.map(shortcut => String(shortcut?.id || "")).filter(Boolean));
+                const nextIds = nextSnapshot.shortcuts.map(shortcut => String(shortcut?.id || "")).filter(Boolean);
+                await Promise.all(nextSnapshot.shortcuts.map(shortcut => saveRecord(userRecordId, shortcutCacheKey(shortcut.id), shortcut)));
+                await Promise.all(Array.from(previousIds).filter(shortcutId => !nextIds.includes(shortcutId)).map(shortcutId => deleteRecord(userRecordId, shortcutCacheKey(shortcutId))));
+                await saveRecord(userRecordId, DESKTOP_STATE_CACHE_KEY, {
+                    version: 2,
+                    viewport: nextSnapshot.viewport,
+                    shortcutIds: nextIds
+                });
                 state = nextSnapshot;
                 return true;
             }).catch(error => {

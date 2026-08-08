@@ -40,7 +40,6 @@ const createWidgetPortalTool = (widget) => ({
 });
 const windowStateManager = (() => {
     let stateByKey = {};
-    let hasExistingFile = false;
     let loadPromise = null;
     let saveQueue = Promise.resolve();
     let restoreAttempted = false;
@@ -135,9 +134,15 @@ const windowStateManager = (() => {
     };
     const normalizeStateRecord = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const serializeStateRecord = (value) => JSON.stringify(JSON.stringify(normalizeStateRecord(value)));
-    const buildFetchCommand = (userRecordId) => `[cache] <user "${userRecordId}", key "interface-windows">`;
-    const buildCreateCommand = (userRecordId, value) => `[cache] + (@${userRecordId}, "interface-windows", ${serializeStateRecord(value)})`;
-    const buildUpdateCommand = (userRecordId, value) => `[cache] value ${serializeStateRecord(value)} <user @${userRecordId}, key "interface-windows">`;
+    const WINDOW_INDEX_CACHE_KEY = "interface-windows";
+    const WINDOW_STATE_CACHE_PREFIX = "interface-window:";
+    const stateCacheKey = (key = "") => `${WINDOW_STATE_CACHE_PREFIX}${encodeURIComponent(key)}`;
+    const buildFetchCommand = (userRecordId, key = WINDOW_INDEX_CACHE_KEY) => `[cache] <user "${userRecordId}", key "${key}">`;
+    const buildCreateCommand = (userRecordId, key, value) => `[cache] + (@${userRecordId}, "${key}", ${serializeStateRecord(value)})`;
+    const buildUpdateCommand = (userRecordId, key, value, recordId = "") => {
+        const filter = recordId ? `id "${recordId}"` : `user @${userRecordId}, key "${key}"`;
+        return `[cache] value ${serializeStateRecord(value)} <${filter}>`;
+    };
     const extractCacheRecord = (payload) => {
         if (!payload) return null;
         if (Array.isArray(payload)) return payload[0] || null;
@@ -148,20 +153,20 @@ const windowStateManager = (() => {
     };
     const parseLookupResponse = (payload) => {
         if (payload === 0 || payload === "0" || payload === "" || payload === null || payload === undefined) {
-            return {exists: false, value: null};
+            return {exists: false, value: null, recordId: ""};
         }
         if (typeof payload === "string") {
             const trimmed = payload.trim();
-            if (!trimmed || trimmed === "0") return {exists: false, value: null};
+            if (!trimmed || trimmed === "0") return {exists: false, value: null, recordId: ""};
             try {
                 return parseLookupResponse(JSON.parse(trimmed));
             } catch (_) {
-                return {exists: true, value: trimmed};
+                return {exists: true, value: trimmed, recordId: ""};
             }
         }
         const record = extractCacheRecord(payload);
-        if (!record) return {exists: false, value: null};
-        return {exists: true, value: record.value ?? record.VL ?? record.vl ?? null};
+        if (!record) return {exists: false, value: null, recordId: ""};
+        return {exists: true, value: record.value ?? record.VL ?? record.vl ?? null, recordId: sanitizeRecordId(record.id || record.ID || "")};
     };
     const parseStateValue = (value) => {
         let candidate = value;
@@ -194,35 +199,49 @@ const windowStateManager = (() => {
             return {exists: false, state: {}, deferred: true};
         }
         const lookup = parseLookupResponse(payload);
+        const indexValue = parseStateValue(lookup.value) || {};
+        if (indexValue.version === 2 && Array.isArray(indexValue.keys)) {
+            const entries = await Promise.all(indexValue.keys.map(async key => {
+                const recordPayload = await sendStateCommand(buildFetchCommand(userRecordId, stateCacheKey(key)), true);
+                const recordLookup = parseLookupResponse(recordPayload);
+                return [key, recordLookup.exists ? parseStateValue(recordLookup.value) : null];
+            }));
+            return {
+                exists: lookup.exists,
+                state: Object.fromEntries(entries.filter(([, value]) => value && typeof value === "object")),
+                legacy: false
+            };
+        }
         return {
             exists: lookup.exists,
-            state: parseStateValue(lookup.value) || {}
+            state: indexValue,
+            legacy: lookup.exists
         };
     };
-    const saveStoredState = async (nextState) => {
+    const saveCacheRecord = async (userRecordId, key, value) => {
+        const lookupPayload = await sendStateCommand(buildFetchCommand(userRecordId, key), true);
+        if (isBadConnectionPayload(lookupPayload)) return false;
+        const lookup = parseLookupResponse(lookupPayload);
+        const command = lookup.exists
+            ? buildUpdateCommand(userRecordId, key, value, lookup.recordId)
+            : buildCreateCommand(userRecordId, key, value);
+        await sendStateCommand(command, false);
+        return true;
+    };
+    const saveStoredState = async (key, snapshot) => {
         const userRecordId = await resolveUserRecordId();
         const cliClient = await waitForCliClient();
         if (!userRecordId || !cliClient) return false;
-        const normalizedState = normalizeStateRecord(nextState);
-        const lookupPayload = await sendStateCommand(buildFetchCommand(userRecordId), true);
-        if (isBadConnectionPayload(lookupPayload)) {
-            return false;
-        }
-        const lookup = parseLookupResponse(lookupPayload);
-        const command = lookup.exists
-            ? buildUpdateCommand(userRecordId, normalizedState)
-            : buildCreateCommand(userRecordId, normalizedState);
-        await sendStateCommand(command, false);
-        hasExistingFile = true;
-        return true;
+        const recordSaved = await saveCacheRecord(userRecordId, stateCacheKey(key), normalizeStateRecord(snapshot));
+        if (!recordSaved) return false;
+        return saveCacheRecord(userRecordId, WINDOW_INDEX_CACHE_KEY, {version: 2, keys: Object.keys(stateByKey)});
     };
     const ensureLoaded = async () => {
         if (!loadPromise) {
             loadPromise = (async () => {
                 try {
-                    const {exists, state} = await fetchStoredState();
+                    const {exists, state, legacy} = await fetchStoredState();
                     stateByKey = normalizeStateRecord(state);
-                    hasExistingFile = exists;
                     Object.entries({...stateByKey}).forEach(([key, value]) => {
                         const segments = key.split("::");
                         if (segments.length === 2) {
@@ -235,6 +254,14 @@ const windowStateManager = (() => {
                             delete stateByKey[key];
                         }
                     });
+                    if (legacy && exists && Object.keys(stateByKey).length) {
+                        const userRecordId = await resolveUserRecordId();
+                        const cliClient = await waitForCliClient();
+                        if (userRecordId && cliClient) {
+                            await Promise.all(Object.entries(stateByKey).map(([key, value]) => saveCacheRecord(userRecordId, stateCacheKey(key), value)));
+                            await saveCacheRecord(userRecordId, WINDOW_INDEX_CACHE_KEY, {version: 2, keys: Object.keys(stateByKey)});
+                        }
+                    }
                 } catch (err) {
                     console.error("Failed to load interface window state", err);
                 }
@@ -243,12 +270,12 @@ const windowStateManager = (() => {
         }
         return loadPromise;
     };
-    const persistNow = () => {
+    const persistNow = (key) => {
         saveQueue = saveQueue
             .catch(() => null)
             .then(async () => {
                 await ensureLoaded();
-                const saved = await saveStoredState(stateByKey);
+                const saved = await saveStoredState(key, stateByKey[key]);
                 if (!saved) {
                     console.error("Failed to save interface window state");
                 }
@@ -298,7 +325,7 @@ const windowStateManager = (() => {
                     type: snapshot?.type || type,
                     instanceId: resolvedInstanceId
                 };
-                persistNow();
+                persistNow(key);
             });
         }, async applyToPortal(portalInstance) {
             await ensureLoaded();
