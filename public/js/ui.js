@@ -1176,6 +1176,7 @@ async function applyThemeData(d) {
     d = {...defaultTheme, ...d};
     window.StandardUI.currentTheme = d;
     document.documentElement.style.setProperty("--fs", `${d.font_size}px`);
+    document.documentElement.style.setProperty("--interface-shortcut-icon-size", `${d.shortcut_icon_size}px`);
     document.documentElement.style.setProperty("--fg", d.foreground);
     document.documentElement.style.setProperty("--primary", d.primary);
     document.documentElement.style.setProperty("--secondary", d.secondary);
@@ -1278,6 +1279,7 @@ const defaultThemeData = {
     transparency: true,
     shadows: true,
     font_size: 16,
+    shortcut_icon_size: 28,
     foreground: "#3e3e3e",
     primary: "#001922",
     secondary: "",

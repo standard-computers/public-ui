@@ -120,12 +120,31 @@ Element.prototype.contextmenu = function (items, selector = null) {
 Element.prototype.popoutmenu = function (items, selector = null) {
 	const ele = this;
 	let lastClickedTarget = null;
+	let selectedIndex = -1;
 	let menu = document.createElement("div");
 	menu.className = "custom-context-menu hidden";
+	menu.setAttribute("role", "menu");
 	const resolveItems = () => typeof items === "function" ? (items(ele, lastClickedTarget) || []) : (items || []);
+	const menuOptions = () => Array.from(menu.querySelectorAll(".context-menu-item"));
+
+	function updateSelection(index) {
+		const options = menuOptions();
+		if (!options.length) {
+			selectedIndex = -1;
+			return;
+		}
+		selectedIndex = ((index % options.length) + options.length) % options.length;
+		options.forEach((option, optionIndex) => {
+			const selected = optionIndex === selectedIndex;
+			option.classList.toggle("selected", selected);
+			option.setAttribute("aria-selected", String(selected));
+			if (selected) option.scrollIntoView({block: "nearest"});
+		});
+	}
 
 	function buildMenu() {
 		menu.innerHTML = "";
+		selectedIndex = -1;
 		resolveItems().forEach(item => {
 			if (item === "separator") {
 				const hr = document.createElement("div");
@@ -137,6 +156,7 @@ Element.prototype.popoutmenu = function (items, selector = null) {
 			}
 			const option = document.createElement("div");
 			option.className = "context-menu-item";
+			option.setAttribute("role", "menuitem");
 			applyAltSyncProperty(option, item, ele, lastClickedTarget);
 			applyHandleProperty(option, item, ele, lastClickedTarget);
 			if (item.className) option.classList.add(...String(item.className).split(/\s+/).filter(Boolean));
@@ -162,6 +182,7 @@ Element.prototype.popoutmenu = function (items, selector = null) {
 					item.action(ele, e, target);
 				}
 			};
+			option.addEventListener("pointerenter", () => updateSelection(menuOptions().indexOf(option)));
 			menu.appendChild(option);
 			if (typeof item.bind === "function") item.bind(option, ele, lastClickedTarget, menu, hideMenu);
 		});
@@ -174,18 +195,50 @@ Element.prototype.popoutmenu = function (items, selector = null) {
 		menu.style.top = y + "px";
 		menu.classList.remove("hidden");
 		menu.in();
+		ele.setAttribute("aria-expanded", "true");
+		updateSelection(0);
 		requestAnimationFrame(() => {
 			const rect = menu.getBoundingClientRect();
 			if (rect.right > window.innerWidth) menu.style.left = (x - rect.width) + "px";
 			if (rect.bottom > window.innerHeight) menu.style.top = (y - rect.height) + "px";
 		});
-		menu.addEventListener("mouseleave", _ => menu.out());
+		menu.addEventListener("mouseleave", _ => {
+			selectedIndex = -1;
+			ele.setAttribute("aria-expanded", "false");
+			menu.out();
+		});
 	}
 
 	function hideMenu() {
 		menu.classList.add("hidden");
 		menu.style.display = "none";
 		menu.style.opacity = 0;
+		selectedIndex = -1;
+		ele.setAttribute("aria-expanded", "false");
+	}
+
+	function handleMenuKeydown(event) {
+		if (menu.classList.contains("hidden") || menu.style.display === "none") return;
+		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+			event.preventDefault();
+			event.stopPropagation();
+			updateSelection(selectedIndex + (event.key === "ArrowDown" ? 1 : -1));
+			return;
+		}
+		if (event.key === "Enter") {
+			const option = menuOptions()[selectedIndex];
+			if (!option) return;
+			event.preventDefault();
+			event.stopPropagation();
+			option.click();
+			return;
+		}
+		if (event.key === "Escape") {
+			event.preventDefault();
+			event.stopPropagation();
+			hideMenu();
+			ele.focus?.();
+		}
 	}
 
 	document.body.appendChild(menu);
@@ -194,8 +247,11 @@ Element.prototype.popoutmenu = function (items, selector = null) {
 		if (interactiveTarget && interactiveTarget !== ele && ele.contains(interactiveTarget)) return;
 		e.stopPropagation();
 		lastClickedTarget = e.target;
-		showMenu(e.clientX, e.clientY);
+		const anchor = ele.getBoundingClientRect();
+		const keyboardActivated = e.detail === 0;
+		showMenu(keyboardActivated ? anchor.left : e.clientX, keyboardActivated ? anchor.bottom : e.clientY);
 	});
+	document.addEventListener("keydown", handleMenuKeydown, true);
 	document.addEventListener("click", (e) => {
 		if (!menu.contains(e.target)) hideMenu();
 	});

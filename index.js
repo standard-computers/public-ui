@@ -42,7 +42,7 @@ const STANDARD_CHIT = (process.env.STANDARD_CHIT || "").trim();
 const SETUP_COOKIE_NAME = "setup";
 const SETUP_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 365;
 const REQUIRED_RELAY_COOKIES = ["relay_chit", "relay_device", "sid", "uid"];
-const RELAY_CONNECTION_EXEMPT_PATHS = ["/bad-connection", "/api/login", "/api/status", "/api/device/status", "/api/keys/push"];
+const RELAY_CONNECTION_EXEMPT_PATHS = ["/bad-connection", "/api/login", "/api/status", "/api/device/status", "/api/keys/push", "/events/"];
 const RELAY_COOKIE_DOMAIN = process.env.RELAY_COOKIE_DOMAIN || process.env.COOKIE_DOMAIN || "";
 const RELAY_COOKIE_SECRET = process.env.RELAY_COOKIE_SECRET || process.env.COOKIE_SECRET || process.env.SESSION_SECRET || "";
 const RELAY_COOKIE_SECRETS = process.env.RELAY_COOKIE_SECRETS || "";
@@ -1220,7 +1220,7 @@ function resolveUploadDirectoryForFile(file = {}, rawDirectory = "") {
 }
 
 function requireLogin(req, res, next) {
-    const publicPaths = ["/login", "/bad-connection", "/api/login", "/api/status", "/api/device/status", "/api/keys/push"];
+    const publicPaths = ["/login", "/bad-connection", "/api/login", "/api/status", "/api/device/status", "/api/keys/push", "/events/"];
     if (isDesktopSetupEnabled) {
         publicPaths.push("/setup");
     }
@@ -1889,8 +1889,10 @@ app.get("/events/device-status", (req, res) => {
 
 app.get("/events/push", (req, res) => {
     const relayContext = isRelayMode ? (req.relayContext || resolveRelayContext(req)) : null;
-    if (isRelayMode && !relayContext) {
-        return res.status(403).end();
+    if (!req.session?.userId || (isRelayMode && !relayContext)) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        return res.status(req.session?.userId ? 403 : 401).end();
     }
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");

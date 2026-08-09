@@ -214,7 +214,7 @@ img {-webkit-user-drag:none;user-select:none}
 .custom-context-menu {position:fixed;z-index:7000;box-shadow:var(--shadow);padding:5px;border-radius:var(--radius);border:1px solid var(--secondary-border);backdrop-filter:blur(var(--blur));background-color:var(--transparent-bg)}
 .custom-context-menu.hidden {display:none}
 .context-menu-item {transition:all 100ms;opacity:0.75;cursor:pointer;padding:6px 10px 6px 8px;border-radius:calc(var(--radius) - 2px)}
-.context-menu-item:hover {opacity:1;transform:scale(var(--zoom));box-shadow:var(--shadow);background-color:var(--secondary-bg)}
+.context-menu-item:hover, .context-menu-item.selected {opacity:1;transform:scale(var(--zoom));box-shadow:var(--shadow);background-color:var(--secondary-bg)}
 .context-menu-item svg {width:18px;height:18px;margin-right:8px;vertical-align:bottom}
 .autocomplete-context-menu {box-sizing:border-box;max-height:min(320px,50vh);overflow-y:auto}
 .autocomplete-context-menu-item {display:flex;align-items:baseline;gap:14px;min-width:0}

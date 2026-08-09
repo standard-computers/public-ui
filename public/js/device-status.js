@@ -50,7 +50,7 @@
         if (!indicator) return;
         const initialStatus = indicator.className.match(/status-(connected|connecting|disconnected)/);
         const setStatus = applyStatus(initialStatus ? initialStatus[1] : "connected");
-        const source = new EventSource("/events/device-status");
+        const source = new EventSource(new URL("/events/device-status", window.location.href).href, {withCredentials: true});
         source.onmessage = event => {
             try {
                 const payload = JSON.parse(event.data);

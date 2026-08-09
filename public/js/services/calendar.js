@@ -2012,6 +2012,11 @@
 			navigation: false,
 			tools: [
 				{
+					title: "Delete",
+					icon: modular.icons.delete,
+					onclick: () => deleteSelectedEvent(5)
+				},
+				{
 					title: "Edit",
 					icon: modular.icons.modify,
 					onclick: () => {
@@ -2020,11 +2025,6 @@
 						modular.show("com.standard.calendar", 6)
 					}
 				},
-				{
-					title: "Delete",
-					icon: modular.icons.delete,
-					onclick: () => deleteSelectedEvent(5)
-				}
 			],
 			icon: "/icons/interfaces/calendar.png",
 			route: () => {

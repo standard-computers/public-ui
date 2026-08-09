@@ -7,6 +7,7 @@
         transparency: true,
         shadows: true,
         font_size: 16,
+        shortcut_icon_size: 28,
         foreground: "#3e3e3e",
         primary: "#001922",
         secondary: "",
@@ -31,6 +32,16 @@
     let ui_settings_options = {...default_settings_options};
     const user_theme = window.StandardUI?.currentTheme || await modular.user.theme();
     if(user_theme != null) ui_settings_options = {...default_settings_options, ...user_theme};
+    const interfaceIconSizes = [28, 32, 36, 40, 44, 48];
+    const interfaceIconSizePicker = () => div({
+        style: "number-picker no-scroll",
+        id: "shortcut_icon_size",
+        content: children(interfaceIconSizes.map(size => div({
+            style: `number animated ${Number(ui_settings_options.shortcut_icon_size) === size ? "selected-number" : ""}`.trim(),
+            content: size,
+            value: size
+        })))
+    });
     const BACKGROUND_IMAGE_CACHE_KEY = "ui-background";
     const BACKGROUND_IMAGE_CACHE_INTERFACE = "com.standard.settings";
     const BACKGROUND_IMAGE_META_KEY = "ui-background-meta";
@@ -554,7 +565,11 @@
             listRoot.innerHTML = standards.map(({name, reference}, index) => div({style: "brick bordered radius padded small-margin-bottom shadowed", content: children([
                 button({style: "tiny float-right inner-radius small-margin-left no-margin-top", title: "View as sheet", icon: modular.icons.sheets, onclick: event => openStandardDataInSheets(reference, name, event?.target)}),
                 button({style: "tiny float-right no-margin inner-radius", content: "Data", onclick: event => openStandardDataInInternals(reference, event?.target)}),
-                div({style: "inline margin-bottom", content: div({style: "brick", content: `<strong>${escapeHtml(name)}</strong><span class="faded"> ${escapeHtml(reference)}</span>`})}),
+                div({style: "inline margin-bottom", content: div({style: "brick", content: children([
+                            strong({content: escapeHtml(name)}),
+                            div({style: "faded inline margin-left", content: escapeHtml(reference)})
+                        ])
+                })}),
                 div({id: `home-standards-detail-${index}`, style: "faded small-padding", content: "Loading details..."})
             ])})).join("");
             await Promise.all(standards.map(async ({name, reference}, index) => {
@@ -743,6 +758,7 @@
         let temp = ui_settings_options;
         if (os) temp = os;
         document.documentElement.style.setProperty("--fs", `${temp.font_size}px`);
+        document.documentElement.style.setProperty("--interface-shortcut-icon-size", `${temp.shortcut_icon_size}px`);
         document.documentElement.style.setProperty("--fg", temp.foreground);
         document.documentElement.style.setProperty("--primary", temp.primary);
         document.documentElement.style.setProperty("--secondary", temp.secondary);
@@ -824,6 +840,7 @@
     const renderThemeMetricPreview = (themeData = {}) => {
         const metrics = [
             {label: "Font", value: themeData.font_size, suffix: "px"},
+            {label: "Icons", value: themeData.shortcut_icon_size, suffix: "px"},
             {label: "Radius", value: themeData.border_radius, suffix: "px"},
             {label: "Border", value: themeData.border_width, suffix: "px"}
         ].filter(({value}) => value !== undefined && value !== null && value !== "");
@@ -1579,6 +1596,10 @@
                             div({style: "big-spacer"}),
                             label({style: "faded", content: "Font Size"}),
                             numbers({id: "font_size", min: 10, max: 24, reference: "--radius"}),
+                            div({style: "big-spacer"}),
+                            label({style: "faded", content: "Interface Icon Size"}),
+                            em({content: "Changes each interface icon below the search input"}),
+                            interfaceIconSizePicker(),
                             div({style: "big-spacer"}),
                             label({style: "faded", content: "Font Color"}),
                             colorPicker({id: "foreground", colors: modular.colors}),

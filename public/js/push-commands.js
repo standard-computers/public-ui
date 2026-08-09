@@ -143,7 +143,7 @@
         drainCommands();
     }
     document.addEventListener("DOMContentLoaded", () => {
-        const source = new EventSource("/events/push");
+        const source = new EventSource(new URL("/events/push", window.location.href).href, {withCredentials: true});
         source.onmessage = event => {
             try {
                 enqueueCommand(JSON.parse(event.data));

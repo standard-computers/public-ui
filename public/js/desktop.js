@@ -505,6 +505,19 @@
         openPinPanel(point);
     });
     document.addEventListener("keydown", event => {
+        if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+            const shortcutButton = {
+                F1: newButton,
+                F2: cursorButton,
+                F3: handButton,
+                F4: document.getElementById("launch-interfaces")
+            }[event.key];
+            if (shortcutButton) {
+                event.preventDefault();
+                if (!event.repeat) shortcutButton.click();
+                return;
+            }
+        }
         if (event.key === "Escape" && panel) closePanel();
         if ((event.key === "Delete" || event.key === "Backspace") && !panel && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
             const ids = Array.from(selected).filter(node => node.matches(".desktop-shortcut")).map(node => node.dataset.shortcutId);

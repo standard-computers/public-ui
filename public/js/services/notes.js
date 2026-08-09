@@ -272,7 +272,8 @@
                     }
                 }
             ],
-            icon: modular.icons.note,
+            svg_icon: modular.icons.note,
+            icon: "/icons/interfaces/notes.png",
             route: () => div({
                 style: "padded large-padding-top",
                 content: `<div class="note-view-content">${sanitizeNoteMarkup(noteContent)}</div>`
@@ -323,7 +324,8 @@
                     }
                 }
             ],
-            icon: modular.icons.note,
+            svg_icon: modular.icons.note,
+            icon: "/icons/interfaces/notes.png",
             route: () => div({style: "large-padding-top editor-portal-shell",
                 content: children([
                     input({type: "hidden", id: "edit-note-color"}),
@@ -376,7 +378,8 @@
                 });
             }
         }],
-        icon: modular.icons.note,
+        svg_icon: modular.icons.note,
+        icon: "/icons/interfaces/notes.png",
         route: _ => div({
             style: "large-padding-top editor-portal-shell",
             content: children([input({type: "hidden", id: "new-note-color"}), div({
@@ -463,23 +466,28 @@
                 bindNoteImageViewer(notesList);
                 notesList.contextmenu([
                     {
-                        icon: modular.icons.open, label: "Open", action: (b, e, el) => {
+                        icon: modular.icons.open,
+                        label: "Open",
+                        action: (b, e, el) => {
                             const nt = el.closest(".note-tile");
                             const note = getNoteTileData(nt);
                             if (!note) return;
                             openNote(note);
                         }
-                    },
-                    {
-                        icon: modular.icons.modify, label: "Edit", action: (b, e, el) => {
+                    }, {
+                        icon: modular.icons.modify,
+                        label: "Edit",
+                        action: (b, e, el) => {
                             const nt = el.closest(".note-tile");
                             const note = getNoteTileData(nt);
                             if (!note) return;
                             openNoteEditor(note);
                         }
-                    },
-                    {
-                        icon: modular.icons.delete, label: "Delete", destructive: true, action: (b, e, el) => {
+                    }, {
+                        icon: modular.icons.delete,
+                        label: "Delete",
+                        destructive: true,
+                        action: (b, e, el) => {
                             const noteTile = el.closest(".note-tile");
                             deleteNote(noteTile?.getAttribute("data"), undefined, noteTile);
                         }

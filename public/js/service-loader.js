@@ -5,7 +5,7 @@
     const platformInterfaces = [
         {serviceId: "com.standard.setup", title: "Setup", script: "/js/services/setup.js", icon: "/icons/interfaces/settings.png", internal: true, required: true, desktopOnly: true},
         {serviceId: "com.standard.internals", title: "Internals", script: "/js/services/internals.js", icon: "/icons/interfaces/cli.png", internal: true},
-        {serviceId: "com.standard.articles", title: "Articles", script: "/js/services/articles.js", icon: "/icons/interfaces/articles.svg"},
+        {serviceId: "com.standard.articles", title: "Articles", script: "/js/services/articles.js", icon: "/icons/interfaces/articles.png"},
         {serviceId: "com.standard.integrator", title: "Integrator", script: "/js/services/integrator.js", icon: "/icons/interfaces/cli.png", internal: true},
         {serviceId: "com.standard.stopwatch", title: "Stopwatch", script: "/js/services/stopwatch.js", icon: "/icons/interfaces/alarms.png", internal: true},
         {serviceId: "com.standard.calculator", title: "Calculator", script: "/js/services/calculator.js", icon: "/icons/interfaces/cli.png", internal: true},

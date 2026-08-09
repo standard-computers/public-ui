@@ -104,9 +104,9 @@ iframe.fill {width:calc(100% - 20px) !important;display:block;height:90vh}
 .control-center-control small {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.75}
 .control-center-control.connected svg {color:var(--green)}
 .control-center-control.disconnected svg {opacity:.45}
-.interface-icon {width:28px;height:28px;border-radius:var(--radius);padding:2px;cursor:pointer;border:none}
+.interface-icon {width:var(--interface-shortcut-icon-size,28px);height:var(--interface-shortcut-icon-size,28px);border-radius:var(--radius);padding:2px;cursor:pointer;border:none}
 .interface-icon:hover {box-shadow:var(--shadow);border:none}
-.interface-icon img {width:28px;height:28px;object-fit:contain}
+.interface-icon img,.interface-icon svg {display:block;width:var(--interface-shortcut-icon-size,28px);height:var(--interface-shortcut-icon-size,28px);object-fit:contain}
 .guttered {margin-right:calc(var(--gutter) * 2.5);margin-left:calc(var(--gutter) * 2.5)}
 .flex {display:flex;flex-direction:column}
 .center-center {position:absolute;top:42%;left:50%;transform:translate(-50%, -50%)}

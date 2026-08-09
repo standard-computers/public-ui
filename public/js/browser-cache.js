@@ -2,7 +2,14 @@
     const CACHE_NAME = "standard-browser-cache-v1";
     const INDEX_KEY = "standard-browser-cache-index-v1";
     const CACHE_URL_PREFIX = "/__standard_browser_cache__";
-    const supportsBrowserCache = () => typeof window !== "undefined" && "caches" in window && typeof localStorage !== "undefined";
+    const memoryCache = new Map();
+    const supportsBrowserCache = () => {
+        try {
+            return typeof window !== "undefined" && typeof window.caches?.open === "function";
+        } catch (_) {
+            return false;
+        }
+    };
     const nowIso = () => new Date().toISOString();
     const asString = value => `${value ?? ""}`.trim();
     const safeIdPart = value => encodeURIComponent(asString(value) || "default");
@@ -50,14 +57,29 @@
         const json = JSON.stringify(value ?? {}, null, 2);
         return {response: new Response(json, {headers: {"Content-Type": contentType || "application/json"}}), size: json.length, contentType: contentType || "application/json", label, source};
     };
+    const memoryCacheAdapter = {
+        async match(key) {
+            const response = memoryCache.get(String(key));
+            return response?.clone?.() || null;
+        },
+        async put(key, response) {
+            memoryCache.set(String(key), response.clone());
+        },
+        async delete(key) {
+            return memoryCache.delete(String(key));
+        }
+    };
     const openCache = async () => {
-        if (!supportsBrowserCache()) throw new Error("Browser cache is unavailable");
-        return caches.open(CACHE_NAME);
+        if (!supportsBrowserCache()) return memoryCacheAdapter;
+        try {
+            return await window.caches.open(CACHE_NAME);
+        } catch (_) {
+            return memoryCacheAdapter;
+        }
     };
     const getResponse = async (interfaceName, key, options = {}) => {
         const cache = await openCache();
-        const request = new Request(buildRequestUrl(interfaceName, key, options.format || ""), {method: "GET"});
-        return cache.match(request);
+        return cache.match(buildRequestUrl(interfaceName, key, options.format || ""));
     };
     const read = async (interfaceName, key, options = {}) => {
         const response = await getResponse(interfaceName, key, options);
@@ -81,7 +103,7 @@
         const response = prepared.response;
         const cache = await openCache();
         const requestUrl = buildRequestUrl(normalizedInterface, normalizedKey, format);
-        await cache.put(new Request(requestUrl, {method: "GET"}), response.clone());
+        await cache.put(requestUrl, response.clone());
         const contentType = prepared.contentType || response.headers.get("content-type") || "application/octet-stream";
         const index = readIndex();
         const id = buildEntryId(normalizedInterface, normalizedKey, format);
@@ -108,7 +130,7 @@
         const normalizedKey = asString(key);
         const format = asString(options.format || "");
         const cache = await openCache();
-        const deleted = await cache.delete(new Request(buildRequestUrl(normalizedInterface, normalizedKey, format), {method: "GET"}));
+        const deleted = await cache.delete(buildRequestUrl(normalizedInterface, normalizedKey, format));
         const index = readIndex();
         delete index.entries[buildEntryId(normalizedInterface, normalizedKey, format)];
         writeIndex(index);

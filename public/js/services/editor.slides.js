@@ -3,7 +3,8 @@
     const SERVICE_ID = "com.standard.editor.slides";
     const SLIDE_GRID_SIZE = 20;
     const SLIDE_BORDER_DRAG_HIT_SIZE = 8;
-    const SLIDE_TEXT_STYLE_KEYS = ["fontWeight", "fontStyle", "textDecoration", "color", "backgroundColor", "fontSize"];
+    const SLIDE_TEXT_STYLE_KEYS = ["fontWeight", "fontStyle", "textDecoration", "fontFamily", "color", "backgroundColor", "fontSize"];
+    const SLIDE_FONT_FAMILIES = window.StandardUI?.fontFamilies || ["Inter", "Arial", "Georgia", "Times New Roman", "Courier New", "Verdana"];
     const SLIDE_FONT_SIZES = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72"];
     const SLIDE_CHART_DEFAULT_WIDTH = 360;
     const SLIDE_CHART_DEFAULT_HEIGHT = 240;
@@ -112,14 +113,22 @@
         if (fontStyle) normalizedStyle.fontStyle = fontStyle;
         const textDecoration = rawStyle.textDecoration === "underline" || rawStyle.u === 1 || rawStyle.u === true ? "underline" : "";
         if (textDecoration) normalizedStyle.textDecoration = textDecoration;
+        const fontFamily = String(rawStyle.fontFamily || rawStyle.f || "").trim();
+        if (fontFamily) normalizedStyle.fontFamily = fontFamily;
         const color = String(rawStyle.color || rawStyle.c || "").trim();
         if (color && color !== "transparent") normalizedStyle.color = color;
         const backgroundColor = String(rawStyle.backgroundColor || rawStyle.g || "").trim();
         if (backgroundColor && backgroundColor !== "transparent") normalizedStyle.backgroundColor = backgroundColor;
         const rawFontSize = rawStyle.fontSize || rawStyle.s || "";
         const numericFontSize = Number(String(rawFontSize).replace(/px$/i, ""));
-        if (Number.isFinite(numericFontSize) && numericFontSize >= 8 && numericFontSize <= 72) normalizedStyle.fontSize = `${numericFontSize}px`;
+        if (Number.isFinite(numericFontSize) && numericFontSize >= 1 && numericFontSize <= 400) normalizedStyle.fontSize = `${Math.round(numericFontSize * 10) / 10}px`;
         return normalizedStyle;
+    };
+    const normalizeSlideFontSizeInput = (rawFontSize = "") => {
+        const numericValue = Number(String(rawFontSize || "").replace(/px$/i, "").trim());
+        if (!Number.isFinite(numericValue)) return "";
+        const boundedValue = Math.max(1, Math.min(400, numericValue));
+        return `${Math.round(boundedValue * 10) / 10}`.replace(/\.0$/, "");
     };
     const encodeSlideTextStyle = (rawStyle = {}) => {
         const normalizedStyle = normalizeSlideTextStyle(rawStyle);
@@ -128,6 +137,7 @@
         if (normalizedStyle.fontWeight === "bold") encodedStyle.b = 1;
         if (normalizedStyle.fontStyle === "italic") encodedStyle.i = 1;
         if (normalizedStyle.textDecoration === "underline") encodedStyle.u = 1;
+        if (normalizedStyle.fontFamily) encodedStyle.f = normalizedStyle.fontFamily;
         if (normalizedStyle.color) encodedStyle.c = normalizedStyle.color;
         if (normalizedStyle.backgroundColor) encodedStyle.g = normalizedStyle.backgroundColor;
         if (normalizedStyle.fontSize) encodedStyle.s = Number(String(normalizedStyle.fontSize).replace(/px$/i, ""));
@@ -288,6 +298,7 @@
         if (normalizedStyle.fontWeight) span.style.fontWeight = normalizedStyle.fontWeight;
         if (normalizedStyle.fontStyle) span.style.fontStyle = normalizedStyle.fontStyle;
         if (normalizedStyle.textDecoration) span.style.textDecoration = normalizedStyle.textDecoration;
+        if (normalizedStyle.fontFamily) span.style.fontFamily = normalizedStyle.fontFamily;
         if (normalizedStyle.color) span.style.color = normalizedStyle.color;
         if (normalizedStyle.backgroundColor) span.style.backgroundColor = normalizedStyle.backgroundColor;
         if (normalizedStyle.fontSize) span.style.fontSize = normalizedStyle.fontSize;
@@ -320,6 +331,7 @@
             fontWeight: element?.style?.fontWeight || "",
             fontStyle: element?.style?.fontStyle || "",
             textDecoration: element?.style?.textDecoration || "",
+            fontFamily: element?.style?.fontFamily || "",
             color: element?.style?.color || "",
             backgroundColor: element?.style?.backgroundColor || "",
             fontSize: element?.style?.fontSize || ""
@@ -554,6 +566,7 @@
         return document.activeElement?.closest?.(".editor-slide-text-content") || anchorElement?.closest?.(".editor-slide-text-content") || null;
     };
     const handleSlideSelectionChange = () => {
+        if (document.activeElement?.matches?.("#editor-slide-font-family, #editor-slide-font-size")) return;
         const contentNode = getSlideTextEditorFromSelection();
         if (!(contentNode instanceof HTMLElement)) {
             hideSlideInlineStyleEditor();
@@ -603,6 +616,7 @@
         });
     };
     const updateSlideToolbarState = () => {
+        const fontFamilySelect = document.getElementById("editor-slide-font-family");
         const fontSizeSelect = document.getElementById("editor-slide-font-size");
         const boldButton = document.getElementById("editor-slide-style-bold");
         const italicButton = document.getElementById("editor-slide-style-italic");
@@ -611,7 +625,8 @@
         const alignmentButton = document.getElementById("editor-slide-style-align");
         const {block, contentNode} = getSlideToolbarTarget();
         const activeStyle = block ? getSlideSelectionStyle(block, getSlideToolbarSelectionOffsets(block, contentNode)) : {};
-        if (fontSizeSelect) fontSizeSelect.value = String((activeStyle.fontSize || "").replace(/px$/i, ""));
+        if (fontFamilySelect) window.StandardUI?.setSearchComboBoxValue?.(fontFamilySelect, activeStyle.fontFamily || "Inter");
+        if (fontSizeSelect) window.StandardUI?.setSearchComboBoxValue?.(fontSizeSelect, normalizeSlideFontSizeInput(activeStyle.fontSize || "12px") || "12");
         setSlideToolbarButtonState(boldButton, activeStyle.fontWeight === "bold");
         setSlideToolbarButtonState(italicButton, activeStyle.fontStyle === "italic");
         syncSlideToolbarIconColor(boldButton);
@@ -1745,6 +1760,7 @@
         ensureSlideBackgroundMenu();
         ensureSlideOptionsMenu();
         const addSlideButton = document.getElementById("editor-slide-add");
+        const fontFamilySelect = document.getElementById("editor-slide-font-family");
         const fontSizeSelect = document.getElementById("editor-slide-font-size");
         const boldButton = document.getElementById("editor-slide-style-bold");
         const italicButton = document.getElementById("editor-slide-style-italic");
@@ -1823,11 +1839,23 @@
             });
         }
         [boldButton, italicButton, textColorButton, backgroundColorButton, alignmentButton].forEach(bindSlideToolbarButtonFocus);
+        if (fontFamilySelect && fontFamilySelect.dataset.bound !== "1") {
+            fontFamilySelect.dataset.bound = "1";
+            fontFamilySelect.addEventListener("mousedown", () => rememberSlideSelection());
+            fontFamilySelect.addEventListener("change", (event) => {
+                const nextFontFamily = window.StandardUI?.getSearchComboBoxValue?.(fontFamilySelect) || event?.target?.value || "Inter";
+                applySlideToolbarStyle((style) => ({...style, fontFamily: nextFontFamily || ""}));
+            });
+        }
         if (fontSizeSelect && fontSizeSelect.dataset.bound !== "1") {
             fontSizeSelect.dataset.bound = "1";
             fontSizeSelect.addEventListener("mousedown", () => rememberSlideSelection());
             fontSizeSelect.addEventListener("change", (event) => {
-                const nextSize = String(event?.target?.value || "").trim();
+                const nextSize = normalizeSlideFontSizeInput(window.StandardUI?.getSearchComboBoxValue?.(fontSizeSelect) || event?.target?.value || "");
+                if (!nextSize) {
+                    updateSlideToolbarState();
+                    return;
+                }
                 applySlideToolbarStyle((style) => ({...style, fontSize: nextSize ? `${nextSize}px` : ""}));
             });
         }
@@ -1910,6 +1938,7 @@
             title: "Slides",
             hints: ["slides", "create slides", "create slideshow", "make a slideshow"],
             dimensions: [1200, 800],
+            maximized: true,
             horizontal_nav: true,
             centered_nav: true,
             tools: [
@@ -1929,17 +1958,17 @@
                 restoreSlidePortalState(this.portal);
                 return div({style: "large-padding-top editor-slide-shell", content: children([
                     div({style: "editor-slide-body", content: children([
-                        div({style: "editor-slide-sidebar secondary-bordered radius shadowed", content: children([
-                            div({style: "editor-slide-sidebar-title", content: "Slides"}),
+                        div({style: "editor-slide-sidebar radius", content: children([
                             div({id: "editor-slide-list", style: "editor-slide-list"})
                         ])}),
                         div({style: "editor-slide-workspace", content: children([
                             div({style: "editor-slide-toolbar secondary-bordered radius shadowed", content: children([
                                 button({id: "editor-slide-add", style: "editor-slide-add-button float-right", content: "+ Slide"}),
+                                searchComboBox({id: "editor-slide-font-family", altsync: "FF", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: SLIDE_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
+                                searchComboBox({id: "editor-slide-font-size", altsync: "FS", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: SLIDE_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
                                 button({id: "editor-slide-add-text", style: "naked align-bottom small-margin-right inner-radius", title: "Add Text", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 11.984375 2.9863281 A 1.0001 1.0001 0 0 0 11.841797 3 L 4.25 3 A 1.0001 1.0001 0 0 0 3.2578125 3.875 L 3.0078125 5.875 A 1.0001 1.0001 0 1 0 4.9921875 6.125 L 5.1328125 5 L 11 5 L 11 19 L 9 19 A 1.0001 1.0001 0 1 0 9 21 L 11.832031 21 A 1.0001 1.0001 0 0 0 12.158203 21 L 15 21 A 1.0001 1.0001 0 1 0 15 19 L 13 19 L 13 5 L 18.867188 5 L 19.007812 6.125 A 1.0001 1.0001 0 1 0 20.992188 5.875 L 20.742188 3.875 A 1.0001 1.0001 0 0 0 19.75 3 L 12.167969 3 A 1.0001 1.0001 0 0 0 11.984375 2.9863281 z"/></svg>`}),
                                 button({id: "editor-slide-add-image", style: "naked align-bottom small-margin-right inner-radius", title: "Add Image", icon: modular.icons.image}),
                                 button({id: "editor-slide-add-chart", style: "naked align-bottom small-margin-right inner-radius", title: "Add Chart", icon: modular.icons.chart}),
-                                select({id: "editor-slide-font-size", style: "small-margin-right inner-radius", value: "", options: [{label: "Size", value: ""}, ...SLIDE_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))]}),
                                 button({id: "editor-slide-style-bold", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: modular.icons.bold}),
                                 button({id: "editor-slide-style-italic", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: modular.icons.italic}),
                                 button({id: "editor-slide-style-color", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
