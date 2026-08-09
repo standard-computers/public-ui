@@ -195,7 +195,7 @@
         const iconState = {file: null, objectUrl: ""};
         const portal = new Portal({
             title: `Edit ${article.title || "Article"}`,
-            dimensions: [560, 650],
+            dimensions: [520, 650],
             navigation: false,
             svg_icon: modular.icons.articles,
             tools: [
@@ -224,7 +224,8 @@
         const source = safeUrl(article.source);
         const portal = new Portal({
             title,
-            dimensions: [680, 560],
+            dimensions: [520, 560],
+            auto_height: true,
             navigation: false,
             svg_icon: modular.icons.articles,
             tools: [
@@ -241,8 +242,7 @@
                     }
                 }
             ],
-            // route: () => div({style: "large-padding-top small-padding", content: `<div class="internals-article-preview"><div class="internals-article-header"><div class="internals-article-meta"><div>
-            // ${escapeHtml(article.created)}</div><div>Priority ${escapeHtml(article.priority)}</div></div><img class="article-icon internals-article-icon" src="${escapeHtml(articleImage(article))}" onerror="this.onerror=null;this.src='${DEFAULT_ARTICLE_ICON}'" alt="${escapeHtml(title)}"><h2>${escapeHtml(title)}</h2><div>${escapeHtml(article.description)}</div>${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.link)}</a>` : ""}</div><div class="internals-article-content">${renderContent(article.content)}</div>${article.source ? `<div class="internals-article-source faded">Source: ${source ? `<a href="${escapeHtml(source)}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.source)}</a>` : escapeHtml(article.source)}</div>` : ""}</div>`})
+            //<img class="article-icon internals-article-icon" src="${escapeHtml(articleImage(article))}" onerror="this.onerror=null;this.src='${DEFAULT_ARTICLE_ICON}'" alt="${escapeHtml(title)}"><div class="internals-article-content">${renderContent(article.content)}</div>`})
             route: () => div({style: "large-padding-top small-padding", content: children([
                     div({style: "internals-article-preview padded", content: children([
                             img({style: "article-icon internals-article-icon", src: escapeHtml(articleImage(article))}),
@@ -298,7 +298,7 @@
     const createPortal = new Portal({
         title: "Create Article",
         hints: ["create article", "new article", "write article"],
-        dimensions: [560, 650],
+        dimensions: [520, 650],
         navigation: false,
         svg_icon: modular.icons.articles,
         tools: [
@@ -415,7 +415,7 @@
         new Portal({
             title: "Articles",
             hints: ["articles", "article manager", "publishing"],
-            dimensions: [560, 560],
+            dimensions: [520, 560],
             navigation: false,
             svg_icon: modular.icons.articles,
             icon: "/icons/interfaces/articles.png",

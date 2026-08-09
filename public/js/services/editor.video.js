@@ -257,7 +257,7 @@
             tools: [
                 {title: "Save", icon: modular.icons.save, onclick: (_, context) => saveProject(context?.portal)}
             ],
-            svg_icon: modular.icons.video,
+            svg_icon: modular.icons.film,
             icon: "/icons/mp4.png",
             route: function () {
                 const state = getState(this.portal);

@@ -1,13 +1,13 @@
 (() => {
 
-    const demoHiddenServices = new Set(["com.standard.internals", "com.standard.integrator", "com.standard.cli"]);
+    const demoHiddenServices = new Set(["com.standard.internals", "com.standard.cli"]);
 
     const platformInterfaces = [
         {serviceId: "com.standard.setup", title: "Setup", script: "/js/services/setup.js", icon: "/icons/interfaces/settings.png", internal: true, required: true, desktopOnly: true},
         {serviceId: "com.standard.internals", title: "Internals", script: "/js/services/internals.js", icon: "/icons/interfaces/cli.png", internal: true},
         {serviceId: "com.standard.articles", title: "Articles", script: "/js/services/articles.js", icon: "/icons/interfaces/articles.png"},
-        {serviceId: "com.standard.integrator", title: "Integrator", script: "/js/services/integrator.js", icon: "/icons/interfaces/cli.png", internal: true},
-        {serviceId: "com.standard.stopwatch", title: "Stopwatch", script: "/js/services/stopwatch.js", icon: "/icons/interfaces/alarms.png", internal: true},
+        {serviceId: "com.standard.integrator", title: "Integrator", script: "/js/services/integrator.js", icon: "/icons/interfaces/cli.png"},
+        {serviceId: "com.standard.stopwatch", title: "Stopwatch", script: "/js/services/stopwatch.js", icon: "/icons/interfaces/stopwatch   .png", internal: true},
         {serviceId: "com.standard.calculator", title: "Calculator", script: "/js/services/calculator.js", icon: "/icons/interfaces/cli.png", internal: true},
         {serviceId: "com.standard.timers", title: "Timers", script: "/js/services/timers.js", icon: "/icons/interfaces/alarms.png"},
         {serviceId: "com.standard.files", title: "Files", script: "/js/services/files.js", icon: "/icons/interfaces/files.png"},
@@ -65,7 +65,7 @@
         return window.StandardDeviceStatus.promise;
     };
 
-    const SERVICE_SCRIPT_CACHE_VERSION = "v17";
+    const SERVICE_SCRIPT_CACHE_VERSION = "v18";
 
     const ENABLED_APPS_CACHE_KEY = "enabled-apps";
     const DESKTOP_STATE_CACHE_KEY = "desktop-canvas";

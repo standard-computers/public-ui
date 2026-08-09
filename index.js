@@ -57,6 +57,7 @@ const SESSION_PRUNE_INTERVAL_MS = Math.max(60 * 1000, Number(process.env.SESSION
 const USER_RECORD_CACHE_TTL_MS = Math.max(5 * 1000, Number(process.env.USER_RECORD_CACHE_TTL_MS || 1000 * 60 * 5) || 1000 * 60 * 5);
 const REQUEST_BODY_LIMIT = (process.env.REQUEST_BODY_LIMIT || "25mb").trim() || "25mb";
 const THEMES_REPO_PATH = path.join(__dirname, "public", "themes.json");
+const INTEGRATIONS_REPO_PATH = path.join(__dirname, "private", "integrations.json");
 const USER_DATA_ROOT = (process.env.PUBLIC_UI_USER_DATA_ROOT || "").trim() || path.join(__dirname, "user_data");
 const ELECTRON_SETUP_CONFIG_PATH = path.join(USER_DATA_ROOT, "desktop-setup.json");
 const DEMO_FIXTURE_PATH = (process.env.DEMO_FIXTURE_PATH || path.join(__dirname, "demo-data.json")).trim();
@@ -1914,6 +1915,23 @@ app.get("/api/client-context", (req, res) => {
         isDemoMode,
         usesStandardBackend: !isDemoMode
     });
+});
+
+app.get("/api/integrations", async (_req, res) => {
+    try {
+        const raw = await fs.readFile(INTEGRATIONS_REPO_PATH, "utf8");
+        const payload = JSON.parse(raw);
+        const integrations = (Array.isArray(payload?.integrations) ? payload.integrations : [])
+            .map(integration => ({
+                name: typeof integration?.name === "string" ? integration.name.trim() : "",
+                icon: typeof integration?.icon === "string" ? integration.icon.trim() : ""
+            }))
+            .filter(integration => integration.name);
+        return res.json({integrations});
+    } catch (err) {
+        console.error("Failed to load integrations:", err.message);
+        return res.status(500).json({error: "Unable to load integrations"});
+    }
 });
 
 app.get("/events/device-status", (req, res) => {

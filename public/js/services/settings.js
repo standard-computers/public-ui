@@ -109,7 +109,7 @@
 
     const getPlatformInterfaces = () => {
         const interfaces = typeof window.StandardPlatformInterfaces?.all === "function" ? window.StandardPlatformInterfaces.all() : [];
-        return interfaces.filter(item => item?.serviceId && item?.title && !["com.standard.internals", "com.standard.integrator"].includes(item.serviceId));
+        return interfaces.filter(item => item?.serviceId && item?.title && item.serviceId !== "com.standard.internals");
     };
 
     const isPlatformInterfaceEnabled = (serviceId) => {
@@ -1498,7 +1498,7 @@
             ])}),
             div({
                 id: "settings-people-list",
-                style: "medium-margin-top",
+                style: "margin-top",
                 content: userTiles.length ? children(userTiles) : div({style: "faded small-padding", content: "No other users."})
             }),
             button({id: "settings-add-person", style: "secondary medium-margin-top", type: "button", content: "Add Person", onclick: openAddPersonPortal}),

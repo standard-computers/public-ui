@@ -46,6 +46,7 @@
       "index.js",
       "demo-provider.js",
       "demo-data.json",
+      "private/integrations.json",
       "preload.js",
       "LICENSE",
       "package.json",
