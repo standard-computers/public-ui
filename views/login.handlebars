@@ -9,97 +9,163 @@
         <link href="/root.css" rel="stylesheet"/>
         <link href="/style.css" rel="stylesheet"/>
         <style>
-            .core-login {
-                box-sizing: border-box;
-                width: min(420px, calc(100% - 32px));
-                margin: 0 auto;
-                padding: 15vh 0 100px;
-            }
-            .core-login input {
-                box-sizing: border-box;
-                width: 100%;
-            }
-            @media (max-width: 560px) {
-                .core-login {padding-top: 48px}
+            html, body {min-height:100%;margin:0}
+            body {color:var(--fg);background:var(--bg);font-family:Inter, "Open Sans", sans-serif}
+            .core-login {position:relative;z-index:1;box-sizing:border-box;display:flex;min-height:100vh;width:min(760px, calc(100% - 32px));margin:0 auto;padding:80px 0;align-items:center;justify-content:center}
+            .login-panel {width:100%;text-align:center}
+            .login-title {margin:0 0 34px;font-size:28px;font-weight:500}
+            .user-list {display:flex;flex-wrap:wrap;justify-content:center;gap:40px;margin:0 auto}
+            .user-choice {appearance:none;display:flex;flex-direction:column;align-items:center;width:96px;min-width:96px;margin:0;padding:0;color:var(--fg);border:0;background:transparent;box-shadow:none;cursor:pointer}
+            .user-choice:hover, .user-choice:focus, .user-choice.selected {background:transparent;transform:none;outline:none}
+            .user-photo {box-sizing:border-box;display:block;width:95px;height:95px;overflow:hidden;border:2px solid rgba(255,255,255,.76);border-radius:50%;background:#e5e9ec url('/images/blank_contact.png') center/cover no-repeat;box-shadow:0 7px 22px rgba(14,44,65,.3);transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease}
+            .user-choice:hover .user-photo, .user-choice:focus .user-photo, .user-choice.selected .user-photo {transform:translateY(-3px) scale(1.04);border-color:#fff;box-shadow:0 10px 28px rgba(8,35,55,.42), 0 0 0 4px rgba(255,255,255,.18)}
+            .user-photo img {display:block;width:100%;height:100%;object-fit:cover}
+            .user-name {display:block;max-width:100%;margin-top:9px;font-size:13px;line-height:1.25;overflow-wrap:anywhere}
+            .password-area, .manual-login {box-sizing:border-box;width:min(340px, 100%);margin:28px auto 0}
+            .password-area[hidden] {display:none}
+            .password-label {display:block;margin:0 0 10px;font-size:14px}
+            .login-input {box-sizing:border-box;width:100%;height:42px;padding:9px 12px;color:#172d3a;border:1px solid rgba(255,255,255,.52);border-radius:10px;background:rgba(255,255,255,.88);font:inherit}
+            .login-input:focus {outline:3px solid rgba(255,255,255,.25);border-color:#fff}
+            .continue-button {box-sizing:border-box;width:100%;margin-top:12px}
+            .login-error {width:min(340px, 100%);box-sizing:border-box;margin:18px auto 0;padding:10px 12px;border-radius:10px;background:rgba(120,18,18,.72);color:#fff}
+            .retry-status:not(.error-state) {background:rgba(17,49,69,.65)}
+            .manual-login {text-align:left}
+            .manual-login label {display:block;margin:0 0 6px;font-size:14px}
+            .manual-login .login-input + label {margin-top:14px}
+            @media (max-width:560px) {
+                .core-login {padding:44px 0;align-items:flex-start}
+                .login-title {margin-bottom:28px}
+                .user-list {gap:18px 10px}
+                .user-choice {width:88px;min-width:88px}
+                .user-photo {width:70px;height:70px}
             }
         </style>
     </head>
     <body>
-        <div class="core-login">
-            <h1>Login</h1>
-            <form method="POST" action="/login" id="login-form">
-                <p>
+        <main class="core-login">
+            <section class="login-panel" aria-labelledby="login-title">
+                {{#if multipleUsers}}
+                <h1 class="login-title" id="login-title">Hello</h1>
+                <div class="user-list" role="list" aria-label="Choose a user">
+                    {{#each users}}
+                    <button class="user-choice" type="button" role="listitem" data-user-id="{{userId}}" data-username="{{username}}" data-name="{{displayName}}" data-has-password="{{hasPassword}}" aria-label="Log in as {{displayName}}">
+                        <span class="user-photo">
+                            {{#if recordId}}<img src="/login/profile-image/{{recordId}}" alt="" onerror="this.style.display='none'"/>{{/if}}
+                        </span>
+                        <span class="user-name">{{displayName}}</span>
+                    </button>
+                    {{/each}}
+                </div>
+                <form method="POST" action="/login" id="login-form">
+                    <input id="username" name="username" type="hidden"/>
+                    <div class="password-area" id="password-area" hidden>
+                        <label class="password-label" for="password">Password for <span id="selected-name"></span></label>
+                        <input class="login-input" id="password" name="password" type="password" autocomplete="current-password"/>
+                        <button type="submit" id="click-me" class="secondary fill fat continue-button">Continue</button>
+                    </div>
+                </form>
+                {{else}}
+                <h1 class="login-title" id="login-title">Login</h1>
+                <form method="POST" action="/login" id="login-form" class="manual-login">
                     <label for="username">Username</label>
-                </p>
-                <input id="username" name="username" type="text" autocomplete="username" placeholder="Username" autofocus required/>
-                <p>
-                    <input id="username" name="psswd" type="text" autocomplete="password"/>
-                </p>
-                <button type="submit" id="click-me" class="fill" style="width:100%">Continue</button>
-                {{#if error}}
-                <div class="error" id="login-error">{{error}}</div>
+                    <input class="login-input" id="username" name="username" type="text" autocomplete="username" placeholder="Username" autofocus required/>
+                    <label for="password">Password</label>
+                    <input class="login-input" id="password" name="password" type="password" autocomplete="current-password"/>
+                    <button type="submit" id="click-me" class="fill continue-button">Continue</button>
+                </form>
                 {{/if}}
-                <div id="retry-status" class="error fill" style="display:none"></div>
-            </form>
-        </div>
+                {{#if error}}<div class="login-error" id="login-error" role="alert">{{error}}</div>{{/if}}
+                <div id="retry-status" class="login-error retry-status" role="status" aria-live="polite" hidden></div>
+            </section>
+        </main>
         <script>
         !function(){
-            let e=document.cookie.match(/(?:^|;\s*)loginUsername=([^;]+)/);
-            if(!e)return;
-            try{
-                let t=decodeURIComponent(e[1]),
-                    n=document.getElementById("username");
-                if(t&&n)n.value=t;
-            }catch(l){}
-        }();
-        !function(){
-            let e=document.getElementById("login-form"),
-                t=document.getElementById("username"),
-                n=document.getElementById("click-me"),
-                o=document.getElementById("login-error"),
-                r=document.getElementById("retry-status");
-            if(!e||!t||!n)return;
-            function i(e){
-                if(!r)return;
-                r.style.display=e?"block":"none";
-                r.textContent=e||"";
+            const form=document.getElementById("login-form"),
+                username=document.getElementById("username"),
+                password=document.getElementById("password"),
+                submit=document.getElementById("click-me"),
+                passwordArea=document.getElementById("password-area"),
+                selectedName=document.getElementById("selected-name"),
+                serverError=document.getElementById("login-error"),
+                status=document.getElementById("retry-status"),
+                choices=Array.from(document.querySelectorAll(".user-choice"));
+            if(!form||!username)return;
+
+            function showStatus(message,isError){
+                if(!status)return;
+                status.hidden=!message;
+                status.textContent=message||"";
+                status.classList.toggle("error-state",!!isError);
             }
-            e.addEventListener("submit",async function(a){
-                a.preventDefault();
-                let s=t.value.trim();
-                if(!s){
-                    i("Username is required");
-                    return;
-                }
-                n.disabled=!0;
-                i("Signing in...");
-                if(o)o.style.display="none";
+
+            function requestPassword(name){
+                if(!passwordArea||!password)return;
+                passwordArea.hidden=false;
+                selectedName.textContent=name||username.value||"this user";
+                password.required=true;
+                password.value="";
+                password.focus();
+            }
+
+            async function login(){
+                const selectedUsername=username.value.trim();
+                if(!selectedUsername){showStatus("Choose a user",true);return}
+                if(passwordArea&&!passwordArea.hidden&&!password.value){showStatus("Password is required",true);password.focus();return}
+                if(submit)submit.disabled=true;
+                choices.forEach(choice=>choice.disabled=true);
+                showStatus("Signing in…",false);
+                if(serverError)serverError.hidden=true;
                 try{
-                    let l=new URLSearchParams;
-                    l.set("username",s);
-                    let c=await fetch(e.action,{
+                    const body=new URLSearchParams();
+                    body.set("username",selectedUsername);
+                    if(password&&password.value)body.set("password",password.value);
+                    const response=await fetch(form.action,{
                         method:"POST",
                         headers:{
                             "Accept":"application/json",
                             "Content-Type":"application/x-www-form-urlencoded;charset=UTF-8",
                             "X-Requested-With":"XMLHttpRequest"
                         },
-                        body:l.toString(),
+                        body:body.toString(),
                         credentials:"same-origin"
                     });
-                    let d=c.headers.get("content-type")||"",
-                        u=d.includes("application/json")?await c.json():null;
-                    if(c.ok&&u&&u.redirect){
-                        window.location.assign(u.redirect);
-                        return;
+                    const contentType=response.headers.get("content-type")||"";
+                    const result=contentType.includes("application/json")?await response.json():null;
+                    if(response.ok&&result&&result.redirect){window.location.assign(result.redirect);return}
+                    const message=(result&&result.error)||"Unable to login";
+                    if(message==="Password is required"&&passwordArea&&passwordArea.hidden){
+                        const selected=choices.find(choice=>choice.classList.contains("selected"));
+                        requestPassword(selected&&selected.dataset.name);
                     }
-                    i((u&&u.error)||"Unable to login");
-                }catch(l){
-                    i("Unable to login");
+                    showStatus(message,true);
+                }catch(_){
+                    showStatus("Unable to login",true);
                 }finally{
-                    n.disabled=!1;
+                    if(submit)submit.disabled=false;
+                    choices.forEach(choice=>choice.disabled=false);
                 }
-            });
+            }
+
+            choices.forEach(choice=>choice.addEventListener("click",function(){
+                choices.forEach(candidate=>candidate.classList.toggle("selected",candidate===choice));
+                username.value=choice.dataset.userId||choice.dataset.username||"";
+                showStatus("",false);
+                if(choice.dataset.hasPassword==="true"){
+                    requestPassword(choice.dataset.name||choice.dataset.username);
+                }else{
+                    passwordArea.hidden=true;
+                    password.required=false;
+                    password.value="";
+                    login();
+                }
+            }));
+
+            form.addEventListener("submit",function(event){event.preventDefault();login()});
+
+            if(!choices.length){
+                const cookie=document.cookie.match(/(?:^|;\s*)loginUsername=([^;]+)/);
+                if(cookie){try{username.value=decodeURIComponent(cookie[1])}catch(_){}}
+            }
         }();
         </script>
     </body>

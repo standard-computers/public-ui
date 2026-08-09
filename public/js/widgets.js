@@ -206,6 +206,7 @@ class Widget {
             handle.className = `resize-handle ${position}`;
             resizer.appendChild(handle);
             handle.addEventListener('mousedown', (e) => {
+                handle.classList.add('is-resizing');
                 const startX = e.clientX;
                 const startY = e.clientY;
                 const startWidth = this.#widgetDiv.offsetWidth;
@@ -241,6 +242,7 @@ class Widget {
                     this.#syncDescendantDimensions(content);
                 };
                 const onMouseUp = () => {
+                    handle.classList.remove('is-resizing');
                     document.removeEventListener('mousemove', onMouseMove);
                     document.removeEventListener('mouseup', onMouseUp);
                     this.#persistWindowState({open: true});

@@ -307,6 +307,7 @@
 		}
 		return null;
 	};
+
 	const printChart = () => {
 		const bounds = chartBounds();
 		if (!bounds) return modular.error("Add something to the chart before printing");
@@ -335,6 +336,7 @@
 			}
 		}, 80);
 	};
+
 	const previewChartPng = async sourceNode => {
 		try {
 			const canvas = await renderChartCanvas();
@@ -345,6 +347,7 @@
 			modular.error(error.message || "Unable to preview this chart as PNG");
 		}
 	};
+
 	const previewChartPdf = async sourceNode => {
 		try {
 			const canvas = await renderChartCanvas(), source = URL.createObjectURL(pdfBlobFromCanvas(canvas));
@@ -358,6 +361,7 @@
 			modular.error(error.message || "Unable to preview this chart as PDF");
 		}
 	};
+
 	const showPrintMenu = event => {
 		const button = event?.currentTarget;
 		if (!button || typeof button.contextmenu !== "function") return;
@@ -449,14 +453,17 @@
 			bottom: {x: item.x + item.w / 2, y: item.y + item.h},
 			left: {x: item.x, y: item.y + item.h / 2}
 		}[vertex]);
+
 		const screenToWorld = (clientX, clientY) => {
 			const rect = stage.getBoundingClientRect(), v = documentState.viewport;
 			return {x: (clientX - rect.left - v.x) / v.scale, y: (clientY - rect.top - v.y) / v.scale};
 		};
+
 		const applyViewport = () => {
 			const v = documentState.viewport;
 			world.style.transform = `translate(${v.x}px,${v.y}px) scale(${v.scale})`;
 		};
+
 		const pathFor = connector => {
 			const a = itemById(connector.from.itemId), b = itemById(connector.to.itemId);
 			if (!a || !b) return "";
@@ -471,6 +478,7 @@
 			}
 			return `M${p1.x},${p1.y} L${p2.x},${p2.y}`;
 		};
+
 		const renderLines = () => {
 			linesLayer.innerHTML = "";
 			documentState.connectors.forEach(connector => {
@@ -516,6 +524,7 @@
 				linesLayer.append(group);
 			});
 		};
+
 		const shapeSvg = item => {
 			const shape = svg("svg", {viewBox: `0 0 ${item.w} ${item.h}`, preserveAspectRatio: "none"});
 			let node;
@@ -539,6 +548,7 @@
 			shape.append(node);
 			return shape;
 		};
+
 		const updateDrawPreview = point => {
 			if (!drawStart || !drawPreview) return;
 			const x = Math.min(drawStart.x, point.x), y = Math.min(drawStart.y, point.y),
@@ -559,6 +569,7 @@
 				drawPreview.replaceChildren(previewShape);
 			}
 		};
+
 		const beginDrawPreview = point => {
 			const isText = activeTool === "text";
 			drawPreview = document.createElement("div");
@@ -574,6 +585,7 @@
 			itemsLayer.append(drawPreview);
 			updateDrawPreview(point);
 		};
+
 		const renderItems = () => {
 			itemsLayer.innerHTML = "";
 			documentState.items.forEach(item => {
@@ -628,6 +640,7 @@
 				itemsLayer.append(el);
 			});
 		};
+
 		const render = () => {
 			root.querySelector('[data-action="background"]').value = documentState.background;
 			root.querySelector('[data-action="connector-style"]').value = documentState.connectorStyle;
@@ -636,6 +649,7 @@
 			renderLines();
 			renderItems();
 		};
+
 		const addItem = (type, kind = "rectangle", extra = {}) => {
 			const center = screenToWorld(stage.getBoundingClientRect().left + stage.clientWidth / 2, stage.getBoundingClientRect().top + stage.clientHeight / 2);
 			const item = {
@@ -653,6 +667,7 @@
 			selected = new Set([item.id]);
 			render();
 		};
+
 		const beginTextEdit = (item, el) => {
 			if (item.type === "image") return;
 			editing?.remove();
@@ -678,6 +693,7 @@
 				}
 			});
 		};
+
 		const itemPointerDown = (event, item) => {
 			if (event.button !== 0) return;
 			event.stopPropagation();
@@ -717,6 +733,7 @@
 			render();
 			stage.setPointerCapture?.(event.pointerId);
 		};
+
 		const finishConnector = event => {
 			if (!connectorDraft) return;
 			const target = document.elementFromPoint(event.clientX, event.clientY)?.closest?.(".charts-vertex");
@@ -732,10 +749,12 @@
 				render();
 			}
 		};
+
 		const applyStyle = () => {
 			documentState.items.filter(item => selected.has(item.id) && item.type !== "image").forEach(item => Object.assign(item.style, currentStyle));
 			render();
 		};
+
 		const duplicateItem = item => {
 			const clone = structuredClone(item);
 			clone.id = uid("item");
@@ -745,12 +764,14 @@
 			selected = new Set([clone.id]);
 			render();
 		};
+
 		const deleteItem = item => {
 			documentState.items = documentState.items.filter(candidate => candidate.id !== item.id);
 			documentState.connectors = documentState.connectors.filter(connector => connector.from.itemId !== item.id && connector.to.itemId !== item.id);
 			selected.delete(item.id);
 			render();
 		};
+
 		const buildItemMenu = item => {
 			selected = new Set([item.id]);
 			render();
@@ -778,19 +799,23 @@
 				}
 			];
 		};
+
 		if (typeof stage.contextmenu === "function") stage.contextmenu((_, target) => {
 			const item = itemById(target?.closest?.(".charts-item")?.dataset.id);
 			return item ? buildItemMenu(item) : [];
 		}, ".charts-item");
+
 		const removeSelected = () => {
 			documentState.items = documentState.items.filter(item => !selected.has(item.id));
 			documentState.connectors = documentState.connectors.filter(c => !selected.has(c.id) && itemById(c.from.itemId) && itemById(c.to.itemId));
 			selected.clear();
 			render();
 		};
+
 		const copy = () => {
 			clipboard = documentState.items.filter(item => selected.has(item.id)).map(item => structuredClone(item));
 		};
+
 		const paste = () => {
 			if (!clipboard.length) return;
 			const idMap = new Map();
@@ -807,6 +832,7 @@
 			clipboard = pasted.map(i => structuredClone(i));
 			render();
 		};
+
 		stage.addEventListener("pointerdown", event => {
 			if (event.target === stage || event.target === world || event.target === itemsLayer) {
 				if (activeTool === "text" || activeTool.startsWith("shape:")) {
@@ -821,6 +847,7 @@
 				render();
 			}
 		});
+
 		stage.addEventListener("pointermove", event => {
 			if (connectorDraft) return;
 			const p = screenToWorld(event.clientX, event.clientY);
@@ -852,6 +879,7 @@
 				applyViewport();
 			}
 		});
+
 		stage.addEventListener("pointerup", event => {
 			if (drawStart && (activeTool === "text" || activeTool.startsWith("shape:"))) {
 				const tool = activeTool, end = screenToWorld(event.clientX, event.clientY),
@@ -881,12 +909,14 @@
 			finishConnector(event);
 			drag = pan = resize = null;
 		});
+
 		stage.addEventListener("pointercancel", () => {
 			drawPreview?.remove();
 			drawPreview = null;
 			drawStart = null;
 			drag = pan = resize = null;
 		});
+
 		stage.addEventListener("wheel", event => {
 			event.preventDefault();
 			const rect = stage.getBoundingClientRect(), v = documentState.viewport, old = v.scale,
@@ -897,11 +927,13 @@
 			v.scale = next;
 			applyViewport();
 		}, {passive: false});
+
 		const setTool = tool => {
 			activeTool = tool;
 			root.querySelectorAll(".charts-tool-button").forEach(button => button.classList.toggle("active", button.dataset.action === tool || tool.startsWith(`${button.dataset.action}:`)));
 			stage.classList.toggle("charts-drawing", tool === "text" || tool.startsWith("shape:"));
 		};
+
 		const shapeButton = root.querySelector('[data-action="shape"]');
 		shapeButton?.popoutmenu(SHAPE_OPTIONS.map(option => ({
 			label: option.label, icon: option.icon, action: () => {
@@ -909,11 +941,13 @@
 				setTool(`shape:${option.type}`);
 			}
 		})));
+
 		root.querySelector('[data-action="text"]').onclick = () => setTool(activeTool === "text" ? "select" : "text");
 		root.querySelector('[data-action="image"]').onclick = () => {
 			setTool("image");
 			imageInput.click();
 		};
+
 		imageInput.onchange = () => {
 			const file = imageInput.files?.[0];
 			if (!file) {
@@ -928,6 +962,7 @@
 			reader.readAsDataURL(file);
 			imageInput.value = "";
 		};
+
 		const fontFamilyInput = root.querySelector("#charts-font-family"),
 			fontSizeInput = root.querySelector("#charts-font-size");
 		fontFamilyInput?.addEventListener("change", () => {
@@ -938,11 +973,13 @@
 			currentStyle.fontSize = Math.min(96, Math.max(8, Number(fontSizeInput.dataset.searchComboboxSelectedValue || fontSizeInput.value) || 16));
 			applyStyle();
 		});
+
 		root.querySelectorAll("[data-style]").forEach(control => control.addEventListener("change", () => {
 			const key = control.dataset.style;
 			currentStyle[key] = control.value;
 			applyStyle();
 		}));
+
 		const alignButton = root.querySelector('[data-action="align"]');
 		alignButton?.popoutmenu(Object.entries(ALIGN_ICONS).map(([value, icon]) => ({
 			label: `Align ${value[0].toUpperCase()}${value.slice(1)}`,
@@ -953,20 +990,24 @@
 				applyStyle();
 			}
 		})));
+
 		root.querySelectorAll("[data-toggle]").forEach(control => control.onclick = () => {
 			const key = control.dataset.toggle;
 			currentStyle[key] = !currentStyle[key];
 			control.classList.toggle("active", currentStyle[key]);
 			applyStyle();
 		});
+
 		root.querySelector('[data-action="background"]').oninput = event => {
 			documentState.background = event.target.value;
 			render();
 		};
+
 		root.querySelector('[data-action="connector-style"]').onchange = event => {
 			documentState.connectorStyle = event.target.value;
 			render();
 		};
+
 		stage.addEventListener("keydown", event => {
 			if (editing) return;
 			if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
@@ -982,6 +1023,7 @@
 				removeSelected();
 			}
 		});
+
 		activeController = {
 			load: render, focusMatch: match => {
 				const item = match?.item || (match?.connector && itemById(match.connector.from.itemId));
@@ -1042,7 +1084,7 @@
 			onclick: exportMermaid
 		}, {
 			title: "New Chart",
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 4v16M4 12h16"/></svg>`,
+			icon: modular.icons.create,
 			onclick: () => {
 				documentState = freshState();
 				activePath = "";

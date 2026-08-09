@@ -1277,6 +1277,7 @@ class Portal {
                 const startResize = (e) => {
                     if (e.cancelable) e.preventDefault();
                     e.stopPropagation();
+                    handle.classList.add('is-resizing');
                     const getPoint = (event) => {
                         if (event.touches && event.touches.length > 0) {
                             return {x: event.touches[0].clientX, y: event.touches[0].clientY};
@@ -1315,6 +1316,7 @@ class Portal {
                         this.#applyWindowLayout(nextLayout, {minBodyHeight: 150});
                     };
                     const endResize = () => {
+                        handle.classList.remove('is-resizing');
                         document.removeEventListener('mousemove', onMove);
                         document.removeEventListener('touchmove', onMove);
                         document.removeEventListener('mouseup', endResize);

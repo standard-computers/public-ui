@@ -1,9 +1,7 @@
 (() => {
 	const DEFAULT_COORDINATES = {lat: 39.103699, lon: -84.513611};
 	const WEATHER_SERVICE_ID = "com.standard.weather";
-	const WEATHER_INTERFACE_ICON = "/icons/interfaces/weather.png";
 	const WEATHER_ICON_BASE_PATH = "/icons/weather";
-	const WEATHER_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z"/></svg>`;
 	const LOCATION_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>`;
 	const listeners = new Set();
 	const state = {
@@ -382,73 +380,49 @@
 		state: () => ({...state, data: state.data ? {...state.data} : null, coords: {...state.coords}}),
 	};
 
-	const weatherPortalMarkup = () => div({
-		style: "weather-portal padded large-padding-top", content: children([
-			div({
-				style: "weather-hero", content: children([
-					div({
-						style: "weather-hero-copy bordered radius padded shadowed", content: children([
-							div({style: "weather-location", content: state.locationLabel}),
-							div({
-								style: "", content: children([
+	const weatherPortalMarkup = () => div({style: "weather-portal padded large-padding-top", content: children([
+			div({style: "weather-hero", content: children([
+					div({style: "weather-hero-copy bordered radius padded shadowed", content: children([
+							div({style: "weather-last-updated float-right smaller faded", content: "Fetching latest conditions"}),
+							div({style: "", content: children([
 									div({style: "weather-current-icon padded inline float-left", content: ""}),
-									div({
-										style: "inline", content: children([
+									div({style: "inline", content: children([
 											div({style: "weather-current-temp", content: "--\u00B0F"}),
 											div({style: "weather-current-summary", content: "Loading forecast..."}),
 										])
 									}),
 								])
 							}),
-							div({style: "weather-last-updated", content: "Fetching latest conditions"}),
+							div({style: "weather-location margin-top", content: state.locationLabel}),
 						])
 					}),
-					div({
-						style: "weather-stat-grid", content: children([
-							div({
-								style: "weather-stat-card bordered radius padded shadowed",
-								content: children([div({
-									style: "weather-stat-label faded",
-									content: "Feels like"
-								}), div({style: "weather-stat-value weather-feels-like", content: "--\u00B0F"})])
+					div({style: "weather-stat-grid", content: children([
+							div({style: "weather-stat-card bordered radius padded shadowed", content: children([
+								div({style: "weather-stat-label faded", content: "Feels like"}),
+								div({style: "weather-stat-value weather-feels-like", content: "--\u00B0F"})])
 							}),
-							div({
-								style: "weather-stat-card bordered radius padded shadowed",
-								content: children([div({
-									style: "weather-stat-label faded",
-									content: "Humidity"
-								}), div({style: "weather-stat-value weather-humidity", content: "--"})])
+							div({style: "weather-stat-card bordered radius padded shadowed", content: children([
+								div({style: "weather-stat-label faded", content: "Humidity"}),
+								div({style: "weather-stat-value weather-humidity", content: "--"})])
 							}),
-							div({
-								style: "weather-stat-card bordered radius padded shadowed",
-								content: children([div({
-									style: "weather-stat-label faded",
-									content: "Wind"
-								}), div({style: "weather-stat-value weather-wind", content: "--"})])
+							div({style: "weather-stat-card bordered radius padded shadowed", content: children([
+								div({style: "weather-stat-label faded", content: "Wind"}),
+								div({style: "weather-stat-value weather-wind", content: "--"})])
 							}),
 						])
 					})
 				])
 			}),
 			div({style: "weather-error padded hidden radius", content: "Weather unavailable right now."}),
-			div({
-				style: "weather-panels", content: children([
-					div({
-						style: "weather-panel padded", content: children([
+			div({style: "weather-panels", content: children([
+					div({style: "weather-panel padded", content: children([
 							h({level: 3, style: "weather-panel-title", content: "Next Hours"}),
-							div({
-								style: "weather-hourly-list",
-								content: div({style: "weather-empty-state", content: "Waiting for forecast data..."})
-							})
+							div({style: "weather-hourly-list", content: div({style: "weather-empty-state", content: "Waiting for forecast data..."})})
 						])
 					}),
-					div({
-						style: "weather-panel padded", content: children([
+					div({style: "weather-panel padded", content: children([
 							h({level: 3, style: "weather-panel-title", content: "Extended Forecast"}),
-							div({
-								style: "weather-daily-list",
-								content: div({style: "weather-empty-state", content: "Waiting for forecast data..."})
-							})
+							div({style: "weather-daily-list", content: div({style: "weather-empty-state", content: "Waiting for forecast data..."})})
 						])
 					})
 				])
@@ -511,8 +485,7 @@
 					style: "weather-day-copy",
 					content: children([div({style: "weather-day-label", content: day.label || "Day"})])
 				}),
-				div({
-					style: "weather-day-temps padded", content: children([
+				div({style: "weather-day-temps padded", content: children([
 						div({style: "weather-day-high inline", content: formatTemperature(day.high)}),
 						div({style: "weather-day-low inline faded", content: formatTemperature(day.low)}),
 						div({style: "weather-day-rain faded brick", content: formatPercent(day.precipitationChance)}),
@@ -521,10 +494,7 @@
 				div({style: "weather-day-summary faded", content: day.description || "Forecast unavailable"}),
 			])
 		}));
-		dailyListNode.innerHTML = dailyRows.length ? children(dailyRows) : div({
-			style: "weather-empty-state",
-			content: "Extended forecast unavailable."
-		});
+		dailyListNode.innerHTML = dailyRows.length ? children(dailyRows) : div({style: "weather-empty-state", content: "Extended forecast unavailable."});
 	};
 
 	const subscribePortal = (windowNode, routeContext) => {
@@ -541,8 +511,8 @@
 			hints: ["weather", "forecast", "temperature", "rain"],
 			dimensions: [900, 620],
 			navigation: false,
-			icon: WEATHER_INTERFACE_ICON,
-			svg_icon: WEATHER_ICON,
+			icon: "/icons/interfaces/weather.png",
+			svg_icon: modular.icons.weather,
 			tools: [{
 				title: "Set weather location",
 				icon: LOCATION_ICON,

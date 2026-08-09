@@ -10,8 +10,6 @@
 		}
 	};
 	const OPERATOR_LABELS = {"/": "÷", "*": "×", "-": "−", "+": "+", "^": "xʸ"};
-	const SCIENTIFIC_MODE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.745 3A23.933 23.933 0 0 0 3 12c0 3.183.62 6.22 1.745 9M19.5 3c.967 2.78 1.5 5.817 1.5 9s-.533 6.22-1.5 9M8.25 8.885l1.444-.89a.75.75 0 0 1 1.105.402l2.402 7.206a.75.75 0 0 0 1.104.401l1.445-.889m-8.25.75.213.09a1.687 1.687 0 0 0 2.062-.617l4.45-6.676a1.688 1.688 0 0 1 2.062-.618l.213.09"/></svg>`;
-	const CONVERTER_MODE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>`;
 	const MAX_INPUT_LENGTH = 15;
 	const CONVERSION_GROUPS = {
 		length: {label: "Length", units: [["Metres", "m", 1], ["Kilometres", "km", 1000], ["Centimetres", "cm", .01], ["Millimetres", "mm", .001], ["Miles", "mi", 1609.344], ["Yards", "yd", .9144], ["Feet", "ft", .3048], ["Inches", "in", .0254]]},
@@ -366,7 +364,7 @@
 				<input id="calculator-converter-input" data-converter-role="input" type="number" inputmode="decimal" step="any" value="${escapeAttribute(converterInput)}" aria-label="Value to convert">
 				${converterDropdown({role: "from", value: converterFrom, units: group.units, ariaLabel: "Convert from", includeCode: converterCategory === "currency"})}
 			</div>
-			<button type="button" class="calculator-converter-swap hover-zoom" data-converter-action="swap" title="Swap units" aria-label="Swap units">${CONVERTER_MODE_ICON}</button>
+			<button type="button" class="calculator-converter-swap hover-zoom" data-converter-action="swap" title="Swap units" aria-label="Swap units"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg></button>
 			<div class="calculator-converter-row calculator-converter-result-row">
 				<output id="calculator-converter-result" aria-live="polite">—</output>
 				${converterDropdown({role: "to", value: converterTo, units: group.units, ariaLabel: "Convert to", includeCode: converterCategory === "currency"})}
@@ -613,11 +611,11 @@
 		resizable: false,
 		tools: [{
 			title: "Scientific calculator mode",
-			icon: SCIENTIFIC_MODE_ICON,
+			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.745 3A23.933 23.933 0 0 0 3 12c0 3.183.62 6.22 1.745 9M19.5 3c.967 2.78 1.5 5.817 1.5 9s-.533 6.22-1.5 9M8.25 8.885l1.444-.89a.75.75 0 0 1 1.105.402l2.402 7.206a.75.75 0 0 0 1.104.401l1.445-.889m-8.25.75.213.09a1.687 1.687 0 0 0 2.062-.617l4.45-6.676a1.688 1.688 0 0 1 2.062-.618l.213.09"/></svg>`,
 			onclick: toggleScientificMode
 		}, {
 			title: "Converter mode",
-			icon: CONVERTER_MODE_ICON,
+			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>`,
 			onclick: toggleConverterMode
 		}],
 		svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3.75h10.5a2.25 2.25 0 0 1 2.25 2.25v12a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 18V6a2.25 2.25 0 0 1 2.25-2.25Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 7.5h9M8.25 11.25h.008v.008H8.25v-.008Zm3.75 0h.008v.008H12v-.008Zm3.75 0h.008v.008h-.008v-.008ZM8.25 15h.008v.008H8.25V15Zm3.75 0h.008v.008H12V15Zm3.75 0h.008v.008h-.008V15Z"/></svg>`,

@@ -498,6 +498,7 @@ function applyCommonAttributes(el, n) {
 	if (n.primary) el.setAttribute("primary", n.primary);
 	if (n.id) el.id = n.id;
 	if (n.contenteditable) el.setAttribute("contenteditable", n.contenteditable);
+	if (n.draggable !== undefined) el.draggable = Boolean(n.draggable);
 	if (n.value) el.setAttribute("value", n.value);
 	if (n.data) el.setAttribute("data", n.data);
 	if (n.handle !== undefined && n.handle !== null) el.setAttribute("handle", String(n.handle));

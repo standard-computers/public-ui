@@ -169,6 +169,23 @@
         const type = String(file?.type || file?.kind || file?.entryType || "").trim().toLowerCase();
         return type === "directory" || type === "folder" || type === "dir";
     };
+    const FILE_SHORTCUT_DRAG_TYPE = "application/x-standard-file-shortcut";
+    const initializeFileShortcutDrag = () => {
+        if (window.__stdFilesShortcutDragInitialized) return;
+        window.__stdFilesShortcutDragInitialized = true;
+        document.addEventListener("dragstart", event => {
+            const tile = event.target?.closest?.(".files-file-item[draggable=\"true\"]");
+            if (!tile || !event.dataTransfer) return;
+            const path = String(tile.getAttribute("directive") || "").trim();
+            if (!path) return event.preventDefault();
+            const name = String(tile.querySelector(".files-file-name")?.textContent || path.split(/[\\/]/).pop() || "File").trim();
+            event.dataTransfer.effectAllowed = "copy";
+            event.dataTransfer.setData(FILE_SHORTCUT_DRAG_TYPE, JSON.stringify({path, name}));
+            event.dataTransfer.setData("text/plain", path);
+        });
+        document.addEventListener("dragend", () => document.body.classList.remove("drag-active"));
+    };
+    initializeFileShortcutDrag();
     let fileSortMode = "name-asc";
     const FILE_DISPLAY_STYLES = [{
         id: "rows",
@@ -732,8 +749,15 @@
                 const trimmedName = String(folderName || "").trim();
                 if (!trimmedName) return;
                 const targetPath = baseDirectory ? `${String(baseDirectory).replace(/\/+$/, "")}/${trimmedName}` : trimmedName;
-                await CLI.send(CLI.buildFilesCommand("folders", targetPath));
-                await refreshFilesAfterMutation();
+                const progressToken = window.StandardDownloads?.beginOpenProgress?.(`Creating ${trimmedName}`) || 0;
+                try {
+                    await CLI.send(CLI.buildFilesCommand("folders", targetPath));
+                    await refreshFilesAfterMutation();
+                    window.StandardDownloads?.hideOpenProgress?.(progressToken);
+                } catch (error) {
+                    window.StandardDownloads?.hideOpenProgress?.(progressToken);
+                    throw error;
+                }
             }
         });
     };
@@ -1310,6 +1334,7 @@
             as.push(div({
                 style: "padded secondary-tile brick list-item hidden file-folder files-file-item",
                 directive: file.path,
+                draggable: !isDirectory(file),
                 content: children([img({style: "margined-icon float-left no-events files-file-icon", src: getFileTypeIconPath(file)}), div({style: "files-file-copy", content: children([div({style: "no-events files-file-name", content: file.name}), em({style: "faded no-wrap hidden files-file-detail", content: file.path.replace("/home/standard-system/", "")})])})]),
                 onclick: () => {
                     if (!isDirectory(file) || !openDirectories) {

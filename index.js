@@ -88,6 +88,7 @@ const pushSubscribers = new Set();
 const userSessions = new Map();
 const knownUsernames = new Map();
 const knownUserFolders = new Map();
+const loginProfileRecordIds = new Set();
 let fileDownloadQueue = Promise.resolve();
 let fileUploadQueue = Promise.resolve();
 const AUTO_UPLOAD_FOLDERS_BY_EXTENSION = {
@@ -622,7 +623,15 @@ function extractUsers(data) {
             );
             const userFolder = sanitizeUserId(item.userid || item.userId || userId || item.id || "");
             if (!userId) return null;
-            return {userId, username, userFolder: userFolder || userId};
+            const recordId = `${item.id || ""}`.trim().replace(/[^a-zA-Z0-9_-]/g, "");
+            return {
+                userId,
+                username,
+                userFolder: userFolder || userId,
+                recordId,
+                displayName: displayName || `${item.displayName || item.name || item.username || item.email || userId}`.trim(),
+                hasPassword: `${item.hash ?? ""}`.trim().length > 0
+            };
         })
         .filter(Boolean);
 }
@@ -1618,7 +1627,7 @@ function stopLocalHostnameAdvertisement() {
     bonjour = null;
 }
 
-app.get("/login", (req, res) => {
+app.get("/login", async (req, res) => {
     if (isDemoMode) {
         return res.redirect("/");
     }
@@ -1631,7 +1640,25 @@ app.get("/login", (req, res) => {
     if (req.session && req.session.userId) {
         return res.redirect("/");
     }
-    res.render("login", {error: req.query?.error || null});
+    const users = await refreshUsersFromSocket(req);
+    loginProfileRecordIds.clear();
+    users.forEach(user => {
+        if (user.recordId) loginProfileRecordIds.add(user.recordId);
+    });
+    res.render("login", {
+        error: req.query?.error || null,
+        multipleUsers: users.length > 1,
+        users
+    });
+});
+
+app.get("/login/profile-image/:recordId", (req, res) => {
+    const recordId = `${req.params.recordId || ""}`.trim().replace(/[^a-zA-Z0-9_-]/g, "");
+    if (!recordId || !loginProfileRecordIds.has(recordId)) {
+        return res.sendStatus(404);
+    }
+    req.params.recordId = recordId;
+    return streamRecordContent(req, res, {contentType: "image/*", requestLabel: "login profile image"});
 });
 
 function wantsLoginJson(req) {
@@ -1673,12 +1700,26 @@ app.post("/login", async (req, res) => {
     const refreshedUser = matchedUser || refreshedUsers.find(user => sanitizeUserId(user.userId) === userId);
     const userFolder = knownUserFolders.get(userId) || refreshedUser?.userFolder || userId;
     try {
+        const userRecord = await fetchUserRecordById(userId);
+        if (!userRecord) {
+            return redirectLoginError(req, res, "Unable to verify user", 503);
+        }
+        const storedHash = typeof userRecord?.hash === "string" ? userRecord.hash : "";
+        if (storedHash.trim()) {
+            const password = `${req.body.password || req.body.psswd || ""}`;
+            if (!password) {
+                return redirectLoginError(req, res, "Password is required", 400);
+            }
+            const providedHash = crypto.createHash("md5").update(password).digest("hex");
+            if (providedHash !== storedHash) {
+                return redirectLoginError(req, res, "Incorrect password", 401);
+            }
+        }
         await ensureUserDir(userFolder);
         req.session = setSession(res, userId, userFolder);
         res.cookie("uid", userId, {sameSite: "lax", path: "/", maxAge: 1000 * 60 * 60 * 24 * 30});
         res.cookie("loginUsername", username, {sameSite: "lax", path: "/", maxAge: 1000 * 60 * 60 * 24 * 30});
         try {
-            const userRecord = await fetchUserRecordById(userId);
             setCachedUserRecord(req.session, userRecord);
             writeUserDataCookie(res, userRecord);
         } catch (err) {

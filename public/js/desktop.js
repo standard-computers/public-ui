@@ -22,6 +22,7 @@
     const FILE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776h16.5M3.75 9.776V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776l-1 8.5a2.25 2.25 0 0 1-2.235 1.974H6.985a2.25 2.25 0 0 1-2.235-1.974l-1-8.5Z"/></svg>`;
     const LINK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M3.5 12h17M12 3c2.2 2.45 3.3 5.45 3.3 9S14.2 18.55 12 21M12 3C9.8 5.45 8.7 8.45 8.7 12S9.8 18.55 12 21"/></svg>`;
     const APP_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25A2.25 2.25 0 0 1 8.25 10.5H6A2.25 2.25 0 0 1 3.75 8.25V6ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z"/></svg>`;
+    const FILE_SHORTCUT_DRAG_TYPE = "application/x-standard-file-shortcut";
 
     const finite = (value, fallback = 0) => {
         const parsed = typeof value === "string" ? Number.parseFloat(value) : Number(value);
@@ -249,6 +250,27 @@
         canvas.querySelectorAll(".desktop-shortcut").forEach(node => node.remove());
         state.shortcuts = state.shortcuts.map(normalizeShortcut);
         state.shortcuts.forEach(renderShortcut);
+    }
+
+    function createShortcutAt(details = {}, point = {}) {
+        const shortcut = normalizeShortcut({...details, x: finite(point.x), y: finite(point.y)});
+        state.shortcuts.push(shortcut);
+        const node = renderShortcut(shortcut);
+        setSelected([node]);
+        scheduleSave(0);
+        return shortcut;
+    }
+
+    function isFileShortcutDrag(event) {
+        return Array.from(event.dataTransfer?.types || []).includes(FILE_SHORTCUT_DRAG_TYPE);
+    }
+
+    function allowFileShortcutDrop(event) {
+        if (!isFileShortcutDrag(event) || !isBackgroundTarget(event.target)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+        document.body.classList.remove("drag-active");
     }
 
     function closePanel() {
@@ -497,6 +519,23 @@
     viewport.addEventListener("pointermove", movePointerInteraction);
     viewport.addEventListener("pointerup", finishPointerInteraction);
     viewport.addEventListener("pointercancel", finishPointerInteraction);
+    viewport.addEventListener("dragenter", allowFileShortcutDrop);
+    viewport.addEventListener("dragover", allowFileShortcutDrop);
+    viewport.addEventListener("drop", event => {
+        if (!isFileShortcutDrag(event) || !isBackgroundTarget(event.target)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        document.body.classList.remove("drag-active");
+        try {
+            const draggedFile = JSON.parse(event.dataTransfer.getData(FILE_SHORTCUT_DRAG_TYPE));
+            const target = String(draggedFile?.path || "").trim();
+            if (!target) throw new Error("Missing file path");
+            createShortcutAt({title: draggedFile?.name, target}, clientToWorld({x: event.clientX, y: event.clientY}));
+        } catch (error) {
+            console.error("Failed to create a desktop file shortcut", error);
+            modular?.error?.("Unable to create the desktop shortcut");
+        }
+    });
     cursorButton.addEventListener("click", event => { event.stopPropagation(); setTool("cursor"); });
     handButton.addEventListener("click", event => { event.stopPropagation(); setTool("hand"); });
     newButton.addEventListener("click", event => {
@@ -552,6 +591,7 @@
             const point = clientToWorld({x: window.innerWidth / 2, y: window.innerHeight - 150});
             openPinPanel(point, null, details);
         },
+        createShortcutAt,
         goTo: goToWorldPoint
     };
 
