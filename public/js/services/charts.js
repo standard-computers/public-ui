@@ -30,6 +30,11 @@
 	const FONT_FAMILIES = ["Inter", "Arial", "Georgia", "Courier New", "Times New Roman", "Trebuchet MS", "Verdana"];
 
 	const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 72, 96];
+	const CONNECTOR_STYLE_OPTIONS = [
+		{label: "Straight", value: "straight"},
+		{label: "Vertexed", value: "vertexed"},
+		{label: "Curved", value: "curved"}
+	];
 
 	const ALIGN_ICONS = {
 		left: modular.icons.left,
@@ -426,7 +431,13 @@
             <span class="charts-toolbar-separator"></span>
             <button class="naked charts-tool-button" data-action="shape" title="Draw shape">${modular.icons.shapes}</button>
             <button class="naked charts-tool-button" data-action="text" title="Draw text box">${TEXT_ICON}</button><button class="naked charts-tool-button" data-action="image" title="Insert image">${modular.icons.image}</button>
-            <select data-action="connector-style" title="Chart connector style"><option value="straight">Straight</option><option value="vertexed">Vertexed</option><option value="curved">Curved</option></select>
+            ${dropdown({
+				id: "charts-connector-style",
+				style: "charts-connector-style",
+				ariaLabel: "Chart connector style",
+				value: documentState.connectorStyle,
+				options: CONNECTOR_STYLE_OPTIONS
+			})}
             <label class="charts-bg-label" title="Chart background">Canvas <input data-action="background" type="color" value="#f5f6f8"></label>
           </div>
           <div class="charts-stage bordered radius shadowed" tabindex="0"><div class="charts-world"><svg class="charts-connectors"><defs><marker id="charts-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="context-stroke"/></marker></defs><g class="charts-lines"></g></svg><div class="charts-items"></div></div><div class="charts-hint">Wheel to zoom · drag empty space to pan · double-click shapes or lines to edit text</div></div>
@@ -643,7 +654,12 @@
 
 		const render = () => {
 			root.querySelector('[data-action="background"]').value = documentState.background;
-			root.querySelector('[data-action="connector-style"]').value = documentState.connectorStyle;
+			const connectorStyleControl = root.querySelector("#charts-connector-style");
+			if (connectorStyleControl) {
+				connectorStyleControl.value = documentState.connectorStyle;
+				const selectedOption = CONNECTOR_STYLE_OPTIONS.find(option => option.value === documentState.connectorStyle) || CONNECTOR_STYLE_OPTIONS[0];
+				connectorStyleControl.querySelector(".plastic-dropdown-label").textContent = selectedOption.label;
+			}
 			stage.style.backgroundColor = documentState.background;
 			applyViewport();
 			renderLines();
@@ -1003,8 +1019,8 @@
 			render();
 		};
 
-		root.querySelector('[data-action="connector-style"]').onchange = event => {
-			documentState.connectorStyle = event.target.value;
+		root.querySelector("#charts-connector-style").onchange = event => {
+			documentState.connectorStyle = event.currentTarget.value || "straight";
 			render();
 		};
 

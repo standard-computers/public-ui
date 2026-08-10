@@ -873,6 +873,7 @@ button.people-user-photo-button svg,.people-user-photo-image {display:block;widt
 .charts-toolbar .editor-font-family-combo {width:132px}.charts-toolbar .editor-font-size-combo {width:64px}
 .charts-toolbar input[type="color"] {width:32px;height:28px;padding:2px;border:1px solid var(--border);border-radius:calc(var(--radius) - 5px);background:var(--bg)}
 .charts-toolbar button {min-height:30px;padding:4px 8px}.charts-toolbar button.active {background:var(--hover-bg);color:var(--primary)}
+.charts-toolbar .charts-connector-style {min-width:112px}
 .charts-toolbar-separator {height:24px;border-left:1px solid var(--border);margin:0 3px}.charts-bg-label {display:flex;align-items:center;gap:5px;font-size:calc(var(--fs) - 2px)}
 .charts-stage {position:relative;flex:1;min-height:420px;overflow:hidden;cursor:grab;touch-action:none;background-image:radial-gradient(circle,rgba(100,110,130,.22) 1px,transparent 1px);background-size:24px 24px;outline:none}
 .charts-stage.charts-drawing {cursor:crosshair}.charts-tool-button svg {display:block}

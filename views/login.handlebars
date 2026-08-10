@@ -13,14 +13,14 @@
             body {color:var(--fg);background:var(--bg);font-family:Inter, "Open Sans", sans-serif}
             .core-login {position:relative;z-index:1;box-sizing:border-box;display:flex;min-height:100vh;width:min(760px, calc(100% - 32px));margin:0 auto;padding:80px 0;align-items:center;justify-content:center}
             .login-panel {width:100%;text-align:center}
-            .login-title {margin:0 0 34px;font-size:28px;font-weight:500}
+            .login-title {margin:0 0 34px;font-size:28px}
             .user-list {display:flex;flex-wrap:wrap;justify-content:center;gap:40px;margin:0 auto}
             .user-choice {appearance:none;display:flex;flex-direction:column;align-items:center;width:96px;min-width:96px;margin:0;padding:0;color:var(--fg);border:0;background:transparent;box-shadow:none;cursor:pointer}
             .user-choice:hover, .user-choice:focus, .user-choice.selected {background:transparent;transform:none;outline:none}
-            .user-photo {box-sizing:border-box;display:block;width:95px;height:95px;overflow:hidden;border:2px solid rgba(255,255,255,.76);border-radius:50%;background:#e5e9ec url('/images/blank_contact.png') center/cover no-repeat;box-shadow:0 7px 22px rgba(14,44,65,.3);transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease}
+            .user-photo {box-sizing:border-box;display:block;width:95px;height:95px;overflow:hidden;border:1px solid rgba(255,255,255,.76);border-radius:50%;background:#e5e9ec url('/images/blank_contact.png') center/cover no-repeat;box-shadow:0 7px 22px rgba(14,44,65,.3);transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease}
             .user-choice:hover .user-photo, .user-choice:focus .user-photo, .user-choice.selected .user-photo {transform:translateY(-3px) scale(1.04);border-color:#fff;box-shadow:0 10px 28px rgba(8,35,55,.42), 0 0 0 4px rgba(255,255,255,.18)}
             .user-photo img {display:block;width:100%;height:100%;object-fit:cover}
-            .user-name {display:block;max-width:100%;margin-top:9px;font-size:13px;line-height:1.25;overflow-wrap:anywhere}
+            .user-name {display:block;max-width:100%;line-height:1.25;overflow-wrap:anywhere}
             .password-area, .manual-login {box-sizing:border-box;width:min(340px, 100%);margin:28px auto 0}
             .password-area[hidden] {display:none}
             .password-label {display:block;margin:0 0 10px;font-size:14px}
@@ -48,11 +48,11 @@
                 <h1 class="login-title" id="login-title">Hello</h1>
                 <div class="user-list" role="list" aria-label="Choose a user">
                     {{#each users}}
-                    <button class="user-choice" type="button" role="listitem" data-user-id="{{userId}}" data-username="{{username}}" data-name="{{displayName}}" data-has-password="{{hasPassword}}" aria-label="Log in as {{displayName}}">
+                    <button class="user-choice larger" type="button" role="listitem" data-user-id="{{userId}}" data-username="{{username}}" data-name="{{displayName}}" data-has-password="{{hasPassword}}" aria-label="Log in as {{displayName}}">
                         <span class="user-photo">
                             {{#if recordId}}<img src="/login/profile-image/{{recordId}}" alt="" onerror="this.style.display='none'"/>{{/if}}
                         </span>
-                        <span class="user-name">{{displayName}}</span>
+                        <div class="user-name larger margin-top">{{firstName}}</div>
                     </button>
                     {{/each}}
                 </div>

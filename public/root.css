@@ -67,7 +67,6 @@ img {-webkit-user-drag:none;user-select:none}
 .background-primary {background-color:var(--primary) !important}
 .background-secondary {background-color:var(--secondary-bg) !important}
 .background-border {background-color:var(--border) !important}
-
 .faded-background-primary {background-color:rgba(13, 125, 175, 0.24) !important;backdrop-filter:opacity(0.5)}
 
 /*TEXT MODIFICATIONS*/
@@ -91,6 +90,7 @@ img {-webkit-user-drag:none;user-select:none}
 .scroller {overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none}
 .scroller::-webkit-scrollbar {display:none}
 .smaller {font-size:calc(var(--fs) - 4px)}
+.larger {font-size:calc(var(--fs) + 2px)}
 .bold {font-weight:bold}
 
 /*BORDER COLORS*/

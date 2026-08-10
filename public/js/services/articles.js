@@ -242,16 +242,17 @@
                     }
                 }
             ],
-            //<img class="article-icon internals-article-icon" src="${escapeHtml(articleImage(article))}" onerror="this.onerror=null;this.src='${DEFAULT_ARTICLE_ICON}'" alt="${escapeHtml(title)}"><div class="internals-article-content">${renderContent(article.content)}</div>`})
+            //<img class="article-icon internals-article-icon" src="${escapeHtml(articleImage(article))}" onerror="this.onerror=null;this.src='${DEFAULT_ARTICLE_ICON}'" alt="${escapeHtml(title)}">
             route: () => div({style: "large-padding-top small-padding", content: children([
                     div({style: "internals-article-preview padded", content: children([
+                            div({style: "float-right inner-radius background-secondary faded small-padding smaller", content: escapeHtml(article.description || "")}),
                             img({style: "article-icon internals-article-icon", src: escapeHtml(articleImage(article))}),
                             div({style: "internals-article-header", content: children([
                                     h({level: 2, content: article.title}),
-                                    a({style: "", src: link, content: link}),
+                                    a({style: "no-wrap", src: link, content: link}),
                                 ])
                             }),
-                            div({style: "", content: article.content}),
+                            div({style: "", content: renderContent(article.content)}),
                             div({style: "internals-article-meta"}),
                             a({style: "", src: source, content: source}),
                             div({style: "smaller faded margin-top", content: `Priority ${escapeHtml(article.priority)} · ${escapeHtml(article.created)}`}),
@@ -317,15 +318,15 @@
 
     const renderArticleList = articles => div({style: "articles-list", content: children(articles.map(article => {
         articleListRecords.set(String(article.id || ""), article);
-        return div({
-            style: "article-tile padded secondary-tile bordered line margin-top small-spaced hover-shadowed radius", data: String(article.id || ""), onclick: event => {
+        return div({style: "article-tile padded hidden secondary-tile bordered line margin-top small-spaced hover-shadowed radius", data: String(article.id || ""), onclick: event => {
                 if (event.target.closest("button")) return;
                 openArticle(article);
             }, content: children([
-                img({style: "article-icon articles-list-icon inline", src: articleImage(article)}),
+                img({style: "article-icon articles-list-icon float-left", src: articleImage(article)}),
                 div({style: "float-right inner-radius background-secondary faded small-padding smaller", content: escapeHtml(article.description || "")}),
                 strong({content: escapeHtml(article.title || "Untitled Article")}),
-                div({content: escapeHtml(article.content || "")}),
+                (article.link ? div({style: "no-wrap", content: a({style: "faded", src: article.link, content: article.link})}) : ""),
+                (article.content ? div({style: "padding-top padding-bottom", content: escapeHtml(article.content || "")}) : ""),
                 div({style: "smaller faded", content: `Priority ${escapeHtml(article.priority)} · ${escapeHtml(article.created || "")}`})
             ])
         });

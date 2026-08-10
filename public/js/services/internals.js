@@ -380,20 +380,11 @@
         const root = portal?.window?.() || document;
         const previewHost = root.querySelector("#internals-image-preview-host");
         if (!previewHost) return;
-        previewHost.innerHTML = "";
+        previewHost.replaceChildren();
         activeImageNeedsWindowAutosize = false;
-        const svgMarkup = getSvgMarkupFromSource(activeImageFileSource);
         const shouldRenderSvg = SVG_FILE_PATTERN.test(String(activeImageFilePath || ""));
-        if (shouldRenderSvg) {
-            previewHost.innerHTML = svgMarkup || String(activeImageFileSource || "");
-            const svgPreview = previewHost.querySelector("svg");
-            if (svgPreview) {
-                svgPreview.style.display = "block";
-                svgPreview.style.borderRadius = "inherit";
-                autoSizeImagePortalToImage(svgPreview, {resizeWindow: autoSizeWindow, portal});
-                bindImageStats(svgPreview, portal);
-            }
-        } else if (activeImageFileSource) {
+        const imageSource = shouldRenderSvg ? getInertSvgImageSource(activeImageFileSource) : activeImageFileSource;
+        if (imageSource) {
             const imagePreview = document.createElement("img");
             imagePreview.className = "radius";
             imagePreview.style.display = "";
@@ -402,7 +393,7 @@
                 autoSizeImagePortalToImage(imagePreview, {resizeWindow: autoSizeWindow, portal});
                 bindImageStats(imagePreview, portal);
             };
-            imagePreview.src = activeImageFileSource;
+            imagePreview.src = imageSource;
             previewHost.appendChild(imagePreview);
             if (imagePreview.complete && imagePreview.naturalWidth > 0 && imagePreview.naturalHeight > 0) {
                 autoSizeImagePortalToImage(imagePreview, {resizeWindow: autoSizeWindow, portal});
@@ -551,6 +542,11 @@
         } catch (_) {
             return "";
         }
+    };
+    const getInertSvgImageSource = (source = "") => {
+        const svgMarkup = getSvgMarkupFromSource(source);
+        if (!svgMarkup) return "";
+        return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
     };
     const getSvgIntrinsicSize = (markup = "") => {
         const svgMarkup = String(markup || "").trim();

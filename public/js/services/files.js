@@ -604,6 +604,21 @@
         const download = await downloadFileForOpen(rawPath);
         return openCodeFilePath(download.path, await download.blob.text(), sourceNode);
     };
+    const runSuiFilePath = async (rawPath = "") => {
+        if (!/\.sui$/i.test(String(rawPath || ""))) return false;
+        const runSuiSource = await waitForServiceMethod(() => window.StandardCodeEditor?.runSuiSource, "com.standard.editor.code");
+        if (!runSuiSource) {
+            modular.error("The Code Editor service is not ready");
+            return false;
+        }
+        try {
+            const download = await downloadFileForOpen(rawPath);
+            return runSuiSource(await download.blob.text(), download.path);
+        } catch (error) {
+            modular.error(error?.message || `Unable to run ${String(rawPath).split("/").pop() || "SUI file"}`);
+            return false;
+        }
+    };
     const openPdfInInternalsApp = async (rawPath = "", sourceNode = null) => {
         const openPdfFilePath = await waitForServiceMethod(() => window.StandardInternals?.openPdfFilePath, "com.standard.internals");
         if (!openPdfFilePath) return false;
@@ -668,6 +683,7 @@
     window.StandardFiles = window.StandardFiles || {};
     window.StandardFiles.openFilePath = (rawPath = "", sourceNode = null) => openFilePath(rawPath, sourceNode);
     window.StandardFiles.openFileBlob = (name = "", blob = null, sourceNode = null) => openFileBlob(name, blob, sourceNode);
+    window.StandardFiles.runSuiFilePath = (rawPath = "") => runSuiFilePath(rawPath);
     window.StandardFiles.getFileTypeIconPath = (fileLike = {}) => getFileTypeIconPath(fileLike);
     const getFilePathForRemoveCommand = (rawPath = "") => {
         return String(rawPath || "").replace(/^\/home\/standard-system\//, "");
@@ -974,6 +990,14 @@
         action: (b, e, el) => {
             const path = el.closest(".file-folder")?.getAttribute("directive");
             openFilePath(path, el);
+        }
+    }, {
+        icon: modular.icons.play,
+        label: "Run",
+        visible: (b, el) => /\.sui$/i.test(el?.closest?.(".file-folder")?.getAttribute("directive") || ""),
+        action: (b, e, el) => {
+            const path = el.closest(".file-folder")?.getAttribute("directive");
+            runSuiFilePath(path);
         }
     }, {
         icon: modular.icons.create,

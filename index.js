@@ -630,6 +630,7 @@ function extractUsers(data) {
                 username,
                 userFolder: userFolder || userId,
                 recordId,
+                firstName: item.firstname || "",
                 displayName: displayName || `${item.displayName || item.name || item.username || item.email || userId}`.trim(),
                 hasPassword: `${item.hash ?? ""}`.trim().length > 0
             };

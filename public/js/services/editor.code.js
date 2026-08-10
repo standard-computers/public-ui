@@ -889,22 +889,27 @@
         return executedLineCount;
     };
 
-    const runSuiCode = async (portal) => {
-        const directive = getPortalRememberedCodePath(portal);
-        if (!SUI_FILE_PATTERN.test(directive)) return false;
-        const source = getPortalCodeEditorInput(portal)?.value ?? getPortalCodeState(portal).cachedContent;
+    const runSuiSource = async (source = "", rawPath = "") => {
+        const fileName = getCodeFileName(rawPath) || "SUI file";
         if (!String(source || "").trim()) {
             modular.error("SUI file is empty");
             return false;
         }
         try {
             const executedLineCount = await executeSuiSource(source);
-            modular.success(`Ran ${getCodeFileName(directive)} (${executedLineCount} ${executedLineCount === 1 ? "action" : "actions"})`);
+            modular.success(`Ran ${fileName} (${executedLineCount} ${executedLineCount === 1 ? "action" : "actions"})`);
             return true;
         } catch (error) {
-            modular.error(error?.message || `Unable to run ${getCodeFileName(directive)}`);
+            modular.error(error?.message || `Unable to run ${fileName}`);
             return false;
         }
+    };
+
+    const runSuiCode = async (portal) => {
+        const directive = getPortalRememberedCodePath(portal);
+        if (!SUI_FILE_PATTERN.test(directive)) return false;
+        const source = getPortalCodeEditorInput(portal)?.value ?? getPortalCodeState(portal).cachedContent;
+        return runSuiSource(source, directive);
     };
 
     const openFreshCodeEditor = () => {
@@ -920,6 +925,7 @@
 
     window.StandardCodeEditor = window.StandardCodeEditor || {};
     window.StandardCodeEditor.openFreshCodeEditor = openFreshCodeEditor;
+    window.StandardCodeEditor.runSuiSource = (source = "", rawPath = "") => runSuiSource(source, rawPath);
     window.StandardCodeEditor.openCodeFilePath = (rawPath = "", content = "") => {
         const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
         if (portal) {

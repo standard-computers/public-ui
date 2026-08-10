@@ -206,6 +206,16 @@
         if (Number.isFinite(x) && Number.isFinite(y)) goToWorldPoint({x, y});
     }
 
+    async function runSuiShortcut(shortcut) {
+        if (shortcut?.type !== "file" || !/\.sui$/i.test(shortcut.target)) return false;
+        let runner = window.StandardFiles?.runSuiFilePath;
+        if (!runner && typeof modular?.show === "function") modular.show("com.standard.files", 0);
+        runner = runner || await waitFor(() => window.StandardFiles?.runSuiFilePath);
+        if (runner) return runner(shortcut.target);
+        modular?.error?.("The Files service is not ready");
+        return false;
+    }
+
     function removeShortcut(id) {
         const index = state.shortcuts.findIndex(shortcut => shortcut.id === id);
         if (index < 0) return;
@@ -234,6 +244,10 @@
         node.contextmenu([{
             label: "Open",
             action: () => openShortcut(shortcut, node)
+        }, {
+            label: "Run",
+            visible: shortcut.type === "file" && /\.sui$/i.test(shortcut.target),
+            action: () => runSuiShortcut(shortcut)
         }, {
             label: "Edit",
             action: () => openPinPanel({x: shortcut.x, y: shortcut.y}, shortcut)
