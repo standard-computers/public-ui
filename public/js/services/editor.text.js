@@ -21,6 +21,11 @@
     const TEXT_INDENT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>`;
     const TEXT_INDENT_RIGHT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.49 12 3.75 3.75m0 0-3.75 3.75m3.75-3.75H3.74V4.499"/></svg>`;
     const TEXT_INDENT_LEFT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m7.49 12-3.75 3.75m0 0 3.75 3.75m-3.75-3.75h16.5V4.499"/></svg>`;
+    const TEXT_EDITOR_SETTINGS = {
+        pages: {label: "Pages by default", type: "boolean", default: true},
+        ruler: {label: "Ruler by default", type: "boolean", default: false},
+        thumbnails: {label: "Thumbnails by default", type: "boolean", default: false}
+    };
 
     const TEXT_TEXT_COLORS = [
         {label: "Default", value: ""},
@@ -82,9 +87,16 @@
     let textEditorLayoutRefreshScheduled = false;
     let activeTextPageViewEnabled = false;
     let activeTextRulerEnabled = false;
+    let activeTextThumbnailsEnabled = false;
     let activeTextPageDimensions = {...TEXT_PAGE_DEFAULT_DIMENSIONS};
     let activeTextFooterSettings = {text: "", pageNumbers: false};
     let textEditorDeferredSyncTimer = null;
+    let textEditorAppSettingsPromise = null;
+    let textEditorDefaultViewSettings = {
+        pages: TEXT_EDITOR_SETTINGS.pages.default,
+        ruler: TEXT_EDITOR_SETTINGS.ruler.default,
+        thumbnails: TEXT_EDITOR_SETTINGS.thumbnails.default
+    };
     const resolvedTextColorCache = new Map();
     const findTextPortal = () => [...Array.from(document.querySelectorAll(".draggable-window"))].reverse().find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID)?.portal;
 
@@ -105,6 +117,7 @@
     const findTextEditorPageBackdrop = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-page-backdrop");
     const findTextEditorPageMeasure = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-page-measure");
     const findTextEditorRulerLayer = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-ruler-layer");
+    const findTextEditorThumbnailSidebar = (portal = findTextPortal()) => findTextPortalNode(portal, "#editor-text-thumbnail-sidebar");
     const normalizeTextFilePath = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
     const getTextFileName = (rawPath = "") => String(rawPath || "").split("/").pop() || "Text";
 
@@ -114,7 +127,9 @@
     };
 
     const isPlainTextFilePath = (rawPath = "") => getTextFileExtension(rawPath) === "txt";
-    const getDefaultTextDocumentPageViewPreference = (rawPath = "") => !isPlainTextFilePath(rawPath);
+    const getDefaultTextDocumentPageViewPreference = (rawPath = "") => !isPlainTextFilePath(rawPath) && textEditorDefaultViewSettings.pages !== false;
+    const getDefaultTextDocumentRulerPreference = (rawPath = "") => !isPlainTextFilePath(rawPath) && textEditorDefaultViewSettings.ruler === true;
+    const getDefaultTextDocumentThumbnailPreference = (rawPath = "") => !isPlainTextFilePath(rawPath) && textEditorDefaultViewSettings.thumbnails === true;
     const getDefaultTextFooterSettings = () => ({text: "", pageNumbers: false});
 
     const roundTextPageDimension = (value = 0, uom = "in") => {
@@ -215,6 +230,7 @@
 
     const getStoredTextDocumentPageViewPreference = (rawPath = "") => getStoredTextDocumentViewPreference(rawPath, "pageViewEnabled");
     const getStoredTextDocumentRulerPreference = (rawPath = "") => getStoredTextDocumentViewPreference(rawPath, "rulerEnabled");
+    const getStoredTextDocumentThumbnailPreference = (rawPath = "") => getStoredTextDocumentViewPreference(rawPath, "thumbnailsEnabled");
     const persistTextDocumentViewPreference = (rawPath = "", updates = {}) => {
         const normalizedPath = normalizeTextFilePath(rawPath);
         if (!normalizedPath) return false;
@@ -232,6 +248,10 @@
 
     const persistTextDocumentRulerPreference = (rawPath = "", enabled = activeTextRulerEnabled) => {
         return persistTextDocumentViewPreference(rawPath, {rulerEnabled: !!enabled});
+    };
+
+    const persistTextDocumentThumbnailPreference = (rawPath = "", enabled = activeTextThumbnailsEnabled) => {
+        return persistTextDocumentViewPreference(rawPath, {thumbnailsEnabled: !!enabled});
     };
 
     const getStoredTextDocumentPageDimensions = (rawPath = "") => {
@@ -280,6 +300,16 @@
         return activeTextRulerEnabled;
     };
 
+    const loadTextDocumentThumbnailPreference = (rawPath = "", fallback = false) => {
+        if (isPlainTextFilePath(rawPath)) {
+            activeTextThumbnailsEnabled = false;
+            return activeTextThumbnailsEnabled;
+        }
+        const storedPreference = getStoredTextDocumentThumbnailPreference(rawPath);
+        activeTextThumbnailsEnabled = typeof storedPreference === "boolean" ? storedPreference : !!fallback;
+        return activeTextThumbnailsEnabled;
+    };
+
     const loadTextDocumentFooterSettings = (rawPath = "", fallback = getDefaultTextFooterSettings()) => {
         if (isPlainTextFilePath(rawPath)) {
             activeTextFooterSettings = getDefaultTextFooterSettings();
@@ -298,9 +328,10 @@
         return activeTextPageDimensions;
     };
 
-    const loadTextDocumentViewPreferences = (rawPath = "", pageFallback = false, rulerFallback = false) => {
+    const loadTextDocumentViewPreferences = (rawPath = "", pageFallback = false, rulerFallback = false, thumbnailFallback = false) => {
         loadTextDocumentPageViewPreference(rawPath, pageFallback);
         loadTextDocumentRulerPreference(rawPath, rulerFallback);
+        loadTextDocumentThumbnailPreference(rawPath, thumbnailFallback);
         loadTextDocumentFooterSettings(rawPath);
         loadTextDocumentPageDimensions(rawPath);
     };
@@ -1114,15 +1145,13 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
     };
 
-    const hasEmbeddedTextEditorImage = (content = "") => /<img[\s\S]*?>/i.test(String(content || ""));
-
-    const encodeTextEditorContentForSave = (content = "") => {
+    const encodeTextEditorContentForSave = (content = "", rawPath = activeTextEditorFilePath) => {
         const normalizedContent = String(content ?? "");
-        return isRichTextDocument() && hasEmbeddedTextEditorImage(normalizedContent) ? encodeTextDocumentContent(normalizedContent) : normalizedContent;
+        return isRichTextDocument(rawPath) ? encodeTextDocumentContent(normalizedContent) : normalizedContent;
     };
 
-    const decodeTextEditorLoadedContent = (content = "") => {
-        return isRichTextDocument() ? decodeTextDocumentContent(String(content ?? "")) : String(content ?? "");
+    const decodeTextEditorLoadedContent = (content = "", rawPath = activeTextEditorFilePath) => {
+        return isRichTextDocument(rawPath) ? decodeTextDocumentContent(String(content ?? "")) : String(content ?? "");
     };
 
     const writeTextEditorContent = (textArea = findTextEditorNode(), content = activeTextEditorContent) => {
@@ -1144,6 +1173,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         cachedContent: activeTextEditorContent,
         pageViewEnabled: activeTextPageViewEnabled,
         rulerEnabled: activeTextRulerEnabled,
+        thumbnailsEnabled: activeTextThumbnailsEnabled,
         pageDimensions: normalizeTextPageDimensions(activeTextPageDimensions),
         footer: normalizeTextFooterSettings(activeTextFooterSettings)
     });
@@ -1164,7 +1194,8 @@ a { color: #1d4ed8; text-decoration: underline; }
         loadTextDocumentViewPreferences(
             activeTextEditorFilePath,
             typeof state?.pageViewEnabled === "boolean" ? state.pageViewEnabled : getDefaultTextDocumentPageViewPreference(activeTextEditorFilePath),
-            typeof state?.rulerEnabled === "boolean" ? state.rulerEnabled : false
+            typeof state?.rulerEnabled === "boolean" ? state.rulerEnabled : getDefaultTextDocumentRulerPreference(activeTextEditorFilePath),
+            typeof state?.thumbnailsEnabled === "boolean" ? state.thumbnailsEnabled : getDefaultTextDocumentThumbnailPreference(activeTextEditorFilePath)
         );
         if (state?.footer && typeof state.footer === "object") activeTextFooterSettings = normalizeTextFooterSettings(state.footer);
         if (state?.pageDimensions && typeof state.pageDimensions === "object") activeTextPageDimensions = normalizeTextPageDimensions(state.pageDimensions);
@@ -2359,6 +2390,139 @@ a { color: #1d4ed8; text-decoration: underline; }
         stageNode.classList.toggle("editor-text-stage-page-view", activeTextPageViewEnabled);
         return true;
     };
+    const scrollTextEditorToPage = (pageNumber = 1, portal = findTextPortal()) => {
+        const pageCard = findTextEditorPageBackdrop(portal)?.querySelector?.(`.editor-text-page-card[data-page-number="${Math.max(1, Number(pageNumber) || 1)}"]`);
+        const bodyNode = portal?.body?.();
+        if (!pageCard || !bodyNode || typeof bodyNode.scrollTo !== "function") return false;
+        const bodyRect = bodyNode.getBoundingClientRect();
+        const pageRect = pageCard.getBoundingClientRect();
+        const nextTop = bodyNode.scrollTop + pageRect.top - bodyRect.top - 18;
+        bodyNode.scrollTo({top: Math.max(0, nextTop), behavior: "smooth"});
+        return true;
+    };
+    const updateTextEditorActiveThumbnail = (portal = findTextPortal()) => {
+        const focusedPage = getFocusedTextEditorPageCard(portal);
+        const pageNumber = focusedPage?.dataset?.pageNumber || "1";
+        findTextEditorThumbnailSidebar(portal)?.querySelectorAll?.(".editor-text-thumbnail-card").forEach((thumbnailNode) => {
+            thumbnailNode.classList.toggle("active", thumbnailNode.dataset.pageNumber === pageNumber);
+        });
+        return true;
+    };
+    const prepareTextEditorThumbnailContent = (textArea = findTextEditorNode()) => {
+        if (!textArea) return null;
+        const previewContent = textArea.cloneNode(true);
+        previewContent.removeAttribute("id");
+        previewContent.removeAttribute("contenteditable");
+        previewContent.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
+        previewContent.querySelectorAll("[contenteditable]").forEach((node) => node.removeAttribute("contenteditable"));
+        previewContent.querySelectorAll(".editor-text-search-marker, .editor-text-image-handle, .editor-text-table-resize-handle").forEach((node) => node.remove());
+        previewContent.classList.add("editor-text-thumbnail-content");
+        previewContent.setAttribute("aria-hidden", "true");
+        previewContent.style.margin = "0";
+        previewContent.style.backgroundColor = "transparent";
+        previewContent.style.pointerEvents = "none";
+        return previewContent;
+    };
+    const updateTextEditorThumbnailPreviews = (sidebarNode = findTextEditorThumbnailSidebar(), portal = findTextPortal()) => {
+        const textArea = findTextEditorNode(portal);
+        if (!sidebarNode || !textArea) return false;
+        const pageSizePx = getTextPageDimensionsPx();
+        const thumbnailWidth = 70;
+        const thumbnailHeight = Math.max(1, Math.round(pageSizePx.height * (thumbnailWidth / Math.max(1, pageSizePx.width))));
+        const scale = thumbnailWidth / Math.max(1, pageSizePx.width);
+        const pagePitchPx = getTextPagePitchPx();
+        const previewSource = prepareTextEditorThumbnailContent(textArea);
+        sidebarNode.querySelectorAll(".editor-text-thumbnail-sheet").forEach((sheetNode) => {
+            const pageNumber = Math.max(1, Number(sheetNode.closest(".editor-text-thumbnail-card")?.dataset?.pageNumber || 1));
+            const previewContent = previewSource?.cloneNode(true);
+            sheetNode.style.width = `${thumbnailWidth}px`;
+            sheetNode.style.height = `${thumbnailHeight}px`;
+            sheetNode.innerHTML = "";
+            if (!previewContent) return;
+            previewContent.style.width = `${pageSizePx.width}px`;
+            previewContent.style.minWidth = `${pageSizePx.width}px`;
+            previewContent.style.maxWidth = `${pageSizePx.width}px`;
+            previewContent.style.height = textArea.style.height || `${Math.max(pageSizePx.height, textArea.scrollHeight || 0)}px`;
+            previewContent.style.minHeight = textArea.style.minHeight || previewContent.style.height;
+            previewContent.style.position = "absolute";
+            previewContent.style.left = "0";
+            previewContent.style.top = `${-((pageNumber - 1) * pagePitchPx * scale)}px`;
+            previewContent.style.transform = `scale(${scale})`;
+            previewContent.style.transformOrigin = "top left";
+            previewContent.style.pointerEvents = "none";
+            sheetNode.append(previewContent);
+            const marksLayer = document.createElement("div");
+            marksLayer.className = "editor-text-thumbnail-marks";
+            const pageTopPx = (pageNumber - 1) * pagePitchPx;
+            const pageBottomPx = pageTopPx + pageSizePx.height;
+            const editorRect = textArea.getBoundingClientRect();
+            let markCount = 0;
+            const appendMark = (rect, className = "editor-text-thumbnail-line") => {
+                if (markCount > 120) return;
+                const topPx = (rect.top - editorRect.top) + textArea.scrollTop;
+                const leftPx = (rect.left - editorRect.left) + textArea.scrollLeft;
+                if (rect.width < 2 || rect.height < 1 || topPx > pageBottomPx || topPx + rect.height < pageTopPx) return;
+                const markNode = document.createElement("span");
+                markNode.className = className;
+                markNode.style.left = `${Math.max(6, leftPx * scale)}px`;
+                markNode.style.top = `${Math.max(6, (topPx - pageTopPx) * scale)}px`;
+                markNode.style.width = `${Math.max(6, Math.min(thumbnailWidth - 12, rect.width * scale))}px`;
+                markNode.style.height = `${Math.max(1, Math.min(10, rect.height * scale))}px`;
+                marksLayer.append(markNode);
+                markCount += 1;
+            };
+            const textWalker = document.createTreeWalker(textArea, NodeFilter.SHOW_TEXT, {
+                acceptNode: (node) => (node.textContent || "").trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+            });
+            let textNode = textWalker.nextNode();
+            while (textNode) {
+                const range = document.createRange();
+                range.selectNodeContents(textNode);
+                Array.from(range.getClientRects()).forEach((rect) => appendMark(rect));
+                range.detach?.();
+                textNode = textWalker.nextNode();
+            }
+            textArea.querySelectorAll("img, .editor-text-shape-frame, .editor-text-table").forEach((node) => appendMark(node.getBoundingClientRect(), "editor-text-thumbnail-block"));
+            sheetNode.append(marksLayer);
+        });
+        return true;
+    };
+    const renderTextEditorThumbnails = (pageCount = getTextEditorPageCount(), portal = findTextPortal()) => {
+        const sidebarNode = findTextEditorThumbnailSidebar(portal);
+        if (!sidebarNode) return false;
+        const shouldShowThumbnails = activeTextPageViewEnabled && activeTextThumbnailsEnabled && !isPlainTextFilePath(activeTextEditorFilePath);
+        sidebarNode.classList.toggle("is-visible", shouldShowThumbnails);
+        sidebarNode.setAttribute("aria-hidden", shouldShowThumbnails ? "false" : "true");
+        if (!shouldShowThumbnails) return true;
+        const totalPages = Math.max(1, Number(pageCount) || 1);
+        const renderedPageCount = Number(sidebarNode.dataset.renderedPageCount || 0);
+        if (renderedPageCount !== totalPages) {
+            sidebarNode.innerHTML = Array.from({length: totalPages}, (_, index) => {
+                const pageNumber = index + 1;
+                return `
+                    <a class="editor-text-thumbnail-card" href="#" data-page-number="${pageNumber}" aria-label="Go to page ${pageNumber}">
+                        <div class="editor-text-thumbnail-sheet" aria-hidden="true"></div>
+                        <span class="editor-text-thumbnail-label">Page ${pageNumber}</span>
+                    </a>
+                `;
+            }).join("");
+            sidebarNode.dataset.renderedPageCount = String(totalPages);
+            sidebarNode.querySelectorAll(".editor-text-thumbnail-card").forEach((thumbnailNode) => {
+                thumbnailNode.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    scrollTextEditorToPage(thumbnailNode.dataset.pageNumber, portal);
+                });
+                thumbnailNode.addEventListener("keydown", (event) => {
+                    if (event.key !== " ") return;
+                    event.preventDefault();
+                    scrollTextEditorToPage(thumbnailNode.dataset.pageNumber, portal);
+                });
+            });
+        }
+        updateTextEditorThumbnailPreviews(sidebarNode, portal);
+        updateTextEditorActiveThumbnail(portal);
+        return true;
+    };
     const ensureTextEditorPageWindowFits = (portal = findTextPortal()) => {
         if (!activeTextPageViewEnabled || !portal || typeof portal.applyWindowState !== "function") return false;
         const windowNode = portal.window?.();
@@ -2434,6 +2598,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         if (!pageViewEnabled) clearTextEditorPageBreakSpacers(textArea);
         renderTextEditorPageBackdrop(requiredPages, stageNode, backdropNode);
         renderTextEditorRulerLayer(activeTextRulerEnabled, stageNode, findTextEditorRulerLayer(portal), portal);
+        renderTextEditorThumbnails(requiredPages, portal);
         requestAnimationFrame(() => updateTextEditorRulerPosition(portal));
         textArea.classList.toggle("editor-text-page-view", pageViewEnabled);
         if (stageNode) {
@@ -2626,6 +2791,14 @@ a { color: #1d4ed8; text-decoration: underline; }
         syncEditorWindowState(portal);
         updateTextToolbarState();
         return activeTextRulerEnabled;
+    };
+    const toggleTextEditorThumbnails = (enabled = !activeTextThumbnailsEnabled, portal = findTextPortal()) => {
+        activeTextThumbnailsEnabled = isPlainTextFilePath(activeTextEditorFilePath) ? false : !!enabled;
+        if (activeTextEditorFilePath) persistTextDocumentThumbnailPreference(activeTextEditorFilePath, activeTextThumbnailsEnabled);
+        renderTextEditorThumbnails(getTextEditorPageCount(portal), portal);
+        syncEditorWindowState(portal);
+        updateTextToolbarState();
+        return activeTextThumbnailsEnabled;
     };
     const getTextTableContext = (targetNode) => {
         const editorNode = findTextEditorNode();
@@ -2886,7 +3059,10 @@ a { color: #1d4ed8; text-decoration: underline; }
         const bodyNode = portal?.body?.();
         if (bodyNode && bodyNode.dataset.textRulerScrollBound !== "1") {
             bodyNode.dataset.textRulerScrollBound = "1";
-            bodyNode.addEventListener("scroll", () => updateTextEditorRulerPosition(portal), {passive: true});
+            bodyNode.addEventListener("scroll", () => {
+                updateTextEditorRulerPosition(portal);
+                updateTextEditorActiveThumbnail(portal);
+            }, {passive: true});
         }
         if (windowNode && windowNode.dataset.textRulerResizeBound !== "1") {
             windowNode.dataset.textRulerResizeBound = "1";
@@ -3456,6 +3632,20 @@ a { color: #1d4ed8; text-decoration: underline; }
                 },
                 action: () => toggleTextEditorRuler(undefined, portal)
             }, {
+                className: "context-menu-item-switch editor-text-menu-thumbnails-option",
+                get content() {
+                    const visibilityClass = activeTextPageViewEnabled ? "is-visible" : "";
+                    return div({style: `editor-text-menu-thumbnails-control ${visibilityClass}`, content: children([
+                        switcher({id: "editor-text-thumbnails-toggle", style: "menu-switcher float-right", checked: activeTextThumbnailsEnabled && activeTextPageViewEnabled}),
+                        `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon space-right" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25h4.5v5.25H4.5V5.25Zm0 8.25h4.5v5.25H4.5V13.5Zm7.5-8.25h7.5m-7.5 3h7.5m-7.5 5.25h7.5m-7.5 3h7.5"/></svg>`,
+                        `<span>Thumbnails</span>`
+                    ])});
+                },
+                action: () => {
+                    if (!activeTextPageViewEnabled) return false;
+                    return toggleTextEditorThumbnails(undefined, portal);
+                }
+            }, {
                 className: "editor-text-menu-page-dimensions",
                 interactive: true,
                 get content() {
@@ -3511,6 +3701,34 @@ a { color: #1d4ed8; text-decoration: underline; }
         requestAnimationFrame(() => requestAnimationFrame(refreshTextEditorPortalsFromState));
     };
 
+    const normalizeTextEditorAppSettings = (settings = {}) => ({
+        pages: (settings.pages ?? settings.show_pages) !== false,
+        ruler: (settings.ruler ?? settings.show_ruler) === true,
+        thumbnails: (settings.thumbnails ?? settings.show_thumbnails) === true
+    });
+
+    const applyTextEditorAppSettingsDefaults = (settings = {}) => {
+        textEditorDefaultViewSettings = normalizeTextEditorAppSettings(settings);
+        return textEditorDefaultViewSettings;
+    };
+
+    const loadTextEditorAppSettingsDefaults = async ({force = false} = {}) => {
+        if (!textEditorAppSettingsPromise || force) {
+            textEditorAppSettingsPromise = (window.StandardAppSettings?.values?.(SERVICE_ID, {force}) || Promise.resolve(window.StandardAppSettings?.defaults?.(SERVICE_ID) || {}))
+                .then(applyTextEditorAppSettingsDefaults)
+                .catch(() => textEditorDefaultViewSettings);
+        }
+        return textEditorAppSettingsPromise;
+    };
+
+    const syncTextEditorAppSettings = (event) => {
+        if (event?.detail?.serviceId !== SERVICE_ID) return;
+        textEditorAppSettingsPromise = Promise.resolve(applyTextEditorAppSettingsDefaults(event.detail?.values || {}));
+    };
+
+    document.addEventListener("standard-app-settings-saved", syncTextEditorAppSettings);
+    document.addEventListener("standard-app-settings-reset", syncTextEditorAppSettings);
+
     const sanitizeNewTextFileName = (rawName = "") => {
         const trimmedName = String(rawName || "").trim().replace(/\\/g, "/");
         const baseName = trimmedName.split("/").pop() || "";
@@ -3533,6 +3751,9 @@ a { color: #1d4ed8; text-decoration: underline; }
         activeTextRulerEnabled = isPlainTextFilePath(normalizedPath)
             ? false
             : (typeof state?.rulerEnabled === "boolean" ? state.rulerEnabled : activeTextRulerEnabled);
+        activeTextThumbnailsEnabled = isPlainTextFilePath(normalizedPath)
+            ? false
+            : (typeof state?.thumbnailsEnabled === "boolean" ? state.thumbnailsEnabled : activeTextThumbnailsEnabled);
         activeTextFooterSettings = isPlainTextFilePath(normalizedPath)
             ? getDefaultTextFooterSettings()
             : normalizeTextFooterSettings(state?.footer || activeTextFooterSettings);
@@ -3542,9 +3763,10 @@ a { color: #1d4ed8; text-decoration: underline; }
         activeTextEditorContent = readTextEditorContent(findTextEditorNode(portal));
         persistTextDocumentPageViewPreference(normalizedPath, activeTextPageViewEnabled);
         persistTextDocumentRulerPreference(normalizedPath, activeTextRulerEnabled);
+        persistTextDocumentThumbnailPreference(normalizedPath, activeTextThumbnailsEnabled);
         persistTextDocumentFooterSettings(normalizedPath, activeTextFooterSettings);
         persistTextDocumentPageDimensions(normalizedPath, activeTextPageDimensions);
-        const persistedContent = encodeTextEditorContentForSave(activeTextEditorContent);
+        const persistedContent = encodeTextEditorContentForSave(activeTextEditorContent, normalizedPath);
         const fileName = getTextFileName(normalizedPath);
         const response = await window.StandardUploads.saveFile(persistedContent, normalizedPath, {label: `Saving ${fileName}`});
         if (!response?.ok) {
@@ -3577,11 +3799,31 @@ a { color: #1d4ed8; text-decoration: underline; }
         await saveTextEditorContentToPath(portalPath, portal);
     };
 
+    const applyLoadedTextEditorDefaultsToPortal = (portal = findTextPortal(), rawPath = "", initialViewState = {}) => {
+        const normalizedPath = normalizeTextFilePath(rawPath);
+        const state = portal?.windowState?.() || {};
+        if (normalizeTextFilePath(state.directive || "") !== normalizedPath) return false;
+        if (state.pageViewEnabled !== initialViewState.pageViewEnabled
+            || state.rulerEnabled !== initialViewState.rulerEnabled
+            || state.thumbnailsEnabled !== initialViewState.thumbnailsEnabled) {
+            return false;
+        }
+        activeTextEditorFilePath = normalizedPath;
+        if (typeof state.cachedContent === "string") activeTextEditorContent = state.cachedContent;
+        if (!normalizedPath || getStoredTextDocumentPageViewPreference(normalizedPath) === null) activeTextPageViewEnabled = getDefaultTextDocumentPageViewPreference(normalizedPath);
+        if (!normalizedPath || getStoredTextDocumentRulerPreference(normalizedPath) === null) activeTextRulerEnabled = getDefaultTextDocumentRulerPreference(normalizedPath);
+        if (!normalizedPath || getStoredTextDocumentThumbnailPreference(normalizedPath) === null) activeTextThumbnailsEnabled = getDefaultTextDocumentThumbnailPreference(normalizedPath);
+        syncEditorWindowState(portal);
+        updateTextEditorView(portal);
+        return true;
+    };
+
     const openFreshTextEditor = (sourceNode = null) => {
         activeTextEditorFilePath = "";
         activeTextEditorContent = "Edit Me";
         activeTextPageViewEnabled = getDefaultTextDocumentPageViewPreference(activeTextEditorFilePath);
-        activeTextRulerEnabled = false;
+        activeTextRulerEnabled = getDefaultTextDocumentRulerPreference(activeTextEditorFilePath);
+        activeTextThumbnailsEnabled = getDefaultTextDocumentThumbnailPreference(activeTextEditorFilePath);
         activeTextPageDimensions = normalizeTextPageDimensions(TEXT_PAGE_DEFAULT_DIMENSIONS);
         activeTextFooterSettings = getDefaultTextFooterSettings();
         clearActiveTextImageSelection({skipSync: true});
@@ -3590,6 +3832,8 @@ a { color: #1d4ed8; text-decoration: underline; }
         syncEditorWindowState(portal);
         updateTextEditorView(portal);
         scheduleTextEditorPortalStateRefresh();
+        const initialViewState = getActiveTextEditorState();
+        void loadTextEditorAppSettingsDefaults().then(() => applyLoadedTextEditorDefaultsToPortal(portal, "", initialViewState));
         return true;
     };
 
@@ -3597,9 +3841,14 @@ a { color: #1d4ed8; text-decoration: underline; }
     window.StandardEditor.openFreshTextEditor = openFreshTextEditor;
     window.StandardEditor.openTextFilePath = (rawPath = "", content = "", sourceNode = null) => {
         const nextFilePath = normalizeTextFilePath(rawPath);
-        const nextContent = decodeTextEditorLoadedContent(content);
+        const nextContent = decodeTextEditorLoadedContent(content, nextFilePath);
         activeTextEditorFilePath = nextFilePath;
-        loadTextDocumentViewPreferences(activeTextEditorFilePath, getDefaultTextDocumentPageViewPreference(activeTextEditorFilePath), false);
+        loadTextDocumentViewPreferences(
+            activeTextEditorFilePath,
+            getDefaultTextDocumentPageViewPreference(activeTextEditorFilePath),
+            getDefaultTextDocumentRulerPreference(activeTextEditorFilePath),
+            getDefaultTextDocumentThumbnailPreference(activeTextEditorFilePath)
+        );
         activeTextEditorContent = nextContent;
         clearActiveTextImageSelection({skipSync: true});
         const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
@@ -3607,6 +3856,8 @@ a { color: #1d4ed8; text-decoration: underline; }
         setTextEditorPortalState(portal, {merge: false});
         updateTextEditorView(portal);
         scheduleTextEditorPortalStateRefresh();
+        const initialViewState = getActiveTextEditorState();
+        void loadTextEditorAppSettingsDefaults().then(() => applyLoadedTextEditorDefaultsToPortal(portal, nextFilePath, initialViewState));
         return true;
     };
 
@@ -3645,11 +3896,14 @@ a { color: #1d4ed8; text-decoration: underline; }
                                 button({id: "editor-sheet-style-other", altsync: "O", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: modular.icons.ellipses}),
                             ])})
                     }),
-                    div({id: "editor-text-stage", style: "small-margin-top", content: children([
-                        div({id: "editor-text-page-measure"}),
-                        div({id: "editor-text-page-backdrop"}),
-                        div({id: "editor-text-ruler-layer"}),
-                        div({id: "editor-text-content", style: "padded", contenteditable: true, content: activeTextEditorContent || "Edit Me"})
+                    div({id: "editor-text-workspace", style: "editor-text-workspace small-margin-top", content: children([
+                        div({id: "editor-text-thumbnail-sidebar", style: "editor-text-thumbnail-sidebar", "aria-hidden": "true"}),
+                        div({id: "editor-text-stage", content: children([
+                            div({id: "editor-text-page-measure"}),
+                            div({id: "editor-text-page-backdrop"}),
+                            div({id: "editor-text-ruler-layer"}),
+                            div({id: "editor-text-content", style: "padded", contenteditable: true, content: activeTextEditorContent || "Edit Me"})
+                        ])})
                     ])})
                 ])
             }),
@@ -3660,5 +3914,5 @@ a { color: #1d4ed8; text-decoration: underline; }
                 requestAnimationFrame(() => focusTextEditorAtEnd(this.portal));
             }
         })
-    ]));
+    ], TEXT_EDITOR_SETTINGS));
 })();

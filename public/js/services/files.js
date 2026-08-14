@@ -427,6 +427,16 @@
         anchor.click();
         anchor.remove();
     };
+    const saveDownloadedBlob = (blob, fileName = "download") => {
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    };
     const waitForServiceMethod = async (lookup, serviceId = "") => {
         if (typeof lookup !== "function") return null;
         let resolved = lookup();
@@ -711,6 +721,68 @@
         window.setTimeout(() => window.StandardDownloads?.hideOpenProgress?.(token), 220);
     };
     const hideDeleteFileProgress = token => window.StandardDownloads?.hideOpenProgress?.(token);
+    const getSelectedFileTiles = root => {
+        if (!(root instanceof Element)) return [];
+        return Array.from(root.querySelectorAll(".file-folder.files-file-selected"));
+    };
+    const downloadSelectedFiles = async tiles => {
+        let downloaded = 0;
+        for (const tile of tiles) {
+            const filePath = getFilePathForRemoveCommand(tile?.getAttribute?.("directive"));
+            if (!filePath) continue;
+            const fileName = filePath.split("/").pop() || "download";
+            try {
+                const download = await window.StandardDownloads.downloadForOpen(filePath, {
+                    label: `Downloading ${fileName}`,
+                    errorMessage: `Failed to download ${fileName}`
+                });
+                saveDownloadedBlob(download.blob, download.fileName || fileName);
+                downloaded += 1;
+            } catch (_) {
+                modular.error(`Failed to download ${fileName}`);
+            }
+        }
+        if (downloaded) modular.success(downloaded === 1 ? "Downloaded 1 file" : `Downloaded ${downloaded} files`);
+    };
+    const deleteSelectedFiles = tiles => {
+        const entries = tiles.map(tile => {
+            const path = getFilePathForRemoveCommand(tile?.getAttribute?.("directive"));
+            return {tile, path, name: path.split("/").pop() || "file", permanent: isRubbishPath(path)};
+        }).filter(entry => entry.path);
+        if (!entries.length) return;
+        const allPermanent = entries.every(entry => entry.permanent);
+        const description = allPermanent
+            ? `Permanently delete ${entries.length} selected items? This cannot be undone.`
+            : `Move ${entries.length} selected items to Rubbish? Items already in Rubbish will be permanently deleted.`;
+        confirmationDialogue({
+            title: allPermanent ? "Permanently delete selected items" : "Delete selected items",
+            destructive: true,
+            content: description,
+            confirmation: async () => {
+                let deleted = 0;
+                for (const entry of entries) {
+                    const progressToken = beginDeleteFileProgress(entry.name, entry.permanent);
+                    try {
+                        const command = entry.permanent
+                            ? CLI.buildFilesCommand("remove", entry.path)
+                            : CLI.buildFilesCommand("move", entry.path, getMoveTargetPath(entry.path, "Rubbish"));
+                        const response = await CLI.send(command);
+                        if (!isSuccessfulCliResponse(response)) throw new Error("File operation failed");
+                        removeDeletedFileTile(entry.path, entry.tile);
+                        finishDeleteFileProgress(progressToken, entry.name, entry.permanent);
+                        deleted += 1;
+                    } catch (_) {
+                        hideDeleteFileProgress(progressToken);
+                        modular.error(entry.permanent ? `Failed to delete ${entry.name}` : `Failed to move ${entry.name} to Rubbish`);
+                    }
+                }
+                if (deleted) {
+                    await refreshFilesRecordCache();
+                    modular.success(deleted === 1 ? "Deleted 1 item" : `Deleted ${deleted} items`);
+                }
+            }
+        });
+    };
     const deleteFile = (rawPath, tile = null) => {
         const filePath = getFilePathForRemoveCommand(rawPath);
         if (!filePath) return;
@@ -1043,6 +1115,211 @@
         }
     }];
 
+    const createMultiFileMenuItems = root => {
+        const selectedTiles = getSelectedFileTiles(root);
+        const count = selectedTiles.length;
+        return [{
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3"/></svg>`,
+            label: `Download ${count} items`,
+            action: () => downloadSelectedFiles(selectedTiles)
+        }, {
+            icon: modular.icons.delete,
+            label: `Delete ${count} items`,
+            destructive: true,
+            action: () => deleteSelectedFiles(selectedTiles)
+        }];
+    };
+    const selectionAwareFileMenu = singleItems => (root, target) => {
+        const targetTile = target?.closest?.(".file-folder");
+        const selectedTiles = getSelectedFileTiles(root);
+        return targetTile?.classList.contains("files-file-selected") && selectedTiles.length > 1
+            ? createMultiFileMenuItems(root)
+            : singleItems;
+    };
+    const bindFileContextMenu = (root, singleItems) => {
+        if (!(root instanceof HTMLElement) || root.dataset.filesContextMenuReady === "true") return;
+        root.dataset.filesContextMenuReady = "true";
+        const menu = document.createElement("div");
+        menu.className = "custom-context-menu hidden";
+        document.body.appendChild(menu);
+        const hideMenu = () => {
+            menu.classList.add("hidden");
+            menu.style.display = "none";
+            menu.style.opacity = 0;
+        };
+        root.addEventListener("contextmenu", event => {
+            const target = event.target;
+            const items = selectionAwareFileMenu(singleItems)(root, target);
+            if (!items.length || !target?.closest?.(".file-folder")) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            document.querySelectorAll(".custom-context-menu:not(.hidden)").forEach(openMenu => {
+                if (openMenu !== menu) openMenu.classList.add("hidden");
+            });
+            menu.innerHTML = "";
+            items.forEach(item => {
+                if (typeof item?.visible === "function" && !item.visible(root, target)) return;
+                if (item?.visible === false) return;
+                const option = document.createElement("div");
+                option.className = "context-menu-item";
+                if (item.destructive) option.classList.add("text-red");
+                const label = typeof item.label === "function" ? item.label(root, target) : item.label;
+                option.innerHTML = item.content || (item.icon ? `${item.icon}<span>${label}</span>` : label);
+                option.addEventListener("click", clickEvent => {
+                    clickEvent.preventDefault();
+                    clickEvent.stopPropagation();
+                    hideMenu();
+                    item.action?.(root, clickEvent, target);
+                });
+                menu.appendChild(option);
+            });
+            if (!menu.children.length) return;
+            menu.style.left = `${event.clientX}px`;
+            menu.style.top = `${event.clientY}px`;
+            menu.classList.remove("hidden");
+            menu.in();
+            requestAnimationFrame(() => {
+                const rect = menu.getBoundingClientRect();
+                if (rect.right > window.innerWidth) menu.style.left = `${event.clientX - rect.width}px`;
+                if (rect.bottom > window.innerHeight) menu.style.top = `${event.clientY - rect.height}px`;
+            });
+        }, true);
+        document.addEventListener("click", hideMenu);
+    };
+
+    const fileSelectionControllers = new WeakMap();
+    const getFileSelectionMarquee = () => {
+        let marquee = document.getElementById("files-selection-marquee");
+        if (marquee) return marquee;
+        marquee = document.createElement("div");
+        marquee.id = "files-selection-marquee";
+        marquee.className = "files-selection-marquee hidden";
+        marquee.setAttribute("aria-hidden", "true");
+        document.body.appendChild(marquee);
+        return marquee;
+    };
+    const selectionBounds = (start, current) => {
+        const left = Math.min(start.x, current.x);
+        const top = Math.min(start.y, current.y);
+        const width = Math.abs(current.x - start.x);
+        const height = Math.abs(current.y - start.y);
+        return {left, top, right: left + width, bottom: top + height, width, height};
+    };
+    const rectanglesIntersect = (rect, bounds) => rect.left < bounds.right && rect.right > bounds.left && rect.top < bounds.bottom && rect.bottom > bounds.top;
+    const bindFileSelection = root => {
+        if (!(root instanceof HTMLElement) || fileSelectionControllers.has(root)) return;
+        const marquee = getFileSelectionMarquee();
+        const selected = new Set();
+        let interaction = null;
+        let anchorTile = null;
+        let suppressClick = false;
+        const tiles = () => Array.from(root.querySelectorAll(".file-folder"));
+        const selectedTiles = () => Array.from(selected).filter(tile => tile.isConnected && root.contains(tile));
+        const applySelection = nextTiles => {
+            selected.clear();
+            nextTiles.forEach(tile => {
+                if (tile?.isConnected && root.contains(tile)) selected.add(tile);
+            });
+            tiles().forEach(tile => {
+                const isSelected = selected.has(tile);
+                tile.classList.toggle("files-file-selected", isSelected);
+                tile.setAttribute("aria-selected", String(isSelected));
+            });
+        };
+        const selectClickedTile = (tile, event) => {
+            const additive = event.metaKey || event.ctrlKey;
+            if (event.shiftKey && anchorTile?.isConnected) {
+                const allTiles = tiles();
+                const startIndex = allTiles.indexOf(anchorTile);
+                const endIndex = allTiles.indexOf(tile);
+                if (startIndex >= 0 && endIndex >= 0) {
+                    const range = allTiles.slice(Math.min(startIndex, endIndex), Math.max(startIndex, endIndex) + 1);
+                    applySelection(additive ? [...selectedTiles(), ...range] : range);
+                    return;
+                }
+            }
+            if (additive) {
+                const next = new Set(selectedTiles());
+                if (next.has(tile)) next.delete(tile); else next.add(tile);
+                applySelection(next);
+            } else {
+                applySelection([tile]);
+            }
+            anchorTile = tile;
+        };
+        root.classList.add("files-selection-root");
+        root.addEventListener("click", event => {
+            if (suppressClick) {
+                suppressClick = false;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                return;
+            }
+            const tile = event.target?.closest?.(".file-folder");
+            if (!tile || !root.contains(tile)) return;
+            selectClickedTile(tile, event);
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }, true);
+        root.addEventListener("contextmenu", event => {
+            const tile = event.target?.closest?.(".file-folder");
+            if (!tile || !root.contains(tile)) {
+                applySelection([]);
+                return;
+            }
+            if (!selected.has(tile)) {
+                applySelection([tile]);
+                anchorTile = tile;
+            }
+        }, true);
+        root.addEventListener("pointerdown", event => {
+            if (event.button !== 0 || event.target?.closest?.("button, a, input, select, textarea")) return;
+            const additive = event.metaKey || event.ctrlKey || event.shiftKey;
+            interaction = {
+                pointerId: event.pointerId,
+                start: {x: event.clientX, y: event.clientY},
+                additive,
+                moved: false,
+                startedOnTile: Boolean(event.target?.closest?.(".file-folder")),
+                baseSelection: additive ? new Set(selectedTiles()) : new Set()
+            };
+            root.setPointerCapture?.(event.pointerId);
+        });
+        root.addEventListener("dragstart", event => {
+            if (interaction) event.preventDefault();
+        });
+        root.addEventListener("pointermove", event => {
+            if (!interaction || event.pointerId !== interaction.pointerId) return;
+            const bounds = selectionBounds(interaction.start, {x: event.clientX, y: event.clientY});
+            if (!interaction.moved && Math.max(bounds.width, bounds.height) < 4) return;
+            if (!interaction.moved) {
+                interaction.moved = true;
+                if (!interaction.additive) applySelection([]);
+            }
+            Object.assign(marquee.style, {left: `${bounds.left}px`, top: `${bounds.top}px`, width: `${bounds.width}px`, height: `${bounds.height}px`});
+            marquee.classList.remove("hidden");
+            const hits = tiles().filter(tile => rectanglesIntersect(tile.getBoundingClientRect(), bounds));
+            applySelection([...interaction.baseSelection, ...hits]);
+            event.preventDefault();
+        });
+        const finishSelection = event => {
+            if (!interaction || event.pointerId !== interaction.pointerId) return;
+            const completedInteraction = interaction;
+            marquee.classList.add("hidden");
+            if (root.hasPointerCapture?.(event.pointerId)) root.releasePointerCapture(event.pointerId);
+            interaction = null;
+            if (completedInteraction.moved) {
+                suppressClick = true;
+                window.setTimeout(() => { suppressClick = false; }, 0);
+            } else if (!completedInteraction.startedOnTile && !completedInteraction.additive) {
+                applySelection([]);
+            }
+        };
+        root.addEventListener("pointerup", finishSelection);
+        root.addEventListener("pointercancel", finishSelection);
+        fileSelectionControllers.set(root, {selectedTiles, applySelection});
+    };
+
     const getImageSourceFromTile = sourceNode => {
         const tile = sourceNode?.closest?.(".file-folder") || sourceNode;
         const image = sourceNode?.matches?.("img") ? sourceNode : tile?.querySelector?.("img");
@@ -1360,7 +1637,7 @@
                 directive: file.path,
                 draggable: !isDirectory(file),
                 content: children([img({style: "margined-icon float-left no-events files-file-icon", src: getFileTypeIconPath(file)}), div({style: "files-file-copy", content: children([div({style: "no-events files-file-name", content: file.name}), em({style: "faded no-wrap hidden files-file-detail", content: file.path.replace("/home/standard-system/", "")})])})]),
-                onclick: () => {
+                ondblclick: () => {
                     if (!isDirectory(file) || !openDirectories) {
                         openFilePath(file.path);
                         return;
@@ -1399,7 +1676,10 @@
             afterRender: () => {
                 bindFileSortButton("everything-sort", "all-files", {openDirectories: false});
                 bindFileDisplayButton("everything-display", "all-files", {openDirectories: false});
-                document.querySelectorAll("#all-files").forEach((el) => el.contextmenu(createFileMenuItems()));
+                document.querySelectorAll("#all-files").forEach(el => {
+                    bindFileSelection(el);
+                    bindFileContextMenu(el, createFileMenuItems());
+                });
             }
         }, {
             text: "Documents",
@@ -1452,7 +1732,10 @@
                 bindFileSortButton("documents-sort", "documents");
                 bindFileDisplayButton("documents-display", "documents");
                 updateDocumentsHeader();
-                document.querySelectorAll("#documents").forEach((el) => el.contextmenu(createFileMenuItems()));
+                document.querySelectorAll("#documents").forEach(el => {
+                    bindFileSelection(el);
+                    bindFileContextMenu(el, createFileMenuItems());
+                });
             }
         }, {
             text: "Notes",
@@ -1564,7 +1847,7 @@
                                 return div({
                                     style: "hover-zoom hover-shadow shadowed hidden file-folder pointer",
                                     directive: photo.path,
-                                    onclick: event => openPhotoInImageViewer(photo.path, event?.target),
+                                    ondblclick: event => openPhotoInImageViewer(photo.path, event?.target),
                                     content: children([div({style: "radius", content: img({style: "fill radius pointer no-events brick covered", src: photoSource})})])
                                 });
                             }));
@@ -1595,7 +1878,9 @@
                     photoCascadeObserver = new MutationObserver(() => applyPhotoDisplayStyle());
                     photoCascadeObserver.observe(photosRoot, {childList: true, subtree: true});
                 }
-                document.querySelectorAll("#photos").forEach((el) => el.contextmenu([{
+                document.querySelectorAll("#photos").forEach(el => {
+                    bindFileSelection(el);
+                    bindFileContextMenu(el, [{
                     icon: modular.icons.modify,
                     label: "Rename",
                     action: (b, e, target) => {
@@ -1618,7 +1903,8 @@
                         const path = tile?.getAttribute("directive");
                         deleteFile(path, tile);
                     }
-                }]));
+                    }]);
+                });
             }
         }, {
             text: "Music",
@@ -1643,7 +1929,7 @@
                                 return div({
                                     style: "hover-zoom hover-shadow hidden file-folder pointer",
                                     directive: video.path,
-                                    onclick: event => openVideoInVideoViewer(video.path, event?.target),
+                                    ondblclick: event => openVideoInVideoViewer(video.path, event?.target),
                                     content: children([
                                         div({
                                             style: "files-video-thumb radius",
@@ -1663,7 +1949,9 @@
             },
             afterRender: () => {
                 setActiveUploadDirectory("Videos");
-                document.querySelectorAll("#videos").forEach((el) => el.contextmenu([{
+                document.querySelectorAll("#videos").forEach(el => {
+                    bindFileSelection(el);
+                    bindFileContextMenu(el, [{
                     icon: modular.icons.open,
                     label: "Open",
                     action: (b, e, target) => {
@@ -1693,7 +1981,8 @@
                         const path = tile?.getAttribute("directive");
                         deleteFile(path, tile);
                     }
-                }]));
+                    }]);
+                });
             }
         }, {
             text: "Rubbish",
@@ -1723,7 +2012,10 @@
                 bindFileSortButton("rubbish-sort", "rubbish", {navigateDirectory: navigateRubbishDirectory});
                 bindFileDisplayButton("rubbish-display", "rubbish", {navigateDirectory: navigateRubbishDirectory});
                 updateRubbishHeader();
-                document.querySelectorAll("#rubbish").forEach(el => el.contextmenu(createFileMenuItems()));
+                document.querySelectorAll("#rubbish").forEach(el => {
+                    bindFileSelection(el);
+                    bindFileContextMenu(el, createFileMenuItems());
+                });
             }
         }, {
             text: "Upload",

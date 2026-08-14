@@ -117,7 +117,20 @@ li {list-style:none}
 .editor-text-page-resize-action {max-height:0;opacity:0;overflow:hidden;transform:translateY(-4px);transition:max-height 160ms ease, opacity 160ms ease, transform 160ms ease}
 .editor-text-page-resize-action.is-visible {max-height:42px;opacity:1;transform:translateY(0)}
 .editor-text-page-resize-button {box-sizing:border-box;width:100%;margin-top:2px}
-#editor-text-stage {position:relative;overflow:visible}
+.editor-text-workspace {display:flex;align-items:flex-start;gap:14px}
+.editor-text-thumbnail-sidebar {box-sizing:border-box;position:sticky;top:58px;flex:0 0 0;width:0;max-width:0;max-height:calc(100vh - 140px);padding-top:10px;opacity:0;overflow:hidden;transform:translateX(-12px);transition:flex-basis 180ms ease,width 180ms ease,max-width 180ms ease,padding 180ms ease,opacity 160ms ease,transform 180ms ease}
+.editor-text-thumbnail-sidebar.is-visible {flex-basis:118px;width:118px;max-width:118px;padding:4px;opacity:1;overflow-y:auto;transform:translateX(0)}
+.editor-text-thumbnail-card {box-sizing:border-box;display:flex;flex-direction:column;gap:6px;align-items:center;width:100%;margin:0 0 10px;padding:8px 6px;border:1px solid transparent;border-radius:14px;background:transparent;color:var(--fg);cursor:pointer;text-decoration:none;transition:background-color 160ms ease,border-color 160ms ease,box-shadow 160ms ease,transform 160ms ease}
+.editor-text-thumbnail-card:hover,.editor-text-thumbnail-card:focus-visible,.editor-text-thumbnail-card.active {background:var(--secondary-bg);border-color:var(--border);box-shadow:var(--small-shadow);transform:translateY(-1px)}
+.editor-text-thumbnail-sheet {box-sizing:border-box;display:block;position:relative;width:70px;height:90px;overflow:hidden;border:1px solid rgba(100,116,139,0.3);border-radius:8px;background:#fff;box-shadow:0 8px 20px rgba(15,23,42,0.12)}
+.editor-text-thumbnail-content {margin:0 !important;z-index:1 !important;overflow:visible !important}
+.editor-text-thumbnail-marks {position:absolute;inset:0;z-index:2;pointer-events:none}
+.editor-text-thumbnail-line,.editor-text-thumbnail-block {position:absolute;display:block;border-radius:999px;background:rgba(71,85,105,0.45)}
+.editor-text-thumbnail-block {border-radius:2px;background:rgba(100,116,139,0.26);outline:1px solid rgba(71,85,105,0.24)}
+.editor-text-thumbnail-label {font-size:10px;line-height:1.1;color:var(--faded)}
+.editor-text-menu-thumbnails-control {max-height:0;opacity:0;overflow:hidden;transform:translateY(-4px);transition:max-height 180ms ease,opacity 160ms ease,transform 180ms ease}
+.editor-text-menu-thumbnails-control.is-visible {max-height:34px;opacity:1;transform:translateY(0)}
+#editor-text-stage {position:relative;overflow:visible;flex:1 1 auto;min-width:0}
 #editor-text-page-measure {display:none;width:100%;height:0}
 #editor-text-page-backdrop {display:none;position:relative;width:100%;pointer-events:none}
 .editor-text-stage-page-view {display:grid}

@@ -65,7 +65,7 @@
         return window.StandardDeviceStatus.promise;
     };
 
-    const SERVICE_SCRIPT_CACHE_VERSION = "v18";
+    const SERVICE_SCRIPT_CACHE_VERSION = "v28";
 
     const ENABLED_APPS_CACHE_KEY = "enabled-apps";
     const DESKTOP_STATE_CACHE_KEY = "desktop-canvas";

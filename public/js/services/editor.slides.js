@@ -10,12 +10,40 @@
     const SLIDE_CHART_DEFAULT_HEIGHT = 240;
     const SLIDE_CHART_MIN_WIDTH = 180;
     const SLIDE_CHART_MIN_HEIGHT = 140;
+    const SLIDE_SHAPE_DEFAULT_WIDTH = 200;
+    const SLIDE_SHAPE_DEFAULT_HEIGHT = 120;
+    const SLIDE_SHAPE_TYPES = ["rectangle", "rounded-rectangle", "ellipse", "triangle", "diamond"];
+    const SLIDE_SHAPE_OPTIONS = [{
+        type: "rectangle",
+        label: "Rectangle",
+        icon: modular.icons.rectangle
+    }, {
+        type: "rounded-rectangle",
+        label: "Rounded Rectangle",
+        icon: modular.icons.rounded_rectangle
+    }, {
+        type: "ellipse",
+        label: "Ellipse",
+        icon: modular.icons.ellipse
+    }, {
+        type: "triangle",
+        label: "Triangle",
+        icon: modular.icons.triangle
+    }, {
+        type: "diamond",
+        label: "Diamond",
+        icon: modular.icons.diamond
+    }];
     const SLIDE_PRESENT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>`;
+    const SLIDE_LAYERS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3"/></svg>`;
+    const SLIDE_ADD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>`;
+    const SLIDE_DUPLICATE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75"/></svg>`;
 
     const SLIDE_EDITOR_SETTINGS = {
         default_background: {label: "Default slide background", type: "text", default: ""},
         show_grid: {label: "Show grid by default", type: "boolean", default: true},
-        snap_to_grid: {label: "Snap to grid", type: "boolean", default: true}
+        snap_to_grid: {label: "Snap to grid", type: "boolean", default: true},
+        show_layers: {label: "Show Layers pane by default", type: "boolean", default: false}
     };
 
     const SLIDE_CHART_TYPES = [
@@ -64,7 +92,6 @@
     let slideBlockCounter = 1;
     let activeSlideDeckFilePath = "";
     let draggingSlideId = null;
-    let contextMenuSlideId = null;
     let slideInlineStyleRequest = 0;
     let slideBackgroundMenuOpen = false;
     let slideOptionsMenuOpen = false;
@@ -74,10 +101,14 @@
     let slideGridDefaultPending = true;
     let slideSnapDefaultPending = true;
     let slideBackgroundDefaultPending = true;
+    let slideLayersDefaultPending = true;
     let slideForceViewDefaults = false;
     let slideForceDefaultBackground = false;
     let slidePresentationActive = false;
     let slidePresentationIndex = 0;
+    let slideLayersVisible = false;
+    let draggingSlideBlockId = null;
+    let suppressSlideLayerClickUntil = 0;
     let savedSlideSelectionOffsets = null;
     const resolvedSlideColorCache = new Map();
     const findSlidesPortal = () => [...Array.from(document.querySelectorAll(".draggable-window"))].reverse().find((windowNode) => windowNode?.portal?.serviceId?.() === SERVICE_ID)?.portal;
@@ -252,6 +283,33 @@
         block.content = block.chartType;
         return block;
     };
+    const normalizeSlideShapeBlock = (block = {}) => {
+        if (block.type !== "shape") return block;
+        const shapeType = String(block.shapeType || block.content || "rectangle").trim().toLowerCase();
+        block.shapeType = SLIDE_SHAPE_TYPES.includes(shapeType) ? shapeType : "rectangle";
+        block.fill = String(block.fill || "#dbeafe").trim() || "transparent";
+        block.stroke = String(block.stroke || "#2563eb").trim() || "transparent";
+        const strokeWidth = Number(block.strokeWidth);
+        block.strokeWidth = Number.isFinite(strokeWidth) ? Math.max(0, Math.min(20, strokeWidth)) : 2;
+        const opacity = Number(block.opacity);
+        block.opacity = Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+        block.width = Math.max(SLIDE_GRID_SIZE * 3, Number(block.width) || SLIDE_SHAPE_DEFAULT_WIDTH);
+        block.height = Math.max(SLIDE_GRID_SIZE * 2, Number(block.height) || SLIDE_SHAPE_DEFAULT_HEIGHT);
+        block.content = block.shapeType;
+        return block;
+    };
+    const getDefaultSlideBlockName = (block = {}) => {
+        if (block.type === "text") return "Text";
+        if (block.type === "image") return "Image";
+        if (block.type === "chart") return String(block.title || "Chart").trim() || "Chart";
+        if (block.type === "shape") return SLIDE_SHAPE_OPTIONS.find((option) => option.type === block.shapeType)?.label || "Shape";
+        return "Object";
+    };
+    const normalizeSlideBlockIdentity = (block = {}, fallbackId = "") => {
+        block.id = String(block.id ?? fallbackId).trim() || String(fallbackId);
+        block.name = String(block.name || "").trim() || getDefaultSlideBlockName(block);
+        return block;
+    };
     const decodeSlideTextRunsForBlock = (block = {}) => normalizeSlideTextRuns(block.runs, block.content);
     const mergeSlideTextStyle = (baseStyle = {}, nextStyle = {}) => {
         const mergedStyle = {...normalizeSlideTextStyle(baseStyle)};
@@ -421,7 +479,7 @@
     };
     const rememberSlideSelection = (contentNode = getSlideTextEditorFromSelection()) => {
         if (!(contentNode instanceof HTMLElement)) return null;
-        const blockId = Number(contentNode.dataset.blockId || 0);
+        const blockId = String(contentNode.dataset.blockId || "").trim();
         if (!blockId) return null;
         const selectionOffsets = getSlideSelectionOffsets(contentNode);
         if (!selectionOffsets) return savedSlideSelectionOffsets;
@@ -573,7 +631,7 @@
             updateSlideToolbarState();
             return;
         }
-        const blockId = Number(contentNode.dataset.blockId || 0);
+        const blockId = String(contentNode.dataset.blockId || "").trim();
         if (!blockId) return;
         selectedSlideBlockId = blockId;
         rememberSlideSelection(contentNode);
@@ -615,6 +673,14 @@
             if (!pathNode.hasAttribute("stroke")) pathNode.setAttribute("fill", "currentColor");
         });
     };
+    const syncSlideLayersUiState = () => {
+        const panel = document.getElementById("editor-slide-layers-panel");
+        const button = document.getElementById("editor-slide-layers-button");
+        panel?.classList.toggle("is-open", slideLayersVisible);
+        panel?.setAttribute("aria-hidden", String(!slideLayersVisible));
+        button?.classList.toggle("active", slideLayersVisible);
+        button?.setAttribute("aria-expanded", String(slideLayersVisible));
+    };
     const updateSlideToolbarState = () => {
         const fontFamilySelect = document.getElementById("editor-slide-font-family");
         const fontSizeSelect = document.getElementById("editor-slide-font-size");
@@ -652,25 +718,37 @@
             alignmentButton.innerHTML = SLIDE_ALIGN_ICONS[alignment] || SLIDE_ALIGN_ICONS.left;
             alignmentButton.className = `${activeStyle.textAlign && activeStyle.textAlign !== "left" ? "tiny primary" : ""} naked align-bottom small-margin-right inner-radius`.trim();
         }
+        document.querySelectorAll(".editor-slide-layer-item").forEach((itemNode) => {
+            itemNode.classList.toggle("active", String(itemNode.dataset.blockId) === selectedSlideBlockId);
+        });
+        syncSlideLayersUiState();
     };
     const ensureDeckIntegrity = () => {
         if (!Array.isArray(activeSlideDeck) || !activeSlideDeck.length) activeSlideDeck = [{id: 1, title: "Slide 1", blocks: []}];
+        if (selectedSlideBlockId !== null && selectedSlideBlockId !== undefined && selectedSlideBlockId !== "") selectedSlideBlockId = String(selectedSlideBlockId);
+        else selectedSlideBlockId = null;
+        const seenBlockIds = new Set();
+        let nextBlockId = activeSlideDeck.reduce((maxId, slide) => {
+            const slideMax = (Array.isArray(slide?.blocks) ? slide.blocks : []).reduce((innerMax, block) => Math.max(innerMax, Number(block?.id) || 0), 0);
+            return Math.max(maxId, slideMax);
+        }, 0) + 1;
         activeSlideDeck.forEach((slide) => {
             setSlideBackground(slide, slide?.background || null);
             slide.blocks = Array.isArray(slide?.blocks) ? slide.blocks : [];
             slide.blocks.forEach((block) => {
                 normalizeSlideTextBlock(block);
                 normalizeSlideChartBlock(block);
+                normalizeSlideShapeBlock(block);
+                let blockId = String(block?.id ?? "").trim();
+                while (!blockId || seenBlockIds.has(blockId)) blockId = String(nextBlockId++);
+                normalizeSlideBlockIdentity(block, blockId);
+                seenBlockIds.add(block.id);
             });
         });
         if (!activeSlideDeck.some((slide) => slide.id === activeSlideId)) activeSlideId = activeSlideDeck[0]?.id || 1;
         const maxSlideId = activeSlideDeck.reduce((maxId, slide) => Math.max(maxId, Number(slide?.id) || 0), 0);
         slideDeckCounter = Math.max(maxSlideId + 1, 2);
-        const maxBlockId = activeSlideDeck.reduce((maxId, slide) => {
-            const slideMax = (Array.isArray(slide?.blocks) ? slide.blocks : []).reduce((innerMax, block) => Math.max(innerMax, Number(block?.id) || 0), 0);
-            return Math.max(maxId, slideMax);
-        }, 0);
-        slideBlockCounter = Math.max(maxBlockId + 1, 1);
+        slideBlockCounter = Math.max(nextBlockId, 1);
         if (!activeSlideDeck.some((slide) => (slide?.blocks || []).some((block) => block.id === selectedSlideBlockId))) selectedSlideBlockId = null;
     };
     const buildSlidesPayload = () => ({
@@ -686,7 +764,7 @@
         const legacyDeck = Array.isArray(rawPayload) ? rawPayload : [];
         activeSlideDeck = hasDeck ? rawPayload.deck : legacyDeck;
         activeSlideId = Number(rawPayload?.activeSlideId) || activeSlideDeck[0]?.id || 1;
-        selectedSlideBlockId = Number(rawPayload?.selectedSlideBlockId) || null;
+        selectedSlideBlockId = rawPayload?.selectedSlideBlockId === null || rawPayload?.selectedSlideBlockId === undefined || rawPayload?.selectedSlideBlockId === "" ? null : String(rawPayload.selectedSlideBlockId);
         ensureDeckIntegrity();
     };
     const updateSlidesPortalTitle = (slidesPortal = findSlidesPortal()) => {
@@ -801,12 +879,6 @@
             });
         });
     };
-    const hideSlideContextMenu = () => {
-        const menu = document.getElementById("editor-slide-context-menu");
-        if (!menu) return;
-        menu.classList.remove("open");
-        contextMenuSlideId = null;
-    };
     const saveSlidePortalState = (portal = findSlidesPortal()) => {
         if (!portal || typeof portal.setWindowState !== "function") return;
         portal.setWindowState({
@@ -817,7 +889,8 @@
             slideDeckCounter,
             slideBlockCounter,
             slideGridVisible,
-            slideSnapToGrid
+            slideSnapToGrid,
+            slideLayersVisible
         });
         updateSlidesPortalTitle(portal);
     };
@@ -825,18 +898,20 @@
         const state = portal?.windowState?.() || {};
         slideGridDefaultPending = slideForceViewDefaults || !Object.prototype.hasOwnProperty.call(state, "slideGridVisible");
         slideSnapDefaultPending = slideForceViewDefaults || !Object.prototype.hasOwnProperty.call(state, "slideSnapToGrid");
+        slideLayersDefaultPending = slideForceViewDefaults || !Object.prototype.hasOwnProperty.call(state, "slideLayersVisible");
         slideBackgroundDefaultPending = slideForceDefaultBackground || !(Array.isArray(state.deck) && state.deck.length);
         slideForceViewDefaults = false;
         slideForceDefaultBackground = false;
         if (Array.isArray(state.deck) && state.deck.length) {
             activeSlideDeck = state.deck;
             activeSlideId = state.activeSlideId || state.deck[0]?.id || 1;
-            selectedSlideBlockId = state.selectedSlideBlockId || null;
+            selectedSlideBlockId = state.selectedSlideBlockId === null || state.selectedSlideBlockId === undefined || state.selectedSlideBlockId === "" ? null : String(state.selectedSlideBlockId);
             slideDeckCounter = Number.isFinite(state.slideDeckCounter) ? state.slideDeckCounter : (state.deck.length + 1);
             slideBlockCounter = Number.isFinite(state.slideBlockCounter) ? state.slideBlockCounter : 1;
         }
         slideGridVisible = state.slideGridVisible !== false;
         slideSnapToGrid = state.slideSnapToGrid !== false;
+        slideLayersVisible = state.slideLayersVisible === true;
         activeSlideDeckFilePath = normalizeSlidesFilePath(state?.directive || "");
         ensureDeckIntegrity();
         updateSlidesPortalTitle(portal);
@@ -846,11 +921,13 @@
         slideDefaultBackground = normalizeDefaultSlideBackground(settings.default_background);
         if (slideGridDefaultPending) slideGridVisible = settings.show_grid !== false;
         if (slideSnapDefaultPending) slideSnapToGrid = settings.snap_to_grid !== false;
+        if (slideLayersDefaultPending) slideLayersVisible = settings.show_layers === true;
         if (slideBackgroundDefaultPending && activeSlideDeck.length === 1 && !(activeSlideDeck[0]?.blocks || []).length && !activeSlideDeck[0]?.background) {
             setSlideBackground(activeSlideDeck[0], slideDefaultBackground);
         }
         slideGridDefaultPending = false;
         slideSnapDefaultPending = false;
+        slideLayersDefaultPending = false;
         slideBackgroundDefaultPending = false;
         renderSlideEditor();
         saveSlidePortalState(portal);
@@ -889,70 +966,6 @@
         activeSlideDeck.splice(targetIndex, 0, movingSlide);
         return true;
     };
-    const ensureSlideContextMenu = () => {
-        if (document.getElementById("editor-slide-context-menu")) return;
-        const menu = document.createElement("div");
-        menu.id = "editor-slide-context-menu";
-        menu.className = "editor-slide-context-menu";
-        menu.innerHTML = [`<button type="button" data-action="rename" class="editor-slide-context-action">Rename</button>`, `<button type="button" data-action="delete" class="editor-slide-context-action danger">Delete</button>`].join("");
-        menu.addEventListener("click", (event) => {
-            const action = event.target?.dataset?.action;
-            const slideId = contextMenuSlideId;
-            if (!action || !slideId) return;
-            const slide = activeSlideDeck.find((item) => item.id === slideId);
-            if (!slide) return hideSlideContextMenu();
-            if (action === "rename") {
-                inputDialogue({title: "Slide name", placeholder: "Untitled Slide", value: slide.title || "", confirmation: (_, nextTitle) => {
-                        slide.title = (nextTitle || "").trim() || slide.title || "Untitled Slide";
-                        renderSlideSidebar();
-                        saveSlidePortalState();
-                    }
-                });
-            } else if (action === "delete") {
-                if (activeSlideDeck.length <= 1) {
-                    hideSlideContextMenu();
-                    return;
-                }
-                confirmationDialogue({
-                    title: "Delete slide",
-                    destructive: true,
-                    content: `Delete "${slide.title}"?`,
-                    confirmation: () => {
-                        activeSlideDeck = activeSlideDeck.filter((item) => item.id !== slideId);
-                        if (activeSlideId === slideId) activeSlideId = activeSlideDeck[0]?.id || activeSlideId;
-                        selectedSlideBlockId = null;
-                        renderSlideEditor();
-                        saveSlidePortalState();
-                    }
-                });
-            }
-            hideSlideContextMenu();
-        });
-        document.body.appendChild(menu);
-        document.addEventListener("mousedown", (event) => {
-            if (!menu.classList.contains("open")) return;
-            if (menu.contains(event.target)) return;
-            hideSlideContextMenu();
-        });
-        window.addEventListener("blur", hideSlideContextMenu);
-        window.addEventListener("resize", hideSlideContextMenu);
-        window.addEventListener("scroll", hideSlideContextMenu, true);
-    };
-    const showSlideContextMenu = (slideId, clientX, clientY) => {
-        ensureSlideContextMenu();
-        const menu = document.getElementById("editor-slide-context-menu");
-        if (!menu) return;
-        contextMenuSlideId = slideId;
-        menu.classList.add("open");
-        menu.style.left = "0px";
-        menu.style.top = "0px";
-        const width = menu.offsetWidth || 150;
-        const height = menu.offsetHeight || 100;
-        const maxX = Math.max(8, window.innerWidth - width - 8);
-        const maxY = Math.max(8, window.innerHeight - height - 8);
-        menu.style.left = `${Math.min(maxX, Math.max(8, clientX))}px`;
-        menu.style.top = `${Math.min(maxY, Math.max(8, clientY))}px`;
-    };
     const hideSlideBackgroundMenu = () => {
         slideBackgroundMenuOpen = false;
         document.getElementById("editor-slide-background-menu")?.classList.remove("open");
@@ -971,8 +984,8 @@
         menu.innerHTML = [
             `<label class="editor-slide-background-section" for="editor-slide-background-color">Color</label>`,
             `<input id="editor-slide-background-color" class="editor-slide-background-color-input" type="color" value="#ffffff"/>`,
-            `<button type="button" id="editor-slide-background-upload" class="editor-slide-background-action">Upload image</button>`,
-            `<button type="button" id="editor-slide-background-clear" class="editor-slide-background-action subtle">Clear background</button>`,
+            `<button type="button" id="editor-slide-background-upload" class="editor-slide-background-action smaller">Upload image</button>`,
+            `<button type="button" id="editor-slide-background-clear" class="editor-slide-background-action subtle smaller">Clear background</button>`,
             `<input id="editor-slide-background-file" type="file" accept="image/*" hidden />`
         ].join("");
         document.body.appendChild(menu);
@@ -1144,6 +1157,94 @@
             showSlideOptionsMenu();
         }
     };
+    const getSlideIdFromThumbnail = (thumbnailNode = null) => Number(thumbnailNode?.closest?.(".editor-slide-item")?.dataset?.slideId) || null;
+    const renameSlide = (slideId = null) => {
+        const slide = activeSlideDeck.find((item) => item.id === slideId);
+        if (!slide) return false;
+        inputDialogue({title: "Slide name", placeholder: "Untitled Slide", value: slide.title || "", confirmation: (_, nextTitle) => {
+                slide.title = String(nextTitle || "").trim() || slide.title || "Untitled Slide";
+                renderSlideSidebar();
+                saveSlidePortalState();
+            }
+        });
+        return true;
+    };
+    const addBlankSlideAfter = (slideId = null) => {
+        const selectedIndex = activeSlideDeck.findIndex((slide) => slide.id === slideId);
+        if (selectedIndex < 0) return false;
+        const slide = createSlideRecord(slideDeckCounter, `Slide ${slideDeckCounter}`);
+        slideDeckCounter += 1;
+        activeSlideDeck.splice(selectedIndex + 1, 0, slide);
+        activeSlideId = slide.id;
+        selectedSlideBlockId = null;
+        savedSlideSelectionOffsets = null;
+        renderSlideEditor();
+        saveSlidePortalState();
+        return true;
+    };
+    const duplicateSlide = (slideId = null) => {
+        const sourceIndex = activeSlideDeck.findIndex((slide) => slide.id === slideId);
+        if (sourceIndex < 0) return false;
+        const sourceSlide = activeSlideDeck[sourceIndex];
+        const duplicate = typeof structuredClone === "function" ? structuredClone(sourceSlide) : JSON.parse(JSON.stringify(sourceSlide));
+        duplicate.id = slideDeckCounter;
+        slideDeckCounter += 1;
+        duplicate.title = `${sourceSlide.title || `Slide ${sourceIndex + 1}`} Copy`;
+        duplicate.blocks = (duplicate.blocks || []).map((block) => ({...block, id: String(slideBlockCounter++)}));
+        activeSlideDeck.splice(sourceIndex + 1, 0, duplicate);
+        activeSlideId = duplicate.id;
+        selectedSlideBlockId = null;
+        savedSlideSelectionOffsets = null;
+        renderSlideEditor();
+        saveSlidePortalState();
+        return true;
+    };
+    const deleteSlide = (slideId = null) => {
+        const slide = activeSlideDeck.find((item) => item.id === slideId);
+        if (!slide || activeSlideDeck.length <= 1) return false;
+        confirmationDialogue({
+            title: "Delete slide",
+            destructive: true,
+            content: `Delete “${slide.title || "Untitled Slide"}”?`,
+            confirmation: () => {
+                const deletedIndex = activeSlideDeck.findIndex((item) => item.id === slideId);
+                activeSlideDeck = activeSlideDeck.filter((item) => item.id !== slideId);
+                if (activeSlideId === slideId) activeSlideId = activeSlideDeck[Math.min(Math.max(0, deletedIndex), activeSlideDeck.length - 1)]?.id || activeSlideDeck[0]?.id;
+                selectedSlideBlockId = null;
+                savedSlideSelectionOffsets = null;
+                renderSlideEditor();
+                saveSlidePortalState();
+            }
+        });
+        return true;
+    };
+    const bindSlideThumbnailContextMenu = () => {
+        const list = document.getElementById("editor-slide-list");
+        if (!list || list.dataset.contextMenuBound === "1") return;
+        list.dataset.contextMenuBound = "1";
+        list.contextmenu(() => {
+            const items = [{
+            label: "Rename",
+            icon: modular.icons.modify,
+            action: (_, __, target) => renameSlide(getSlideIdFromThumbnail(target))
+        }, {
+            label: "Add Slide",
+            icon: SLIDE_ADD_ICON,
+            action: (_, __, target) => addBlankSlideAfter(getSlideIdFromThumbnail(target))
+        }, {
+            label: "Duplicate",
+            icon: SLIDE_DUPLICATE_ICON,
+            action: (_, __, target) => duplicateSlide(getSlideIdFromThumbnail(target))
+            }];
+            if (activeSlideDeck.length > 1) items.push("separator", {
+                label: "Delete",
+                icon: modular.icons.delete,
+                destructive: true,
+                action: (_, __, target) => deleteSlide(getSlideIdFromThumbnail(target))
+            });
+            return items;
+        }, ".editor-slide-item");
+    };
     const renderSlideSidebar = () => {
         const list = document.getElementById("editor-slide-list");
         if (!list) return;
@@ -1167,16 +1268,11 @@
                 savedSlideSelectionOffsets = null;
                 renderSlideEditor();
             });
-            slideButton.addEventListener("contextmenu", (event) => {
-                event.preventDefault();
-                showSlideContextMenu(slide.id, event.clientX, event.clientY);
-            });
             slideButton.addEventListener("dragstart", (event) => {
                 draggingSlideId = slide.id;
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", String(slide.id));
                 slideButton.classList.add("dragging");
-                hideSlideContextMenu();
             });
             slideButton.addEventListener("dragend", () => {
                 draggingSlideId = null;
@@ -1195,6 +1291,314 @@
             });
             list.appendChild(slideButton);
         });
+    };
+    const getSlideLayerLabel = (block = {}) => {
+        const name = String(block.name || "").trim();
+        if (name) return name;
+        if (block.type === "text") {
+            const text = getSlidePlainTextFromRuns(decodeSlideTextRunsForBlock(block)).replace(/\s+/g, " ").trim();
+            return text ? (text.length > 34 ? `${text.slice(0, 34)}\u2026` : text) : "Text";
+        }
+        if (block.type === "chart") return String(block.title || "Chart").trim() || "Chart";
+        if (block.type === "shape") return SLIDE_SHAPE_OPTIONS.find((option) => option.type === block.shapeType)?.label || "Shape";
+        if (block.type === "image") return "Image";
+        return "Object";
+    };
+    const getSlideLayerTypeLabel = (block = {}) => {
+        if (block.type === "text") return "T";
+        if (block.type === "chart") return "CH";
+        if (block.type === "shape") return "SH";
+        if (block.type === "image") return "IM";
+        return "OB";
+    };
+    const getSlideLayerContent = (block = {}) => {
+        if (block.type === "text" || block.type === "image") return String(block.content || "");
+        if (block.type === "chart") return JSON.stringify({
+            title: block.title || "Chart",
+            chartType: block.chartType || "bar",
+            data: block.data || [],
+            labelValues: block.labelValues === true
+        }, null, 2);
+        if (block.type === "shape") return String(block.shapeType || block.content || "rectangle");
+        return String(block.content || "");
+    };
+    const getSlideLayerAppearance = (block = {}) => ({
+        borderWidth: block.type === "shape" ? Number(block.strokeWidth ?? 2) : Number(block.borderWidth ?? 1),
+        borderColor: block.type === "shape" ? String(block.stroke || "#2563eb") : String(block.borderColor || "#fb923c"),
+        fill: block.type === "shape" ? String(block.fill || "transparent") : String(block.backgroundColor || "transparent"),
+        opacity: Math.round(Math.max(0, Math.min(1, Number(block.opacity ?? 1))) * 100),
+        borderRadius: Number(block.borderRadius || 0)
+    });
+    const getSlideLayerAdditionalProperties = (block = {}) => {
+        const omittedKeys = new Set(["id", "name", "type", "content", "x", "y", "width", "height", "strokeWidth", "stroke", "fill", "opacity", "borderWidth", "borderColor", "backgroundColor", "borderRadius"]);
+        return Object.fromEntries(Object.entries(block).filter(([key]) => !omittedKeys.has(key)));
+    };
+    const applySlideLayerDetails = (block = {}, windowNode = null) => {
+        if (!block || !(windowNode instanceof HTMLElement)) return false;
+        let additionalProperties;
+        try {
+            additionalProperties = JSON.parse(windowNode.querySelector("#editor-slide-layer-properties")?.value || "{}");
+            if (!additionalProperties || typeof additionalProperties !== "object" || Array.isArray(additionalProperties)) throw new Error("Properties must be an object");
+        } catch (_) {
+            modular.error("Additional properties must be valid JSON");
+            return false;
+        }
+        let parsedChartContent = null;
+        const nextContent = String(windowNode.querySelector("#editor-slide-layer-content")?.value || "");
+        if (block.type === "chart") {
+            try {
+                parsedChartContent = JSON.parse(nextContent || "{}");
+                if (!parsedChartContent || typeof parsedChartContent !== "object" || Array.isArray(parsedChartContent)) throw new Error("Chart content must be an object");
+            } catch (_) {
+                modular.error("Chart content must be valid JSON");
+                return false;
+            }
+        }
+        const numberValue = (selector, fallback, minimum = 0) => {
+            const value = Number(windowNode.querySelector(selector)?.value);
+            return Number.isFinite(value) ? Math.max(minimum, value) : fallback;
+        };
+        Object.assign(block, additionalProperties, {
+            id: String(block.id),
+            name: String(windowNode.querySelector("#editor-slide-layer-name")?.value || "").trim() || getDefaultSlideBlockName(block),
+            type: block.type,
+            x: numberValue("#editor-slide-layer-x", block.x),
+            y: numberValue("#editor-slide-layer-y", block.y),
+            width: numberValue("#editor-slide-layer-width", block.width, SLIDE_GRID_SIZE * 3),
+            height: numberValue("#editor-slide-layer-height", block.height, SLIDE_GRID_SIZE * 2)
+        });
+        const borderWidth = numberValue("#editor-slide-layer-border-width", block.type === "shape" ? block.strokeWidth : block.borderWidth, 0);
+        const borderColor = String(windowNode.querySelector("#editor-slide-layer-border-color")?.value || "transparent").trim() || "transparent";
+        const fill = String(windowNode.querySelector("#editor-slide-layer-fill")?.value || "transparent").trim() || "transparent";
+        const opacity = numberValue("#editor-slide-layer-opacity", 100, 0);
+        const borderRadius = numberValue("#editor-slide-layer-border-radius", 0, 0);
+        if (block.type === "shape") {
+            block.shapeType = nextContent.trim().toLowerCase();
+            block.content = block.shapeType;
+            block.strokeWidth = borderWidth;
+            block.stroke = borderColor;
+            block.fill = fill;
+        } else {
+            if (block.type === "text" && block.content !== nextContent) {
+                block.content = nextContent;
+                block.runs = encodeSlideTextRuns([{text: nextContent, style: getSlideBlockTextStyle(block)}], nextContent);
+            } else if (block.type === "chart") Object.assign(block, parsedChartContent);
+            else block.content = nextContent;
+            block.borderWidth = borderWidth;
+            block.borderColor = borderColor;
+            block.backgroundColor = fill;
+            block.borderRadius = borderRadius;
+        }
+        block.opacity = Math.max(0, Math.min(100, opacity)) / 100;
+        normalizeSlideTextBlock(block);
+        normalizeSlideChartBlock(block);
+        normalizeSlideShapeBlock(block);
+        clampSlideBlockToBounds(block);
+        selectedSlideBlockId = block.id;
+        renderSlideCanvas();
+        saveSlidePortalState();
+        return true;
+    };
+    const deleteSlideLayerFromDetails = (slideId = null, blockId = null, detailsPortal = null) => {
+        const slide = activeSlideDeck.find((candidate) => candidate.id === slideId);
+        const block = slide?.blocks?.find((candidate) => candidate.id === blockId);
+        if (!slide || !block) {
+            detailsPortal?.close?.();
+            return false;
+        }
+        confirmationDialogue({
+            title: "Delete layer",
+            destructive: true,
+            content: `Delete “${getSlideLayerLabel(block)}”? This layer will be removed from the slide.`,
+            confirmation: () => {
+                slide.blocks = (slide.blocks || []).filter((candidate) => candidate.id !== blockId);
+                if (selectedSlideBlockId === blockId) selectedSlideBlockId = null;
+                savedSlideSelectionOffsets = null;
+                detailsPortal?.close?.();
+                renderSlideEditor();
+                saveSlidePortalState();
+            }
+        });
+        return true;
+    };
+    const showSlideLayerDetailsPortal = (blockId = null) => {
+        const ownerSlide = getActiveSlide();
+        const block = ownerSlide?.blocks?.find((candidate) => candidate.id === blockId);
+        if (!block) return false;
+        selectedSlideBlockId = block.id;
+        renderSlideCanvas();
+        const appearance = getSlideLayerAppearance(block);
+        const contentHelp = block.type === "chart" ? "Chart content is editable JSON." : (block.type === "shape" ? `Shape type: ${SLIDE_SHAPE_TYPES.join(", ")}.` : "Edit the object's displayed content.");
+        let detailsPortal = null;
+        const saveLayerDetails = (_, context) => {
+            const windowNode = context?.window || detailsPortal?.window?.();
+            if (!applySlideLayerDetails(block, windowNode)) return false;
+            (context?.portal || detailsPortal)?.setTitle?.(`Layer Details: ${getSlideLayerLabel(block)}`);
+            modular.success("Layer changes saved");
+            return true;
+        };
+        detailsPortal = new Portal({
+            title: `Layer Details: ${getSlideLayerLabel(block)}`,
+            dimensions: [540, 680],
+            navigation: false,
+            tools: [{
+                title: "Delete",
+                icon: modular.icons.delete,
+                destructive: true,
+                onclick: (_, context) => deleteSlideLayerFromDetails(ownerSlide.id, block.id, context?.portal || detailsPortal)
+            }, {
+                title: "Save",
+                icon: modular.icons.save,
+                onclick: saveLayerDetails
+            }],
+            route: () => div({style: "large-padding-top editor-slide-layer-details editor-portal-shell", content: children([
+                div({style: "editor-slide-layer-details-scroll", content: children([
+                    div({style: "editor-slide-layer-details-section", content: children([
+                        div({style: "editor-slide-layer-details-section-title", content: "Identity"}),
+                        div({style: "editor-slide-layer-details-grid two", content: children([
+                            div({content: children([label({input: "editor-slide-layer-name", content: "Name"}), input({id: "editor-slide-layer-name", style: "fill", value: getSlideLayerLabel(block)})])}),
+                            div({content: children([label({input: "editor-slide-layer-id", content: "ID"}), input({id: "editor-slide-layer-id", style: "fill", value: String(block.id), readonly: true})])}),
+                            div({content: children([label({input: "editor-slide-layer-type", content: "Object type"}), input({id: "editor-slide-layer-type", style: "fill", value: String(block.type || "object"), readonly: true})])})
+                        ])})
+                    ])}),
+                    div({style: "editor-slide-layer-details-section", content: children([
+                        div({style: "editor-slide-layer-details-section-title", content: "Content"}),
+                        textarea({id: "editor-slide-layer-content", style: "fill editor-slide-layer-details-content", value: getSlideLayerContent(block), rows: block.type === "chart" ? 8 : 4}),
+                        div({style: "editor-slide-layer-details-help", content: contentHelp})
+                    ])}),
+                    div({style: "editor-slide-layer-details-section", content: children([
+                        div({style: "editor-slide-layer-details-section-title", content: "Geometry"}),
+                        div({style: "editor-slide-layer-details-grid four", content: children([
+                            div({content: children([label({input: "editor-slide-layer-x", content: "X"}), input({id: "editor-slide-layer-x", type: "number", style: "fill", min: 0, value: block.x})])}),
+                            div({content: children([label({input: "editor-slide-layer-y", content: "Y"}), input({id: "editor-slide-layer-y", type: "number", style: "fill", min: 0, value: block.y})])}),
+                            div({content: children([label({input: "editor-slide-layer-width", content: "Width"}), input({id: "editor-slide-layer-width", type: "number", style: "fill", min: SLIDE_GRID_SIZE * 3, value: block.width})])}),
+                            div({content: children([label({input: "editor-slide-layer-height", content: "Height"}), input({id: "editor-slide-layer-height", type: "number", style: "fill", min: SLIDE_GRID_SIZE * 2, value: block.height})])})
+                        ])})
+                    ])}),
+                    div({style: "editor-slide-layer-details-section", content: children([
+                        div({style: "editor-slide-layer-details-section-title", content: "Appearance"}),
+                        div({style: "editor-slide-layer-details-grid two", content: children([
+                            div({content: children([label({input: "editor-slide-layer-border-width", content: "Border width"}), input({id: "editor-slide-layer-border-width", type: "number", style: "fill", min: 0, value: appearance.borderWidth})])}),
+                            div({content: children([label({input: "editor-slide-layer-border-color", content: "Border color"}), input({id: "editor-slide-layer-border-color", style: "fill", value: appearance.borderColor})])}),
+                            div({content: children([label({input: "editor-slide-layer-fill", content: block.type === "shape" ? "Fill color" : "Background"}), input({id: "editor-slide-layer-fill", style: "fill", value: appearance.fill})])}),
+                            div({content: children([label({input: "editor-slide-layer-opacity", content: "Opacity (%)"}), input({id: "editor-slide-layer-opacity", type: "number", style: "fill", min: 0, max: 100, value: appearance.opacity})])}),
+                            block.type !== "shape" && div({content: children([label({input: "editor-slide-layer-border-radius", content: "Corner radius"}), input({id: "editor-slide-layer-border-radius", type: "number", style: "fill", min: 0, value: appearance.borderRadius})])})
+                        ].filter(Boolean))})
+                    ])}),
+                    div({style: "editor-slide-layer-details-section", content: children([
+                        div({style: "editor-slide-layer-details-section-title", content: "Additional properties (JSON)"}),
+                        textarea({id: "editor-slide-layer-properties", style: "fill editor-slide-layer-details-properties", value: JSON.stringify(getSlideLayerAdditionalProperties(block), null, 2), rows: 8})
+                    ])})
+                ])})
+            ])}),
+            afterRender: (windowNode) => {
+                const contentNode = windowNode.querySelector("#editor-slide-layer-content");
+                const propertiesNode = windowNode.querySelector("#editor-slide-layer-properties");
+                if (contentNode instanceof HTMLTextAreaElement) contentNode.value = getSlideLayerContent(block);
+                if (propertiesNode instanceof HTMLTextAreaElement) propertiesNode.value = JSON.stringify(getSlideLayerAdditionalProperties(block), null, 2);
+            }
+        });
+        detailsPortal.show();
+        return true;
+    };
+    const reorderSlideLayers = (draggedBlockId = null, targetBlockId = null, placeAfter = false) => {
+        const activeSlide = getActiveSlide();
+        if (!activeSlide || draggedBlockId === targetBlockId) return false;
+        const displayOrder = [...(activeSlide.blocks || [])].reverse();
+        const draggedIndex = displayOrder.findIndex((block) => block.id === draggedBlockId);
+        if (draggedIndex < 0) return false;
+        const [draggedBlock] = displayOrder.splice(draggedIndex, 1);
+        const targetIndex = displayOrder.findIndex((block) => block.id === targetBlockId);
+        if (targetIndex < 0) return false;
+        displayOrder.splice(targetIndex + (placeAfter ? 1 : 0), 0, draggedBlock);
+        activeSlide.blocks = displayOrder.reverse();
+        return true;
+    };
+    const renderSlideLayers = () => {
+        const list = document.getElementById("editor-slide-layers-list");
+        const count = document.getElementById("editor-slide-layers-count");
+        if (!list) return;
+        const blocks = [...(getActiveSlide()?.blocks || [])].reverse();
+        list.innerHTML = "";
+        if (count) count.textContent = String(blocks.length);
+        if (!blocks.length) {
+            const emptyNode = document.createElement("div");
+            emptyNode.className = "editor-slide-layers-empty";
+            emptyNode.textContent = "No objects on this slide";
+            list.appendChild(emptyNode);
+            syncSlideLayersUiState();
+            return;
+        }
+        blocks.forEach((block, index) => {
+            const itemNode = document.createElement("button");
+            itemNode.type = "button";
+            itemNode.className = `editor-slide-layer-item${block.id === selectedSlideBlockId ? " active" : ""}`;
+            itemNode.dataset.blockId = String(block.id);
+            itemNode.setAttribute("aria-label", `Select ${getSlideLayerLabel(block)}`);
+            itemNode.draggable = true;
+
+            const typeNode = document.createElement("span");
+            typeNode.className = `editor-slide-layer-type editor-slide-layer-type-${block.type || "object"}`;
+            typeNode.textContent = getSlideLayerTypeLabel(block);
+
+            const labelNode = document.createElement("span");
+            labelNode.className = "editor-slide-layer-label";
+            labelNode.textContent = getSlideLayerLabel(block);
+
+            const orderNode = document.createElement("span");
+            orderNode.className = "editor-slide-layer-order";
+            orderNode.textContent = String(blocks.length - index);
+            orderNode.title = "Stack position";
+
+            itemNode.append(typeNode, labelNode, orderNode);
+            itemNode.addEventListener("click", () => {
+                if (Date.now() < suppressSlideLayerClickUntil) return;
+                selectedSlideBlockId = block.id;
+                savedSlideSelectionOffsets = null;
+                blurSlideTextEditing();
+                hideSlideInlineStyleEditor();
+                renderSlideCanvas();
+                saveSlidePortalState();
+                showSlideLayerDetailsPortal(block.id);
+            });
+            itemNode.addEventListener("dragstart", (event) => {
+                draggingSlideBlockId = block.id;
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", String(block.id));
+                itemNode.classList.add("dragging");
+            });
+            itemNode.addEventListener("dragover", (event) => {
+                if (!draggingSlideBlockId || draggingSlideBlockId === block.id) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                const placeAfter = event.clientY > itemNode.getBoundingClientRect().top + (itemNode.offsetHeight / 2);
+                list.querySelectorAll(".editor-slide-layer-item").forEach((node) => node.classList.remove("drop-before", "drop-after"));
+                itemNode.classList.add(placeAfter ? "drop-after" : "drop-before");
+            });
+            itemNode.addEventListener("drop", (event) => {
+                event.preventDefault();
+                const draggedId = draggingSlideBlockId || String(event.dataTransfer.getData("text/plain") || "").trim();
+                const placeAfter = event.clientY > itemNode.getBoundingClientRect().top + (itemNode.offsetHeight / 2);
+                if (reorderSlideLayers(draggedId, block.id, placeAfter)) {
+                    suppressSlideLayerClickUntil = Date.now() + 250;
+                    renderSlideCanvas();
+                    saveSlidePortalState();
+                }
+                draggingSlideBlockId = null;
+            });
+            itemNode.addEventListener("dragend", () => {
+                draggingSlideBlockId = null;
+                suppressSlideLayerClickUntil = Date.now() + 250;
+                list.querySelectorAll(".editor-slide-layer-item").forEach((node) => node.classList.remove("dragging", "drop-before", "drop-after"));
+            });
+            list.appendChild(itemNode);
+        });
+        syncSlideLayersUiState();
+    };
+    const toggleSlideLayers = () => {
+        slideLayersVisible = !slideLayersVisible;
+        syncSlideLayersUiState();
+        saveSlidePortalState();
     };
     const createSlideThumbnailNode = (slide = {}, targetWidth = 136) => {
         const viewport = getSlideThumbnailViewport();
@@ -1219,6 +1623,54 @@
         previewNode.appendChild(sceneNode);
         return previewNode;
     };
+    const createSlideShapeContentNode = (block = {}) => {
+        normalizeSlideShapeBlock(block);
+        const svgNamespace = "http://www.w3.org/2000/svg";
+        const svgNode = document.createElementNS(svgNamespace, "svg");
+        svgNode.classList.add("editor-slide-shape-content");
+        svgNode.setAttribute("viewBox", "0 0 100 100");
+        svgNode.setAttribute("preserveAspectRatio", "none");
+        svgNode.setAttribute("aria-label", SLIDE_SHAPE_OPTIONS.find((option) => option.type === block.shapeType)?.label || "Shape");
+        let shapeNode;
+        if (block.shapeType === "ellipse") {
+            shapeNode = document.createElementNS(svgNamespace, "ellipse");
+            shapeNode.setAttribute("cx", "50");
+            shapeNode.setAttribute("cy", "50");
+            shapeNode.setAttribute("rx", "47");
+            shapeNode.setAttribute("ry", "47");
+        } else if (block.shapeType === "triangle" || block.shapeType === "diamond") {
+            shapeNode = document.createElementNS(svgNamespace, "path");
+            shapeNode.setAttribute("d", block.shapeType === "triangle" ? "M50 3 L97 97 H3 Z" : "M50 3 L97 50 L50 97 L3 50 Z");
+            shapeNode.setAttribute("stroke-linejoin", "round");
+        } else {
+            shapeNode = document.createElementNS(svgNamespace, "rect");
+            shapeNode.setAttribute("x", "3");
+            shapeNode.setAttribute("y", "3");
+            shapeNode.setAttribute("width", "94");
+            shapeNode.setAttribute("height", "94");
+            if (block.shapeType === "rounded-rectangle") shapeNode.setAttribute("rx", "14");
+        }
+        shapeNode.setAttribute("fill", block.fill);
+        shapeNode.setAttribute("stroke", block.stroke);
+        shapeNode.setAttribute("stroke-width", String(block.strokeWidth));
+        shapeNode.setAttribute("vector-effect", "non-scaling-stroke");
+        svgNode.style.opacity = String(block.opacity);
+        svgNode.appendChild(shapeNode);
+        return svgNode;
+    };
+    const applySlideBlockAppearance = (blockNode = null, block = {}, includeEditorDefault = false) => {
+        if (!(blockNode instanceof HTMLElement) || block.type === "shape") return;
+        const hasBorderWidth = Number.isFinite(Number(block.borderWidth));
+        const borderWidth = hasBorderWidth ? Math.max(0, Number(block.borderWidth)) : (includeEditorDefault ? 1 : 0);
+        if (hasBorderWidth || includeEditorDefault) {
+            blockNode.style.borderWidth = `${borderWidth}px`;
+            blockNode.style.borderStyle = borderWidth > 0 ? "solid" : "none";
+            blockNode.style.borderColor = String(block.borderColor || (includeEditorDefault ? "#fb923c" : "transparent"));
+        }
+        if (block.backgroundColor) blockNode.style.backgroundColor = String(block.backgroundColor);
+        if (Number.isFinite(Number(block.borderRadius))) blockNode.style.borderRadius = `${Math.max(0, Number(block.borderRadius))}px`;
+        if (Number.isFinite(Number(block.opacity))) blockNode.style.opacity = String(Math.max(0, Math.min(1, Number(block.opacity))));
+    };
     const createSlideBlockNode = (block = {}) => {
         const blockNode = document.createElement("div");
         blockNode.className = "editor-slide-block";
@@ -1228,6 +1680,7 @@
         blockNode.style.top = `${block.y}px`;
         blockNode.style.width = `${block.width}px`;
         blockNode.style.height = `${block.height}px`;
+        applySlideBlockAppearance(blockNode, block, true);
         if (block.id === selectedSlideBlockId) blockNode.classList.add("selected");
         if (block.type === "text") {
             const contentNode = document.createElement("div");
@@ -1280,6 +1733,8 @@
             chartNode.className = "editor-slide-chart-content";
             renderSlideChartIntoNode(chartNode, block);
             blockNode.appendChild(chartNode);
+        } else if (block.type === "shape") {
+            blockNode.appendChild(createSlideShapeContentNode(block));
         } else {
             const imageNode = document.createElement("img");
             imageNode.className = "editor-slide-image-content";
@@ -1290,6 +1745,7 @@
         resizeHandle.className = "editor-slide-resize-handle";
         blockNode.appendChild(resizeHandle);
         blockNode.addEventListener("mousedown", (event) => {
+            if (event.button === 2) return;
             event.preventDefault();
             event.stopPropagation();
             const wasSelected = selectedSlideBlockId === block.id;
@@ -1304,7 +1760,7 @@
             const borderHitPadding = Math.max(1, SLIDE_BORDER_DRAG_HIT_SIZE);
             const isBorderHit = Boolean(blockRect) && ((event.clientX - blockRect.left) <= borderHitPadding || (event.clientY - blockRect.top) <= borderHitPadding || (blockRect.right - event.clientX) <= borderHitPadding || (blockRect.bottom - event.clientY) <= borderHitPadding);
             const isResize = isOnResizeControl;
-            const isMove = wasSelected && (block.type === "chart" || isBorderHit) && !isOnResizeControl;
+            const isMove = wasSelected && (block.type === "chart" || block.type === "shape" || isBorderHit) && !isOnResizeControl;
             if (isResize) {
                 savedSlideSelectionOffsets = null;
                 blurSlideTextEditing();
@@ -1432,7 +1888,8 @@
         if (!activeSlide) return false;
         const insertionPoint = getSlideChartInsertionPoint();
         const block = normalizeSlideChartBlock({
-            id: slideBlockCounter,
+            id: String(slideBlockCounter),
+            name: String(title || "Chart").trim() || "Chart",
             type: "chart",
             chartType: type,
             title,
@@ -1586,6 +2043,7 @@
         blockNode.style.top = `${block.y}px`;
         blockNode.style.width = `${block.width}px`;
         blockNode.style.height = `${block.height}px`;
+        applySlideBlockAppearance(blockNode, block, false);
         if (block.type === "text") {
             const contentNode = document.createElement("div");
             contentNode.className = "editor-slide-present-text";
@@ -1596,6 +2054,8 @@
             chartNode.className = "editor-slide-present-chart";
             renderSlideChartIntoNode(chartNode, block);
             blockNode.appendChild(chartNode);
+        } else if (block.type === "shape") {
+            blockNode.appendChild(createSlideShapeContentNode(block));
         } else {
             const imageNode = document.createElement("img");
             imageNode.className = "editor-slide-present-image";
@@ -1669,7 +2129,6 @@
         }
         hideSlideBackgroundMenu();
         hideSlideOptionsMenu();
-        hideSlideContextMenu();
         hideSlideInlineStyleEditor();
         slidePresentationActive = true;
         slidePresentationIndex = getActiveSlideIndex();
@@ -1705,6 +2164,7 @@
             canvas.appendChild(createSlideBlockNode(block));
         });
         renderSlideSidebar();
+        renderSlideLayers();
         updateSlideToolbarState();
     };
     const deleteSelectedSlideBlock = () => {
@@ -1746,7 +2206,7 @@
     const createSlideBlock = (type = "text") => {
         const activeSlide = getActiveSlide();
         if (!activeSlide) return;
-        const block = {id: slideBlockCounter, type, x: SLIDE_GRID_SIZE, y: SLIDE_GRID_SIZE, width: type === "text" ? 240 : 260, height: type === "text" ? 120 : 160, content: type === "text" ? "Double click to edit" : "https://placehold.co/320x180?text=Image"};
+        const block = {id: String(slideBlockCounter), name: type === "text" ? "Text" : "Image", type, x: SLIDE_GRID_SIZE, y: SLIDE_GRID_SIZE, width: type === "text" ? 240 : 260, height: type === "text" ? 120 : 160, content: type === "text" ? "Double click to edit" : "https://placehold.co/320x180?text=Image"};
         slideBlockCounter += 1;
         normalizeSlideTextBlock(block);
         clampSlideBlockToBounds(block);
@@ -1755,10 +2215,122 @@
         renderSlideCanvas();
         saveSlidePortalState();
     };
+    const insertSlideShape = (shapeType = "rectangle") => {
+        const activeSlide = getActiveSlide();
+        if (!activeSlide) return false;
+        const insertionPoint = getSlideChartInsertionPoint();
+        const block = normalizeSlideShapeBlock({
+            id: String(slideBlockCounter),
+            name: SLIDE_SHAPE_OPTIONS.find((option) => option.type === shapeType)?.label || "Shape",
+            type: "shape",
+            shapeType,
+            x: insertionPoint.x,
+            y: insertionPoint.y,
+            width: SLIDE_SHAPE_DEFAULT_WIDTH,
+            height: SLIDE_SHAPE_DEFAULT_HEIGHT,
+            fill: "#dbeafe",
+            stroke: "#2563eb",
+            strokeWidth: 2,
+            opacity: 1
+        });
+        slideBlockCounter += 1;
+        clampSlideBlockToBounds(block);
+        activeSlide.blocks.push(block);
+        selectedSlideBlockId = block.id;
+        savedSlideSelectionOffsets = null;
+        blurSlideTextEditing();
+        renderSlideCanvas();
+        saveSlidePortalState();
+        return true;
+    };
+    const getSlideShapeBlockFromNode = (blockNode = null) => {
+        const blockId = String(blockNode?.dataset?.blockId || "").trim();
+        return getActiveSlide()?.blocks?.find((block) => block.id === blockId && block.type === "shape") || null;
+    };
+    const updateSlideShapeStyle = (blockNode = null, nextStyle = {}) => {
+        const block = getSlideShapeBlockFromNode(blockNode);
+        if (!block) return false;
+        Object.assign(block, nextStyle);
+        normalizeSlideShapeBlock(block);
+        selectedSlideBlockId = block.id;
+        renderSlideCanvas();
+        saveSlidePortalState();
+        return true;
+    };
+    const showSlideShapeStyleDialogue = (blockNode = null, property = "fill") => {
+        const block = getSlideShapeBlockFromNode(blockNode);
+        if (!block) return false;
+        const controls = {
+            fill: {title: "Shape fill color", placeholder: "#dbeafe, red, or transparent", value: block.fill},
+            stroke: {title: "Shape border color", placeholder: "#2563eb, red, or transparent", value: block.stroke},
+            strokeWidth: {title: "Shape border width", placeholder: "0–20", value: String(block.strokeWidth)},
+            opacity: {title: "Shape opacity", placeholder: "0–100", value: String(Math.round(block.opacity * 100))}
+        };
+        const control = controls[property];
+        if (!control) return false;
+        inputDialogue({...control, confirmation: (_, rawValue) => {
+                const value = String(rawValue || "").trim();
+                if (property === "fill" || property === "stroke") {
+                    if (!value) {
+                        modular.error("Enter a color or transparent");
+                        return false;
+                    }
+                    return updateSlideShapeStyle(blockNode, {[property]: value});
+                }
+                const numericValue = Number(value);
+                const maxValue = property === "opacity" ? 100 : 20;
+                if (!Number.isFinite(numericValue) || numericValue < 0 || numericValue > maxValue) {
+                    modular.error(property === "opacity" ? "Enter opacity from 0 to 100" : "Enter border width from 0 to 20");
+                    return false;
+                }
+                return updateSlideShapeStyle(blockNode, {[property]: property === "opacity" ? numericValue / 100 : numericValue});
+            }
+        });
+        return true;
+    };
+    const bindSlideShapeContextMenu = (canvas = null) => {
+        if (!canvas || canvas.dataset.shapeContextBound === "1") return;
+        canvas.dataset.shapeContextBound = "1";
+        const hasShapeContext = (_, target) => !!target?.closest?.('.editor-slide-block[data-block-type="shape"]');
+        canvas.addEventListener("contextmenu", (event) => {
+            const blockNode = event.target?.closest?.('.editor-slide-block[data-block-type="shape"]');
+            if (!blockNode || !canvas.contains(blockNode)) return;
+            selectedSlideBlockId = String(blockNode.dataset.blockId || "").trim() || null;
+            canvas.querySelectorAll(".editor-slide-block").forEach((node) => node.classList.toggle("selected", node === blockNode));
+            updateSlideToolbarState();
+        }, true);
+        canvas.contextmenu([{
+            label: "Fill Color",
+            icon: modular.icons.brush,
+            visible: hasShapeContext,
+            action: (_, __, target) => showSlideShapeStyleDialogue(target, "fill")
+        }, {
+            label: "Border Color",
+            icon: modular.icons.rectangle,
+            visible: hasShapeContext,
+            action: (_, __, target) => showSlideShapeStyleDialogue(target, "stroke")
+        }, {
+            label: "Border Width",
+            icon: modular.icons.modify,
+            visible: hasShapeContext,
+            action: (_, __, target) => showSlideShapeStyleDialogue(target, "strokeWidth")
+        }, {
+            label: "Opacity",
+            icon: modular.icons.ellipse,
+            visible: hasShapeContext,
+            action: (_, __, target) => showSlideShapeStyleDialogue(target, "opacity")
+        }, "separator", {
+            label: "Delete Shape",
+            icon: modular.icons.delete,
+            destructive: true,
+            visible: hasShapeContext,
+            action: () => deleteSelectedSlideBlock()
+        }], '.editor-slide-block[data-block-type="shape"]');
+    };
     const bindSlideInteractions = () => {
-        ensureSlideContextMenu();
         ensureSlideBackgroundMenu();
         ensureSlideOptionsMenu();
+        bindSlideThumbnailContextMenu();
         const addSlideButton = document.getElementById("editor-slide-add");
         const fontFamilySelect = document.getElementById("editor-slide-font-family");
         const fontSizeSelect = document.getElementById("editor-slide-font-size");
@@ -1767,6 +2339,8 @@
         const textColorButton = document.getElementById("editor-slide-style-color");
         const backgroundColorButton = document.getElementById("editor-slide-style-background");
         const alignmentButton = document.getElementById("editor-slide-style-align");
+        const addShapeButton = document.getElementById("editor-slide-add-shape");
+        const layersButton = document.getElementById("editor-slide-layers-button");
         const bindSlideToolbarButtonFocus = (buttonNode) => {
             if (!buttonNode || buttonNode.dataset.selectionBound === "1") return;
             buttonNode.dataset.selectionBound = "1";
@@ -1837,6 +2411,14 @@
                 event.preventDefault();
                 showSlideChartPortal();
             });
+        }
+        if (addShapeButton && addShapeButton.dataset.bound !== "1") {
+            addShapeButton.dataset.bound = "1";
+            addShapeButton.popoutmenu(SLIDE_SHAPE_OPTIONS.map((shape) => ({
+                label: shape.label,
+                icon: shape.icon,
+                action: () => insertSlideShape(shape.type)
+            })));
         }
         [boldButton, italicButton, textColorButton, backgroundColorButton, alignmentButton].forEach(bindSlideToolbarButtonFocus);
         if (fontFamilySelect && fontFamilySelect.dataset.bound !== "1") {
@@ -1913,13 +2495,19 @@
                 toggleSlideOptionsMenu();
             });
         }
+        if (layersButton && layersButton.dataset.bound !== "1") {
+            layersButton.dataset.bound = "1";
+            layersButton.setAttribute("aria-controls", "editor-slide-layers-panel");
+            layersButton.addEventListener("click", toggleSlideLayers);
+        }
         const canvas = document.getElementById("editor-slide-canvas");
         if (canvas && canvas.dataset.bound !== "1") {
             canvas.dataset.bound = "1";
-            canvas.addEventListener("mousedown", () => {
+            bindSlideShapeContextMenu(canvas);
+            canvas.addEventListener("mousedown", (event) => {
+                if (event.button === 2) return;
                 selectedSlideBlockId = null;
                 savedSlideSelectionOffsets = null;
-                hideSlideContextMenu();
                 hideSlideOptionsMenu();
                 hideSlideInlineStyleEditor();
                 renderSlideCanvas();
@@ -1963,21 +2551,30 @@
                         ])}),
                         div({style: "editor-slide-workspace", content: children([
                             div({style: "editor-slide-toolbar secondary-bordered radius shadowed", content: children([
-                                button({id: "editor-slide-add", style: "editor-slide-add-button float-right", content: "+ Slide"}),
+                                button({id: "editor-slide-add", style: "editor-slide-add-button float-right", icon: modular.icons.create}),
                                 searchComboBox({id: "editor-slide-font-family", altsync: "FF", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: SLIDE_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
                                 searchComboBox({id: "editor-slide-font-size", altsync: "FS", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: SLIDE_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
                                 button({id: "editor-slide-add-text", style: "naked align-bottom small-margin-right inner-radius", title: "Add Text", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 11.984375 2.9863281 A 1.0001 1.0001 0 0 0 11.841797 3 L 4.25 3 A 1.0001 1.0001 0 0 0 3.2578125 3.875 L 3.0078125 5.875 A 1.0001 1.0001 0 1 0 4.9921875 6.125 L 5.1328125 5 L 11 5 L 11 19 L 9 19 A 1.0001 1.0001 0 1 0 9 21 L 11.832031 21 A 1.0001 1.0001 0 0 0 12.158203 21 L 15 21 A 1.0001 1.0001 0 1 0 15 19 L 13 19 L 13 5 L 18.867188 5 L 19.007812 6.125 A 1.0001 1.0001 0 1 0 20.992188 5.875 L 20.742188 3.875 A 1.0001 1.0001 0 0 0 19.75 3 L 12.167969 3 A 1.0001 1.0001 0 0 0 11.984375 2.9863281 z"/></svg>`}),
                                 button({id: "editor-slide-add-image", style: "naked align-bottom small-margin-right inner-radius", title: "Add Image", icon: modular.icons.image}),
                                 button({id: "editor-slide-add-chart", style: "naked align-bottom small-margin-right inner-radius", title: "Add Chart", icon: modular.icons.chart}),
+                                button({id: "editor-slide-add-shape", style: "naked align-bottom small-margin-right inner-radius", title: "Insert Shape", icon: modular.icons.shapes}),
                                 button({id: "editor-slide-style-bold", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: modular.icons.bold}),
                                 button({id: "editor-slide-style-italic", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: modular.icons.italic}),
                                 button({id: "editor-slide-style-color", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
                                 button({id: "editor-slide-style-background", style: "naked align-bottom small-margin-right inner-radius", title: "Fill", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
                                 button({id: "editor-slide-style-align", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: SLIDE_ALIGN_ICONS.left}),
                                 button({id: "editor-slide-background-button", style: "naked align-bottom small-margin-right inner-radius", title: "Slide background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42"/></svg>`}),
-                                button({id: "editor-slide-more-options", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: modular.icons.ellipses})
+                                button({id: "editor-slide-layers-button", style: "naked align-bottom small-margin-right inner-radius", title: "Layers", icon: SLIDE_LAYERS_ICON}),
+                                button({id: "editor-slide-more-options", style: "naked align-bottom inner-radius", title: "Other", icon: modular.icons.ellipses})
                             ])}),
                             div({id: "editor-slide-canvas", style: "editor-slide-canvas secondary-bordered shadowed radius"})
+                        ])}),
+                        div({id: "editor-slide-layers-panel", style: `editor-slide-layers-panel window-sidebar${slideLayersVisible ? " is-open" : ""}`, content: children([
+                            div({style: "editor-slide-layers-header", content: children([
+                                div({style: "editor-slide-layers-title", content: "Layers"}),
+                                div({id: "editor-slide-layers-count", style: "editor-slide-layers-count", content: "0"})
+                            ])}),
+                            div({id: "editor-slide-layers-list", style: "editor-slide-layers-list"})
                         ])})
                     ])})
                 ])});

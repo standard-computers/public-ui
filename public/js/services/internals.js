@@ -318,9 +318,37 @@
         });
         return wrapper.innerHTML;
     };
+
+    const sanitizeTextEditorSourceMarkup = (markup = "") => {
+        const template = document.createElement("template");
+        template.innerHTML = String(markup || "");
+        template.content.querySelectorAll("script, style, iframe, object, embed, link, meta, base, form, input, button, select, textarea, foreignObject").forEach(node => node.remove());
+        template.content.querySelectorAll("*").forEach(node => {
+            Array.from(node.attributes || []).forEach(attribute => {
+                if (/^on/i.test(attribute.name) || ["srcdoc", "nonce", "integrity"].includes(attribute.name.toLowerCase())) {
+                    node.removeAttribute(attribute.name);
+                }
+            });
+            const inlineStyle = String(node.getAttribute("style") || "");
+            if (/url\s*\(|expression\s*\(|@import/i.test(inlineStyle)) node.removeAttribute("style");
+            ["href", "src", "xlink:href"].forEach(attributeName => {
+                if (!node.hasAttribute(attributeName)) return;
+                const value = String(node.getAttribute(attributeName) || "").trim();
+                const isSafeLink = /^(https?:|mailto:|\/|#)/i.test(value);
+                const isSafeImage = attributeName === "src" && /^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+$/i.test(value);
+                if (!isSafeLink && !isSafeImage) node.removeAttribute(attributeName);
+            });
+        });
+        return template.innerHTML;
+    };
+
     const normalizeTextPreviewContent = (content = "", filePath = "") => {
+        // Keep the canonical document markup intact while it is held in portal state.
+        // Rendering still passes through sanitizeTextPreviewMarkup in updateTextPreview,
+        // but the editor must receive every supported style, data attribute, and object
+        // dimension when the user chooses Edit.
         const decodedContent = decodeTextDocumentContent(content);
-        return shouldRenderTextPreviewAsHtml(filePath) ? sanitizeTextPreviewMarkup(decodedContent) : decodedContent;
+        return shouldRenderTextPreviewAsHtml(filePath) ? sanitizeTextEditorSourceMarkup(decodedContent) : decodedContent;
     };
     const updateTextPreview = (portal = findInternalsWindow(0)?.portal) => {
         const root = portal?.window?.() || document;

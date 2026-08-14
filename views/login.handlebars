@@ -160,6 +160,16 @@
                 }
             }));
 
+            document.addEventListener("keydown",function(event){
+                const choiceIndex=Number(event.key)-1,
+                    enteringPassword=username.value.trim()&&passwordArea&&!passwordArea.hidden;
+                if(enteringPassword||event.ctrlKey||event.altKey||event.metaKey||!Number.isInteger(choiceIndex))return;
+                const choice=choices[choiceIndex];
+                if(!choice||choice.disabled)return;
+                event.preventDefault();
+                choice.click();
+            });
+
             form.addEventListener("submit",function(event){event.preventDefault();login()});
 
             if(!choices.length){
