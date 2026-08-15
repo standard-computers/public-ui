@@ -1,5 +1,6 @@
 (function () {
     const STATUS_COPY = {connected: "Connected", connecting: "Connecting…", disconnected: "Disconnected"};
+    const CONNECTION_CHECK_INTERVAL = 60 * 1000;
     function ensureToastContainer() {
         let container = document.querySelector(".status-toast-container");
         if (!container) {
@@ -51,6 +52,22 @@
         const initialStatus = indicator.className.match(/status-(connected|connecting|disconnected)/);
         const setStatus = applyStatus(initialStatus ? initialStatus[1] : "connected");
         const source = new EventSource(new URL("/events/device-status", window.location.href).href, {withCredentials: true});
+        let connectionLostAt = Date.now();
+        let isReloading = false;
+        function checkConnection() {
+            if (source.readyState === EventSource.OPEN) {
+                connectionLostAt = null;
+                return;
+            }
+            if (connectionLostAt === null) connectionLostAt = Date.now();
+            if (!isReloading && Date.now() - connectionLostAt >= CONNECTION_CHECK_INTERVAL) {
+                isReloading = true;
+                window.location.reload();
+            }
+        }
+        source.onopen = () => {
+            connectionLostAt = null;
+        };
         source.onmessage = event => {
             try {
                 const payload = JSON.parse(event.data);
@@ -59,6 +76,13 @@
                 console.error("Failed to parse status event", err);
             }
         };
-        source.onerror = () => setStatus("connecting");
+        source.onerror = () => {
+            setStatus("connecting");
+            checkConnection();
+        };
+        window.setInterval(checkConnection, CONNECTION_CHECK_INTERVAL);
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) checkConnection();
+        });
     });
 })();

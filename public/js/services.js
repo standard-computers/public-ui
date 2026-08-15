@@ -263,7 +263,7 @@ const windowStateManager = (() => {
                         }
                     }
                 } catch (err) {
-                    console.error("Failed to load interface window state", err);
+                    console.error("Failed to load interface window state");
                 }
                 return stateByKey;
             })();
@@ -1117,8 +1117,17 @@ class Portal {
     }
     #build() {
         const {
-            title, dimensions, accent, background, foreground, icon, actionable, navigation, routes, route, tools
+            title, dimensions, accent, background, foreground, icon, actionable, navigation, routes: configuredRoutes, route, tools
         } = this.#struct;
+        const routes = Array.isArray(configuredRoutes) ? configuredRoutes.filter(navItem => {
+            if (typeof navItem?.visible !== "function") return navItem?.visible !== false;
+            try {
+                return navItem.visible(this.#struct) !== false;
+            } catch (error) {
+                console.error("Failed to resolve route visibility", error);
+                return false;
+            }
+        }) : configuredRoutes;
         const isResizable = this.#isResizable();
         //CREATE WINDOW
         this.#windowDiv = document.createElement('div');
@@ -1462,11 +1471,15 @@ class Portal {
     }
     hide() {
         if (this.#windowDiv?.parentElement) {
+            const disposedWindow = this.#windowDiv;
+            const shouldRestoreFocus = disposedWindow.classList.contains("window-focused")
+                || !document.querySelector(".draggable-window.window-focused:not(.widget-window):not(.minimized)");
             this.#persistWindowState({open: false});
-            this.#windowDiv.remove();
+            disposedWindow.remove();
             if (typeof this.#struct?.onDispose === "function") {
                 this.#struct.onDispose();
             }
+            if (shouldRestoreFocus) modular?.focusLastWindow?.(disposedWindow);
         }
     }
     minimize(positionOverride) {

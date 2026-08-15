@@ -1215,6 +1215,23 @@
         let suppressClick = false;
         const tiles = () => Array.from(root.querySelectorAll(".file-folder"));
         const selectedTiles = () => Array.from(selected).filter(tile => tile.isConnected && root.contains(tile));
+        const isPointInsideRoot = point => {
+            const rect = root.getBoundingClientRect();
+            return point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom;
+        };
+        const isDesktopDropPoint = point => {
+            const dropTarget = document.elementFromPoint(point.x, point.y);
+            const desktopViewport = document.getElementById("desktop-viewport");
+            return Boolean(dropTarget && desktopViewport?.contains(dropTarget) && !dropTarget.closest(".draggable-window, header, .desktop-shortcut, .desktop-command-panel"));
+        };
+        const createDesktopShortcutFromTile = (tile, point) => {
+            const path = String(tile?.getAttribute?.("directive") || "").trim();
+            if (!path || tile?.getAttribute?.("data") === "directory" || isFolderPath(path) || typeof window.StandardDesktop?.createShortcutAt !== "function") return false;
+            const name = String(tile.querySelector(".files-file-name")?.textContent || path.split(/[\\/]/).pop() || "File").trim();
+            const worldPoint = window.StandardDesktop.clientToWorld?.(point) || point;
+            window.StandardDesktop.createShortcutAt({type: "file", title: name, target: path}, worldPoint);
+            return true;
+        };
         const applySelection = nextTiles => {
             selected.clear();
             nextTiles.forEach(tile => {
@@ -1280,15 +1297,16 @@
                 start: {x: event.clientX, y: event.clientY},
                 additive,
                 moved: false,
+                sourceTile: event.target?.closest?.(".file-folder") || null,
                 startedOnTile: Boolean(event.target?.closest?.(".file-folder")),
+                desktopDrag: false,
                 baseSelection: additive ? new Set(selectedTiles()) : new Set()
             };
-            root.setPointerCapture?.(event.pointerId);
         });
         root.addEventListener("dragstart", event => {
             if (interaction) event.preventDefault();
         });
-        root.addEventListener("pointermove", event => {
+        const moveSelection = event => {
             if (!interaction || event.pointerId !== interaction.pointerId) return;
             const bounds = selectionBounds(interaction.start, {x: event.clientX, y: event.clientY});
             if (!interaction.moved && Math.max(bounds.width, bounds.height) < 4) return;
@@ -1296,27 +1314,39 @@
                 interaction.moved = true;
                 if (!interaction.additive) applySelection([]);
             }
+            const currentPoint = {x: event.clientX, y: event.clientY};
+            interaction.desktopDrag = Boolean(interaction.sourceTile && !isPointInsideRoot(currentPoint));
+            if (interaction.desktopDrag) {
+                marquee.classList.add("hidden");
+                if (!interaction.additive) applySelection([interaction.sourceTile]);
+                event.preventDefault();
+                return;
+            }
             Object.assign(marquee.style, {left: `${bounds.left}px`, top: `${bounds.top}px`, width: `${bounds.width}px`, height: `${bounds.height}px`});
             marquee.classList.remove("hidden");
             const hits = tiles().filter(tile => rectanglesIntersect(tile.getBoundingClientRect(), bounds));
             applySelection([...interaction.baseSelection, ...hits]);
             event.preventDefault();
-        });
+        };
         const finishSelection = event => {
             if (!interaction || event.pointerId !== interaction.pointerId) return;
             const completedInteraction = interaction;
             marquee.classList.add("hidden");
-            if (root.hasPointerCapture?.(event.pointerId)) root.releasePointerCapture(event.pointerId);
             interaction = null;
             if (completedInteraction.moved) {
                 suppressClick = true;
                 window.setTimeout(() => { suppressClick = false; }, 0);
+                const dropPoint = {x: event.clientX, y: event.clientY};
+                if (completedInteraction.desktopDrag && isDesktopDropPoint(dropPoint)) {
+                    createDesktopShortcutFromTile(completedInteraction.sourceTile, dropPoint);
+                }
             } else if (!completedInteraction.startedOnTile && !completedInteraction.additive) {
                 applySelection([]);
             }
         };
-        root.addEventListener("pointerup", finishSelection);
-        root.addEventListener("pointercancel", finishSelection);
+        window.addEventListener("pointermove", moveSelection);
+        window.addEventListener("pointerup", finishSelection);
+        window.addEventListener("pointercancel", finishSelection);
         fileSelectionControllers.set(root, {selectedTiles, applySelection});
     };
 
@@ -1635,7 +1665,7 @@
             as.push(div({
                 style: "padded secondary-tile brick list-item hidden file-folder files-file-item",
                 directive: file.path,
-                draggable: !isDirectory(file),
+                data: isDirectory(file) ? "directory" : "file",
                 content: children([img({style: "margined-icon float-left no-events files-file-icon", src: getFileTypeIconPath(file)}), div({style: "files-file-copy", content: children([div({style: "no-events files-file-name", content: file.name}), em({style: "faded no-wrap hidden files-file-detail", content: file.path.replace("/home/standard-system/", "")})])})]),
                 ondblclick: () => {
                     if (!isDirectory(file) || !openDirectories) {

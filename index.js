@@ -14,6 +14,8 @@ const fs = require("fs/promises");
 const fsSync = require("fs");
 const crypto = require("crypto");
 const os = require("os");
+const dns = require("dns").promises;
+const net = require("net");
 const cookieParser = require('cookie-parser');
 const {Bonjour} = require("bonjour-service");
 const {DemoProvider} = require("./demo-provider");
@@ -56,6 +58,8 @@ const SESSION_TTL_MS = Math.max(60 * 1000, Number(process.env.SESSION_TTL_MS || 
 const SESSION_PRUNE_INTERVAL_MS = Math.max(60 * 1000, Number(process.env.SESSION_PRUNE_INTERVAL_MS || 1000 * 60 * 10) || 1000 * 60 * 10);
 const USER_RECORD_CACHE_TTL_MS = Math.max(5 * 1000, Number(process.env.USER_RECORD_CACHE_TTL_MS || 1000 * 60 * 5) || 1000 * 60 * 5);
 const REQUEST_BODY_LIMIT = (process.env.REQUEST_BODY_LIMIT || "25mb").trim() || "25mb";
+const ARTICLE_CRAWL_MAX_BYTES = 2 * 1024 * 1024;
+const ARTICLE_CRAWL_TIMEOUT_MS = 15000;
 const THEMES_REPO_PATH = path.join(__dirname, "public", "themes.json");
 const INTEGRATIONS_REPO_PATH = path.join(__dirname, "private", "integrations.json");
 const USER_DATA_ROOT = (process.env.PUBLIC_UI_USER_DATA_ROOT || "").trim() || path.join(__dirname, "user_data");
@@ -1629,6 +1633,215 @@ function stopLocalHostnameAdvertisement() {
     bonjour = null;
 }
 
+function decodeArticleHtmlEntities(value = "") {
+    const namedEntities = {amp: "&", apos: "'", gt: ">", lt: "<", nbsp: " ", quot: '"'};
+    return String(value || "").replace(/&(#(?:x[0-9a-f]+|\d+)|[a-z]+);/gi, (entity, token) => {
+        if (token[0] !== "#") return namedEntities[token.toLowerCase()] ?? entity;
+        const hexadecimal = token[1]?.toLowerCase() === "x";
+        const codePoint = Number.parseInt(token.slice(hexadecimal ? 2 : 1), hexadecimal ? 16 : 10);
+        if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return entity;
+        try {
+            return String.fromCodePoint(codePoint);
+        } catch (_) {
+            return entity;
+        }
+    });
+}
+
+function articlePlainText(markup = "") {
+    return decodeArticleHtmlEntities(String(markup || "")
+        .replace(/<(script|style|noscript|svg|nav|footer|header|form)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+        .replace(/<\s*(?:br|\/p|\/div|\/li|\/h[1-6])\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, " "))
+        .replace(/[\t\f\v ]+/g, " ")
+        .replace(/ *\n */g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
+
+function articleTagAttributes(tag = "") {
+    const attributes = {};
+    const pattern = /([:\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
+    let match;
+    while ((match = pattern.exec(tag))) {
+        attributes[match[1].toLowerCase()] = decodeArticleHtmlEntities(match[2] ?? match[3] ?? match[4] ?? "").trim();
+    }
+    return attributes;
+}
+
+function articleMetadataFromHtml(html = "") {
+    const metadata = new Map();
+    for (const tag of String(html || "").match(/<meta\b[^>]*>/gi) || []) {
+        const attributes = articleTagAttributes(tag);
+        const key = String(attributes.property || attributes.name || "").toLowerCase();
+        if (key && attributes.content && !metadata.has(key)) metadata.set(key, attributes.content);
+    }
+    return metadata;
+}
+
+function articleJsonLdFromHtml(html = "") {
+    const candidates = [];
+    for (const match of String(html || "").matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+        try {
+            candidates.push(JSON.parse(match[1].trim()));
+        } catch (_) {}
+    }
+    const objects = [];
+    const visit = value => {
+        if (Array.isArray(value)) return value.forEach(visit);
+        if (!value || typeof value !== "object") return;
+        objects.push(value);
+        if (value["@graph"]) visit(value["@graph"]);
+    };
+    candidates.forEach(visit);
+    return objects.find(item => item.articleBody || /article|posting/i.test(String(item["@type"] || ""))) || objects[0] || {};
+}
+
+function isPrivateArticleAddress(address = "") {
+    const normalized = String(address || "").toLowerCase().replace(/^\[|\]$/g, "");
+    if (net.isIPv4(normalized)) {
+        const [a, b] = normalized.split(".").map(Number);
+        return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224;
+    }
+    if (net.isIPv6(normalized)) {
+        if (normalized === "::" || normalized === "::1" || normalized.startsWith("fc") || normalized.startsWith("fd") || /^fe[89ab]/.test(normalized)) return true;
+        const mapped = normalized.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+        return mapped ? isPrivateArticleAddress(mapped[1]) : false;
+    }
+    return true;
+}
+
+async function validateArticleCrawlUrl(rawUrl = "") {
+    let target;
+    try {
+        target = new URL(String(rawUrl || "").trim());
+    } catch (_) {
+        throw Object.assign(new Error("Enter a valid article URL"), {status: 400});
+    }
+    if (!["http:", "https:"].includes(target.protocol) || target.username || target.password) {
+        throw Object.assign(new Error("Only public HTTP and HTTPS links are supported"), {status: 400});
+    }
+    if ((target.protocol === "http:" && target.port && target.port !== "80") || (target.protocol === "https:" && target.port && target.port !== "443")) {
+        throw Object.assign(new Error("The article URL uses an unsupported port"), {status: 400});
+    }
+    const hostname = target.hostname.toLowerCase().replace(/\.$/, "");
+    if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local")) {
+        throw Object.assign(new Error("Private network links are not supported"), {status: 400});
+    }
+    let addresses;
+    try {
+        addresses = net.isIP(hostname) ? [{address: hostname}] : await dns.lookup(hostname, {all: true, verbatim: true});
+    } catch (_) {
+        throw Object.assign(new Error("Unable to resolve the article website"), {status: 502});
+    }
+    if (!addresses.length || addresses.some(record => isPrivateArticleAddress(record.address))) {
+        throw Object.assign(new Error("Private network links are not supported"), {status: 400});
+    }
+    return target;
+}
+
+async function readArticleResponseText(response) {
+    const declaredLength = Number(response.headers.get("content-length") || 0);
+    if (declaredLength > ARTICLE_CRAWL_MAX_BYTES) throw Object.assign(new Error("The article page is too large"), {status: 413});
+    if (!response.body?.getReader) return (await response.text()).slice(0, ARTICLE_CRAWL_MAX_BYTES);
+    const reader = response.body.getReader();
+    const chunks = [];
+    let received = 0;
+    while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        received += value.byteLength;
+        if (received > ARTICLE_CRAWL_MAX_BYTES) {
+            await reader.cancel();
+            throw Object.assign(new Error("The article page is too large"), {status: 413});
+        }
+        chunks.push(value);
+    }
+    const bytes = new Uint8Array(received);
+    let offset = 0;
+    chunks.forEach(chunk => {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    });
+    return new TextDecoder().decode(bytes);
+}
+
+async function fetchArticleCrawlUrl(rawUrl, {accept = "text/html,application/xhtml+xml"} = {}) {
+    let target = await validateArticleCrawlUrl(rawUrl);
+    for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
+        const response = await fetch(target, {
+            redirect: "manual",
+            signal: AbortSignal.timeout(ARTICLE_CRAWL_TIMEOUT_MS),
+            headers: {Accept: accept, "User-Agent": "Standard Articles/1.0 (+article metadata import)"}
+        });
+        if ([301, 302, 303, 307, 308].includes(response.status)) {
+            const location = response.headers.get("location");
+            if (!location || redirectCount === 5) throw Object.assign(new Error("The article redirected too many times"), {status: 502});
+            target = await validateArticleCrawlUrl(new URL(location, target).toString());
+            continue;
+        }
+        if (!response.ok) throw Object.assign(new Error(`The article page returned ${response.status}`), {status: 502});
+        return {response, target};
+    }
+    throw Object.assign(new Error("Unable to fetch the article"), {status: 502});
+}
+
+function isWikipediaArticleUrl(url) {
+    return /^(?:[a-z0-9-]+\.)?wikipedia\.org$/i.test(url.hostname) && url.pathname.startsWith("/wiki/");
+}
+
+function wikipediaArticleExcerpt(extract = "") {
+    const firstParagraph = String(extract || "").replace(/\r\n?/g, "\n").split(/\n\s*\n/)[0].trim();
+    if (!firstParagraph) return "";
+    const sentences = firstParagraph.match(/[^.!?]+(?:[.!?]+["')\]]*|$)/g) || [firstParagraph];
+    return sentences.slice(0, 3).join(" ").replace(/\s+/g, " ").trim().slice(0, 2000);
+}
+
+async function crawlWikipediaArticle(url) {
+    const pageName = decodeURIComponent(url.pathname.slice("/wiki/".length));
+    if (!pageName) throw Object.assign(new Error("Enter a Wikipedia article link"), {status: 400});
+    const summaryUrl = new URL(`/api/rest_v1/page/summary/${encodeURIComponent(pageName)}`, url.origin);
+    const {response} = await fetchArticleCrawlUrl(summaryUrl.toString(), {accept: "application/json"});
+    const payload = JSON.parse(await readArticleResponseText(response));
+    if (payload.type === "disambiguation") throw Object.assign(new Error("Choose a specific Wikipedia article instead of a disambiguation page"), {status: 400});
+    return {
+        title: String(payload.title || pageName.replace(/_/g, " ")).trim(),
+        description: String(payload.description || payload.extract || "").trim().slice(0, 500),
+        link: "",
+        content: wikipediaArticleExcerpt(payload.extract),
+        source: url.toString(),
+        priority: 0
+    };
+}
+
+async function crawlGenericArticle(url) {
+    const {response, target} = await fetchArticleCrawlUrl(url.toString());
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    if (contentType && !contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
+        throw Object.assign(new Error("The link does not point to an HTML article"), {status: 415});
+    }
+    const html = await readArticleResponseText(response);
+    const metadata = articleMetadataFromHtml(html);
+    const jsonLd = articleJsonLdFromHtml(html);
+    const titleMarkup = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "";
+    const articleMarkup = html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)?.[1]
+        || html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1]
+        || html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i)?.[1]
+        || "";
+    const content = articlePlainText(jsonLd.articleBody || articleMarkup).slice(0, 20000);
+    const title = String(jsonLd.headline || metadata.get("og:title") || metadata.get("twitter:title") || articlePlainText(titleMarkup)).trim().slice(0, 300);
+    const suppliedDescription = String(jsonLd.description || metadata.get("description") || metadata.get("og:description") || metadata.get("twitter:description") || "").trim();
+    const description = (suppliedDescription || content.split(/(?<=[.!?])\s+/)[0] || `Article from ${target.hostname}`).slice(0, 500);
+    return {
+        title: title || target.pathname.split("/").filter(Boolean).pop()?.replace(/[-_]+/g, " ") || target.hostname,
+        description,
+        link: target.toString(),
+        content,
+        source: String(metadata.get("og:site_name") || target.hostname.replace(/^www\./i, "")).slice(0, 300),
+        priority: 0
+    };
+}
+
 app.get("/login", async (req, res) => {
     if (isDemoMode) {
         return res.redirect("/");
@@ -1932,6 +2145,19 @@ app.get("/api/integrations", async (_req, res) => {
     } catch (err) {
         console.error("Failed to load integrations:", err.message);
         return res.status(500).json({error: "Unable to load integrations"});
+    }
+});
+
+app.post("/api/articles/crawl", async (req, res) => {
+    try {
+        const url = await validateArticleCrawlUrl(req.body?.url);
+        const article = isWikipediaArticleUrl(url) ? await crawlWikipediaArticle(url) : await crawlGenericArticle(url);
+        return res.json({article});
+    } catch (err) {
+        const timedOut = err?.name === "AbortError" || err?.name === "TimeoutError";
+        const status = Number(err?.status) || (timedOut ? 504 : 500);
+        if (status >= 500) console.error("Article crawl failed:", err.message);
+        return res.status(status).json({error: timedOut ? "The article took too long to respond" : err.message || "Unable to gather article information"});
     }
 });
 

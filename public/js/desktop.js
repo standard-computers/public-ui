@@ -41,7 +41,10 @@
         if (!(target instanceof Element)) return false;
         return !target.closest("header, .draggable-window, .desktop-shortcut, #search-box-container, .desktop-command-panel, .custom-context-menu, #cover");
     };
-    const clearPortalFocus = () => document.querySelectorAll(".draggable-window.window-focused").forEach(node => node.classList.remove("window-focused"));
+    const clearPortalFocus = () => {
+        document.querySelectorAll(".draggable-window.window-focused").forEach(node => node.classList.remove("window-focused"));
+        window.StandardElectron?.setFocusedService?.("");
+    };
 
     function applyViewport() {
         canvas.style.transform = `translate(${state.viewport.x}px, ${state.viewport.y}px)`;

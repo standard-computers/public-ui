@@ -2,13 +2,54 @@
 
     const SERVICE_ID = "com.standard.editor.code";
     const SUI_FILE_PATTERN = /\.sui$/i;
+    const STD_FILE_PATTERN = /\.std$/i;
     const SUI_CLICK_DELAY_MS = 250;
     const SUI_TYPE_DELAY_MS = 24;
     const CODE_EDITOR_MOON_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>`;
     const CODE_EDITOR_SUN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/></svg>`;
 
     const CODE_EDITOR_SETTINGS = {
-        dark_mode: {label: "Dark mode", type: "boolean", default: false}
+        dark_mode: {label: "Dark mode", type: "boolean", default: false},
+        minimap: {label: "Minimap", type: "boolean", default: true},
+        comment_color: {label: "Comment color", type: "string", default: "#6b7280"},
+        string_color: {label: "String color", type: "string", default: "#0f9d58"},
+        number_color: {label: "Number color", type: "string", default: "#d97706"},
+        keyword_color: {label: "Keyword color", type: "string", default: "#2563eb"},
+        builtin_color: {label: "Built-in color", type: "string", default: "#7c3aed"},
+        type_color: {label: "Type and title color", type: "string", default: "#c2410c"},
+        call_color: {label: "Function call color", type: "string", default: "#0f766e"},
+        operator_color: {label: "Operator and punctuation color", type: "string", default: "#475569"},
+        tag_color: {label: "Tag color", type: "string", default: "#be123c"},
+        dark_comment_color: {label: "Dark comment color", type: "string", default: "#94a3b8"},
+        dark_string_color: {label: "Dark string color", type: "string", default: "#86efac"},
+        dark_number_color: {label: "Dark number color", type: "string", default: "#fbbf24"},
+        dark_keyword_color: {label: "Dark keyword color", type: "string", default: "#93c5fd"},
+        dark_builtin_color: {label: "Dark built-in color", type: "string", default: "#c4b5fd"},
+        dark_type_color: {label: "Dark type and title color", type: "string", default: "#fdba74"},
+        dark_call_color: {label: "Dark function call color", type: "string", default: "#5eead4"},
+        dark_operator_color: {label: "Dark operator and punctuation color", type: "string", default: "#cbd5e1"},
+        dark_tag_color: {label: "Dark tag color", type: "string", default: "#fda4af"}
+    };
+
+    const CODE_EDITOR_COLOR_PROPERTIES = {
+        comment_color: "--editor-code-comment-light",
+        string_color: "--editor-code-string-light",
+        number_color: "--editor-code-number-light",
+        keyword_color: "--editor-code-keyword-light",
+        builtin_color: "--editor-code-builtin-light",
+        type_color: "--editor-code-type-light",
+        call_color: "--editor-code-call-light",
+        operator_color: "--editor-code-operator-light",
+        tag_color: "--editor-code-tag-light",
+        dark_comment_color: "--editor-code-comment-dark",
+        dark_string_color: "--editor-code-string-dark",
+        dark_number_color: "--editor-code-number-dark",
+        dark_keyword_color: "--editor-code-keyword-dark",
+        dark_builtin_color: "--editor-code-builtin-dark",
+        dark_type_color: "--editor-code-type-dark",
+        dark_call_color: "--editor-code-call-dark",
+        dark_operator_color: "--editor-code-operator-dark",
+        dark_tag_color: "--editor-code-tag-dark"
     };
 
     const CODE_EDITOR_KEYWORDS = new Set([
@@ -315,6 +356,9 @@
     const getPortalCodeLineNumbers = (portal) => portal?.window?.()?.querySelector?.("#editor-code-lines") || null;
     const getPortalCodeHighlight = (portal) => portal?.window?.()?.querySelector?.("#editor-code-highlight") || null;
     const getPortalCodeStage = (portal) => portal?.window?.()?.querySelector?.("#editor-code-stage") || null;
+    const getPortalCodeMinimap = (portal) => portal?.window?.()?.querySelector?.("#editor-code-minimap") || null;
+    const getPortalCodeMinimapContent = (portal) => portal?.window?.()?.querySelector?.("#editor-code-minimap-content") || null;
+    const getPortalCodeMinimapViewport = (portal) => portal?.window?.()?.querySelector?.("#editor-code-minimap-viewport") || null;
 
     const setCodeEditorThemeToolIcon = (tool, darkMode) => {
         if (!tool) return;
@@ -338,12 +382,48 @@
         });
     };
 
-    const loadCodeEditorDarkMode = async () => {
+    const applyCodeEditorMinimap = (minimap) => {
+        const enabled = minimap !== false;
+        document.querySelectorAll(".editor-code-shell").forEach(shell => {
+            shell.classList.toggle("editor-code-minimap-disabled", !enabled);
+            const minimapNode = shell.querySelector(".editor-code-minimap");
+            if (minimapNode) {
+                const wasHidden = minimapNode.hidden;
+                minimapNode.hidden = !enabled;
+                if (enabled && wasHidden) shell.querySelector(".editor-code-input")?.dispatchEvent(new Event("scroll"));
+            }
+        });
+    };
+
+    const applyCodeEditorColors = (settings = {}) => {
+        document.querySelectorAll(".editor-code-shell").forEach(shell => {
+            Object.entries(CODE_EDITOR_COLOR_PROPERTIES).forEach(([settingName, propertyName]) => {
+                const value = String(settings?.[settingName] ?? CODE_EDITOR_SETTINGS[settingName]?.default ?? "").trim();
+                if (value) shell.style.setProperty(propertyName, value);
+                else shell.style.removeProperty(propertyName);
+            });
+        });
+    };
+
+    const loadCodeEditorSettings = async () => {
         const settings = await window.StandardAppSettings?.values?.(SERVICE_ID);
         const darkMode = settings?.dark_mode === true;
+        const minimap = settings?.minimap !== false;
         applyCodeEditorDarkMode(darkMode);
-        return darkMode;
+        applyCodeEditorMinimap(minimap);
+        applyCodeEditorColors(settings);
+        return {darkMode, minimap, colors: settings};
     };
+
+    const syncSavedCodeEditorSettings = (event) => {
+        if (event?.detail?.serviceId !== SERVICE_ID) return;
+        applyCodeEditorDarkMode(event.detail?.values?.dark_mode === true);
+        applyCodeEditorMinimap(event.detail?.values?.minimap !== false);
+        applyCodeEditorColors(event.detail?.values || {});
+    };
+
+    document.addEventListener("standard-app-settings-saved", syncSavedCodeEditorSettings);
+    document.addEventListener("standard-app-settings-reset", syncSavedCodeEditorSettings);
 
     const toggleCodeEditorDarkMode = async (_event, context) => {
         const settingsApi = context?.settings;
@@ -355,10 +435,27 @@
         if (!saved) modular.error("Unable to save code editor theme");
     };
 
+    const isDeveloperModeEnabled = () => window.StandardUI?.currentTheme?.developer_mode === true;
+
+    const shouldShowCodeEditorRunTool = (rawPath = "") => SUI_FILE_PATTERN.test(rawPath)
+        || (isDeveloperModeEnabled() && STD_FILE_PATTERN.test(rawPath));
+
     const syncCodeEditorRunTool = (portal) => {
         const runTool = portal?.window?.()?.querySelector?.('[data-portal-tool-title="run"]');
-        if (runTool) runTool.hidden = !SUI_FILE_PATTERN.test(getPortalRememberedCodePath(portal));
+        if (runTool) runTool.hidden = !shouldShowCodeEditorRunTool(getPortalRememberedCodePath(portal));
     };
+
+    const syncAllCodeEditorRunTools = () => {
+        document.querySelectorAll(".editor-code-shell").forEach(shell => {
+            const editorWindow = shell.closest(".draggable-window");
+            const runTool = editorWindow?.querySelector?.('[data-portal-tool-title="run"]');
+            const editorInput = shell.querySelector(".editor-code-input");
+            const path = normalizeCodeFilePath(editorWindow?.dataset?.codeFilePath || editorInput?.dataset?.codeFilePath || "");
+            if (runTool) runTool.hidden = !shouldShowCodeEditorRunTool(path);
+        });
+    };
+
+    document.addEventListener("standard-developer-mode-changed", syncAllCodeEditorRunTools);
 
     const isCodeEditorGoToLineShortcut = (event) => event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.key?.toLowerCase?.() === "g";
 
@@ -388,6 +485,44 @@
         codeHighlight.scrollLeft = codeEditorInput.scrollLeft;
         lineNumberContainer.scrollTop = codeEditorInput.scrollTop;
         codeStage.dataset.empty = content ? "0" : "1";
+        syncCodeEditorMinimap(portal, content, directive);
+    };
+
+    const syncCodeEditorMinimapViewport = (portal) => {
+        const codeEditorInput = getPortalCodeEditorInput(portal);
+        const minimap = getPortalCodeMinimap(portal);
+        const viewport = getPortalCodeMinimapViewport(portal);
+        if (!codeEditorInput || !minimap || !viewport || minimap.hidden) return;
+        const trackHeight = Math.max(0, minimap.clientHeight - 2);
+        const scrollHeight = Math.max(codeEditorInput.scrollHeight, codeEditorInput.clientHeight, 1);
+        const viewportHeight = Math.max(18, Math.min(trackHeight, trackHeight * (codeEditorInput.clientHeight / scrollHeight)));
+        const maxScrollTop = Math.max(0, scrollHeight - codeEditorInput.clientHeight);
+        const top = maxScrollTop ? (codeEditorInput.scrollTop / maxScrollTop) * (trackHeight - viewportHeight) : 0;
+        viewport.style.height = `${viewportHeight}px`;
+        viewport.style.transform = `translateY(${top}px)`;
+    };
+
+    const syncCodeEditorMinimap = (portal, content = "", directive = "") => {
+        const minimap = getPortalCodeMinimap(portal);
+        const minimapContent = getPortalCodeMinimapContent(portal);
+        if (!minimap || !minimapContent || minimap.hidden) return;
+        minimapContent.innerHTML = renderCodeEditorHighlighting(content, {path: directive});
+        minimapContent.style.transform = "none";
+        const availableHeight = Math.max(1, minimap.clientHeight - 12);
+        const contentHeight = Math.max(1, minimapContent.scrollHeight);
+        const scale = Math.min(1, availableHeight / contentHeight);
+        minimapContent.style.transform = `scaleY(${scale})`;
+        syncCodeEditorMinimapViewport(portal);
+    };
+
+    const scrollCodeEditorFromMinimap = (portal, clientY = 0) => {
+        const codeEditorInput = getPortalCodeEditorInput(portal);
+        const minimap = getPortalCodeMinimap(portal);
+        if (!codeEditorInput || !minimap) return;
+        const bounds = minimap.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, (clientY - bounds.top) / Math.max(1, bounds.height)));
+        codeEditorInput.scrollTop = (ratio * codeEditorInput.scrollHeight) - (codeEditorInput.clientHeight / 2);
+        syncCodeEditorPresentation(portal);
     };
 
     const hydrateCodeEditorFromState = (portal) => {
@@ -429,6 +564,36 @@
         const cursorPosition = selectionStart + offset;
         textArea.selectionStart = cursorPosition;
         textArea.selectionEnd = cursorPosition;
+    };
+
+    const getCodeEditorIndentUnit = () => "    ";
+
+    const getCodeEditorNewlineEdit = (value = "", selectionStart = 0, selectionEnd = selectionStart, rawPath = "") => {
+        const content = String(value ?? "");
+        const start = Math.max(0, Math.min(Number(selectionStart) || 0, content.length));
+        const end = Math.max(start, Math.min(Number(selectionEnd) || start, content.length));
+        const lineStart = content.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+        const lineBeforeCaret = content.slice(lineStart, start);
+        const baseIndent = lineBeforeCaret.match(/^[\t ]*/)?.[0] || "";
+        const trimmedBeforeCaret = lineBeforeCaret.trimEnd();
+        const nextCharacter = content[end] || "";
+        const previousCharacter = content[start - 1] || "";
+        const bracketPairs = {"{": "}", "[": "]", "(": ")", "<": ">"};
+        const isPairedBracketBoundary = bracketPairs[previousCharacter] === nextCharacter;
+        const extension = getCodeFileName(rawPath).split(".").pop()?.toLowerCase?.() || "";
+        const colonIndentExtensions = new Set(["coffee", "ex", "exs", "nim", "py", "rb", "sass", "sui", "yaml", "yml"]);
+        const endsWithOpeningBracket = /[{[(]$/.test(trimmedBeforeCaret);
+        const endsWithIndentingColon = colonIndentExtensions.has(extension) && /:$/.test(trimmedBeforeCaret);
+        const endsWithOpeningTag = /<[A-Za-z][\w:-]*(?:\s+[^<>]*?)?>$/.test(trimmedBeforeCaret) && !/\/>$/.test(trimmedBeforeCaret);
+        const isBeforeClosingTag = endsWithOpeningTag && /^\s*<\//.test(content.slice(end));
+        const shouldIncreaseIndent = endsWithOpeningBracket || endsWithIndentingColon || endsWithOpeningTag || isPairedBracketBoundary;
+        const nextIndent = `${baseIndent}${shouldIncreaseIndent ? getCodeEditorIndentUnit() : ""}`;
+        if (isPairedBracketBoundary || isBeforeClosingTag) {
+            const text = `\n${nextIndent}\n${baseIndent}`;
+            return {text, offset: 1 + nextIndent.length};
+        }
+        const text = `\n${nextIndent}`;
+        return {text, offset: text.length};
     };
 
     const getDuplicateLineDownEdit = (value = "", selectionStart = 0, selectionEnd = selectionStart) => {
@@ -605,6 +770,26 @@
         codeEditorInput.dataset.bound = "1";
         const lineNumberContainer = getPortalCodeLineNumbers(portal);
         if (lineNumberContainer) lineNumberContainer.style.overflow = "hidden";
+        const minimap = getPortalCodeMinimap(portal);
+        if (minimap && minimap.dataset.bound !== "1") {
+            minimap.dataset.bound = "1";
+            minimap.addEventListener("pointerdown", (event) => {
+                event.preventDefault();
+                minimap.setPointerCapture?.(event.pointerId);
+                minimap.dataset.dragging = "1";
+                scrollCodeEditorFromMinimap(portal, event.clientY);
+            });
+            minimap.addEventListener("pointermove", (event) => {
+                if (minimap.dataset.dragging === "1") scrollCodeEditorFromMinimap(portal, event.clientY);
+            });
+            const stopDragging = (event) => {
+                minimap.dataset.dragging = "0";
+                minimap.releasePointerCapture?.(event.pointerId);
+            };
+            minimap.addEventListener("pointerup", stopDragging);
+            minimap.addEventListener("pointercancel", stopDragging);
+            if (typeof ResizeObserver === "function") new ResizeObserver(() => syncCodeEditorPresentation(portal)).observe(minimap);
+        }
         const windowNode = portal?.window?.();
         if (windowNode && windowNode.dataset.codeGotoLineBound !== "1") {
             windowNode.dataset.codeGotoLineBound = "1";
@@ -645,7 +830,20 @@
             }
             if (event.key === "Tab") {
                 event.preventDefault();
-                insertCodeEditorText(codeEditorInput, "    ", 4);
+                const indent = getCodeEditorIndentUnit();
+                insertCodeEditorText(codeEditorInput, indent, indent.length);
+                codeEditorInput.dispatchEvent(new Event("input", {bubbles: true}));
+                return;
+            }
+            if (event.key === "Enter" && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                event.preventDefault();
+                const newlineEdit = getCodeEditorNewlineEdit(
+                    codeEditorInput.value,
+                    codeEditorInput.selectionStart,
+                    codeEditorInput.selectionEnd,
+                    getPortalRememberedCodePath(portal)
+                );
+                insertCodeEditorText(codeEditorInput, newlineEdit.text, newlineEdit.offset);
                 codeEditorInput.dispatchEvent(new Event("input", {bubbles: true}));
                 return;
             }
@@ -912,6 +1110,30 @@
         return runSuiSource(source, directive);
     };
 
+    const getStdSourceKind = (source = "") => String(source || "").trimStart().startsWith("window")
+        ? "standard-ui"
+        : "standard-script";
+
+    const runStandardUiCode = async () => {
+        modular.message("Standard UI execution will be implemented later");
+        return false;
+    };
+
+    const runStandardScriptCode = async () => {
+        modular.message("Standard script execution will be implemented later");
+        return false;
+    };
+
+    const runCode = async (portal) => {
+        const directive = getPortalRememberedCodePath(portal);
+        if (SUI_FILE_PATTERN.test(directive)) return runSuiCode(portal);
+        if (!isDeveloperModeEnabled() || !STD_FILE_PATTERN.test(directive)) return false;
+        const source = getPortalCodeEditorInput(portal)?.value ?? getPortalCodeState(portal).cachedContent;
+        return getStdSourceKind(source) === "standard-ui"
+            ? runStandardUiCode(portal, source, directive)
+            : runStandardScriptCode(portal, source, directive);
+    };
+
     const openFreshCodeEditor = () => {
         const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
         if (portal) {
@@ -947,7 +1169,7 @@
             horizontal_nav: true,
             centered_nav: true,
             tools: [
-                {title: "Run", icon: modular.icons.play, onclick: (_, context) => runSuiCode(context?.portal)},
+                {title: "Run", icon: modular.icons.play, onclick: (_, context) => runCode(context?.portal)},
                 {title: "Dark mode", icon: CODE_EDITOR_MOON_ICON, onclick: toggleCodeEditorDarkMode},
                 {title: "Save", icon: modular.icons.save, onclick: (_, context) => saveLoadedCodeFile(context?.portal)},
                 {title: "Search", icon: modular.icons.search, onclick: (event, context) => showCodeEditorSearchDialogue(context?.portal, event?.currentTarget)}
@@ -963,7 +1185,11 @@
                             div({id: "editor-code-lines", style: "editor-code-lines", content: "1"}),
                             div({id: "editor-code-stage", style: "editor-code-stage", content: children([
                                 div({id: "editor-code-highlight", style: "editor-code-highlight", content: "&nbsp;"}),
-                                textarea({id: "editor-code-content", style: "editor-code-input no-radius", placeholder: "Write code...", value: cachedContent})
+                                textarea({id: "editor-code-content", style: "editor-code-input no-radius", placeholder: "Write code...", value: cachedContent}),
+                                div({id: "editor-code-minimap", style: "editor-code-minimap radius margin secondary-border", ariaLabel: "Code minimap", content: children([
+                                    div({id: "editor-code-minimap-content", style: "editor-code-minimap-content", content: "&nbsp;"}),
+                                    div({id: "editor-code-minimap-viewport", style: "editor-code-minimap-viewport"})
+                                ])})
                             ])})
                         ])})
                     ])})
@@ -974,7 +1200,7 @@
                 hydrateCodeEditorFromState(this.portal);
                 updateCodeEditorPortalTitle(this.portal);
                 syncCodeEditorRunTool(this.portal);
-                loadCodeEditorDarkMode();
+                loadCodeEditorSettings();
                 focusCodeEditorAtEnd(this.portal);
             }
         })

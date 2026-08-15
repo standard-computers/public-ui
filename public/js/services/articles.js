@@ -2,6 +2,7 @@
 
     const articleListRecords = new Map();
     const createArticleIconState = {file: null, objectUrl: ""};
+    let pendingCreateArticleDraft = null;
     const escapeQuoted = value => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     const safeUrl = value => /^(https?:\/\/|mailto:)/i.test(String(value || "").trim()) ? String(value).trim() : "";
     const articleImage = article => article.id ? `/api/records/images/${encodeURIComponent(article.id)}?cb=${Date.now()}` : "/icons/interfaces/articles.png";
@@ -309,7 +310,11 @@
                 onclick: (_, context) => createArticle(context?.portal)
             }
         ],
-        route: () => editorRoute({}, "new-article"),
+        route: () => {
+            const draft = pendingCreateArticleDraft || {};
+            pendingCreateArticleDraft = null;
+            return editorRoute(draft, "new-article");
+        },
         afterRender: root => bindArticleIconPicker(root, {}, "new-article", createArticleIconState),
         onDispose: () => releaseArticleIconPreview(createArticleIconState)
     });
@@ -412,6 +417,93 @@
         });
     };
 
+    const openManualCreateArticle = () => {
+        pendingCreateArticleDraft = null;
+        modular.show("com.standard.articles", 1);
+    };
+
+    const finishArticleCrawlProgress = (token, label) => {
+        window.StandardDownloads?.updateOpenProgress?.({label, loaded: 1, total: 1, indeterminate: false, token});
+        window.setTimeout(() => window.StandardDownloads?.hideOpenProgress?.(token), 220);
+    };
+
+    const importArticleLink = async rawLink => {
+        const link = String(rawLink || "").trim();
+        if (!link) return modular.error("Enter an article link");
+        try {
+            const parsed = new URL(link);
+            if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Enter a valid HTTP or HTTPS article link");
+        } catch (error) {
+            return modular.error(error.message || "Enter a valid article link");
+        }
+        const progressToken = window.StandardDownloads?.beginOpenProgress?.("Gathering article information") || 0;
+        try {
+            const response = await fetch("/api/articles/crawl", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({url: link})
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.error || "Unable to gather article information");
+            pendingCreateArticleDraft = normalizeArticle(payload.article || {});
+            modular.show("com.standard.articles", 1);
+            finishArticleCrawlProgress(progressToken, "Article information gathered");
+        } catch (error) {
+            window.StandardDownloads?.hideOpenProgress?.(progressToken);
+            modular.error(error.message || "Unable to gather article information");
+        }
+    };
+
+    const showCreateArticleLinkDialogue = () => inputDialogue({
+        title: "Create Article from Link",
+        placeholder: "https://example.com/article",
+        confirmation: (_, link) => importArticleLink(link)
+    });
+
+    const showCreateArticleMenu = event => {
+        const trigger = event?.currentTarget;
+        if (!trigger) return;
+        if (!trigger.__articlesCreateMenuAttached) {
+            trigger.__articlesCreateMenuAttached = true;
+            trigger.popoutmenu([{
+                label: "Manual",
+                action: openManualCreateArticle
+            }, {
+                label: "Link",
+                action: showCreateArticleLinkDialogue
+            }]);
+            queueMicrotask(() => trigger.click());
+        }
+    };
+
+    const bindArticleLinkShortcut = () => {
+        if (window.__standardArticlesLinkShortcutBound) return;
+        window.__standardArticlesLinkShortcutBound = true;
+        const openLinkDialogue = () => {
+            const hasVisibleDialogue = Array.from(document.querySelectorAll(".dialogue")).some(dialogue => dialogue.getClientRects().length > 0);
+            if (hasVisibleDialogue) return;
+            const focusedWindow = typeof getFocusedPortalWindow === "function" ? getFocusedPortalWindow() : null;
+            if (focusedWindow?.portal?.serviceId?.() !== "com.standard.articles") return;
+            showCreateArticleLinkDialogue();
+        };
+        document.addEventListener("keydown", event => {
+            const isLinkShortcut = (event.ctrlKey || event.metaKey)
+                && !event.altKey
+                && !event.shiftKey
+                && event.key?.toLowerCase?.() === "k";
+            if (!isLinkShortcut || event.defaultPrevented || event.repeat) return;
+            const focusedWindow = typeof getFocusedPortalWindow === "function" ? getFocusedPortalWindow() : null;
+            if (focusedWindow?.portal?.serviceId?.() !== "com.standard.articles") return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            openLinkDialogue();
+        }, true);
+        window.StandardElectron?.onArticleLinkShortcut?.(openLinkDialogue);
+    };
+
+    bindArticleLinkShortcut();
+
     modular.register(new Service("com.standard.articles", [
         new Portal({
             title: "Articles",
@@ -423,7 +515,7 @@
             tools: [{
                 title: "Create Article",
                 icon: modular.icons.create,
-                onclick: () => modular.show("com.standard.articles", 1)
+                onclick: showCreateArticleMenu
             }],
             route: () => div({style: "large-padding-top small-padding", content: div({id: "articles-list-results", content: () => CLI.send("[articles] <LIMIT 25>").then(payload => {
                 const articles = recordsFrom(payload).sort((a, b) => Number(b.priority) - Number(a.priority) || String(b.created).localeCompare(String(a.created)));

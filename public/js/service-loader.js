@@ -1,13 +1,13 @@
 (() => {
 
-    const demoHiddenServices = new Set(["com.standard.internals", "com.standard.cli"]);
+    const demoHiddenServices = new Set(["com.standard.internals", "com.standard.integrator", "com.standard.cli"]);
 
     const platformInterfaces = [
         {serviceId: "com.standard.setup", title: "Setup", script: "/js/services/setup.js", icon: "/icons/interfaces/settings.png", internal: true, required: true, desktopOnly: true},
         {serviceId: "com.standard.internals", title: "Internals", script: "/js/services/internals.js", icon: "/icons/interfaces/cli.png", internal: true},
         {serviceId: "com.standard.articles", title: "Articles", script: "/js/services/articles.js", icon: "/icons/interfaces/articles.png"},
         {serviceId: "com.standard.integrator", title: "Integrator", script: "/js/services/integrator.js", icon: "/icons/interfaces/cli.png"},
-        {serviceId: "com.standard.stopwatch", title: "Stopwatch", script: "/js/services/stopwatch.js", icon: "/icons/interfaces/stopwatch   .png", internal: true},
+        {serviceId: "com.standard.stopwatch", title: "Stopwatch", script: "/js/services/stopwatch.js", icon: "/icons/interfaces/stopwatch.png", internal: true},
         {serviceId: "com.standard.calculator", title: "Calculator", script: "/js/services/calculator.js", icon: "/icons/interfaces/cli.png", internal: true},
         {serviceId: "com.standard.timers", title: "Timers", script: "/js/services/timers.js", icon: "/icons/interfaces/alarms.png"},
         {serviceId: "com.standard.files", title: "Files", script: "/js/services/files.js", icon: "/icons/interfaces/files.png"},
@@ -40,6 +40,10 @@
     const serviceScripts = platformInterfaces.map(({script}) => script);
 
     const SERVICE_SCRIPT_CACHE_INTERFACE = "service-loader";
+    const SERVICE_SCRIPT_CACHE_VERSION = "v31";
+    const ENABLED_APPS_CACHE_KEY = "enabled-apps";
+    const DESKTOP_STATE_CACHE_KEY = "desktop-canvas";
+    const DESKTOP_SHORTCUT_CACHE_PREFIX = "desktop-shortcut:";
 
     const defaultDeviceStatus = {serial: "Unknown", config: {}, network: {}, storage: {}, volume: {}};
     window.StandardDeviceStatus = window.StandardDeviceStatus || {data: null, promise: null};
@@ -47,9 +51,7 @@
     const loadDeviceStatus = () => {
         if (window.StandardDeviceStatus.promise) return window.StandardDeviceStatus.promise;
         const cli = typeof window.CLI?.send === "function" ? window.CLI : null;
-        window.StandardDeviceStatus.promise = (cli
-            ? cli.send("status")
-            : Promise.reject(new Error("CLI is unavailable")))
+        window.StandardDeviceStatus.promise = (cli ? cli.send("status") : Promise.reject(new Error("CLI is unavailable")))
             .then((deviceStatus) => {
                 const normalizedStatus = deviceStatus && typeof deviceStatus === "object" ? deviceStatus : defaultDeviceStatus;
                 window.StandardDeviceStatus.data = normalizedStatus;
@@ -65,11 +67,6 @@
         return window.StandardDeviceStatus.promise;
     };
 
-    const SERVICE_SCRIPT_CACHE_VERSION = "v28";
-
-    const ENABLED_APPS_CACHE_KEY = "enabled-apps";
-    const DESKTOP_STATE_CACHE_KEY = "desktop-canvas";
-    const DESKTOP_SHORTCUT_CACHE_PREFIX = "desktop-shortcut:";
 
     const buildServiceScriptCacheKey = (url = "") => `${SERVICE_SCRIPT_CACHE_VERSION}:${url}`;
 
@@ -120,8 +117,8 @@
     const isLikelyJavaScript = (source = "", contentType = "") => {
         const type = `${contentType || ""}`.toLowerCase();
         const trimmed = `${source || ""}`.trimStart();
-        if (type.includes("text/html") || trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) return false;
-        return true;
+        return !(type.includes("text/html") || trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html"));
+
     };
 
     const fetchServiceScriptSource = async (url) => {

@@ -652,7 +652,7 @@ function textarea(n) {
 	applyCommonAttributes(el, n);
 	if (n.rows) el.rows = n.rows;
 	if (n.placeholder) el.placeholder = n.placeholder;
-	if (n.value) el.value = n.value;
+	if (n.value !== undefined && n.value !== null) el.textContent = String(n.value);
 	return el.outerHTML;
 }
 

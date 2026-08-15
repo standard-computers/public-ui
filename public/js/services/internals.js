@@ -879,6 +879,21 @@
         return {serviceId: String(state.serviceId || ""), title: String(state.title || state.serviceId || "App Settings")};
     };
     const getSettingsFieldId = (name = "") => `internals-app-setting-${String(name || "").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+    const isAppSettingColorValue = (value = "") => {
+        const normalizedValue = String(value || "").trim();
+        if (!/^(?:#|rgba?\s*\()/i.test(normalizedValue)) return false;
+        return typeof window.CSS?.supports !== "function" || window.CSS.supports("color", normalizedValue);
+    };
+    const wrapSettingColorPreview = (controlMarkup = "") => `<span class="internals-app-setting-value"><span class="internals-app-setting-color-preview" aria-hidden="true" hidden></span>${controlMarkup}</span>`;
+    const refreshAppSettingColorPreview = (field = null) => {
+        const preview = field?.closest?.(".internals-app-setting-value")?.querySelector?.(".internals-app-setting-color-preview");
+        if (!preview) return;
+        const value = String(field?.value || "").trim();
+        const isColor = isAppSettingColorValue(value);
+        preview.hidden = !isColor;
+        preview.style.backgroundColor = isColor ? value : "";
+        preview.title = isColor ? value : "";
+    };
     const renderSettingControl = (name = "", setting = {}, value) => {
         const fieldId = getSettingsFieldId(name);
         const type = String(setting?.type || "text").toLowerCase();
@@ -907,10 +922,10 @@
             const field = wrapper.firstElementChild;
             field.setAttribute("data-setting-name", name);
             field.setAttribute("data-setting-type", type);
-            return field.outerHTML;
+            return wrapSettingColorPreview(field.outerHTML);
         }
         const inputType = type === "number" ? "number" : "text";
-        return `<input id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="${escapeHtml(type)}" type="${inputType}" class="undecorated no-padding fill" value="${escapeHtml(normalizedValue)}">`;
+        return wrapSettingColorPreview(`<input id="${fieldId}" data-setting-name="${escapeHtml(name)}" data-setting-type="${escapeHtml(type)}" type="${inputType}" class="undecorated no-padding fill" value="${escapeHtml(normalizedValue)}">`);
     };
     const renderAppSettingsPortal = async (portal = findInternalsWindow(4)?.portal) => {
         const root = portal?.window?.() || document;
@@ -938,6 +953,11 @@
         }).join("");
         host.innerHTML = `<div class="internals-app-settings" data-settings-service="${escapeHtml(serviceId)}">${rows}</div>`;
         const settingsRoot = host.querySelector(".internals-app-settings");
+        settingsRoot?.querySelectorAll?.("[data-setting-name]").forEach(refreshAppSettingColorPreview);
+        settingsRoot?.addEventListener("input", (event) => {
+            const field = event.target?.closest?.("[data-setting-name]");
+            if (field && settingsRoot.contains(field)) refreshAppSettingColorPreview(field);
+        });
         settingsRoot?.addEventListener("change", (event) => {
             const field = event.target?.closest?.("[data-setting-name]");
             if (!field || !settingsRoot.contains(field)) return;

@@ -465,6 +465,23 @@ let modular = {
             widgetWindow.style.zIndex = `${2147483000 + index}`;
         });
     },
+    focusLastWindow: (excludedElement = null) => {
+        const focusedWindow = document.querySelector('.draggable-window.window-focused:not(.widget-window):not(.minimized)');
+        if (focusedWindow && focusedWindow !== excludedElement) return focusedWindow;
+        const nextWindow = Array.from(document.querySelectorAll('.draggable-window:not(.widget-window):not(.minimized)'))
+            .filter(windowNode => windowNode !== excludedElement && document.body.contains(windowNode))
+            .sort((left, right) => {
+                const leftZ = Number.parseInt(window.getComputedStyle(left).zIndex, 10) || 0;
+                const rightZ = Number.parseInt(window.getComputedStyle(right).zIndex, 10) || 0;
+                return rightZ - leftZ;
+            })[0] || null;
+        if (nextWindow) {
+            modular.bringToFront(nextWindow);
+        } else {
+            window.StandardElectron?.setFocusedService?.("");
+        }
+        return nextWindow;
+    },
     bringToFront: (element) => {
         if (!element) return;
         document.querySelectorAll('.draggable-window.window-focused').forEach(windowDiv => {
@@ -473,6 +490,7 @@ let modular = {
             }
         });
         element.classList.add('window-focused');
+        window.StandardElectron?.setFocusedService?.(element?.portal?.serviceId?.() || "");
         modular.highestZ += 1;
         element.style.zIndex = `${modular.highestZ}`;
         modular.raisePinnedWidgets(element);

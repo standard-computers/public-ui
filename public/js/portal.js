@@ -1131,6 +1131,16 @@ function getFocusedPortalSearchTool() {
 function isEditableShortcutTarget(element = document.activeElement) {
     return !!element && (element.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(element.tagName));
 }
+function isTextEditingShortcutTarget(element = document.activeElement) {
+    if (!element) return false;
+    if (element.isContentEditable || element.tagName === "TEXTAREA") return true;
+    if (element.tagName !== "INPUT") return false;
+    return !["button", "checkbox", "color", "file", "image", "radio", "range", "reset", "submit"].includes(String(element.type || "text").toLowerCase());
+}
+function isMacPlatform() {
+    const platform = navigator.userAgentData?.platform || navigator.platform || "";
+    return /mac/i.test(platform);
+}
 function getFocusedPortalWindow() {
     return document.querySelector(".draggable-window.window-focused:not(.widget-window)");
 }
@@ -1230,6 +1240,10 @@ function tileFocusedPortalFromShortcut(e) {
     };
     const tileDirection = tileDirectionByKey[e.key];
     if (!tileDirection) return false;
+    if (isMacPlatform() && isTextEditingShortcutTarget(e.target || document.activeElement)) {
+        lastHandledTileShortcutDirection = "";
+        return false;
+    }
     if (e.type === "keyup" && lastHandledTileShortcutDirection === tileDirection) {
         lastHandledTileShortcutDirection = "";
         e.preventDefault();

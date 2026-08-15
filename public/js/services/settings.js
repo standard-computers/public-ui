@@ -23,6 +23,7 @@
         hide_shortcuts: false,
         kiosk_mode: false,
         disable_bar: false,
+        developer_mode: false,
         media_widget: true,
         video_widget: true,
     }
@@ -1695,6 +1696,10 @@
                             switcher({id: "disable-bar", checked: ui_settings_options.disable_bar === true}),
                             label({style: "faded", content: "Disable Bar"}),
                             div({style: "big-spacer"}),
+                            switcher({id: "developer-mode", checked: ui_settings_options.developer_mode === true}),
+                            label({style: "faded", content: "Developer Mode"}),
+                            em({style: "faded", content: "Show developer configuration tools"}),
+                            div({style: "big-spacer"}),
                             switcher({id: "use-player-widget", checked: ui_settings_options.interface_state}),
                             label({style: "faded", content: "Use Player Widget"}),
                             em({style: "faded", content: "Widget to control active media"}),
@@ -1704,7 +1709,7 @@
                             em({style: "faded", content: "Widget to stream video and control"})
                         ])
                     }),
-                    afterRender: () => {
+                    afterRender: (_window, context) => {
                         document.getElementById("use-cursor").addEventListener("change", event => {
                             ui_settings_options.use_cursor = event.target?.checked === true;
                             window.StandardUI?.setUseCursor?.(ui_settings_options.use_cursor);
@@ -1722,6 +1727,20 @@
                             window.StandardUI?.setDisableBar?.(ui_settings_options.disable_bar);
                             saveSettings({successMessage: ui_settings_options.disable_bar ? "Bar disabled" : "Bar enabled"});
                         });
+                        document.getElementById("developer-mode").addEventListener("change", async event => {
+                            const toggle = event.target;
+                            const previousValue = ui_settings_options.developer_mode === true;
+                            ui_settings_options.developer_mode = toggle?.checked === true;
+                            const saved = await saveSettings({successMessage: ui_settings_options.developer_mode ? "Developer mode enabled" : "Developer mode disabled"});
+                            if (!saved) {
+                                ui_settings_options.developer_mode = previousValue;
+                                if (toggle) toggle.checked = previousValue;
+                                return;
+                            }
+                            document.dispatchEvent(new CustomEvent("standard-developer-mode-changed", {detail: {enabled: ui_settings_options.developer_mode}}));
+                            context?.portal?.close?.();
+                            modular.show("com.standard.settings");
+                        });
                     }
                 }, {
                     text: "Interfaces",
@@ -1733,6 +1752,7 @@
                     afterRender: () => initializeInterfacesRoute()
                 }, {
                     text: "Config",
+                    visible: () => ui_settings_options.developer_mode === true,
                     icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h15M4.5 12h15m-15 5.25h15"/><circle cx="8" cy="6.75" r="1.5" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="10" cy="17.25" r="1.5" fill="currentColor" stroke="none"/></svg>`,
                     route: () => div({id: "settings-config-root", style: "small-padding", content: children([
                         div({style: "brick small-margin-bottom", content: children([

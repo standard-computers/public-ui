@@ -14,12 +14,22 @@ const AUTO_OPEN_DEVTOOLS = process.env.ELECTRON_OPEN_DEVTOOLS === "true";
 const START_MAXIMIZED = process.env.ELECTRON_START_MAXIMIZED === "true";
 
 let mainWindow = null;
+let focusedServiceId = "";
 
 function installDevToolsShortcuts(window) {
     if (!window || window.isDestroyed()) return;
     window.webContents.on("before-input-event", (event, input) => {
         if (input.type !== "keyDown") return;
         const key = String(input.key || "").toLowerCase();
+        const isArticleLinkCombo = key === "k"
+            && (input.control || input.meta)
+            && !input.alt
+            && !input.shift;
+        if (isArticleLinkCombo && focusedServiceId === "com.standard.articles") {
+            event.preventDefault();
+            window.webContents.send("standard:article-link-shortcut");
+            return;
+        }
         const isToggleCombo = key === "f12"
             || (key === "i" && ((input.control && input.shift) || input.meta));
         if (!isToggleCombo) return;
@@ -83,6 +93,11 @@ ipcMain.handle("standard:set-kiosk-mode", (_, enabled) => {
     window.setKiosk(kioskEnabled);
     window.setFullScreen(kioskEnabled);
     return true;
+});
+
+ipcMain.on("standard:focused-service", (event, serviceId) => {
+    if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return;
+    focusedServiceId = String(serviceId || "").trim().slice(0, 200);
 });
 
 async function bootstrapDesktopApp() {
