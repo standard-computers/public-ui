@@ -519,8 +519,7 @@
         svg_icon: modular.icons.at,
         icon: "/icons/interfaces/contacts.png",
         route: () => div({ style: "large-padding-top", content: children([
-                div({ id: "contacts-list", style : "notes-list", content: div({
-                        style: "padded", content: () => {
+                div({ id: "contacts-list", style : "notes-list", content: div({style: "padded", content: () => {
                             return CLI.send("[contacts]").then(d => {
                                 const contacts = d === 0 ? [] : d.contacts;
                                 if (!Array.isArray(contacts)) throw new Error("Invalid contacts response");
@@ -550,6 +549,7 @@
                                         ])
                                     }))
                                 }
+                                as.push(div({style: "faded center margin-top", content: `${contacts.length} Contacts`}));
                                 return children(as);
                             })
                         }

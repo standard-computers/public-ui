@@ -586,7 +586,7 @@
         return true;
     };
     const hideSlideInlineStyleEditor = () => {
-        if (typeof window.StandardPlastic?.removeInlineStyleEditor === "function") window.StandardPlastic.removeInlineStyleEditor(false);
+        if (typeof window.Plastic?.removeInlineStyleEditor === "function") window.Plastic.removeInlineStyleEditor(false);
     };
     const blurSlideTextEditing = () => {
         const activeEditor = document.activeElement?.closest?.(".editor-slide-text-content");
@@ -597,13 +597,13 @@
     };
     const openSlideInlineStyleEditor = ({blockId = selectedSlideBlockId, contentNode = null, event = null} = {}) => {
         const block = getSlideTextBlockById(blockId);
-        if (!block || typeof window.StandardPlastic?.showInlineStyleEditor !== "function") return;
+        if (!block || typeof window.Plastic?.showInlineStyleEditor !== "function") return;
         const activeContentNode = contentNode instanceof HTMLElement ? contentNode : document.querySelector(`.editor-slide-text-content[data-block-id="${block.id}"]`);
         if (!(activeContentNode instanceof HTMLElement)) return;
         const selectionOffsets = getSlideSelectionOffsets(activeContentNode) || {start: 0, end: block.content.length};
         const selectionRect = getSlideSelectionRect(activeContentNode);
         const blockRect = activeContentNode.getBoundingClientRect();
-        window.StandardPlastic.showInlineStyleEditor({
+        window.Plastic.showInlineStyleEditor({
             title: "Text Style",
             x: event?.clientX ?? selectionRect?.left ?? (blockRect.right - 20),
             y: event?.clientY ?? selectionRect?.bottom ?? (blockRect.top + 20),
@@ -1818,8 +1818,8 @@
     const renderSlideChartIntoNode = (targetNode = null, block = {}) => {
         if (!(targetNode instanceof HTMLElement)) return;
         normalizeSlideChartBlock(block);
-        if (typeof window.StandardPlastic?.renderChart === "function") {
-            window.StandardPlastic.renderChart(targetNode, {
+        if (typeof window.Plastic?.renderChart === "function") {
+            window.Plastic.renderChart(targetNode, {
                 type: block.chartType,
                 title: block.title || "Chart",
                 data: block.data || [],

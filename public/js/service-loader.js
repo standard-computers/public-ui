@@ -39,7 +39,6 @@
 
     const serviceScripts = platformInterfaces.map(({script}) => script);
 
-    const SERVICE_SCRIPT_CACHE_INTERFACE = "service-loader";
     const SERVICE_SCRIPT_CACHE_VERSION = "v31";
     const ENABLED_APPS_CACHE_KEY = "enabled-apps";
     const DESKTOP_STATE_CACHE_KEY = "desktop-canvas";
@@ -81,7 +80,7 @@
     const getCachedServiceScriptSource = async (url) => {
         if (!supportsServiceScriptCache()) return null;
         try {
-            const cached = await window.StandardBrowserCache.get(SERVICE_SCRIPT_CACHE_INTERFACE, buildServiceScriptCacheKey(url), {format: "js"});
+            const cached = await window.StandardBrowserCache.get("service-loader", buildServiceScriptCacheKey(url), {format: "js"});
             return typeof cached === "string" && cached.trim() ? cached : null;
         } catch (error) {
             console.warn(`Failed to read cached service script ${url}`, error);
@@ -92,7 +91,7 @@
     const cacheServiceScriptSource = async (url, source) => {
         if (!supportsServiceScriptCache() || typeof source !== "string") return false;
         try {
-            await window.StandardBrowserCache.set(SERVICE_SCRIPT_CACHE_INTERFACE, buildServiceScriptCacheKey(url), source, {
+            await window.StandardBrowserCache.set("service-loader", buildServiceScriptCacheKey(url), source, {
                 format: "js",
                 contentType: "text/javascript; charset=utf-8",
                 label: url,
@@ -108,7 +107,7 @@
     const deleteCachedServiceScriptSource = async (url) => {
         if (!supportsServiceScriptCache()) return false;
         try {
-            return await window.StandardBrowserCache.delete(SERVICE_SCRIPT_CACHE_INTERFACE, buildServiceScriptCacheKey(url), {format: "js"});
+            return await window.StandardBrowserCache.delete("service-loader", buildServiceScriptCacheKey(url), {format: "js"});
         } catch (_) {
             return false;
         }

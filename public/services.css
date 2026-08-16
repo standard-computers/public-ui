@@ -480,6 +480,7 @@ input.calendar-recurrence-number {width:46px;padding:5px 6px;text-align:center}
 .maps-directions-action {flex:1;justify-content:center}
 .maps-directions-result-actions {display:flex;gap:6px}
 .maps-directions-result-actions.hidden {display:none}
+.maps-directions-icon-action {flex:0 0 38px;padding-left:8px;padding-right:8px}
 .maps-directions-summary {font-size:.9em;font-weight:600;padding:6px 8px;background:var(--secondary-bg);border-radius:var(--radius)}
 .maps-directions-summary.hidden {display:none}
 .maps-directions-error {color:var(--danger,#b00020)}
@@ -495,6 +496,10 @@ input.calendar-recurrence-number {width:46px;padding:5px 6px;text-align:center}
 .maps-directions-navigation-instruction {font-size:.94em;font-weight:600;line-height:1.25}
 .maps-directions-navigation-distance {font-size:.82em;opacity:.7}
 .maps-directions-navigation-actions {display:flex;gap:6px}
+.maps-directions-portal {display:flex;flex-direction:column;gap:8px;box-sizing:border-box;height:100%;overflow:hidden}
+.maps-directions-portal-title {margin:0;line-height:1.2}
+.maps-directions-portal-summary {padding:8px 10px;background:var(--secondary-bg);border-radius:var(--radius);font-weight:600}
+.maps-directions-portal-steps {max-height:none;flex:1;font-size:.95em;padding-left:28px;padding-right:6px}
 .maps-controls-overlay {position:absolute;right:12px;bottom:12px;z-index:4;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .maps-control-row {display:flex;gap:4px}
 .maps-control-button {margin:0 !important}

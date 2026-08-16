@@ -1,6 +1,7 @@
 (async () => {
 
     const NOTE_CONTENT_PREFIX = "__STD_NOTE_B64__:";
+
     const escapeQuotedValue = value => String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     const encodeNoteContent = value => {
         const bytes = new TextEncoder().encode(String(value || ""));
@@ -242,9 +243,7 @@
                 } else {
                     modular.error("Unable to delete note");
                 }
-            }).catch(() => {
-                modular.error("Unable to delete note");
-            })
+            }).catch(() => modular.error("Couldn't delete"))
         });
     };
 
@@ -257,27 +256,21 @@
             title: noteCreated,
             dimensions: [380, 270],
             navigation: false,
-            tools: [
-                {
-                    title: "Delete",
-                    icon: modular.icons.delete,
-                    onclick: () => deleteNote(note.id, () => notePortal.close())
-                },
-                {
-                    title: "Edit",
-                    icon: modular.icons.modify,
-                    onclick: () => {
-                        notePortal.close();
-                        openNoteEditor(note);
-                    }
+            tools: [{
+                title: "Delete",
+                icon: modular.icons.delete,
+                onclick: () => deleteNote(note.id, () => notePortal.close())
+            }, {
+                title: "Edit",
+                icon: modular.icons.modify,
+                onclick: () => {
+                    notePortal.close();
+                    openNoteEditor(note);
                 }
-            ],
+            }],
             svg_icon: modular.icons.note,
             icon: "/icons/interfaces/notes.png",
-            route: () => div({
-                style: "padded large-padding-top",
-                content: `<div class="note-view-content">${sanitizeNoteMarkup(noteContent)}</div>`
-            }),
+            route: () => div({style: "padded large-padding-top", content: `<div class="note-view-content">${sanitizeNoteMarkup(noteContent)}</div>`}),
             afterRender: win => {
                 win.style.background = noteColor;
                 bindNoteImageViewer(win);
@@ -296,34 +289,33 @@
             title: updatedTitle || "Edit Note",
             title_editable: true,
             on_title_change: title => updatedTitle = title,
-            dimensions: [380, 300], navigation: false, tools: [
-                {
-                    title: "Delete",
-                    icon: modular.icons.delete,
-                    onclick: () => deleteNote(noteId, () => noteEditorPortal.close())
-                },
-                {
-                    title: "Save", icon: modular.icons.save, onclick: (_, context) => {
-                        updatedTitle = readPortalTitle(context, updatedTitle);
-                        const updatedContent = getNoteMarkup(document.getElementById("edit-note-content"));
-                        const updatedColor = document.getElementById("edit-note-color").value;
-                        const escapedContent = serializeNoteContent(updatedContent);
-                        const escapedColor = escapeQuotedValue(updatedColor);
-                        Promise.all([
-                            CLI.send(`[notes] content "${escapedContent}" <id ${noteId}>`),
-                            CLI.send(`[notes] color "${escapedColor}" <id ${noteId}>`),
-                            CLI.send(`[notes] title "${escapeQuotedValue(updatedTitle)}" <id ${noteId}>`)
-                        ]).then(([contentResponse, colorResponse, titleResponse]) => {
-                            if (contentResponse !== 0 && colorResponse !== 0 && titleResponse !== 0) {
-                                context?.portal?.close?.();
-                                refreshNotes();
-                            } else {
-                                modular.error("Failed to update note");
-                            }
-                        });
-                    }
+            dimensions: [380, 300],
+            navigation: false,
+            tools: [{
+                title: "Delete",
+                icon: modular.icons.delete,
+                onclick: () => deleteNote(noteId, () => noteEditorPortal.close())
+            }, {
+                title: "Save", icon: modular.icons.save, onclick: (_, context) => {
+                    updatedTitle = readPortalTitle(context, updatedTitle);
+                    const updatedContent = getNoteMarkup(document.getElementById("edit-note-content"));
+                    const updatedColor = document.getElementById("edit-note-color").value;
+                    const escapedContent = serializeNoteContent(updatedContent);
+                    const escapedColor = escapeQuotedValue(updatedColor);
+                    Promise.all([
+                        CLI.send(`[notes] content "${escapedContent}" <id ${noteId}>`),
+                        CLI.send(`[notes] color "${escapedColor}" <id ${noteId}>`),
+                        CLI.send(`[notes] title "${escapeQuotedValue(updatedTitle)}" <id ${noteId}>`)
+                    ]).then(([contentResponse, colorResponse, titleResponse]) => {
+                        if (contentResponse !== 0 && colorResponse !== 0 && titleResponse !== 0) {
+                            context?.portal?.close?.();
+                            refreshNotes();
+                        } else {
+                            modular.error("Failed to update note");
+                        }
+                    });
                 }
-            ],
+            }],
             svg_icon: modular.icons.note,
             icon: "/icons/interfaces/notes.png",
             route: () => div({style: "large-padding-top editor-portal-shell",
@@ -380,14 +372,11 @@
         }],
         svg_icon: modular.icons.note,
         icon: "/icons/interfaces/notes.png",
-        route: _ => div({
-            style: "large-padding-top editor-portal-shell",
-            content: children([input({type: "hidden", id: "new-note-color"}), div({
-                style: "undecorated fill padded",
-                id: "new-note-content",
-                contenteditable: true,
-                content: ""
-            }), colorPicker({id: "foreground", colors: noteColors})])
+        route: _ => div({style: "large-padding-top editor-portal-shell", content: children([
+                input({type: "hidden", id: "new-note-color"}),
+                div({style: "undecorated fill padded", id: "new-note-content", contenteditable: true, content: ""}),
+                colorPicker({id: "foreground", colors: noteColors})
+            ])
         }),
         afterRender: win => {
             const newNoteContent = document.getElementById("new-note-content");
@@ -412,11 +401,8 @@
             }],
             svg_icon: modular.icons.note,
             icon: "/icons/interfaces/notes.png",
-            route: () => div({
-                style: "large-padding-top padding-right", content: children([
-                    div({
-                        style: "notes-list", content: div({
-                            style: "padded", content: () => {
+            route: () => div({style: "large-padding-top padding-right", content: children([
+                    div({style: "notes-list", content: div({style: "padded", content: () => {
                                 return CLI.send("[notes]").then(d => {
                                     const noteRecords = d === 0 ? [] : (d.notes || d.NTS);
                                     if (!Array.isArray(noteRecords)) throw new Error("Invalid notes response");
@@ -447,10 +433,7 @@
                                                 }),
                                                 strong({style: "note-tile-title", content: escapeHtml(note.title || note.created || "Untitled Note")}),
                                                 note.title ? em({style: "smaller faded", content: escapeHtml(note.created || "")}) : "",
-                                                div({
-                                                    style: "note-tile-content",
-                                                    content: sanitizeNoteMarkup(normalizeNoteContent(note.content))
-                                                }),
+                                                div({style: "note-tile-content", content: sanitizeNoteMarkup(normalizeNoteContent(note.content))}),
                                             ])
                                         }));
                                     }
@@ -464,35 +447,33 @@
             afterRender: () => {
                 const notesList = document.querySelector(".notes-list");
                 bindNoteImageViewer(notesList);
-                notesList.contextmenu([
-                    {
-                        icon: modular.icons.open,
-                        label: "Open",
-                        action: (b, e, el) => {
-                            const nt = el.closest(".note-tile");
-                            const note = getNoteTileData(nt);
-                            if (!note) return;
-                            openNote(note);
-                        }
-                    }, {
-                        icon: modular.icons.modify,
-                        label: "Edit",
-                        action: (b, e, el) => {
-                            const nt = el.closest(".note-tile");
-                            const note = getNoteTileData(nt);
-                            if (!note) return;
-                            openNoteEditor(note);
-                        }
-                    }, {
-                        icon: modular.icons.delete,
-                        label: "Delete",
-                        destructive: true,
-                        action: (b, e, el) => {
-                            const noteTile = el.closest(".note-tile");
-                            deleteNote(noteTile?.getAttribute("data"), undefined, noteTile);
-                        }
+                notesList.contextmenu([{
+                    icon: modular.icons.open,
+                    label: "Open",
+                    action: (b, e, el) => {
+                        const nt = el.closest(".note-tile");
+                        const note = getNoteTileData(nt);
+                        if (!note) return;
+                        openNote(note);
                     }
-                ]);
+                }, {
+                    icon: modular.icons.modify,
+                    label: "Edit",
+                    action: (b, e, el) => {
+                        const nt = el.closest(".note-tile");
+                        const note = getNoteTileData(nt);
+                        if (!note) return;
+                        openNoteEditor(note);
+                    }
+                }, {
+                    icon: modular.icons.delete,
+                    label: "Delete",
+                    destructive: true,
+                    action: (b, e, el) => {
+                        const noteTile = el.closest(".note-tile");
+                        deleteNote(noteTile?.getAttribute("data"), undefined, noteTile);
+                    }
+                }]);
             }
         }),
         createNotePortal,

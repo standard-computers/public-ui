@@ -22,7 +22,7 @@
 		return div({style: "large-padding-top small-padding", content: children([
 			div({style: "padded", content: children([
 				h({level: 3, content: "Integrations"}),
-				div({style: "faded", content: "Connections for these services will be available here."})
+				div({style: "faded", content: "Click to connect a service"})
 			])}),
 			div({style: "settings-interfaces-list small-padding", content})
 		])});

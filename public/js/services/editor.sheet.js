@@ -650,7 +650,7 @@
         activeSheetFilePath = sheetPath;
         activeSheetDisplayTitle = "";
         isActiveSheetXlsxReadOnly = options?.xlsxReadOnly === true && isXlsxSheetPath(sheetPath);
-        window.StandardPlastic?.removeInlineStyleEditor?.(false);
+        window.Plastic?.removeInlineStyleEditor?.(false);
         const portal = modular.show(SERVICE_ID, 0, {newInstance: true});
         prioritizePortalDomForLegacyLookups(portal);
         saveSheetPortalState(portal);
@@ -945,7 +945,7 @@
         isActiveSheetXlsxReadOnly = false;
         activeSheetRangeStart = null;
         activeSheetRangeEnd = null;
-        window.StandardPlastic?.removeInlineStyleEditor?.(false);
+        window.Plastic?.removeInlineStyleEditor?.(false);
         modular.show(SERVICE_ID, 0, {newInstance: true});
         saveSheetPortalState();
         refreshSheetCells();
@@ -964,7 +964,7 @@
         clearSheetCharts();
         clearSheetImages();
         clearSheetFilters();
-        window.StandardPlastic?.removeInlineStyleEditor?.(false);
+        window.Plastic?.removeInlineStyleEditor?.(false);
         activeSheetCell = "A1";
         activeSheetRow = null;
         activeSheetColumn = null;
@@ -2970,8 +2970,8 @@
             const chartBody = document.createElement("div");
             chartBody.className = "editor-sheet-chart-body";
             chartNode.append(chartBody);
-            if (typeof window.StandardPlastic?.renderChart === "function") {
-                window.StandardPlastic.renderChart(chartBody, {
+            if (typeof window.Plastic?.renderChart === "function") {
+                window.Plastic.renderChart(chartBody, {
                     type: chartItem.type,
                     title: chartItem.title,
                     data: chartItem.data,
@@ -3104,8 +3104,8 @@
                     chartNode.style.width = `${chartItem.width}px`;
                     chartNode.style.height = `${chartItem.height}px`;
                     const chartBody = chartNode.querySelector(".editor-sheet-chart-body");
-                    if (chartBody && typeof window.StandardPlastic?.renderChart === "function") {
-                        window.StandardPlastic.renderChart(chartBody, {
+                    if (chartBody && typeof window.Plastic?.renderChart === "function") {
+                        window.Plastic.renderChart(chartBody, {
                             type: chartItem.type,
                             title: chartItem.title,
                             data: chartItem.data,
@@ -3343,8 +3343,8 @@
 
     const openSheetCellStyleEditor = (cellReference = "A1", event = null) => {
         if (!isCellInActiveSheetRange(cellReference)) setActiveSheetCell(cellReference);
-        if (typeof window.StandardPlastic?.showInlineStyleEditor !== "function") return;
-        window.StandardPlastic.showInlineStyleEditor({
+        if (typeof window.Plastic?.showInlineStyleEditor !== "function") return;
+        window.Plastic.showInlineStyleEditor({
             title: `${getSheetSelectionLabel()} Style`,
             x: event?.clientX ?? 0,
             y: event?.clientY ?? 0,

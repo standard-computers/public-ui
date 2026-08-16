@@ -7,6 +7,15 @@
 /**
  * Element Effects/Controls
  */
+HTMLElement.prototype.in = function () {
+	let e = this;
+	e.style.display = "block", e.style.opacity = 0;
+	let i = null;
+	window.requestAnimationFrame(function n(l) {
+		l -= i = i || l, e.style.opacity = Math.min(l / 50, 1), l < 50 && window.requestAnimationFrame(n)
+	})
+};
+
 HTMLElement.prototype.out = function () {
 	let e = this;
 	e.style.opacity = 1;
@@ -16,13 +25,32 @@ HTMLElement.prototype.out = function () {
 	})
 };
 
-HTMLElement.prototype.in = function () {
-	let e = this;
-	e.style.display = "block", e.style.opacity = 0;
-	let i = null;
-	window.requestAnimationFrame(function n(l) {
-		l -= i = i || l, e.style.opacity = Math.min(l / 50, 1), l < 50 && window.requestAnimationFrame(n)
-	})
+Element.prototype.empty = function () {
+	for (; this.firstChild;) this.removeChild(this.firstChild)
+};
+
+Element.prototype.remove = function () {
+	this.parentNode && this.parentNode.removeChild(this)
+};
+
+Element.prototype.prepend = function () {
+	for (let t = 0; t < arguments.length; t++) {
+		let e = arguments[t];
+		if ("string" == typeof e) {
+			let i = document.createElement("div");
+			for (i.innerHTML = e.trim(); i.firstChild;) this.insertBefore(i.firstChild, this.firstChild)
+		} else this.insertBefore(e, this.firstChild)
+	}
+};
+
+Element.prototype.append = function () {
+	for (let e = 0; e < arguments.length; e++) {
+		let t = arguments[e];
+		if ("string" == typeof t) {
+			let i = document.createElement("div");
+			for (i.innerHTML = t.trim(); i.firstChild;) this.appendChild(i.firstChild)
+		} else this.appendChild(t)
+	}
 };
 
 Element.prototype.contextmenu = function (items, selector = null) {
@@ -257,10 +285,6 @@ Element.prototype.popoutmenu = function (items, selector = null) {
 	});
 };
 
-/**
- * Anchored, keyboard-navigable suggestions for text inputs.
- * Items may be strings or {label, value, description} objects.
- */
 Element.prototype.autocompleteMenu = function (options = {}) {
 
 	const input = this;
@@ -418,34 +442,6 @@ Element.prototype.autocompleteMenu = function (options = {}) {
 	window.addEventListener("resize", positionMenu);
 	window.addEventListener("scroll", positionMenu, true);
 	return {destroy, handleKeydown, hide, isOpen: () => open, select, setItems};
-};
-
-Element.prototype.empty = function () {
-	for (; this.firstChild;) this.removeChild(this.firstChild)
-};
-
-Element.prototype.remove = function () {
-	this.parentNode && this.parentNode.removeChild(this)
-};
-
-Element.prototype.prepend = function () {
-	for (let t = 0; t < arguments.length; t++) {
-		let e = arguments[t];
-		if ("string" == typeof e) {
-			let i = document.createElement("div");
-			for (i.innerHTML = e.trim(); i.firstChild;) this.insertBefore(i.firstChild, this.firstChild)
-		} else this.insertBefore(e, this.firstChild)
-	}
-};
-
-Element.prototype.append = function () {
-	for (let e = 0; e < arguments.length; e++) {
-		let t = arguments[e];
-		if ("string" == typeof t) {
-			let i = document.createElement("div");
-			for (i.innerHTML = t.trim(); i.firstChild;) this.appendChild(i.firstChild)
-		} else this.appendChild(t)
-	}
 };
 
 Element.prototype.animate = function (n, t, o, c) {
@@ -2112,16 +2108,16 @@ function renderChart(target, n = {}) {
 	return node;
 }
 
-window.StandardPlastic = window.StandardPlastic || {};
-window.StandardPlastic.showInlineStyleEditor = showInlineStyleEditor;
-window.StandardPlastic.removeInlineStyleEditor = removeInlineStyleEditor;
-window.StandardPlastic.normalizeChartData = normalizePlasticChartData;
-window.StandardPlastic.barChart = barChart;
-window.StandardPlastic.lineChart = lineChart;
-window.StandardPlastic.areaChart = areaChart;
-window.StandardPlastic.scatterChart = scatterChart;
-window.StandardPlastic.pieChart = pieChart;
-window.StandardPlastic.chart = chart;
-window.StandardPlastic.renderChart = renderChart;
-window.StandardPlastic.segmented = segmented;
-window.StandardPlastic.segmentedSelection = segmentedSelection;
+window.Plastic = window.Plastic || {};
+window.Plastic.showInlineStyleEditor = showInlineStyleEditor;
+window.Plastic.removeInlineStyleEditor = removeInlineStyleEditor;
+window.Plastic.normalizeChartData = normalizePlasticChartData;
+window.Plastic.barChart = barChart;
+window.Plastic.lineChart = lineChart;
+window.Plastic.areaChart = areaChart;
+window.Plastic.scatterChart = scatterChart;
+window.Plastic.pieChart = pieChart;
+window.Plastic.chart = chart;
+window.Plastic.renderChart = renderChart;
+window.Plastic.segmented = segmented;
+window.Plastic.segmentedSelection = segmentedSelection;

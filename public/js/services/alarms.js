@@ -1,6 +1,5 @@
 (async () => {
 
-	const ALARMS_SERVICE_ID = "com.standard.alarms";
 	const DEFAULT_ALARM_NAME = "Untitled";
 	const ALARM_SETTINGS = {
 		default_name: {
@@ -39,32 +38,7 @@
 		return parsed.hour * 60 + parsed.minute;
 	};
 
-	const NUMBER_WORDS = {
-		zero: 0,
-		one: 1,
-		two: 2,
-		three: 3,
-		four: 4,
-		five: 5,
-		six: 6,
-		seven: 7,
-		eight: 8,
-		nine: 9,
-		ten: 10,
-		eleven: 11,
-		twelve: 12,
-		thirteen: 13,
-		fourteen: 14,
-		fifteen: 15,
-		sixteen: 16,
-		seventeen: 17,
-		eighteen: 18,
-		nineteen: 19,
-		twenty: 20,
-		thirty: 30,
-		forty: 40,
-		fifty: 50
-	};
+	const NUMBER_WORDS = {zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50};
 
 	const parseNumberWords = str => {
 		const words = str.split(/\s+/);
@@ -121,7 +95,7 @@
 
 	const getDefaultAlarmName = async (view = null) => {
 		try {
-			const values = typeof view?.settings?.values === "function" ? await view.settings.values() : await window.StandardAppSettings?.values?.(ALARMS_SERVICE_ID);
+			const values = typeof view?.settings?.values === "function" ? await view.settings.values() : await window.StandardAppSettings?.values?.("com.standard.alarms");
 			const defaultName = String(values?.default_name || DEFAULT_ALARM_NAME).trim();
 			return defaultName || DEFAULT_ALARM_NAME;
 		} catch (_) {
@@ -164,14 +138,15 @@
 			dimensions: [340, 146],
 			resizable: false,
 			navigation: false,
-			tools: [
-				{
-					title: "Delete",
-					icon: modular.icons.delete,
-					onclick: () => handleAlarmMutation(CLI.send(`[alarms] - <id ${alarm.id}>`), "Deleted alarm", "Couldn't delete alarm")
-				},
-				{title: "Save", icon: modular.icons.save, onclick: saveAlarm}
-			],
+			tools: [{
+				title: "Delete",
+				icon: modular.icons.delete,
+				onclick: () => handleAlarmMutation(CLI.send(`[alarms] - <id ${alarm.id}>`), "Deleted alarm", "Couldn't delete alarm")
+			}, {
+				title: "Save",
+				icon: modular.icons.save,
+				onclick: saveAlarm
+			}],
 			svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`,
 			icon: "/icons/interfaces/alarms.png",
 			route: () => div({style: "large-padding-top no-scrollbars", content: children([
@@ -185,8 +160,8 @@
 										])
 									}),
 									div({content: children([
-										label({style: "faded", content: "Minute"}),
-										input({id: "alarm-edit-minute", type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: 2, value: padTimeUnit(parsedTime.minute)})
+											label({style: "faded", content: "Minute"}),
+											input({id: "alarm-edit-minute", type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: 2, value: padTimeUnit(parsedTime.minute)})
 										])
 									})
 								])
@@ -262,12 +237,12 @@
 			message: alarmTime ? `Alarm set for ${alarmTime}` : "Alarm triggered",
 			icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`
 		});
-		modular.refresh(ALARMS_SERVICE_ID);
+		modular.refresh("com.standard.alarms");
 	};
 
 	window.StandardNotifications?.register?.("alarms", window.StandardAlarms.notifyAlarm);
 
-	modular.register(new Service(ALARMS_SERVICE_ID, [new Portal({
+	modular.register(new Service("com.standard.alarms", [new Portal({
 		title: "Alarms",
 		hints: ["alarms"],
 		dimensions: [380, 500],
@@ -293,7 +268,7 @@
 						const alarmName = String(title || "").trim() === "" ? defaultAlarmName : title;
 						CLI.send(`[alarms] + (@${userId}, "${escapeCliQuotedValue(alarmName)}", "${tds}", 1, true, true, [0,1,2,3,4,5,6])`, false).then(d => {
 							if (d !== 0) {
-								modular.refresh(ALARMS_SERVICE_ID, 0);
+								modular.refresh("com.standard.alarms", 0);
 								modular.success("Created alarm");
 							} else {
 								modular.error("Couldn't create alarm");

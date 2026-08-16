@@ -4,13 +4,300 @@
     let activeMapContainer = null;
     let detachMapsSearchHandlers = null;
     let detachMapsLocationsHandler = null;
+    let detachMapsSettingsHandler = null;
     let savedLocations = [];
     let locationsFetchPromise = null;
     let focusSavedLocation = null;
     let locationsSourcePortal = null;
     let locationPortalIndex = 0;
+    let latestDirectionsDocument = null;
     const MAPS_CACHE_KEY = "recent-searches";
     const MAPS_CACHE_LIMIT = 10;
+    const DIRECTIONS_PORTAL_INDEX = 2;
+    const DOWNLOAD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5M4.5 19.5h15"/></svg>`;
+    const POPOUT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5H19.5V10.5M19.5 4.5L10.5 13.5M10.5 6H6.75A2.25 2.25 0 0 0 4.5 8.25V17.25A2.25 2.25 0 0 0 6.75 19.5H15.75A2.25 2.25 0 0 0 18 17.25V13.5"/></svg>`;
+
+    const escapeDirectionsHtml = (value = "") => String(value ?? "").replace(/[&<>"']/g, character => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[character] || character));
+    const formatDirectionsDistance = meters => {
+        if (!Number.isFinite(Number(meters))) return "";
+        const miles = Number(meters) / 1609.344;
+        return miles >= 10 ? `${Math.round(miles)} mi` : `${miles.toFixed(1)} mi`;
+    };
+    const formatDirectionsDuration = seconds => {
+        if (!Number.isFinite(Number(seconds))) return "";
+        const minutes = Math.max(1, Math.round(Number(seconds) / 60));
+        if (minutes < 60) return `${minutes} min`;
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+        return remainingMinutes ? `${hours} hr ${remainingMinutes} min` : `${hours} hr`;
+    };
+    const createDirectionsDocument = directions => {
+        const steps = Array.isArray(directions?.steps) ? directions.steps : directions?.route?.legs?.flatMap(leg => leg.steps || []) || [];
+        if (!steps.length) return null;
+        const origin = String(directions?.origin?.label || directions?.origin || "Start");
+        const destination = String(directions?.destination?.label || directions?.destination || "Destination");
+        return {
+            title: `${origin} to ${destination}`,
+            summary: `${formatDirectionsDistance(directions?.route?.distance ?? directions?.distance)} / ${formatDirectionsDuration(directions?.route?.duration ?? directions?.duration)}`,
+            origin,
+            destination,
+            steps: steps.map(step => ({
+                instruction: String(step?.maneuver?.instruction || step?.instruction || "Continue"),
+                distance: formatDirectionsDistance(step?.distance)
+            }))
+        };
+    };
+    const normalizeDirectionsDocument = documentValue => {
+        if (!documentValue || !Array.isArray(documentValue.steps) || !documentValue.steps.length) return null;
+        return {
+            title: String(documentValue.title || "Directions"),
+            summary: String(documentValue.summary || ""),
+            origin: String(documentValue.origin || "Start"),
+            destination: String(documentValue.destination || "Destination"),
+            steps: documentValue.steps.map(step => ({instruction: String(step?.instruction || "Continue"), distance: String(step?.distance || "")}))
+        };
+    };
+    const directionsArticleHtml = documentValue => {
+        const directions = normalizeDirectionsDocument(documentValue);
+        if (!directions) return "";
+        const steps = directions.steps.map(step => `<li><strong>${escapeDirectionsHtml(step.instruction)}</strong>${step.distance ? `<div>${escapeDirectionsHtml(step.distance)}</div>` : ""}</li>`).join("");
+        return `<h1>${escapeDirectionsHtml(directions.title)}</h1><p>${escapeDirectionsHtml(directions.summary)}</p><ol>${steps}</ol>`;
+    };
+    const directionsPrintHtml = documentValue => {
+        const directions = normalizeDirectionsDocument(documentValue);
+        if (!directions) return "";
+        return `<!doctype html><html><head><title>${escapeDirectionsHtml(directions.title)}</title><style>@page{margin:.45in}body{font-family:Arial,sans-serif;margin:32px;color:#111}h1{font-size:22px;margin:0 0 8px}p{margin:0 0 20px;color:#555}ol{padding-left:24px}li{margin:0 0 14px;break-inside:avoid}li div{margin-top:4px;color:#555;font-size:.85em}</style></head><body>${directionsArticleHtml(directions)}</body></html>`;
+    };
+    const printDirectionsDocument = documentValue => {
+        const directions = normalizeDirectionsDocument(documentValue);
+        if (!directions) return modular.error("Create a route before printing directions.");
+        const printWindow = window.open("", "_blank", "width=720,height=900");
+        if (!printWindow) return modular.error("Allow pop-ups to print these directions.");
+        printWindow.document.write(directionsPrintHtml(directions));
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+    };
+    const waitForDirectionsExportMethod = async (serviceId, lookup) => {
+        let method = lookup();
+        if (typeof method === "function") return method;
+        modular.start?.(serviceId);
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+            method = lookup();
+            if (typeof method === "function") return method;
+        }
+        return null;
+    };
+    const exportDirectionsToWords = async (documentValue, sourceNode = null) => {
+        const directions = normalizeDirectionsDocument(documentValue);
+        if (!directions) return modular.error("Create a route before exporting directions.");
+        const openTextFilePath = await waitForDirectionsExportMethod("com.standard.editor.text", () => window.StandardEditor?.openTextFilePath);
+        if (typeof openTextFilePath !== "function") return modular.error("Text Editor is not ready yet");
+        openTextFilePath("", directionsArticleHtml(directions), sourceNode);
+        return true;
+    };
+    const concatDirectionsPdfBytes = parts => {
+        const length = parts.reduce((total, part) => total + part.length, 0);
+        const output = new Uint8Array(length);
+        let offset = 0;
+        parts.forEach(part => {
+            output.set(part, offset);
+            offset += part.length;
+        });
+        return output;
+    };
+    const wrapDirectionsCanvasText = (context, value, maximumWidth) => {
+        const words = String(value || "").split(/\s+/).filter(Boolean);
+        if (!words.length) return [""];
+        const lines = [];
+        let line = "";
+        words.forEach(word => {
+            const candidate = line ? `${line} ${word}` : word;
+            if (line && context.measureText(candidate).width > maximumWidth) {
+                lines.push(line);
+                line = word;
+            } else {
+                line = candidate;
+            }
+        });
+        if (line) lines.push(line);
+        return lines;
+    };
+    const directionsPdfBytes = documentValue => {
+        const directions = normalizeDirectionsDocument(documentValue);
+        if (!directions) throw new Error("Create a route before saving directions");
+        const width = 1224;
+        const height = 1584;
+        const margin = 96;
+        const bottom = height - margin;
+        const pages = [];
+        let canvas;
+        let context;
+        let y;
+        const addPage = continued => {
+            canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            context = canvas.getContext("2d");
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, width, height);
+            context.fillStyle = "#111827";
+            y = margin;
+            if (continued) {
+                context.font = "600 28px Arial, sans-serif";
+                context.fillText("Directions (continued)", margin, y);
+                y += 54;
+            }
+            pages.push(canvas);
+        };
+        const ensureRoom = requiredHeight => {
+            if (y + requiredHeight <= bottom) return;
+            addPage(true);
+        };
+        const drawWrapped = (text, x, maximumWidth, font, lineHeight, color = "#111827") => {
+            context.font = font;
+            const lines = wrapDirectionsCanvasText(context, text, maximumWidth);
+            lines.forEach(line => {
+                ensureRoom(lineHeight);
+                context.font = font;
+                context.fillStyle = color;
+                context.fillText(line, x, y);
+                y += lineHeight;
+            });
+        };
+        addPage(false);
+        drawWrapped(directions.title, margin, width - margin * 2, "700 42px Arial, sans-serif", 52);
+        y += 8;
+        drawWrapped(directions.summary, margin, width - margin * 2, "28px Arial, sans-serif", 38, "#4b5563");
+        y += 36;
+        directions.steps.forEach((step, index) => {
+            ensureRoom(76);
+            const instructionX = margin + 56;
+            context.font = "700 27px Arial, sans-serif";
+            context.fillStyle = "#111827";
+            context.fillText(`${index + 1}.`, margin, y);
+            drawWrapped(step.instruction, instructionX, width - margin - instructionX, "600 27px Arial, sans-serif", 38);
+            if (step.distance) drawWrapped(step.distance, instructionX, width - margin - instructionX, "24px Arial, sans-serif", 34, "#6b7280");
+            y += 22;
+        });
+        pages.forEach((page, index) => {
+            const pageContext = page.getContext("2d");
+            pageContext.font = "22px Arial, sans-serif";
+            pageContext.fillStyle = "#6b7280";
+            pageContext.textAlign = "right";
+            pageContext.fillText(`${index + 1} / ${pages.length}`, width - margin, height - 42);
+        });
+        const encoder = new TextEncoder();
+        const textBytes = value => encoder.encode(value);
+        const imageBytes = pages.map(page => Uint8Array.from(atob(page.toDataURL("image/jpeg", .92).split(",")[1]), character => character.charCodeAt(0)));
+        const pageObjectNumbers = pages.map((_, index) => 3 + index * 3);
+        const objects = [
+            textBytes("<< /Type /Catalog /Pages 2 0 R >>"),
+            textBytes(`<< /Type /Pages /Kids [${pageObjectNumbers.map(number => `${number} 0 R`).join(" ")}] /Count ${pages.length} >>`)
+        ];
+        imageBytes.forEach((jpegBytes, index) => {
+            const pageObjectNumber = pageObjectNumbers[index];
+            const imageObjectNumber = pageObjectNumber + 1;
+            const contentObjectNumber = pageObjectNumber + 2;
+            const stream = "q\n612 0 0 792 0 0 cm\n/Im0 Do\nQ\n";
+            objects.push(
+                textBytes(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /XObject << /Im0 ${imageObjectNumber} 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`),
+                concatDirectionsPdfBytes([textBytes(`<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`), jpegBytes, textBytes("\nendstream")]),
+                textBytes(`<< /Length ${stream.length} >>\nstream\n${stream}endstream`)
+            );
+        });
+        const parts = [textBytes("%PDF-1.4\n%\xFF\xFF\xFF\xFF\n")];
+        const offsets = [0];
+        objects.forEach((object, index) => {
+            offsets.push(parts.reduce((total, part) => total + part.length, 0));
+            parts.push(textBytes(`${index + 1} 0 obj\n`), object, textBytes("\nendobj\n"));
+        });
+        const xrefOffset = parts.reduce((total, part) => total + part.length, 0);
+        parts.push(textBytes(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map(offset => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\ntrailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`));
+        return concatDirectionsPdfBytes(parts);
+    };
+    const directionsFileStem = documentValue => String(documentValue?.title || "Directions").replace(/\s+to\s+/i, "-to-").replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "Directions";
+    const saveDirectionsAsPdf = documentValue => {
+        const directions = normalizeDirectionsDocument(documentValue);
+        if (!directions) return modular.error("Create a route before saving directions.");
+        const suggestedName = `${directionsFileStem(directions)}.pdf`;
+        inputDialogue({
+            title: "Save directions as PDF",
+            placeholder: suggestedName,
+            value: suggestedName,
+            location_picker: true,
+            confirmation: async (_, rawFileName, location) => {
+                let fileName = String(rawFileName || "").trim();
+                if (!/\.pdf$/i.test(fileName)) fileName += ".pdf";
+                if (!modular.validateFileName(fileName)) return;
+                try {
+                    const response = await window.StandardUploads.saveFile(directionsPdfBytes(directions), `${location}/${fileName}`, {label: `Saving ${fileName}`, type: "application/pdf"});
+                    if (!response?.ok) throw new Error("Unable to save PDF");
+                    await window.StandardFilesRefreshCache?.();
+                    modular.success(`Saved ${fileName}`);
+                } catch (error) {
+                    console.error("Failed to save directions PDF:", error);
+                    modular.error(error.message || "Unable to save directions PDF");
+                }
+            }
+        });
+    };
+    const showDirectionsDownloadMenu = (event, resolveDocument) => {
+        const button = event?.currentTarget;
+        if (!button || typeof button.contextmenu !== "function") return;
+        if (!button.__mapsDirectionsDownloadMenu) {
+            button.__mapsDirectionsDownloadMenu = true;
+            button.contextmenu([
+                {label: "Save as PDF", icon: modular.icons.pdf, action: () => saveDirectionsAsPdf(resolveDocument())},
+                {label: "Export to Text Editor (.wrds)", icon: modular.icons.note, action: () => exportDirectionsToWords(resolveDocument(), button)}
+            ]);
+        }
+        const rect = button.getBoundingClientRect();
+        button.dispatchEvent(new MouseEvent("contextmenu", {bubbles: true, cancelable: true, clientX: rect.left + rect.width / 2, clientY: rect.bottom}));
+    };
+    const renderDirectionsPortal = portal => {
+        const directions = normalizeDirectionsDocument(portal?.windowState?.()?.directions || latestDirectionsDocument);
+        const root = portal?.body?.();
+        if (!root) return;
+        const title = root.querySelector(".maps-directions-portal-title");
+        const summary = root.querySelector(".maps-directions-portal-summary");
+        const steps = root.querySelector(".maps-directions-portal-steps");
+        if (!directions) {
+            if (title) title.textContent = "No directions selected";
+            if (summary) summary.textContent = "Create a route in Maps, then choose Pop out.";
+            if (steps) steps.replaceChildren();
+            return;
+        }
+        portal.setTitle?.(directions.title);
+        if (title) title.textContent = directions.title;
+        if (summary) summary.textContent = directions.summary;
+        if (steps) {
+            steps.replaceChildren();
+            directions.steps.forEach(step => {
+                const item = document.createElement("li");
+                const instruction = document.createElement("span");
+                instruction.textContent = step.instruction;
+                item.appendChild(instruction);
+                if (step.distance) {
+                    const distance = document.createElement("small");
+                    distance.textContent = step.distance;
+                    item.appendChild(distance);
+                }
+                steps.appendChild(item);
+            });
+        }
+    };
+    const openDirectionsPortal = (documentValue, sourceNode = null) => {
+        const directions = normalizeDirectionsDocument(documentValue);
+        if (!directions) return modular.error("Create a route before popping out directions.");
+        latestDirectionsDocument = directions;
+        const portal = modular.show("com.standard.maps", DIRECTIONS_PORTAL_INDEX, {newInstance: true, sourceNode});
+        portal?.setWindowState?.({directions}, {persist: false, merge: false});
+        portal?.setTitle?.(directions.title);
+        window.setTimeout(() => renderDirectionsPortal(portal), 0);
+        return portal;
+    };
 
     const escapeCliQuotedValue = (value = "") => String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
@@ -296,8 +583,21 @@
         {id: "light", label: "Light", style: "mapbox://styles/mapbox/light-v11"},
         {id: "navigation", label: "Navigation", style: "mapbox://styles/mapbox/navigation-day-v1"}
     ];
+    const MAPS_SERVICE_ID = "com.standard.maps";
+    const MAPS_SETTINGS = {
+        map_style: {
+            label: "Map style",
+            type: "text",
+            default: MAP_STYLE_OPTIONS[0].label,
+            restrictions: MAP_STYLE_OPTIONS.map(styleOption => styleOption.label)
+        }
+    };
+    const resolveMapStyleOption = value => {
+        const normalizedValue = String(value || "").trim().toLowerCase();
+        return MAP_STYLE_OPTIONS.find(styleOption => styleOption.id === normalizedValue || styleOption.label.toLowerCase() === normalizedValue) || MAP_STYLE_OPTIONS[0];
+    };
 
-    modular.register(new Service("com.standard.maps", [
+    modular.register(new Service(MAPS_SERVICE_ID, [
         new Portal({
             title: "Maps",
             hints: ["maps", "where am i"],
@@ -336,7 +636,9 @@
                             `<ol id="maps-directions-steps" class="maps-directions-steps hidden"></ol>`,
                             div({id: "maps-directions-result-actions", style: "maps-directions-result-actions hidden", content: [
                                     button({id: "maps-directions-start", style: "maps-directions-action", content: "Start"}),
-                                    button({id: "maps-directions-print", style: "maps-directions-action secondary-bordered no-background", content: "Print"})
+                                    button({id: "maps-directions-print", style: "maps-directions-action secondary-bordered no-background", content: "Print"}),
+                                    button({id: "maps-directions-popout", style: "maps-directions-action secondary-bordered no-background maps-directions-icon-action", icon: POPOUT_ICON}),
+                                    button({id: "maps-directions-download", style: "maps-directions-action secondary-bordered no-background maps-directions-icon-action", icon: DOWNLOAD_ICON})
                                 ].join("")}),
                             div({id: "maps-directions-navigation", style: "maps-directions-navigation hidden", content: [
                                     div({id: "maps-directions-navigation-count", style: "maps-directions-navigation-count"}),
@@ -401,14 +703,28 @@
                     detachMapsLocationsHandler();
                     detachMapsLocationsHandler = null;
                 }
+                if (typeof detachMapsSettingsHandler === "function") {
+                    detachMapsSettingsHandler();
+                    detachMapsSettingsHandler = null;
+                }
                 const mapboxToken = window.StandardRuntimeConfig?.mapboxAccessToken || "";
                 if (!mapboxToken) {
                     console.error("Missing Mapbox access token");
                     return;
                 }
                 mapboxgl.accessToken = mapboxToken;
-                const map = new mapboxgl.Map({container: mapContainer, zoom: 11.2, center: [-84.513611, 39.103699], style: 'mapbox://styles/mapbox/streets-v12'});
+                let initialMapStyle = MAP_STYLE_OPTIONS[0];
+                try {
+                    const mapSettings = await view?.settings?.values?.() || await window.StandardAppSettings?.values?.(MAPS_SERVICE_ID) || {};
+                    initialMapStyle = resolveMapStyleOption(mapSettings.map_style);
+                } catch (error) {
+                    console.error("Failed to load Maps settings:", error);
+                }
+                const map = new mapboxgl.Map({container: mapContainer, zoom: 11.2, center: [-84.513611, 39.103699], style: initialMapStyle.style});
                 map.once("load", () => {
+                    if (initialMapStyle.config?.basemap && typeof map.setConfigProperty === "function") {
+                        Object.entries(initialMapStyle.config.basemap).forEach(([key, value]) => map.setConfigProperty("basemap", key, value));
+                    }
                     syncMapViewport();
                     map.resize();
                 });
@@ -684,6 +1000,8 @@
                 const directionsResultActions = document.getElementById("maps-directions-result-actions");
                 const directionsStartButton = document.getElementById("maps-directions-start");
                 const directionsPrintButton = document.getElementById("maps-directions-print");
+                const directionsPopoutButton = document.getElementById("maps-directions-popout");
+                const directionsDownloadButton = document.getElementById("maps-directions-download");
                 const directionsNavigation = document.getElementById("maps-directions-navigation");
                 const directionsNavigationCount = document.getElementById("maps-directions-navigation-count");
                 const directionsNavigationInstruction = document.getElementById("maps-directions-navigation-instruction");
@@ -693,7 +1011,7 @@
                 const directionsStopButton = document.getElementById("maps-directions-stop");
                 let cachedSearches = [];
                 let cacheWriteInFlight = Promise.resolve();
-                let activeStyleId = MAP_STYLE_OPTIONS[0].id;
+                let activeStyleId = initialMapStyle.id;
                 let activeDirections = null;
                 let activeDirectionsStepIndex = 0;
                 const normalizeSearchValue = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
@@ -727,19 +1045,8 @@
                     if (!Array.isArray(firstFeature?.center) || firstFeature.center.length !== 2) return null;
                     return {coordinates: firstFeature.center, label: firstFeature.place_name || normalizedQuery};
                 };
-                const formatDistance = (meters) => {
-                    if (!Number.isFinite(meters)) return "";
-                    const miles = meters / 1609.344;
-                    return miles >= 10 ? `${Math.round(miles)} mi` : `${miles.toFixed(1)} mi`;
-                };
-                const formatDuration = (seconds) => {
-                    if (!Number.isFinite(seconds)) return "";
-                    const minutes = Math.max(1, Math.round(seconds / 60));
-                    if (minutes < 60) return `${minutes} min`;
-                    const hours = Math.floor(minutes / 60);
-                    const remainingMinutes = minutes % 60;
-                    return remainingMinutes ? `${hours} hr ${remainingMinutes} min` : `${hours} hr`;
-                };
+                const formatDistance = formatDirectionsDistance;
+                const formatDuration = formatDirectionsDuration;
                 const getAutocompleteMatches = (query) => {
                     const normalizedQuery = normalizeSearchValue(query).toLowerCase();
                     if (!normalizedQuery) return cachedSearches.slice(0, MAPS_CACHE_LIMIT);
@@ -800,6 +1107,7 @@
                 };
                 const hideDirectionsOutput = () => {
                     activeDirections = null;
+                    latestDirectionsDocument = null;
                     activeDirectionsStepIndex = 0;
                     directionsSummary?.classList.add("hidden");
                     directionsSummary?.classList.remove("maps-directions-error");
@@ -858,22 +1166,9 @@
                     }
                 };
                 const printDirections = () => {
-                    if (!activeDirections?.steps?.length) {
-                        setDirectionsMessage("Create a route before printing directions.", true);
-                        return;
-                    }
-                    const title = `${activeDirections.origin.label || "Start"} to ${activeDirections.destination.label || "Destination"}`;
-                    const summary = `${formatDistance(activeDirections.route.distance)} / ${formatDuration(activeDirections.route.duration)}`;
-                    const steps = activeDirections.steps.map((step) => `<li><strong>${escapeHtml(step.maneuver?.instruction || "Continue")}</strong><small>${escapeHtml(formatDistance(step.distance))}</small></li>`).join("");
-                    const printWindow = window.open("", "_blank", "width=720,height=900");
-                    if (!printWindow) {
-                        window.print();
-                        return;
-                    }
-                    printWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(title)}</title><style>body{font-family:Arial,sans-serif;margin:32px;color:#111}h1{font-size:22px;margin:0 0 8px}p{margin:0 0 20px;color:#555}ol{padding-left:24px}li{margin:0 0 14px;break-inside:avoid}small{display:block;margin-top:4px;color:#555}</style></head><body><h1>${escapeHtml(title)}</h1><p>${escapeHtml(summary)}</p><ol>${steps}</ol></body></html>`);
-                    printWindow.document.close();
-                    printWindow.focus();
-                    printWindow.print();
+                    const directions = createDirectionsDocument(activeDirections);
+                    if (!directions) return setDirectionsMessage("Create a route before printing directions.", true);
+                    printDirectionsDocument(directions);
                 };
                 const fitDirectionsBounds = (route, origin, destination) => {
                     const bounds = new mapboxgl.LngLatBounds();
@@ -917,6 +1212,7 @@
                             return;
                         }
                         activeDirections = {route, origin, destination, steps: getDirectionsSteps(route)};
+                        latestDirectionsDocument = createDirectionsDocument(activeDirections);
                         activeDirectionsStepIndex = 0;
                         setDirectionsData({route, origin, destination});
                         setDirectionsMessage(`${formatDistance(route.distance)} / ${formatDuration(route.duration)}`);
@@ -972,6 +1268,12 @@
                 directionsClearButton?.addEventListener("click", clearDirections);
                 directionsStartButton?.addEventListener("click", startDirectionsNavigation);
                 directionsPrintButton?.addEventListener("click", printDirections);
+                directionsPopoutButton?.addEventListener("click", event => openDirectionsPortal(createDirectionsDocument(activeDirections), event.currentTarget));
+                directionsDownloadButton?.addEventListener("click", event => showDirectionsDownloadMenu(event, () => createDirectionsDocument(activeDirections)));
+                directionsPopoutButton?.setAttribute("title", "Pop out directions");
+                directionsPopoutButton?.setAttribute("aria-label", "Pop out directions");
+                directionsDownloadButton?.setAttribute("title", "Save directions");
+                directionsDownloadButton?.setAttribute("aria-label", "Save directions");
                 directionsPreviousStepButton?.addEventListener("click", () => updateNavigationStep(activeDirectionsStepIndex - 1));
                 directionsNextStepButton?.addEventListener("click", () => updateNavigationStep(activeDirectionsStepIndex + 1));
                 directionsStopButton?.addEventListener("click", stopDirectionsNavigation);
@@ -995,7 +1297,18 @@
                     label: "Create Location",
                     action: () => createLocationRecord(contextMenuCoordinates)
                 }]);
-                const applyMapStyle = (styleOption) => {
+                const persistMapStyleSetting = async styleOption => {
+                    try {
+                        const currentSettings = await view?.settings?.values?.() || await window.StandardAppSettings?.values?.(MAPS_SERVICE_ID) || {};
+                        const saved = await (view?.settings?.save?.({...currentSettings, map_style: styleOption.label})
+                            || window.StandardAppSettings?.save?.(MAPS_SERVICE_ID, {...currentSettings, map_style: styleOption.label}));
+                        if (saved === false) throw new Error("Unable to save Maps settings");
+                    } catch (error) {
+                        console.error("Failed to save Maps style setting:", error);
+                        modular.error("Unable to save the Maps style setting");
+                    }
+                };
+                const applyMapStyle = (styleOption, {persist = false} = {}) => {
                     if (!styleOption || activeStyleId === styleOption.id) return;
                     const previousStyleId = activeStyleId;
                     activeStyleId = styleOption.id;
@@ -1021,6 +1334,7 @@
                         ensureDirectionsLayers();
                         if (pendingDirectionsRouteData) map.getSource(DIRECTIONS_ROUTE_SOURCE_ID)?.setData(pendingDirectionsRouteData);
                         if (pendingDirectionsPointsData) map.getSource(DIRECTIONS_POINTS_SOURCE_ID)?.setData(pendingDirectionsPointsData);
+                        if (persist) void persistMapStyleSetting(styleOption);
                     };
                     map.once("style.load", handleStyleLoad);
                     try {
@@ -1031,7 +1345,17 @@
                         console.error("Failed to apply map style:", error);
                     }
                 };
-                styleButton?.popoutmenu(MAP_STYLE_OPTIONS.map((styleOption) => ({icon: MAP_STYLE_ICON, label: styleOption.label, action: () => applyMapStyle(styleOption)})));
+                const syncMapsAppSettings = event => {
+                    if (event?.detail?.serviceId !== MAPS_SERVICE_ID) return;
+                    applyMapStyle(resolveMapStyleOption(event.detail?.values?.map_style));
+                };
+                document.addEventListener("standard-app-settings-saved", syncMapsAppSettings);
+                document.addEventListener("standard-app-settings-reset", syncMapsAppSettings);
+                detachMapsSettingsHandler = () => {
+                    document.removeEventListener("standard-app-settings-saved", syncMapsAppSettings);
+                    document.removeEventListener("standard-app-settings-reset", syncMapsAppSettings);
+                };
+                styleButton?.popoutmenu(MAP_STYLE_OPTIONS.map((styleOption) => ({icon: MAP_STYLE_ICON, label: styleOption.label, action: () => applyMapStyle(styleOption, {persist: true})})));
                 zoomInButton.addEventListener("click", () => map.zoomIn());
                 zoomOutButton.addEventListener("click", () => map.zoomOut());
                 homeButton.addEventListener("click", () => flyToCoordinates(homeCoordinates[0], homeCoordinates[1], 13, homeLocationLabel));
@@ -1108,6 +1432,32 @@
                     focusSavedLocation?.(location);
                 });
             }
+        }),
+        new Portal({
+            title: "Directions",
+            hints: ["directions", "route", "turn by turn"],
+            internal: true,
+            dimensions: [500, 620],
+            navigation: false,
+            icon: "/icons/interfaces/maps.png",
+            svg_icon: modular.icons.globe,
+            tools: [{
+                title: "Print",
+                icon: modular.icons.print,
+                onclick: (_, context) => printDirectionsDocument(context?.portal?.windowState?.()?.directions || latestDirectionsDocument)
+            }, {
+                title: "Download",
+                icon: DOWNLOAD_ICON,
+                onclick: (event, context) => showDirectionsDownloadMenu(event, () => context?.portal?.windowState?.()?.directions || latestDirectionsDocument)
+            }],
+            route: () => div({style: "maps-directions-portal large-padding-top small-padding", content: children([
+                h({level: 2, style: "maps-directions-portal-title", content: "Directions"}),
+                div({style: "maps-directions-portal-summary faded", content: ""}),
+                `<ol class="maps-directions-portal-steps maps-directions-steps"></ol>`
+            ])}),
+            afterRender: function () {
+                renderDirectionsPortal(this.portal);
+            }
         })
-    ]))
+    ], MAPS_SETTINGS))
 })();
