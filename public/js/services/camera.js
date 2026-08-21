@@ -122,7 +122,7 @@
         empty: true,
         svg_icon: CAMERA_ICON,
         icon: "/icons/interfaces/camera.png",
-        route: () => `<main class="camera-portal"><video class="camera-feed" autoplay muted playsinline aria-label="Live camera preview"></video><div class="camera-shade" aria-hidden="true"></div><div class="camera-status" role="status"><div class="camera-status-icon" aria-hidden="true">${modular.icons.video}</div><strong>Starting camera…</strong></div><button class="camera-shutter round secondary" type="button" aria-label="Take picture" title="Take picture" disabled>${CAMERA_ICON}</button></main>`,
+        route: () => `<main class="camera-portal"><video class="camera-feed" autoplay muted playsinline aria-label="Live camera preview"></video><div class="camera-shade" aria-hidden="true"></div><div class="camera-status" role="status"><div class="camera-status-icon" aria-hidden="true">${window.Plastic.icons.video}</div><strong>Starting camera…</strong></div><button class="camera-shutter round secondary" type="button" aria-label="Take picture" title="Take picture" disabled>${CAMERA_ICON}</button></main>`,
         afterRender: bindCamera,
         onDispose: stopCamera
     })]));

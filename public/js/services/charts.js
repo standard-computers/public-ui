@@ -1,35 +1,8 @@
 (() => {
 
 	const SERVICE_ID = "com.standard.charts";
-	const ICON = "/icons/interfaces/charts.png";
 	const NS = "http://www.w3.org/2000/svg";
 
-	const SHAPE_OPTIONS = [
-		{
-			type: "rectangle",
-			label: "Rectangle",
-			icon: modular.icons.rectangle,
-		},
-		{
-			type: "rounded",
-			label: "Rounded Rectangle",
-			icon: modular.icons.rounded_rectangle,
-		},
-		{
-			type: "ellipse",
-			label: "Ellipse",
-			icon: modular.icons.ellipse,
-		},
-		{
-			type: "diamond",
-			label: "Diamond",
-			icon: modular.icons.diamond,
-		}
-	];
-
-	const FONT_FAMILIES = ["Inter", "Arial", "Georgia", "Courier New", "Times New Roman", "Trebuchet MS", "Verdana"];
-
-	const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 72, 96];
 	const CONNECTOR_STYLE_OPTIONS = [
 		{label: "Straight", value: "straight"},
 		{label: "Vertexed", value: "vertexed"},
@@ -37,13 +10,12 @@
 	];
 
 	const ALIGN_ICONS = {
-		left: modular.icons.left,
-		center: modular.icons.center,
-		right: modular.icons.right
+		left: window.Plastic.icons.left,
+		center: window.Plastic.icons.center,
+		right: window.Plastic.icons.right
 	};
 
 	const TEXT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" d="M5 6h14M12 6v12m-4 0h8"/></svg>`;
-	const DUPLICATE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>`;
 	const PNG_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="16.5" cy="8.5" r="1.5"/><path stroke-linejoin="round" d="m5.5 17 4.5-5 3 3 2-2 3.5 4"/></svg>`;
 
 	const defaultStyle = () => ({
@@ -373,8 +345,8 @@
 		if (!button.__chartsPrintMenu) {
 			button.__chartsPrintMenu = true;
 			button.contextmenu([
-				{label: "Print", icon: modular.icons.print, action: printChart},
-				{label: "Preview as PDF", icon: modular.icons.pdf, action: () => previewChartPdf(button)},
+				{label: "Print", icon: window.Plastic.icons.print, action: printChart},
+				{label: "Preview as PDF", icon: window.Plastic.icons.pdf, action: () => previewChartPdf(button)},
 				{label: "Preview as PNG", icon: PNG_ICON, action: () => previewChartPng(button)}
 			]);
 		}
@@ -414,7 +386,7 @@
 			style: "inner-radius editor-font-family-combo",
 			value: "Inter",
 			placeholder: "Font",
-			options: FONT_FAMILIES.map(value => ({label: value, value}))
+			options: window.Plastic.fontFamilies.map(value => ({label: value, value}))
 		})}
             ${searchComboBox({
 			id: "charts-font-size",
@@ -423,14 +395,14 @@
 			value: "16",
 			placeholder: "Size",
 			allow_custom: true,
-			options: FONT_SIZES.map(value => ({label: String(value), value: String(value)}))
+			options: window.Plastic.fontSizes.map(value => ({label: String(value), value: String(value)}))
 		})}
             <button class="naked" data-toggle="bold" title="Bold"><b>B</b></button><button class="naked" data-toggle="italic" title="Italic"><i>I</i></button><button class="naked" data-toggle="underline" title="Underline"><u>U</u></button>
             <input data-style="textColor" type="color" value="#172033" title="Text color"><input data-style="fill" type="color" value="#ffffff" title="Shape fill"><input data-style="stroke" type="color" value="#657089" title="Border color">
             <button class="naked" data-action="align" title="Text alignment">${ALIGN_ICONS.center}</button>
             <span class="charts-toolbar-separator"></span>
-            <button class="naked charts-tool-button" data-action="shape" title="Draw shape">${modular.icons.shapes}</button>
-            <button class="naked charts-tool-button" data-action="text" title="Draw text box">${TEXT_ICON}</button><button class="naked charts-tool-button" data-action="image" title="Insert image">${modular.icons.image}</button>
+            <button class="naked charts-tool-button" data-action="shape" title="Draw shape">${window.Plastic.icons.shapes}</button>
+            <button class="naked charts-tool-button" data-action="text" title="Draw text box">${TEXT_ICON}</button><button class="naked charts-tool-button" data-action="image" title="Insert image">${window.Plastic.icons.image}</button>
             ${dropdown({
 				id: "charts-connector-style",
 				style: "charts-connector-style",
@@ -797,7 +769,7 @@
 					icon: TEXT_ICON,
 					action: () => beginTextEdit(item, itemsLayer.querySelector(`[data-id="${item.id}"]`))
 				}] : []),
-				{label: "Duplicate", icon: DUPLICATE_ICON, action: () => duplicateItem(item)},
+				{label: "Duplicate", icon: window.Plastic.icons.duplicate, action: () => duplicateItem(item)},
 				{
 					label: "Bring to front",
 					icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="m7 7 5-5 5 5M12 2v14M5 20h14"/></svg>`,
@@ -809,7 +781,7 @@
 				"separator",
 				{
 					label: "Delete",
-					icon: modular.icons.delete,
+					icon: window.Plastic.icons.delete,
 					destructive: true,
 					action: () => deleteItem(item)
 				}
@@ -951,7 +923,7 @@
 		};
 
 		const shapeButton = root.querySelector('[data-action="shape"]');
-		shapeButton?.popoutmenu(SHAPE_OPTIONS.map(option => ({
+		shapeButton?.popoutmenu(window.Plastic.shapeOptions.map(option => ({
 			label: option.label, icon: option.icon, action: () => {
 				shapeButton.innerHTML = option.icon;
 				setTool(`shape:${option.type}`);
@@ -1061,7 +1033,7 @@
 			const tree = await CLI.send("tree Charts");
 			const files = Array.isArray(tree?.children) ? tree.children.filter(file => !file.children && /\.chrts$/i.test(file.name || "")) : [];
 			if (!files.length) return `<div class="charts-empty faded">No charts</div>`;
-			return files.map(file => `<div class="chart-file padded radius pointer hover-background hover-shadowed center" directive="${esc(file.path)}"><img class="large-icon contained" src="${ICON}"><div>${esc(file.name)}</div></div>`).join("");
+			return files.map(file => `<div class="chart-file padded radius pointer hover-background hover-shadowed center" directive="${esc(file.path)}"><img class="large-icon contained" src="/icons/interfaces/charts.png"><div>${esc(file.name)}</div></div>`).join("");
 		} catch (_) {
 			return `<div class="faded small-padding">Charts folder not available yet.</div>`;
 		}
@@ -1084,15 +1056,15 @@
 		horizontal_nav: true,
 		centered_nav: true,
 		maximized: true,
-		icon: ICON,
+		icon: "/icons/interfaces/charts.png",
 		svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h6A1.5 1.5 0 0 1 11.25 6v3A1.5 1.5 0 0 1 9.75 10.5h-6A1.5 1.5 0 0 1 2.25 9V6A1.5 1.5 0 0 1 3.75 4.5Zm10.5 9h6A1.5 1.5 0 0 1 21.75 15v3a1.5 1.5 0 0 1-1.5 1.5h-6a1.5 1.5 0 0 1-1.5-1.5v-3a1.5 1.5 0 0 1 1.5-1.5ZM11.25 7.5h3.375A3.375 3.375 0 0 1 18 10.875V13.5m0 0-2.25-2.25M18 13.5l2.25-2.25"/></svg>`,
-		tools: [{title: "Save", icon: modular.icons.save, onclick: saveChart}, {
+		tools: [{title: "Save", icon: window.Plastic.icons.save, onclick: saveChart}, {
 			title: "Print",
-			icon: modular.icons.print,
+			icon: window.Plastic.icons.print,
 			onclick: showPrintMenu
 		}, {
 			title: "Search",
-			icon: modular.icons.search,
+			icon: window.Plastic.icons.search,
 			onclick: event => showSearch(event.currentTarget)
 		}, {
 			title: "Export Mermaid",
@@ -1100,7 +1072,7 @@
 			onclick: exportMermaid
 		}, {
 			title: "New Chart",
-			icon: modular.icons.create,
+			icon: window.Plastic.icons.create,
 			onclick: () => {
 				documentState = freshState();
 				activePath = "";

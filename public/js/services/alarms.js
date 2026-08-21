@@ -140,11 +140,11 @@
 			navigation: false,
 			tools: [{
 				title: "Delete",
-				icon: modular.icons.delete,
+				icon: window.Plastic.icons.delete,
 				onclick: () => handleAlarmMutation(CLI.send(`[alarms] - <id ${alarm.id}>`), "Deleted alarm", "Couldn't delete alarm")
 			}, {
 				title: "Save",
-				icon: modular.icons.save,
+				icon: window.Plastic.icons.save,
 				onclick: saveAlarm
 			}],
 			svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`,
@@ -156,12 +156,12 @@
 							div({style: "bi", content: children([
 									div({content: children([
 											label({style: "faded", content: "Hour"}),
-											input({id: "alarm-edit-hour", type: "number", min: 0, max: 23, value: parsedTime.hour})
+											input({id: "alarm-edit-hour", handle: "hour", type: "number", min: 0, max: 23, value: parsedTime.hour})
 										])
 									}),
 									div({content: children([
 											label({style: "faded", content: "Minute"}),
-											input({id: "alarm-edit-minute", type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: 2, value: padTimeUnit(parsedTime.minute)})
+											input({id: "alarm-edit-minute", handle: "minute", type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: 2, value: padTimeUnit(parsedTime.minute)})
 										])
 									})
 								])
@@ -204,12 +204,12 @@
 		if (!alarmsList || alarmsList.dataset.contextMenuBound === "1") return;
 		alarmsList.dataset.contextMenuBound = "1";
 		alarmsList.contextmenu([{
-			icon: modular.icons.modify,
+			icon: window.Plastic.icons.modify,
 			label: "Edit",
 			visible: (_root, target) => !!target?.closest?.(".alarm-tile"),
 			action: (_root, _event, tile) => openAlarmTileEditor(tile)
 		}, {
-			icon: modular.icons.delete,
+			icon: window.Plastic.icons.delete,
 			label: "Delete",
 			destructive: true,
 			visible: (_root, target) => !!target?.closest?.(".alarm-tile"),
@@ -250,7 +250,7 @@
 		resizable: false,
 		tools: [{
 			title: "New Alarm",
-			icon: modular.icons.create,
+			icon: window.Plastic.icons.create,
 			onclick: async (_event, view) => {
 				const defaultAlarmName = await getDefaultAlarmName(view);
 				inputDialogue({

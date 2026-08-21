@@ -407,13 +407,13 @@
             phone && button({
                 style: "naked small-padding round background-secondary" + (email ? " margin-right" : ""),
                 title: `Call ${fullName}`,
-                icon: modular.icons.phone,
+                icon: window.Plastic.icons.phone,
                 onclick: () => window.location.href = `tel:${phone}`
             }),
             email && button({
                 style: "naked small-padding round background-secondary",
                 title: `Email ${fullName}`,
-                icon: modular.icons.email,
+                icon: window.Plastic.icons.email,
                 onclick: () => window.location.href = `mailto:${email}`
             })
         ].filter(Boolean);
@@ -435,7 +435,7 @@
             tools: [
                 {
                     title: "Delete",
-                    icon: modular.icons.delete,
+                    icon: window.Plastic.icons.delete,
                     onclick: () => {
                         deleteContact(contact, () => {
                             removeContactFromVisibleLists(contact.id);
@@ -445,7 +445,7 @@
                 },
                 {
                     title: "Edit",
-                    icon: modular.icons.modify,
+                    icon: window.Plastic.icons.modify,
                     onclick: () => {
                         selected_contact = {...contact};
                         detailsPortal.close();
@@ -453,7 +453,7 @@
                     }
                 }
             ],
-            icon: modular.icons.at,
+            icon: window.Plastic.icons.at,
             route: () => div({content: children([
                     div({style: "center large-margin-top large-margin-bottom", content: children([
                         img({style: "contact-image real-large-icon round inline", src: contactImageUrl(contact.id)}),
@@ -477,7 +477,7 @@
         contactsList.addEventListener("contextmenu", hideContactPreview);
         const hasContactTarget = (_root, target) => !!target?.closest?.(".contact.tile");
         contactsList.contextmenu([{
-            icon: modular.icons.open,
+            icon: window.Plastic.icons.open,
             label: "Open",
             visible: hasContactTarget,
             action: (_root, _event, tile) => {
@@ -485,7 +485,7 @@
                 if (contact) openContact(contact);
             }
         }, {
-            icon: modular.icons.modify,
+            icon: window.Plastic.icons.modify,
             label: "Edit",
             visible: hasContactTarget,
             action: (_root, _event, tile) => {
@@ -495,7 +495,7 @@
                 modular.show("com.standard.contacts", 2);
             }
         }, {
-            icon: modular.icons.delete,
+            icon: window.Plastic.icons.delete,
             label: "Delete",
             destructive: true,
             visible: hasContactTarget,
@@ -513,10 +513,10 @@
         resizable: false,
         tools: [{
             title: "New Contact",
-            icon: modular.icons.create,
+            icon: window.Plastic.icons.create,
             onclick: _ => modular.show("com.standard.contacts", 1),
         }],
-        svg_icon: modular.icons.at,
+        svg_icon: window.Plastic.icons.at,
         icon: "/icons/interfaces/contacts.png",
         route: () => div({ style: "large-padding-top", content: children([
                 div({ id: "contacts-list", style : "notes-list", content: div({style: "padded", content: () => {
@@ -537,7 +537,7 @@
                                             if (e.target.closest("button")) return;
                                             openContact(contact);
                                         }, content: children([
-                                            button({style: "naked inner-radius float-right expose small-padding round", icon: modular.icons.delete,
+                                            button({style: "naked inner-radius float-right expose small-padding round", icon: window.Plastic.icons.delete,
                                                 onclick: (e) => {
                                                     e.stopPropagation();
                                                     deleteContact(contact, () => removeContactTile(e.target.closest(".contact.tile")));
@@ -568,10 +568,10 @@
         resizable: false,
         tools: [{
             title: "Save",
-            icon: modular.icons.save,
+            icon: window.Plastic.icons.save,
             onclick: createContact
         }],
-        icon: modular.icons.at,
+        icon: window.Plastic.icons.at,
         route: () => div({content: children([
                 div({style: "center medium-margin-top margin-bottom", content: children([
                         div({style: "background-secondary round real-large-icon inline medium-margin-top margin-bottom" , id: "add-contact-photo"})
@@ -652,7 +652,7 @@
             navigation: false,
             tools: [{
                 title: "Delete",
-                icon: modular.icons.delete,
+                icon: window.Plastic.icons.delete,
                 onclick: () => {
                     const contactId = selected_contact?.id;
                     deleteContact(selected_contact, () => {
@@ -662,10 +662,10 @@
                 }
             }, {
                 title: "Save",
-                icon: modular.icons.save,
+                icon: window.Plastic.icons.save,
                 onclick: saveSelectedContact
             }],
-            icon: modular.icons.at,
+            icon: window.Plastic.icons.at,
             route: () => div({content: children([
                     div({style: "center medium-margin-top margin-bottom", content: children([
                             div({style: "background-secondary round real-large-icon inline medium-margin-top margin-bottom" , id: "edit-contact-photo"})

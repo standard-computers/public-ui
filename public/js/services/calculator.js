@@ -114,7 +114,7 @@
 	};
 
 	const loadDefaultState = async settingsApi => {
-		let settings = {};
+		let settings;
 		try {
 			settings = await settingsApi?.values?.() || await window.StandardAppSettings?.values?.(SERVICE_ID) || {};
 		} catch (_) {

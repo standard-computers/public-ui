@@ -114,7 +114,7 @@
         if (preview) {
             preview.innerHTML = media?.url
                 ? `<video controls preload="metadata" src="${media.url}"></video>`
-                : `<div class="editor-video-empty">${modular.icons.video}<strong>Bring your first clip into the timeline</strong><p>Import a video to preview it, trim it, and save the edit as a Standard video project.</p><button type="button" class="editor-video-import primary">Import video</button></div>`;
+                : `<div class="editor-video-empty">${window.Plastic.icons.video}<strong>Bring your first clip into the timeline</strong><p>Import a video to preview it, trim it, and save the edit as a Standard video project.</p><button type="button" class="editor-video-import primary">Import video</button></div>`;
         }
         const track = root.querySelector(".editor-video-track");
         if (track) track.innerHTML = state.clips.map((clip) => {
@@ -255,9 +255,9 @@
             horizontal_nav: true,
             centered_nav: true,
             tools: [
-                {title: "Save", icon: modular.icons.save, onclick: (_, context) => saveProject(context?.portal)}
+                {title: "Save", icon: window.Plastic.icons.save, onclick: (_, context) => saveProject(context?.portal)}
             ],
-            svg_icon: modular.icons.film,
+            svg_icon: window.Plastic.icons.film,
             icon: "/icons/mp4.png",
             route: function () {
                 const state = getState(this.portal);
@@ -269,8 +269,8 @@
                             div({style: "editor-video-transport", content: children([
                                 div({style: "editor-video-transport-time editor-video-current-time", content: formatTime(state.playhead)}),
                                 div({style: "editor-video-transport-actions", content: children([
-                                    button({style: "naked inner-radius editor-video-import", title: "Import video", icon: modular.icons.create}),
-                                    button({style: "naked inner-radius editor-video-play-toggle", title: "Play or pause", icon: modular.icons.play})
+                                    button({style: "naked inner-radius editor-video-import", title: "Import video", icon: window.Plastic.icons.create}),
+                                    button({style: "naked inner-radius editor-video-play-toggle", title: "Play or pause", icon: window.Plastic.icons.play})
                                 ])}),
                                 div({style: "editor-video-transport-time text-right", content: state.clips.length ? `${state.clips.length} clip${state.clips.length === 1 ? "" : "s"}` : "No clips"})
                             ])})
@@ -286,8 +286,8 @@
                             div({style: "editor-video-timeline-header", content: children([
                                 `<strong>Timeline</strong>`,
                                 div({style: "editor-video-timeline-actions", content: children([
-                                    button({style: "naked inner-radius editor-video-import", title: "Import video", icon: modular.icons.create}),
-                                    button({style: "naked inner-radius editor-video-delete", title: "Delete selected clip", icon: modular.icons.delete})
+                                    button({style: "naked inner-radius editor-video-import", title: "Import video", icon: window.Plastic.icons.create}),
+                                    button({style: "naked inner-radius editor-video-delete", title: "Delete selected clip", icon: window.Plastic.icons.delete})
                                 ])})
                             ])}),
                             `<div class="editor-video-track-wrap"><div class="editor-video-ruler">0s 5s 10s 15s 20s 25s 30s</div><div class="editor-video-playhead"></div><div class="editor-video-track"></div></div>`

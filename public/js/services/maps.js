@@ -249,8 +249,8 @@
         if (!button.__mapsDirectionsDownloadMenu) {
             button.__mapsDirectionsDownloadMenu = true;
             button.contextmenu([
-                {label: "Save as PDF", icon: modular.icons.pdf, action: () => saveDirectionsAsPdf(resolveDocument())},
-                {label: "Export to Text Editor (.wrds)", icon: modular.icons.note, action: () => exportDirectionsToWords(resolveDocument(), button)}
+                {label: "Save as PDF", icon: window.Plastic.icons.pdf, action: () => saveDirectionsAsPdf(resolveDocument())},
+                {label: "Export to Text Editor (.wrds)", icon: window.Plastic.icons.note, action: () => exportDirectionsToWords(resolveDocument(), button)}
             ]);
         }
         const rect = button.getBoundingClientRect();
@@ -495,10 +495,10 @@
             dimensions: [520, 620],
             navigation: false,
             icon: "/icons/interfaces/maps.png",
-            svg_icon: modular.icons.globe,
+            svg_icon: window.Plastic.icons.globe,
             tools: [
-                {title: "Delete", icon: modular.icons.delete, onclick: () => deleteLocation(location, editorPortal)},
-                {title: "Save", icon: modular.icons.save, onclick: (_, context) => saveLocation(context)}
+                {title: "Delete", icon: window.Plastic.icons.delete, onclick: () => deleteLocation(location, editorPortal)},
+                {title: "Save", icon: window.Plastic.icons.save, onclick: (_, context) => saveLocation(context)}
             ],
             route: () => locationEditorRoute(location, prefix),
             afterRender: win => {
@@ -539,14 +539,14 @@
             auto_height: true,
             navigation: false,
             icon: "/icons/interfaces/maps.png",
-            svg_icon: modular.icons.globe,
+            svg_icon: window.Plastic.icons.globe,
             tools: [
                 {
-                    title: "Delete", icon: modular.icons.delete,
+                    title: "Delete", icon: window.Plastic.icons.delete,
                     onclick: () => deleteLocation(location, locationPortal)
                 },
                 {
-                    title: "Edit", icon: modular.icons.modify,
+                    title: "Edit", icon: window.Plastic.icons.modify,
                     onclick: () => {
                         locationPortal.close();
                         openLocationEditor(location);
@@ -555,7 +555,7 @@
             ],
             route: () => div({style: "maps-location-view large-padding-top small-padding", content: children([
                 div({style: "maps-location-view-heading", content: children([
-                    div({style: "maps-location-pin", content: modular.icons.globe}),
+                    div({style: "maps-location-pin", content: window.Plastic.icons.globe}),
                     h({level: 2, content: escapeHtml(location.name)})
                 ])}),
                 div({style: "maps-location-details", content: children(details.map(([label, value]) => div({
@@ -606,7 +606,7 @@
             centered_nav: true,
             tools: [{
                 title: "Locations",
-                icon: modular.icons.globe,
+                icon: window.Plastic.icons.globe,
                 onclick: (_, context) => {
                     locationsSourcePortal = context?.portal || null;
                     fetchSavedLocations({force: true});
@@ -1293,7 +1293,7 @@
                     contextMenuCoordinates = map.unproject([event.clientX - bounds.left, event.clientY - bounds.top]);
                 }, {capture: true});
                 mapContainer.contextmenu([{
-                    icon: modular.icons.create,
+                    icon: window.Plastic.icons.create,
                     label: "Create Location",
                     action: () => createLocationRecord(contextMenuCoordinates)
                 }]);
@@ -1382,8 +1382,8 @@
             dimensions: [420, 520],
             navigation: false,
             icon: "/icons/interfaces/maps.png",
-            svg_icon: modular.icons.globe,
-            tools: [{title: "Refresh", icon: modular.icons.refresh, onclick: () => fetchSavedLocations({force: true})}],
+            svg_icon: window.Plastic.icons.globe,
+            tools: [{title: "Refresh", icon: window.Plastic.icons.refresh, onclick: () => fetchSavedLocations({force: true})}],
             route: () => div({style: "maps-locations-portal large-padding-top", content: div({id: "maps-locations-list", style: "maps-locations-list"})}),
             afterRender: async () => {
                 const list = document.getElementById("maps-locations-list");
@@ -1393,7 +1393,7 @@
                     const hasLocationTarget = (_root, target) => !!target?.closest?.(".maps-location-item");
                     const getLocationFromItem = item => savedLocations[Number(item?.dataset?.locationIndex)];
                     list.contextmenu([{
-                        icon: modular.icons.open,
+                        icon: window.Plastic.icons.open,
                         label: "Open",
                         visible: hasLocationTarget,
                         action: (_root, _event, item) => {
@@ -1401,7 +1401,7 @@
                             if (location) openLocation(location);
                         }
                     }, {
-                        icon: modular.icons.modify,
+                        icon: window.Plastic.icons.modify,
                         label: "Edit",
                         visible: hasLocationTarget,
                         action: (_root, _event, item) => {
@@ -1409,7 +1409,7 @@
                             if (location) openLocationEditor(location);
                         }
                     }, {
-                        icon: modular.icons.delete,
+                        icon: window.Plastic.icons.delete,
                         label: "Delete",
                         destructive: true,
                         visible: hasLocationTarget,
@@ -1440,10 +1440,10 @@
             dimensions: [500, 620],
             navigation: false,
             icon: "/icons/interfaces/maps.png",
-            svg_icon: modular.icons.globe,
+            svg_icon: window.Plastic.icons.globe,
             tools: [{
                 title: "Print",
-                icon: modular.icons.print,
+                icon: window.Plastic.icons.print,
                 onclick: (_, context) => printDirectionsDocument(context?.portal?.windowState?.()?.directions || latestDirectionsDocument)
             }, {
                 title: "Download",

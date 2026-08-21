@@ -3,8 +3,6 @@
     const SERVICE_ID = "com.standard.editor.sheet";
     const DEFAULT_SHEET_ROWS = 25;
     const DEFAULT_SHEET_COLUMNS = 12;
-    const SHEET_FONT_FAMILIES = window.StandardUI?.fontFamilies || ["Inter", "Arial", "Georgia", "Times New Roman", "Courier New", "Verdana"];
-    const SHEET_FONT_SIZES = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72"];
     const SHEET_ROW_GROWTH = 25;
     const SHEET_COLUMN_GROWTH = 6;
     const SHEET_SCROLL_BUFFER = 120;
@@ -71,28 +69,10 @@
         {label: "Pie", value: "pie"}
     ];
 
-    const SHEET_TEXT_COLORS = [
-        {label: "Default", value: ""},
-        {label: "Ink", value: "var(--fg)"},
-        {label: "Blue", value: "var(--blue)"},
-        {label: "Green", value: "var(--green)"},
-        {label: "Orange", value: "var(--orange)"},
-        {label: "Red", value: "var(--red)"}
-    ];
-
-    const SHEET_FILL_COLORS = [
-        {label: "None", value: ""},
-        {label: "Paper", value: "var(--bg)"},
-        {label: "Soft", value: "var(--secondary-bg)"},
-        {label: "Blue", value: "#dbeafe"},
-        {label: "Green", value: "#dcfce7"},
-        {label: "Yellow", value: "#fef3c7"}
-    ];
-
     const SHEET_ALIGN_ICONS = {
-        left: modular.icons.left,
-        center: modular.icons.center,
-        right: modular.icons.right
+        left: window.Plastic.icons.left,
+        center: window.Plastic.icons.center,
+        right: window.Plastic.icons.right
     };
 
     const SHEET_LOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="small-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>`;
@@ -220,7 +200,7 @@
     const normalizeSheetChart = (rawChart = {}) => {
         if (!rawChart || typeof rawChart !== "object" || Array.isArray(rawChart)) return null;
         const chartType = String(rawChart.type || "bar").toLowerCase();
-        const type = SHEET_CHART_TYPES.some((option) => option.value === chartType) ? chartType : "bar";
+        const type = window.Plastic.chartTypes.some((option) => option.value === chartType) ? chartType : "bar";
         const id = String(rawChart.id || `sheet-chart-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
         const data = (Array.isArray(rawChart.data) ? rawChart.data : []).map((item, index) => {
             const value = Number(item?.value);
@@ -1878,7 +1858,7 @@
         }
         if (alignmentButton) {
             const alignment = activeStyle.textAlign || "left";
-            alignmentButton.innerHTML = SHEET_ALIGN_ICONS[alignment] || SHEET_ALIGN_ICONS.left;
+            alignmentButton.innerHTML = window.Plastic.icons[alignment] || window.Plastic.icons.left;
             alignmentButton.className = `${activeStyle.textAlign ? "tiny primary" : ""} naked align-bottom small-margin-right inner-radius`.trim();
         }
         if (typeSelect) typeSelect.value = getSheetSelectionCellType();
@@ -3020,22 +3000,24 @@
                         style: "editor-chart-type-segmented",
                         ariaLabel: "Chart type",
                         value: initialType,
-                        options: SHEET_CHART_TYPES
+                        options: window.Plastic.chartTypes
                     }),
-                    chartSource.hasSelectionData ? div({style: "small-margin-top faded", content: `Data: ${chartSource.range}`}) : div({style: "small-margin-top", content: children([
-                        label({input: "editor-sheet-chart-range", content: "Range"}),
-                        input({id: "editor-sheet-chart-range", style: "fill", placeholder: "A1:B6", value: ""})
-                    ])}),
-                    div({style: "small-margin-top", content: children([
-                        label({input: "editor-sheet-chart-title", content: "Title"}),
-                        input({id: "editor-sheet-chart-title", style: "fill", placeholder: "Chart", value: "Chart"})
-                    ])}),
-                    div({style: "small-margin-top", content: children([
-                        input({id: "editor-sheet-chart-label-values", type: "checkbox"}),
-                        label({input: "editor-sheet-chart-label-values", style: "inline small-margin-left", content: "Label Values"})
-                    ])}),
+                    div({style: "padded", content: children([
+                            chartSource.hasSelectionData ? div({style: "small-margin-top faded", content: `Using ${chartSource.range}`}) : div({style: "small-margin-top", content: children([
+                                label({input: "editor-sheet-chart-range", content: "Range"}),
+                                input({id: "editor-sheet-chart-range", style: "fill", placeholder: "A1:B6", value: ""})
+                            ])}),
+                            div({style: "small-margin-top", content: children([
+                                label({input: "editor-sheet-chart-title", content: "Title"}),
+                                input({id: "editor-sheet-chart-title", style: "fill", placeholder: "Chart", value: "Chart"})
+                            ])}),
+                            div({style: "small-margin-top", content: children([
+                                input({id: "editor-sheet-chart-label-values", type: "checkbox"}),
+                                label({input: "editor-sheet-chart-label-values", style: "inline small-margin-left", content: "Label Values"})
+                            ])})
+                        ])
+                    }),
                     div({style: "float-right small-margin-top", content: children([
-                        button({id: "editor-sheet-chart-cancel", style: "secondary space-right", type: "button", content: "Cancel"}),
                         button({id: "editor-sheet-chart-ok", style: "primary", type: "button", content: "OK"})
                     ])})
                 ])})
@@ -3046,15 +3028,6 @@
                     chartTypeControl.dataset.bound = "1";
                     chartTypeControl.addEventListener("change", (event) => {
                         selectedType = event.detail?.value || chartTypeControl.getAttribute("value") || initialType;
-                    });
-                }
-                const cancelButton = windowNode.querySelector("#editor-sheet-chart-cancel");
-                if (cancelButton && cancelButton.dataset.bound !== "1") {
-                    cancelButton.dataset.bound = "1";
-                    cancelButton.addEventListener("click", (event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        routeContext?.portal?.close?.();
                     });
                 }
                 const okButton = windowNode.querySelector("#editor-sheet-chart-ok");
@@ -3426,7 +3399,7 @@
         }
         if (textColorButton && textColorButton.dataset.bound !== "1") {
             textColorButton.dataset.bound = "1";
-            textColorButton.popoutmenu(SHEET_TEXT_COLORS.map((colorOption) => ({
+            textColorButton.popoutmenu(window.Plastic.text_colors.map((colorOption) => ({
                 label: colorOption.label,
                 icon: `<div class="inline round small-icon space-right" style="background:${colorOption.value || "transparent"};border:1px solid var(--border)"></div>`,
                 action: () => applySheetStyleToSelection((style) => ({
@@ -3437,7 +3410,7 @@
         }
         if (backgroundColorButton && backgroundColorButton.dataset.bound !== "1") {
             backgroundColorButton.dataset.bound = "1";
-            backgroundColorButton.popoutmenu(SHEET_FILL_COLORS.map((colorOption) => ({
+            backgroundColorButton.popoutmenu(window.Plastic.fillColors.map((colorOption) => ({
                 label: colorOption.label,
                 icon: `<div class="inline round small-icon space-right" style="background:${colorOption.value || "transparent"};border:1px solid var(--border)"></div>`,
                 action: () => applySheetStyleToSelection((style) => ({
@@ -3891,7 +3864,7 @@
                     cellInput.blur();
                 });
                 cellInput.contextmenu([
-                    {label: "Hyperlink", icon: modular.icons.link, action: () => showSheetHyperlinkDialogue(cellReference)},
+                    {label: "Hyperlink", icon: window.Plastic.icons.link, action: () => showSheetHyperlinkDialogue(cellReference)},
                     {label: "Lock Cell", icon: SHEET_LOCK_ICON, visible: () => !isSheetCellLocked(cellReference), action: () => toggleSheetCellLock(cellReference, true)},
                     {label: "Unlock Cell", icon: SHEET_UNLOCK_ICON, visible: () => isSheetCellLocked(cellReference), action: () => toggleSheetCellLock(cellReference, false)},
                     {label: "Style", action: (_, event) => openSheetCellStyleEditor(cellReference, event)}
@@ -4048,13 +4021,14 @@
             dimensions: [1000, 740],
             horizontal_nav: true,
             centered_nav: true,
+            maximized: true,
             tools: [{
                 title: "Save",
-                icon: modular.icons.save,
+                icon: window.Plastic.icons.save,
                 onclick: () => saveLoadedSheet()
             }, {
                 title: "Search",
-                icon: modular.icons.search,
+                icon: window.Plastic.icons.search,
                 onclick: (event) => showSheetSearchDialogue(event?.currentTarget)
             }],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5"/></svg>`,
@@ -4064,21 +4038,21 @@
                 return div({style: "large-padding-top editor-portal-shell", content: children([
                         div({style: "editor-sheet-shell", content: children([
                                 div({id: "editor-text-toolbar", style: "bordered shadowed radius small-padding", content: div({style: "faded", content: children([
-                                            searchComboBox({id: "editor-sheet-font-family", altsync: "FF", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: SHEET_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
-                                            searchComboBox({id: "editor-sheet-font-size", altsync: "FS", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: SHEET_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
-                                            button({id: "editor-sheet-style-bold", altsync: "B", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: modular.icons.bold}),
-                                            button({id: "editor-sheet-style-italic", altsync: "I", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: modular.icons.italic}),
-                                            button({id: "editor-sheet-style-underline", altsync: "U", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: modular.icons.underline}),
+                                            searchComboBox({id: "editor-sheet-font-family", altsync: "FF", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: window.Plastic.fontFamilies.map((fontName) => ({label: fontName, value: fontName}))}),
+                                            searchComboBox({id: "editor-sheet-font-size", altsync: "FS", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: window.Plastic.fontSizes.map((fontSize) => ({label: fontSize, value: fontSize}))}),
+                                            button({id: "editor-sheet-style-bold", altsync: "B", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: window.Plastic.icons.bold}),
+                                            button({id: "editor-sheet-style-italic", altsync: "I", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: window.Plastic.icons.italic}),
+                                            button({id: "editor-sheet-style-underline", altsync: "U", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: window.Plastic.icons.underline}),
                                             button({id: "editor-sheet-style-color", altsync: "F", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
                                             button({id: "editor-sheet-style-background", altsync: "BG", style: "naked align-bottom small-margin-right inner-radius", title: "Background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
                                             button({id: "editor-sheet-style-align", altsync: "A", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: SHEET_ALIGN_ICONS.left}),
-                                            button({id: "editor-sheet-style-link", altsync: "K", style: "naked align-bottom small-margin-right inner-radius", title: "Hyperlink", icon: modular.icons.link}),
+                                            button({id: "editor-sheet-style-link", altsync: "K", style: "naked align-bottom small-margin-right inner-radius", title: "Hyperlink", icon: window.Plastic.icons.link}),
                                             div({style: "inline bordered-right small-margin-right small-margin-left", content: " "}),
                                             select({id: "editor-sheet-cell-type", style: "small-margin-right inner-radius", value: "", options: [{label: "Mixed", value: "__mixed__", disabled: true}, ...SHEET_CELL_TYPES]}),
                                             button({id: "editor-sheet-decimal-decrease", altsync: "DC", style: "naked align-bottom small-margin-right inner-radius", title: "Decrease Decimal Count", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.75h8.5M5.25 10.25h5.25M4.5 15.75h.008v.008H4.5v-.008Zm3 0h.008v.008H7.5v-.008Zm3 0h.008v.008H10.5v-.008Zm3 0h.008v.008H13.5v-.008Zm5.25-6.25-3 3m0 0 3 3m-3-3h4.5"/></svg>`}),
                                             button({id: "editor-sheet-decimal-increase", altsync: "IC", style: "naked align-bottom small-margin-right inner-radius", title: "Increase Decimal Count", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 6.75h8.5M5.25 10.25h5.25M4.5 15.75h.008v.008H4.5v-.008Zm3 0h.008v.008H7.5v-.008Zm3 0h.008v.008H10.5v-.008Zm6.75-3.25 3 3m0 0-3 3m3-3h-4.5"/></svg>`}),
-                                            button({id: "editor-sheet-add-image", altsync: "IM", style: "naked align-bottom small-margin-right inner-radius", title: "Add image", icon: modular.icons.image}),
-                                            button({id: "editor-sheet-make-chart", altsync: "C", style: "naked align-bottom small-margin-right inner-radius", title: "Add Chart", icon: modular.icons.chart}),
+                                            button({id: "editor-sheet-add-image", altsync: "IM", style: "naked align-bottom small-margin-right inner-radius", title: "Add image", icon: window.Plastic.icons.image}),
+                                            button({id: "editor-sheet-make-chart", altsync: "C", style: "naked align-bottom small-margin-right inner-radius", title: "Add Chart", icon: window.Plastic.icons.chart}),
                                         ])})
                                 }),
                                 div({style: "padding-left padding-right padding-bottom editor-sheet-workspace", content: children([

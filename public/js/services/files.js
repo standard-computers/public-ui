@@ -349,7 +349,7 @@
             return false;
         }
         return window.StandardUI.openSearchDialogue({
-            title: "Search",
+            // title: "Search",
             placeholder: "Find files",
             confirmText: "Search",
             anchor: anchorNode,
@@ -378,7 +378,7 @@
             refreshFileListRoot(rootId, options);
         }
     }));
-    const fileSortButton = id => button({id, style: "small naked float-right hover-zoom", altsync: "F", icon: modular.icons.sort, title: "Sort"});
+    const fileSortButton = id => button({id, style: "small naked float-right hover-zoom", altsync: "F", icon: window.Plastic.icons.sort, title: "Sort"});
     const fileDisplayButton = id => button({id, style: "small naked float-right hover-zoom files-display-button", icon: getFileDisplayStyle().icon, title: `Display style: ${getFileDisplayStyle().label}`});
     const syncFileDisplayButtons = () => {
         const displayStyle = getFileDisplayStyle();
@@ -1057,14 +1057,14 @@
         }
     };
     const createFileMenuItems = () => [{
-        icon: modular.icons.open,
+        icon: window.Plastic.icons.open,
         label: "Open",
         action: (b, e, el) => {
             const path = el.closest(".file-folder")?.getAttribute("directive");
             openFilePath(path, el);
         }
     }, {
-        icon: modular.icons.play,
+        icon: window.Plastic.icons.play,
         label: "Run",
         visible: (b, el) => /\.sui$/i.test(el?.closest?.(".file-folder")?.getAttribute("directive") || ""),
         action: (b, e, el) => {
@@ -1072,7 +1072,7 @@
             runSuiFilePath(path);
         }
     }, {
-        icon: modular.icons.create,
+        icon: window.Plastic.icons.create,
         label: "Pin to Desktop",
         action: (b, e, el) => {
             const path = el.closest(".file-folder")?.getAttribute("directive");
@@ -1084,7 +1084,7 @@
             });
         }
     }, {
-        icon: modular.icons.modify,
+        icon: window.Plastic.icons.modify,
         label: "Rename",
         action: (b, e, el) => {
             const path = el.closest(".file-folder")?.getAttribute("directive");
@@ -1105,7 +1105,7 @@
             triggerFileDownload(path);
         }
     }, {
-        icon: modular.icons.delete,
+        icon: window.Plastic.icons.delete,
         label: "Delete",
         destructive: true,
         action: (b, e, el) => {
@@ -1123,7 +1123,7 @@
             label: `Download ${count} items`,
             action: () => downloadSelectedFiles(selectedTiles)
         }, {
-            icon: modular.icons.delete,
+            icon: window.Plastic.icons.delete,
             label: `Delete ${count} items`,
             destructive: true,
             action: () => deleteSelectedFiles(selectedTiles)
@@ -1684,7 +1684,7 @@
         dimensions: [775, 500],
         tools: [{
             title: "Search",
-            icon: modular.icons.search,
+            icon: window.Plastic.icons.search,
             onclick: (event, context) => showFilesSearchDialogue(context?.portal, event?.currentTarget)
         }],
         svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/></svg>`,
@@ -1789,11 +1789,11 @@
                                         },
                                         content: children([
                                             button({style: "naked inner-radius float-right expose no-padding small-padding",
-                                                icon: modular.icons.modify,
+                                                icon: window.Plastic.icons.modify,
                                                 onclick: () => openNoteEditorInNotesApp(notes[i])
                                             }),
                                             button({style: "naked inner-radius float-right expose no-padding small-padding",
-                                                icon: modular.icons.delete,
+                                                icon: window.Plastic.icons.delete,
                                                 onclick: event => deleteNoteFromNotesSection(notes[i].id, notes[i], event.target)
                                             }),
                                             strong({style: "note-tile-title", content: escapeHtml(notes[i].title || notes[i].created || "Untitled Note")}),
@@ -1811,7 +1811,7 @@
                     }),
                     button({
                         style: "secondary primary-action round hover-zoom",
-                        icon: modular.icons.create,
+                        icon: window.Plastic.icons.create,
                         onclick: () => modular.show("com.standard.notes", 1)
                     })
                 ])
@@ -1820,7 +1820,7 @@
                 const notesRoot = document.getElementById("notes");
                 bindNoteImageViewer(notesRoot);
                 document.querySelectorAll("#notes").forEach((el) => el.contextmenu([{
-                    icon: modular.icons.open,
+                    icon: window.Plastic.icons.open,
                     label: "Open",
                     action: (b, e, target) => {
                         const note = getNoteFromTile(target);
@@ -1831,7 +1831,7 @@
                         openNoteInNotesApp(note);
                     }
                 }, {
-                    icon: modular.icons.modify,
+                    icon: window.Plastic.icons.modify,
                     label: "Edit",
                     action: (b, e, target) => {
                         const note = getNoteFromTile(target);
@@ -1842,7 +1842,7 @@
                         openNoteEditorInNotesApp(note);
                     }
                 }, {
-                    icon: modular.icons.delete,
+                    icon: window.Plastic.icons.delete,
                     label: "Delete",
                     destructive: true,
                     action: (b, e, target) => {
@@ -1911,7 +1911,7 @@
                 document.querySelectorAll("#photos").forEach(el => {
                     bindFileSelection(el);
                     bindFileContextMenu(el, [{
-                    icon: modular.icons.modify,
+                    icon: window.Plastic.icons.modify,
                     label: "Rename",
                     action: (b, e, target) => {
                         const path = target.closest(".file-folder")?.getAttribute("directive");
@@ -1925,7 +1925,7 @@
                         triggerFileDownload(path);
                     }
                 }, {
-                    icon: modular.icons.delete,
+                    icon: window.Plastic.icons.delete,
                     label: "Delete",
                     destructive: true,
                     action: (b, e, target) => {
@@ -1982,14 +1982,14 @@
                 document.querySelectorAll("#videos").forEach(el => {
                     bindFileSelection(el);
                     bindFileContextMenu(el, [{
-                    icon: modular.icons.open,
+                    icon: window.Plastic.icons.open,
                     label: "Open",
                     action: (b, e, target) => {
                         const path = target.closest(".file-folder")?.getAttribute("directive");
                         openVideoInVideoViewer(path, target);
                     }
                 }, {
-                    icon: modular.icons.modify,
+                    icon: window.Plastic.icons.modify,
                     label: "Rename",
                     action: (b, e, target) => {
                         const path = target.closest(".file-folder")?.getAttribute("directive");
@@ -2003,7 +2003,7 @@
                         triggerFileDownload(path);
                     }
                 }, {
-                    icon: modular.icons.delete,
+                    icon: window.Plastic.icons.delete,
                     label: "Delete",
                     destructive: true,
                     action: (b, e, target) => {

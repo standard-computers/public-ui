@@ -78,8 +78,8 @@
         if (!exportButton.__stopwatchExportMenu) {
             exportButton.__stopwatchExportMenu = true;
             exportButton.contextmenu([
-                {label: "Export to Sheets", icon: modular.icons.sheets, action: () => exportToSheets(exportButton)},
-                {label: "Export to Words", icon: modular.icons.note, action: () => exportToWords(exportButton)}
+                {label: "Export to Sheets", icon: window.Plastic.icons.sheets, action: () => exportToSheets(exportButton)},
+                {label: "Export to Words", icon: window.Plastic.icons.note, action: () => exportToWords(exportButton)}
             ]);
         }
         const rect = exportButton.getBoundingClientRect();

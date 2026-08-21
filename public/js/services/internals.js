@@ -1518,7 +1518,7 @@
             internal: true,
             dimensions: [520, 460],
             navigation: false,
-            tools: [{title: "Edit", icon: modular.icons.modify, onclick: (event) => openTextInEditorApp(event?.target)}],
+            tools: [{title: "Edit", icon: window.Plastic.icons.modify, onclick: (event) => openTextInEditorApp(event?.target)}],
             route: () => div({style: "large-padding-top small-padding", content: children([div({id: "internals-text-preview", style: "padded", content: activeTextFileContent})])}),
             afterRender: function () {
                 restoreTextStateFromPortal(this.portal);
@@ -1530,7 +1530,7 @@
             internal: true,
             dimensions: [720, 540],
             navigation: false,
-            tools: [{title: "Delete", icon: modular.icons.delete, onclick: (event, context) => deleteImageFromPortal(context?.portal || getPortalFromSource(event?.target, 1))}],
+            tools: [{title: "Delete", icon: window.Plastic.icons.delete, onclick: (event, context) => deleteImageFromPortal(context?.portal || getPortalFromSource(event?.target, 1))}],
             route: () => div({id: "internals-image-preview-shell", style: "large-padding-top fill", content: children([
                 `<div style="height:calc(100% - 24px);box-sizing:border-box;display:flex;align-items:center;justify-content:center;overflow:hidden"><div id="internals-image-preview-host" class="internals-image-preview-host radius"></div></div>`,
                 `<div id="internals-image-stats" style="height:22px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 5px 0 5px;bottom:0;font-size:11px;line-height:16px" class="no-wrap faded"><span id="internals-image-stats-dimensions">Current - x - | Original - x -</span><span id="internals-image-stats-coordinates">x -, y -</span></div>`
@@ -1570,11 +1570,11 @@
             tools: [
                 {
                     title: "Delete",
-                    icon: modular.icons.delete,
+                    icon: window.Plastic.icons.delete,
                     onclick: deleteAppSettingsFromPortal
                 }, {
                     title: "Save",
-                    icon: modular.icons.save,
+                    icon: window.Plastic.icons.save,
                     onclick: saveAppSettingsFromPortal
                 }
             ],
@@ -1588,7 +1588,7 @@
             internal: true,
             dimensions: [820, 640],
             navigation: false,
-            tools: [{title: "Print", icon: modular.icons.print, onclick: (event, context) => printActivePdf(context?.portal || getPortalFromSource(event?.target, 5))}],
+            tools: [{title: "Print", icon: window.Plastic.icons.print, onclick: (event, context) => printActivePdf(context?.portal || getPortalFromSource(event?.target, 5))}],
             route: () => div({style: "large-padding-top fill internals-pdf-viewer-shell", content: `<iframe id="internals-pdf-preview" class="internals-pdf-preview radius" src="${activePdfFileSource || "about:blank"}" title="${escapeHtml(activePdfFilePath || "PDF preview")}"></iframe>`}),
             afterRender: function () {
                 restorePdfStateFromPortal(this.portal);

@@ -512,14 +512,14 @@
 			dimensions: [900, 620],
 			navigation: false,
 			icon: "/icons/interfaces/weather.png",
-			svg_icon: modular.icons.weather,
+			svg_icon: window.Plastic.icons.weather,
 			tools: [{
 				title: "Set weather location",
 				icon: LOCATION_ICON,
 				onclick: promptForWeatherLocation
 			}, {
 				title: "Refresh forecast",
-				icon: modular.icons.refresh,
+				icon: window.Plastic.icons.refresh,
 				onclick: () => window.standardWeather?.refresh?.()
 			}],
 			route: weatherPortalMarkup,

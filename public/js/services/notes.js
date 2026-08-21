@@ -258,17 +258,17 @@
             navigation: false,
             tools: [{
                 title: "Delete",
-                icon: modular.icons.delete,
+                icon: window.Plastic.icons.delete,
                 onclick: () => deleteNote(note.id, () => notePortal.close())
             }, {
                 title: "Edit",
-                icon: modular.icons.modify,
+                icon: window.Plastic.icons.modify,
                 onclick: () => {
                     notePortal.close();
                     openNoteEditor(note);
                 }
             }],
-            svg_icon: modular.icons.note,
+            svg_icon: window.Plastic.icons.note,
             icon: "/icons/interfaces/notes.png",
             route: () => div({style: "padded large-padding-top", content: `<div class="note-view-content">${sanitizeNoteMarkup(noteContent)}</div>`}),
             afterRender: win => {
@@ -293,10 +293,10 @@
             navigation: false,
             tools: [{
                 title: "Delete",
-                icon: modular.icons.delete,
+                icon: window.Plastic.icons.delete,
                 onclick: () => deleteNote(noteId, () => noteEditorPortal.close())
             }, {
-                title: "Save", icon: modular.icons.save, onclick: (_, context) => {
+                title: "Save", icon: window.Plastic.icons.save, onclick: (_, context) => {
                     updatedTitle = readPortalTitle(context, updatedTitle);
                     const updatedContent = getNoteMarkup(document.getElementById("edit-note-content"));
                     const updatedColor = document.getElementById("edit-note-color").value;
@@ -316,7 +316,7 @@
                     });
                 }
             }],
-            svg_icon: modular.icons.note,
+            svg_icon: window.Plastic.icons.note,
             icon: "/icons/interfaces/notes.png",
             route: () => div({style: "large-padding-top editor-portal-shell",
                 content: children([
@@ -352,7 +352,7 @@
         navigation: false,
         tools: [{
             title: "Save",
-            icon: modular.icons.save,
+            icon: window.Plastic.icons.save,
             onclick: (_, context) => {
                 const userId = modular.user.id();
                 const content = getNoteMarkup(document.getElementById("new-note-content"));
@@ -370,7 +370,7 @@
                 });
             }
         }],
-        svg_icon: modular.icons.note,
+        svg_icon: window.Plastic.icons.note,
         icon: "/icons/interfaces/notes.png",
         route: _ => div({style: "large-padding-top editor-portal-shell", content: children([
                 input({type: "hidden", id: "new-note-color"}),
@@ -396,10 +396,10 @@
             resizable: false,
             tools: [{
                 title: "Create Note",
-                icon: modular.icons.create,
+                icon: window.Plastic.icons.create,
                 onclick: _ => modular.show("com.standard.notes", 1)
             }],
-            svg_icon: modular.icons.note,
+            svg_icon: window.Plastic.icons.note,
             icon: "/icons/interfaces/notes.png",
             route: () => div({style: "large-padding-top padding-right", content: children([
                     div({style: "notes-list", content: div({style: "padded", content: () => {
@@ -423,12 +423,12 @@
                                             content: children([
                                                 button({
                                                     style: "naked inner-radius float-right expose small-padding",
-                                                    icon: modular.icons.modify,
+                                                    icon: window.Plastic.icons.modify,
                                                     onclick: () => openNoteEditor(note)
                                                 }),
                                                 button({
                                                     style: "naked inner-radius float-right expose small-padding",
-                                                    icon: modular.icons.delete,
+                                                    icon: window.Plastic.icons.delete,
                                                     onclick: event => deleteNote(note.id, undefined, event.currentTarget)
                                                 }),
                                                 strong({style: "note-tile-title", content: escapeHtml(note.title || note.created || "Untitled Note")}),
@@ -448,7 +448,7 @@
                 const notesList = document.querySelector(".notes-list");
                 bindNoteImageViewer(notesList);
                 notesList.contextmenu([{
-                    icon: modular.icons.open,
+                    icon: window.Plastic.icons.open,
                     label: "Open",
                     action: (b, e, el) => {
                         const nt = el.closest(".note-tile");
@@ -457,7 +457,7 @@
                         openNote(note);
                     }
                 }, {
-                    icon: modular.icons.modify,
+                    icon: window.Plastic.icons.modify,
                     label: "Edit",
                     action: (b, e, el) => {
                         const nt = el.closest(".note-tile");
@@ -466,7 +466,7 @@
                         openNoteEditor(note);
                     }
                 }, {
-                    icon: modular.icons.delete,
+                    icon: window.Plastic.icons.delete,
                     label: "Delete",
                     destructive: true,
                     action: (b, e, el) => {

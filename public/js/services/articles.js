@@ -198,15 +198,15 @@
             title: `Edit ${article.title || "Article"}`,
             dimensions: [520, 650],
             navigation: false,
-            svg_icon: modular.icons.articles,
+            svg_icon: window.Plastic.icons.articles,
             tools: [
                 {
                     title: "Delete",
-                    icon: modular.icons.delete,
+                    icon: window.Plastic.icons.delete,
                     onclick: () => deleteArticle(article, portal)
                 }, {
                     title: "Save",
-                    icon: modular.icons.save,
+                    icon: window.Plastic.icons.save,
                     onclick: () => saveArticle(article, "edit-article", portal, iconState)
                 }
             ],
@@ -228,15 +228,15 @@
             dimensions: [520, 560],
             auto_height: true,
             navigation: false,
-            svg_icon: modular.icons.articles,
+            svg_icon: window.Plastic.icons.articles,
             tools: [
                 {
                     title: "Delete",
-                    icon: modular.icons.delete,
+                    icon: window.Plastic.icons.delete,
                     onclick: () => deleteArticle(article, portal)
                 }, {
                     title: "Edit",
-                    icon: modular.icons.modify,
+                    icon: window.Plastic.icons.modify,
                     onclick: () => {
                         portal.close();
                         openEditor(article);
@@ -302,11 +302,11 @@
         hints: ["create article", "new article", "write article"],
         dimensions: [520, 650],
         navigation: false,
-        svg_icon: modular.icons.articles,
+        svg_icon: window.Plastic.icons.articles,
         tools: [
             {
                 title: "Save",
-                icon: modular.icons.save,
+                icon: window.Plastic.icons.save,
                 onclick: (_, context) => createArticle(context?.portal)
             }
         ],
@@ -350,7 +350,7 @@
         const hasArticleTarget = (_root, target) => !!target?.closest?.(".article-tile");
         const getArticleFromTile = tile => articleListRecords.get(String(tile?.getAttribute("data") || ""));
         resultsHost.contextmenu([{
-            icon: modular.icons.open,
+            icon: window.Plastic.icons.open,
             label: "Open",
             visible: hasArticleTarget,
             action: (_root, _event, tile) => {
@@ -358,7 +358,7 @@
                 if (article) openArticle(article);
             }
         }, {
-            icon: modular.icons.modify,
+            icon: window.Plastic.icons.modify,
             label: "Edit",
             visible: hasArticleTarget,
             action: (_root, _event, tile) => {
@@ -366,7 +366,7 @@
                 if (article) openEditor(article);
             }
         }, {
-            icon: modular.icons.delete,
+            icon: window.Plastic.icons.delete,
             label: "Delete",
             destructive: true,
             visible: hasArticleTarget,
@@ -510,11 +510,11 @@
             hints: ["articles", "article manager", "publishing"],
             dimensions: [520, 560],
             navigation: false,
-            svg_icon: modular.icons.articles,
+            svg_icon: window.Plastic.icons.articles,
             icon: "/icons/interfaces/articles.png",
             tools: [{
                 title: "Create Article",
-                icon: modular.icons.create,
+                icon: window.Plastic.icons.create,
                 onclick: showCreateArticleMenu
             }],
             route: () => div({style: "large-padding-top small-padding", content: div({id: "articles-list-results", content: () => CLI.send("[articles] <LIMIT 25>").then(payload => {

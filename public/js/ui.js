@@ -1177,12 +1177,17 @@ async function applyThemeData(d) {
     window.StandardUI.currentTheme = d;
     document.documentElement.style.setProperty("--fs", `${d.font_size}px`);
     document.documentElement.style.setProperty("--interface-shortcut-icon-size", `${d.shortcut_icon_size}px`);
+    document.documentElement.style.setProperty("--font-family", d.font_family ? `${d.font_family}, sans-serif` : '"Inter", sans-serif');
+    document.documentElement.style.setProperty("--font-weight", d.bold_font === true ? "700" : "400");
     document.documentElement.style.setProperty("--fg", d.foreground);
     document.documentElement.style.setProperty("--primary", d.primary);
-    document.documentElement.style.setProperty("--secondary", d.secondary);
+    document.documentElement.style.setProperty("--secondary", d.secondary || d.primary);
     document.documentElement.style.setProperty("--bg", d.background);
     document.documentElement.style.setProperty("--border", d.border_color);
     document.documentElement.style.setProperty("--radius", `${d.border_radius}px`);
+    document.documentElement.style.setProperty("--border-width", `${d.border_width}px`);
+    document.documentElement.style.setProperty("--transparent-bg", d.transparency === false ? "var(--secondary-bg)" : "color-mix(in srgb,var(--secondary-bg) 55%,transparent)");
+    document.documentElement.style.setProperty("--blur", d.transparency === false ? "0px" : "16px");
     const shadowsEnabled = d.shadows !== false;
     document.documentElement.style.setProperty("--small-shadow", shadowsEnabled ? "0 4px 12px rgba(5, 5, 5, 0.08)" : "none");
     document.documentElement.style.setProperty("--shadow", shadowsEnabled ? "0 8px 32px rgba(0, 0, 0, 0.1)" : "none");
@@ -1295,6 +1300,7 @@ const defaultThemeData = {
     hide_shortcuts: false,
     kiosk_mode: false,
     disable_bar: false,
+    developer_mode: false,
     media_widget: true,
     video_widget: true
 };

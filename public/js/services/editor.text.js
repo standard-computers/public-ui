@@ -1,8 +1,6 @@
 (async () => {
 
     const SERVICE_ID = "com.standard.editor.text";
-    const TEXT_FONT_FAMILIES = window.StandardUI?.fontFamilies || ["Inter", "Georgia", "Times New Roman", "Courier New", "Verdana"];
-    const TEXT_FONT_SIZES = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72"];
     const TEXT_HIGHLIGHT_COLOR = "#fef08a";
     const TEXT_DOCUMENT_CONTENT_PREFIX = "__STD_TEXT_EDITOR_B64__:";
     const TEXT_DOCUMENT_VIEW_SETTINGS_KEY = "std.textEditor.documentViewSettings";
@@ -27,50 +25,32 @@
         thumbnails: {label: "Thumbnails by default", type: "boolean", default: false}
     };
 
-    const TEXT_TEXT_COLORS = [
-        {label: "Default", value: ""},
-        {label: "Ink", value: "var(--fg)"},
-        {label: "Blue", value: "var(--blue)"},
-        {label: "Green", value: "var(--green)"},
-        {label: "Orange", value: "var(--orange)"},
-        {label: "Red", value: "var(--red)"}
-    ];
-
-    const TEXT_BACKGROUND_COLORS = [
-        {label: "None", value: ""},
-        {label: "Paper", value: "var(--bg)"},
-        {label: "Soft", value: "var(--secondary-bg)"},
-        {label: "Blue", value: "#dbeafe"},
-        {label: "Green", value: "#dcfce7"},
-        {label: "Yellow", value: "#fef3c7"}
-    ];
-
     const TEXT_SHAPE_OPTIONS = [{
         type: "rectangle",
         label: "Rectangle",
-        icon: modular.icons.rectangle
+        icon: window.Plastic.icons.rectangle
     }, {
         type: "rounded-rectangle",
         label: "Rounded Rectangle",
-        icon: modular.icons.rounded_rectangle
+        icon: window.Plastic.icons.rounded_rectangle
     }, {
         type: "ellipse",
         label: "Ellipse",
-        icon: modular.icons.ellipse
+        icon: window.Plastic.icons.ellipse
     }, {
         type: "triangle",
         label: "Triangle",
-        icon: modular.icons.triangle
+        icon: window.Plastic.icons.triangle
     }, {
         type: "diamond",
         label: "Diamond",
-        icon: modular.icons.diamond
+        icon: window.Plastic.icons.diamond
     }];
 
     const TEXT_ALIGN_ICONS = {
-        left: modular.icons.left,
-        center: modular.icons.center,
-        right: modular.icons.right,
+        left: window.Plastic.icons.left,
+        center: window.Plastic.icons.center,
+        right: window.Plastic.icons.right,
     };
 
     let activeTextEditorFilePath = "";
@@ -2005,7 +1985,7 @@ a { color: #1d4ed8; text-decoration: underline; }
     };
     const normalizeFontFamilyForToolbar = (fontFamily = "") => {
         const primaryFont = String(fontFamily || "").split(",")[0].replace(/^["']|["']$/g, "").trim();
-        return TEXT_FONT_FAMILIES.includes(primaryFont) ? primaryFont : (primaryFont || "Inter");
+        return window.Plastic.fontFamilies.includes(primaryFont) ? primaryFont : (primaryFont || "Inter");
     };
     const updateTextToolbarState = () => {
         const editorNode = findTextEditorNode();
@@ -3110,7 +3090,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         });
         textArea.contextmenu([{
             label: "Hyperlink",
-            icon: modular.icons.link,
+            icon: window.Plastic.icons.link,
             visible: () => hasHighlightedTextSelection() && isRichTextDocument(),
             action: () => showTextEditorHyperlinkDialogue()
         },
@@ -3227,7 +3207,7 @@ a { color: #1d4ed8; text-decoration: underline; }
             visible: (_, target) => !!target?.closest?.(".editor-text-shape-frame"),
             action: (_, __, target) => showTextEditorShapeColorDialogue(target?.closest?.(".editor-text-shape-frame") || activeTextShapeFrame, "stroke", "Border color", "#1f2937")
         }, {
-            icon: modular.icons.delete,
+            icon: window.Plastic.icons.delete,
             label: "Delete",
             destructive: true,
             visible: (_, target) => !!target?.closest?.(".editor-text-shape-frame"),
@@ -3478,7 +3458,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         if (textColorButton && textColorButton.dataset.bound !== "1") {
             textColorButton.dataset.bound = "1";
-            textColorButton.popoutmenu(TEXT_TEXT_COLORS.map((colorOption) => ({
+            textColorButton.popoutmenu(window.Plastic.text_colors.map((colorOption) => ({
                 label: colorOption.label,
                 icon: `<div class="inline round small-icon space-right" style="background:${colorOption.value || "transparent"};border:1px solid var(--border)"></div>`,
                 action: () => execTextEditorCommand("foreColor", colorOption.value || "inherit")
@@ -3486,7 +3466,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         if (backgroundColorButton && backgroundColorButton.dataset.bound !== "1") {
             backgroundColorButton.dataset.bound = "1";
-            backgroundColorButton.popoutmenu(TEXT_BACKGROUND_COLORS.map((colorOption) => ({
+            backgroundColorButton.popoutmenu(window.Plastic.fillColors.map((colorOption) => ({
                 label: colorOption.label,
                 icon: `<div class="inline round small-icon space-right" style="background:${colorOption.value || "transparent"};border:1px solid var(--border)"></div>`,
                 action: () => execTextEditorCommand("hiliteColor", colorOption.value || "transparent")
@@ -3575,7 +3555,7 @@ a { color: #1d4ed8; text-decoration: underline; }
         }
         if (shapeButton && shapeButton.dataset.bound !== "1") {
             shapeButton.dataset.bound = "1";
-            shapeButton.popoutmenu(TEXT_SHAPE_OPTIONS.map((shape) => ({
+            shapeButton.popoutmenu(window.Plastic.shapeOptions.map((shape) => ({
                 icon: shape.icon,
                 label: shape.label,
                 action: () => insertTextEditorShape(shape.type)
@@ -3870,31 +3850,31 @@ a { color: #1d4ed8; text-decoration: underline; }
             horizontal_nav: true,
             centered_nav: true,
             tools: [
-                {title: "Save", icon: modular.icons.save, onclick: (_, context) => saveLoadedTextFile(context?.portal)},
-                {title: "Print", icon: modular.icons.print, onclick: (_, context) => printTextEditorDocument(context?.portal)},
-                {title: "Search", icon: modular.icons.search,onclick: (event, context) => showTextEditorSearchDialogue(context?.portal, event?.currentTarget)}
+                {title: "Save", icon: window.Plastic.icons.save, onclick: (_, context) => saveLoadedTextFile(context?.portal)},
+                {title: "Print", icon: window.Plastic.icons.print, onclick: (_, context) => printTextEditorDocument(context?.portal)},
+                {title: "Search", icon: window.Plastic.icons.search,onclick: (event, context) => showTextEditorSearchDialogue(context?.portal, event?.currentTarget)}
             ],
             svg_icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>`,
             icon: "/icons/interfaces/editor.png",
             route: () => div({style: "large-padding-top", content: children([
                     div({id: "editor-text-toolbar", style: "bordered shadowed radius small-padding blurred", content: div({style: "faded", content: children([
-                                searchComboBox({id: "editor-sheet-font-family", altsync: "FF", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: TEXT_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
-                                searchComboBox({id: "editor-sheet-font-size", altsync: "FS", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: TEXT_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
-                                button({id: "editor-sheet-style-bold", altsync: "B", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: modular.icons.bold}),
-                                button({id: "editor-sheet-style-italic", altsync: "I", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: modular.icons.italic}),
-                                button({id: "editor-sheet-style-underline", altsync: "U", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: modular.icons.underline}),
-                                button({id: "editor-sheet-style-link", altsync: "K", style: "naked align-bottom small-margin-right inner-radius", title: "Hyperlink", icon: modular.icons.link}),
-                                button({id: "editor-sheet-style-color", altsync: "F", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
-                                button({id: "editor-sheet-style-background", altsync: "BG", style: "naked align-bottom small-margin-right inner-radius", title: "Background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
-                                button({id: "editor-sheet-style-align", altsync: "A", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: TEXT_ALIGN_ICONS.left}),
-                                button({id: "editor-sheet-style-indent", altsync: "D", style: "naked align-bottom small-margin-right inner-radius", title: "Indent", icon: TEXT_INDENT_ICON}),
-                                button({id: "editor-sheet-style-highlight", altsync: "H", style: "naked align-bottom small-margin-right inner-radius", title: "Highlight", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.494141 1.1171875 C 12.366141 1.1171875 12.238125 1.1661719 12.140625 1.2636719 L 9.1484375 4.2578125 C 8.0944375 5.3118125 7.299125 6.5957656 6.828125 8.0097656 L 5.5742188 11.775391 C 5.4752187 12.069391 5.3098438 12.338594 5.0898438 12.558594 L 3.3027344 14.345703 C 2.9117344 14.736703 2.9117344 15.369766 3.3027344 15.759766 L 3.8554688 16.3125 L 1.2851562 19.009766 C 0.78015625 19.540766 0.99835938 20.416438 1.6933594 20.648438 L 4.6074219 21.591797 C 4.9524219 21.706797 5.3316094 21.625906 5.5996094 21.378906 L 7.328125 19.783203 L 8.2539062 20.708984 C 8.4489063 20.903984 8.7049375 21.001953 8.9609375 21.001953 C 9.2169375 21.001953 9.4729687 20.903984 9.6679688 20.708984 L 11.455078 18.921875 C 11.675078 18.701875 11.941328 18.5355 12.236328 18.4375 L 16.001953 17.183594 C 17.415953 16.712594 18.700859 15.917281 19.755859 14.863281 L 22.748047 11.869141 C 22.943047 11.674141 22.943047 11.357109 22.748047 11.162109 C 22.552047 10.967109 22.236016 10.967109 22.041016 11.162109 L 19.048828 14.15625 C 19.040972 14.164106 19.031323 14.16991 19.023438 14.177734 L 9.8359375 4.9882812 C 9.8431253 4.981042 9.8482537 4.9720588 9.8554688 4.9648438 L 12.847656 1.9707031 C 13.042656 1.7757031 13.042656 1.4586719 12.847656 1.2636719 C 12.750156 1.1661719 12.622141 1.1171875 12.494141 1.1171875 z M 9.171875 5.7382812 L 18.273438 14.841797 C 17.49882 15.44921 16.624226 15.921729 15.685547 16.234375 L 11.919922 17.490234 C 11.477922 17.637234 11.076094 17.884844 10.746094 18.214844 L 8.9609375 20.001953 L 4.0097656 15.052734 L 5.796875 13.265625 C 6.125875 12.936625 6.3734844 12.533797 6.5214844 12.091797 L 7.7773438 8.3261719 C 8.0908498 7.387136 8.5643624 6.513116 9.171875 5.7382812 z"/></svg>`}),
-                                button({id: "editor-sheet-style-list", altsync: "L", style: "naked align-bottom small-margin-right inner-radius", title: "List", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>`}),
-                                button({id: "editor-sheet-style-shape", altsync: "SH", style: "naked align-bottom small-margin-right inner-radius", title: "Shape", icon: TEXT_SHAPE_ICON}),
-                                button({id: "editor-sheet-style-image", altsync: "IM", style: "naked align-bottom small-margin-right inner-radius", title: "Image", icon: modular.icons.image}),
-                                button({id: "editor-sheet-style-table", altsync: "X", style: "naked align-bottom small-margin-right inner-radius", title: "Table", icon: modular.icons.sheets}),
-                                button({id: "editor-sheet-style-other", altsync: "O", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: modular.icons.ellipses}),
-                            ])})
+                            searchComboBox({id: "editor-sheet-font-family", altsync: "FF", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: window.Plastic.fontFamilies.map((fontName) => ({label: fontName, value: fontName}))}),
+                            searchComboBox({id: "editor-sheet-font-size", altsync: "FS", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: window.Plastic.fontSizes.map((fontSize) => ({label: fontSize, value: fontSize}))}),
+                            button({id: "editor-sheet-style-bold", altsync: "B", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: window.Plastic.icons.bold}),
+                            button({id: "editor-sheet-style-italic", altsync: "I", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: window.Plastic.icons.italic}),
+                            button({id: "editor-sheet-style-underline", altsync: "U", style: "naked align-bottom small-margin-right inner-radius", title: "Underline", icon: window.Plastic.icons.underline}),
+                            button({id: "editor-sheet-style-link", altsync: "K", style: "naked align-bottom small-margin-right inner-radius", title: "Hyperlink", icon: window.Plastic.icons.link}),
+                            button({id: "editor-sheet-style-color", altsync: "F", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
+                            button({id: "editor-sheet-style-background", altsync: "BG", style: "naked align-bottom small-margin-right inner-radius", title: "Background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
+                            button({id: "editor-sheet-style-align", altsync: "A", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: TEXT_ALIGN_ICONS.left}),
+                            button({id: "editor-sheet-style-indent", altsync: "D", style: "naked align-bottom small-margin-right inner-radius", title: "Indent", icon: TEXT_INDENT_ICON}),
+                            button({id: "editor-sheet-style-highlight", altsync: "H", style: "naked align-bottom small-margin-right inner-radius", title: "Highlight", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.494141 1.1171875 C 12.366141 1.1171875 12.238125 1.1661719 12.140625 1.2636719 L 9.1484375 4.2578125 C 8.0944375 5.3118125 7.299125 6.5957656 6.828125 8.0097656 L 5.5742188 11.775391 C 5.4752187 12.069391 5.3098438 12.338594 5.0898438 12.558594 L 3.3027344 14.345703 C 2.9117344 14.736703 2.9117344 15.369766 3.3027344 15.759766 L 3.8554688 16.3125 L 1.2851562 19.009766 C 0.78015625 19.540766 0.99835938 20.416438 1.6933594 20.648438 L 4.6074219 21.591797 C 4.9524219 21.706797 5.3316094 21.625906 5.5996094 21.378906 L 7.328125 19.783203 L 8.2539062 20.708984 C 8.4489063 20.903984 8.7049375 21.001953 8.9609375 21.001953 C 9.2169375 21.001953 9.4729687 20.903984 9.6679688 20.708984 L 11.455078 18.921875 C 11.675078 18.701875 11.941328 18.5355 12.236328 18.4375 L 16.001953 17.183594 C 17.415953 16.712594 18.700859 15.917281 19.755859 14.863281 L 22.748047 11.869141 C 22.943047 11.674141 22.943047 11.357109 22.748047 11.162109 C 22.552047 10.967109 22.236016 10.967109 22.041016 11.162109 L 19.048828 14.15625 C 19.040972 14.164106 19.031323 14.16991 19.023438 14.177734 L 9.8359375 4.9882812 C 9.8431253 4.981042 9.8482537 4.9720588 9.8554688 4.9648438 L 12.847656 1.9707031 C 13.042656 1.7757031 13.042656 1.4586719 12.847656 1.2636719 C 12.750156 1.1661719 12.622141 1.1171875 12.494141 1.1171875 z M 9.171875 5.7382812 L 18.273438 14.841797 C 17.49882 15.44921 16.624226 15.921729 15.685547 16.234375 L 11.919922 17.490234 C 11.477922 17.637234 11.076094 17.884844 10.746094 18.214844 L 8.9609375 20.001953 L 4.0097656 15.052734 L 5.796875 13.265625 C 6.125875 12.936625 6.3734844 12.533797 6.5214844 12.091797 L 7.7773438 8.3261719 C 8.0908498 7.387136 8.5643624 6.513116 9.171875 5.7382812 z"/></svg>`}),
+                            button({id: "editor-sheet-style-list", altsync: "L", style: "naked align-bottom small-margin-right inner-radius", title: "List", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>`}),
+                            button({id: "editor-sheet-style-shape", altsync: "SH", style: "naked align-bottom small-margin-right inner-radius", title: "Shape", icon: TEXT_SHAPE_ICON}),
+                            button({id: "editor-sheet-style-image", altsync: "IM", style: "naked align-bottom small-margin-right inner-radius", title: "Image", icon: window.Plastic.icons.image}),
+                            button({id: "editor-sheet-style-table", altsync: "X", style: "naked align-bottom small-margin-right inner-radius", title: "Table", icon: window.Plastic.icons.sheets}),
+                            button({id: "editor-sheet-style-other", altsync: "O", style: "naked align-bottom small-margin-right inner-radius", title: "Other", icon: window.Plastic.icons.ellipses}),
+                        ])})
                     }),
                     div({id: "editor-text-workspace", style: "editor-text-workspace small-margin-top", content: children([
                         div({id: "editor-text-thumbnail-sidebar", style: "editor-text-thumbnail-sidebar", "aria-hidden": "true"}),

@@ -274,34 +274,6 @@
 		operations: boardOperations
 	});
 
-	const boardShapeOptions = [
-		{
-			type: "rectangle",
-			label: "Rectangle",
-			icon: modular.icons.rectangle
-		},
-		{
-			type: "rounded-rectangle",
-			label: "Rounded Rectangle",
-			icon: modular.icons.rounded_rectangle
-		},
-		{
-			type: "ellipse",
-			label: "Ellipse",
-			icon: modular.icons.ellipse
-		},
-		{
-			type: "triangle",
-			label: "Triangle",
-			icon: modular.icons.triangle
-		},
-		{
-			type: "diamond",
-			label: "Diamond",
-			icon: modular.icons.diamond
-		}
-	];
-
 	const saveBoardToBoardsFolder = async (boardName, canvas = null) => {
 		const fileName = `${boardName}.wtb`;
 		const payload = buildBoardPayload(canvas);
@@ -380,23 +352,21 @@
 			maximized: true,
 			tools: [{
 				title: "Save",
-				icon: modular.icons.save,
+				icon: window.Plastic.icons.save,
 				onclick: (_, routeContext) => triggerBoardSave(routeContext?.window || routeContext?.struct?.body || null)
 			}, {
 				title: "New Board",
-				icon: modular.icons.create,
+				icon: window.Plastic.icons.create,
 				onclick: (event, routeContext) => openNewBoardMenu(event, routeContext)
 			}],
-			svg_icon: modular.icons.brush,
+			svg_icon: window.Plastic.icons.brush,
 			icon: "/icons/interfaces/whiteboard.png",
 			routes: [
 				{
 					text: "Edit",
-					icon: modular.icons.modify,
-					route: () => div({
-						style: "relative hidden large-padding-top", id: "boards-editor-root", content: children([
-							div({
-								style: "bordered radius shadowed", id: "boards-canvas-frame", content: () => {
+					icon: window.Plastic.icons.modify,
+					route: () => div({style: "relative hidden large-padding-top", id: "boards-editor-root", content: children([
+							div({style: "bordered radius shadowed", id: "boards-canvas-frame", content: () => {
 									const container = document.createElement("div");
 									const canvas = document.createElement("canvas");
 									container.id = "boards-canvas-container";
@@ -418,18 +388,11 @@
 									return container;
 								}
 							}),
-							div({
-								style: "absolute left bottomed bordered radius shadowed no-padding align-top small-padding-top small-padding-left small-padding-right center blurred",
+							div({style: "absolute left bottomed bordered radius shadowed no-padding align-top small-padding-top small-padding-left small-padding-right center blurred",
 								id: "boards-toolbar",
 								content: children([
-									div({
-										style: "color-block boards-custom-color pointer hover-zoom cube inline radius",
-										content: input({
-											id: "boards-custom-color-input",
-											type: "color",
-											value: "#000000",
-											tooltip: "Custom color"
-										})
+									div({style: "color-block boards-custom-color pointer hover-zoom cube inline radius",
+										content: input({id: "boards-custom-color-input", type: "color", value: "#000000", tooltip: "Custom color"})
 									}),
 									div({
 										style: "color-block pointer hover-zoom cube inline background-black radius",
@@ -485,13 +448,13 @@
 										style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top",
 										altsync: "D",
 										data: "action-clear",
-										icon: modular.icons.delete
+										icon: window.Plastic.icons.delete
 									}),
 									button({
 										style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top",
 										altsync: "S",
 										data: "action-shapes",
-										icon: modular.icons.shapes
+										icon: window.Plastic.icons.shapes
 									}),
 									button({
 										style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top",
@@ -516,13 +479,13 @@
 										altsync: "T",
 										data: "action-text",
 										title: "Insert text box",
-										icon: modular.icons.text
+										icon: window.Plastic.icons.text
 									}),
 									button({
 										style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button",
 										altsync: "B",
 										data: "tool-draw",
-										icon: modular.icons.brush
+										icon: window.Plastic.icons.brush
 									}),
 									button({
 										style: "undecorated hover-background inner-radius float-right no-padding small-space-right adjust-top tool-button",
@@ -1306,7 +1269,7 @@
 						const shapeButton = windowBody.querySelector('button[data="action-shapes"]');
 						if (shapeButton && !shapeButton.__boardsShapesMenuAttached) {
 							shapeButton.__boardsShapesMenuAttached = true;
-							shapeButton.popoutmenu(boardShapeOptions.map(shape => ({
+							shapeButton.popoutmenu(window.Plastic.shapeOptions.map(shape => ({
 								icon: shape.icon,
 								label: shape.label,
 								action: () => insertShape(shape.type)
@@ -1362,7 +1325,7 @@
 								action: () => changeShapeProperty("height", "Height", "110", parsePositivePixel)
 							},
 							{
-								icon: modular.icons.delete,
+								icon: window.Plastic.icons.delete,
 								label: "Delete",
 								destructive: true,
 								visible: () => contextShapeIndex >= 0,
@@ -1395,21 +1358,21 @@
 					}
 				}, {
 					text: "Boards",
-					icon: modular.icons.brush,
+					icon: window.Plastic.icons.brush,
 					route: () => div({
 						style: "small-padding large-padding-top",
 						content: children([div({style: "gridded", id: "boards-list", content: () => renderBoards()})])
 					}),
 					afterRender: () => {
 						document.querySelectorAll("#boards-list").forEach(list => list.contextmenu([{
-							icon: modular.icons.modify,
+							icon: window.Plastic.icons.modify,
 							label: "Rename",
 							action: (_, __, target) => {
 								const path = target?.getAttribute("directive");
 								renameBoardFile(path);
 							}
 						}, {
-							icon: modular.icons.delete,
+							icon: window.Plastic.icons.delete,
 							label: "Delete",
 							destructive: true,
 							action: (_, __, target) => {

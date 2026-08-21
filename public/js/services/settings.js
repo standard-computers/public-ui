@@ -564,7 +564,7 @@
                 return;
             }
             listRoot.innerHTML = standards.map(({name, reference}, index) => div({style: "brick bordered radius padded small-margin-bottom shadowed", content: children([
-                button({style: "tiny float-right inner-radius small-margin-left no-margin-top", title: "View as sheet", icon: modular.icons.sheets, onclick: event => openStandardDataInSheets(reference, name, event?.target)}),
+                button({style: "tiny float-right inner-radius small-margin-left no-margin-top", title: "View as sheet", icon: window.Plastic.icons.sheets, onclick: event => openStandardDataInSheets(reference, name, event?.target)}),
                 button({style: "tiny float-right no-margin inner-radius", content: "Data", onclick: event => openStandardDataInInternals(reference, event?.target)}),
                 div({style: "inline margin-bottom", content: div({style: "brick", content: children([
                             strong({content: escapeHtml(name)}),
@@ -760,12 +760,17 @@
         if (os) temp = os;
         document.documentElement.style.setProperty("--fs", `${temp.font_size}px`);
         document.documentElement.style.setProperty("--interface-shortcut-icon-size", `${temp.shortcut_icon_size}px`);
+        document.documentElement.style.setProperty("--font-family", temp.font_family ? `${temp.font_family}, sans-serif` : '"Inter", sans-serif');
+        document.documentElement.style.setProperty("--font-weight", temp.bold_font === true ? "700" : "400");
         document.documentElement.style.setProperty("--fg", temp.foreground);
         document.documentElement.style.setProperty("--primary", temp.primary);
-        document.documentElement.style.setProperty("--secondary", temp.secondary);
+        document.documentElement.style.setProperty("--secondary", temp.secondary || temp.primary);
         document.documentElement.style.setProperty("--bg", temp.background);
         document.documentElement.style.setProperty("--border", temp.border_color);
         document.documentElement.style.setProperty("--radius", `${temp.border_radius}px`);
+        document.documentElement.style.setProperty("--border-width", `${temp.border_width}px`);
+        document.documentElement.style.setProperty("--transparent-bg", temp.transparency === false ? "var(--secondary-bg)" : "color-mix(in srgb,var(--secondary-bg) 55%,transparent)");
+        document.documentElement.style.setProperty("--blur", temp.transparency === false ? "0px" : "16px");
         const shadowsEnabled = temp.shadows !== false;
         document.documentElement.style.setProperty("--small-shadow", shadowsEnabled ? "0 4px 12px rgba(5, 5, 5, 0.08)" : "none");
         document.documentElement.style.setProperty("--shadow", shadowsEnabled ? "0 8px 32px rgba(0, 0, 0, 0.1)" : "none");
@@ -1596,7 +1601,7 @@
                             em({content: "Window icons will be shape outlines"}),
                             div({style: "big-spacer"}),
                             label({style: "faded", content: "Font Size"}),
-                            numbers({id: "font_size", min: 10, max: 24, reference: "--radius"}),
+                            numbers({id: "font_size", min: 10, max: 24, selected: ui_settings_options.font_size, reference: "--fs"}),
                             div({style: "big-spacer"}),
                             label({style: "faded", content: "Interface Icon Size"}),
                             em({content: "Changes each interface icon below the search input"}),
@@ -1618,10 +1623,10 @@
                             colorPicker({id: "border_color", colors: modular.colors}),
                             div({style: "big-spacer"}),
                             label({style: "faded", content: "Border Radius"}),
-                            numbers({id: "border_radius", min: 0, max: 25, inc: 1, reference: "--radius"}),
+                            numbers({id: "border_radius", min: 0, max: 25, inc: 1, selected: ui_settings_options.border_radius, reference: "--radius"}),
                             div({style: "big-spacer"}),
                             label({style: "faded", content: "Border Thickness"}),
-                            numbers({id: "border_width", min: 1, max: 4, inc: 1, reference: "--border-width"}),
+                            numbers({id: "border_width", min: 1, max: 4, inc: 1, selected: ui_settings_options.border_width, reference: "--border-width"}),
                             div({style: "big-spacer"}),
                         ])
                     }),
@@ -1629,12 +1634,16 @@
                         document.querySelectorAll(".color-option").forEach(co => {
                             co.addEventListener("mouseenter", () => {
                                 let s = Object.assign({}, ui_settings_options);
-                                s[co.parentElement.getAttribute("id")] = window.getComputedStyle(co).getPropertyValue("background-color");
+                                const settingName = co.parentElement.getAttribute("id");
+                                s[settingName] = window.getComputedStyle(co).getPropertyValue("background-color");
+                                if (settingName === "primary") s.secondary = co.getAttribute("secondary") || s.primary;
                                 refreshUITheme(s);
                             });
                             co.addEventListener("mouseleave", () => refreshUITheme());
                             co.addEventListener("click", () => {
-                                ui_settings_options[co.parentElement.getAttribute("id")] = window.getComputedStyle(co).getPropertyValue("background-color");
+                                const settingName = co.parentElement.getAttribute("id");
+                                ui_settings_options[settingName] = window.getComputedStyle(co).getPropertyValue("background-color");
+                                if (settingName === "primary") ui_settings_options.secondary = co.getAttribute("secondary") || ui_settings_options.primary;
                                 refreshUITheme();
                                 saveSettings();
                             });
@@ -1648,7 +1657,7 @@
                             n.addEventListener("mouseleave", () => refreshUITheme());
                         })
                         document.querySelectorAll(".number").forEach(n => n.addEventListener("click", () => {
-                            document.querySelectorAll(".number").forEach(v => v.classList.remove("selected-number"));
+                            n.parentElement.querySelectorAll(".number").forEach(v => v.classList.remove("selected-number"));
                             n.classList.add("selected-number");
                             ui_settings_options[n.parentElement.getAttribute("id")] = parseInt(n.getAttribute("value"));
                             refreshUITheme();
@@ -1850,7 +1859,7 @@
             internal: true,
             dimensions: [420, 620],
             navigation: false,
-            tools: [{title: "Save", icon: modular.icons.save, onclick: saveAddedPerson}],
+            tools: [{title: "Save", icon: window.Plastic.icons.save, onclick: saveAddedPerson}],
             route: () => div({
                 style: "large-padding-top small-padding fill",
                 content: children([
@@ -1871,7 +1880,7 @@
             hints: ["create a standard", "create standard"],
             tools: [{
                 title: "Save",
-                icon: modular.icons.save,
+                icon: window.Plastic.icons.save,
                 onclick: saveCreatedStandard
             }],
             route: () => div({style: "large-padding-top padded", content: children([
@@ -1911,7 +1920,7 @@
             tools: [
                 {
                     title: "Modify",
-                    icon: modular.icons.modify,
+                    icon: window.Plastic.icons.modify,
                     onclick: openModifyPersonPortal
                 }
             ],
@@ -1929,12 +1938,12 @@
             tools: [
                 {
                     title: "Delete",
-                    icon: modular.icons.delete,
+                    icon: window.Plastic.icons.delete,
                     onclick: deleteModifiedPerson
                 },
                 {
                     title: "Save",
-                    icon: modular.icons.save,
+                    icon: window.Plastic.icons.save,
                     onclick: saveModifiedPerson
                 }
             ],

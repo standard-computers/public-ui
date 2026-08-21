@@ -4,8 +4,6 @@
     const SLIDE_GRID_SIZE = 20;
     const SLIDE_BORDER_DRAG_HIT_SIZE = 8;
     const SLIDE_TEXT_STYLE_KEYS = ["fontWeight", "fontStyle", "textDecoration", "fontFamily", "color", "backgroundColor", "fontSize"];
-    const SLIDE_FONT_FAMILIES = window.StandardUI?.fontFamilies || ["Inter", "Arial", "Georgia", "Times New Roman", "Courier New", "Verdana"];
-    const SLIDE_FONT_SIZES = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72"];
     const SLIDE_CHART_DEFAULT_WIDTH = 360;
     const SLIDE_CHART_DEFAULT_HEIGHT = 240;
     const SLIDE_CHART_MIN_WIDTH = 180;
@@ -13,31 +11,8 @@
     const SLIDE_SHAPE_DEFAULT_WIDTH = 200;
     const SLIDE_SHAPE_DEFAULT_HEIGHT = 120;
     const SLIDE_SHAPE_TYPES = ["rectangle", "rounded-rectangle", "ellipse", "triangle", "diamond"];
-    const SLIDE_SHAPE_OPTIONS = [{
-        type: "rectangle",
-        label: "Rectangle",
-        icon: modular.icons.rectangle
-    }, {
-        type: "rounded-rectangle",
-        label: "Rounded Rectangle",
-        icon: modular.icons.rounded_rectangle
-    }, {
-        type: "ellipse",
-        label: "Ellipse",
-        icon: modular.icons.ellipse
-    }, {
-        type: "triangle",
-        label: "Triangle",
-        icon: modular.icons.triangle
-    }, {
-        type: "diamond",
-        label: "Diamond",
-        icon: modular.icons.diamond
-    }];
     const SLIDE_PRESENT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>`;
-    const SLIDE_LAYERS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3"/></svg>`;
     const SLIDE_ADD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>`;
-    const SLIDE_DUPLICATE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75"/></svg>`;
 
     const SLIDE_EDITOR_SETTINGS = {
         default_background: {label: "Default slide background", type: "text", default: ""},
@@ -46,44 +21,12 @@
         show_layers: {label: "Show Layers pane by default", type: "boolean", default: false}
     };
 
-    const SLIDE_CHART_TYPES = [
-        {label: "Column", value: "bar"},
-        {label: "Line", value: "line"},
-        {label: "Area", value: "area"},
-        {label: "Scatter", value: "scatter"},
-        {label: "Pie", value: "pie"}
-    ];
-
     const SLIDE_CHART_DEFAULT_DATA = [
         {label: "Q1", value: 24},
         {label: "Q2", value: 38},
         {label: "Q3", value: 31},
         {label: "Q4", value: 46}
     ];
-
-    const SLIDE_TEXT_COLORS = [
-        {label: "Default", value: ""},
-        {label: "Ink", value: "var(--fg)"},
-        {label: "Blue", value: "var(--blue)"},
-        {label: "Green", value: "var(--green)"},
-        {label: "Orange", value: "var(--orange)"},
-        {label: "Red", value: "var(--red)"}
-    ];
-
-    const SLIDE_BACKGROUND_COLORS = [
-        {label: "None", value: ""},
-        {label: "Paper", value: "var(--bg)"},
-        {label: "Soft", value: "var(--secondary-bg)"},
-        {label: "Blue", value: "#dbeafe"},
-        {label: "Green", value: "#dcfce7"},
-        {label: "Yellow", value: "#fef3c7"}
-    ];
-
-    const SLIDE_ALIGN_ICONS = {
-        left: modular.icons.left,
-        center: modular.icons.center,
-        right: modular.icons.right
-    };
 
     let activeSlideDeck = [{id: 1, title: "Slide 1", blocks: []}];
     let activeSlideId = 1;
@@ -119,20 +62,26 @@
         parentNode.insertBefore(windowNode, parentNode.firstElementChild);
         if (typeof modular?.bringToFront === "function") modular.bringToFront(windowNode);
     };
+
     const normalizeSlidesFilePath = (rawPath = "") => String(rawPath || "").replace(/^\/home\/standard-system\//, "").replace(/^\/+/, "");
+
     const getSlidesFileName = (rawPath = "") => String(rawPath || "").split("/").pop() || "";
+
     const getSlidesFileDirectory = (rawPath = "") => {
         const normalizedPath = normalizeSlidesFilePath(rawPath);
         if (!normalizedPath.includes("/")) return "";
         return normalizedPath.split("/").slice(0, -1).join("/");
     };
+
     const ensureSlidesExtension = (rawName = "") => /\.slds$/i.test(String(rawName || "")) ? String(rawName || "") : `${String(rawName || "")}.slds`;
+
     const sanitizeSlidesFileName = (rawName = "") => {
         const trimmedName = String(rawName || "").trim().replace(/\\/g, "/");
         const baseName = trimmedName.split("/").pop() || "";
         const withoutLeadingDots = baseName.replace(/^\.+/, "");
         return ensureSlidesExtension(withoutLeadingDots.replace(/[^a-zA-Z0-9._-]/g, ""));
     };
+
     const normalizeSlideTextStyle = (rawStyle = {}) => {
         if (!rawStyle || typeof rawStyle !== "object" || Array.isArray(rawStyle)) return {};
         const normalizedStyle = {};
@@ -155,12 +104,14 @@
         if (Number.isFinite(numericFontSize) && numericFontSize >= 1 && numericFontSize <= 400) normalizedStyle.fontSize = `${Math.round(numericFontSize * 10) / 10}px`;
         return normalizedStyle;
     };
+
     const normalizeSlideFontSizeInput = (rawFontSize = "") => {
         const numericValue = Number(String(rawFontSize || "").replace(/px$/i, "").trim());
         if (!Number.isFinite(numericValue)) return "";
         const boundedValue = Math.max(1, Math.min(400, numericValue));
         return `${Math.round(boundedValue * 10) / 10}`.replace(/\.0$/, "");
     };
+
     const encodeSlideTextStyle = (rawStyle = {}) => {
         const normalizedStyle = normalizeSlideTextStyle(rawStyle);
         const encodedStyle = {};
@@ -174,7 +125,9 @@
         if (normalizedStyle.fontSize) encodedStyle.s = Number(String(normalizedStyle.fontSize).replace(/px$/i, ""));
         return encodedStyle;
     };
+
     const slideTextStylesEqual = (left = {}, right = {}) => JSON.stringify(encodeSlideTextStyle(left)) === JSON.stringify(encodeSlideTextStyle(right));
+
     const compactSlideTextRuns = (rawRuns = []) => {
         const compactedRuns = [];
         rawRuns.forEach((run) => {
@@ -190,16 +143,19 @@
         });
         return compactedRuns;
     };
+
     const normalizeSlideTextRuns = (rawRuns = [], fallbackText = "") => {
         if (!Array.isArray(rawRuns) || !rawRuns.length) return fallbackText ? [{text: String(fallbackText), style: {}}] : [];
         return compactSlideTextRuns(rawRuns);
     };
+
     const encodeSlideTextRuns = (rawRuns = [], fallbackText = "") => compactSlideTextRuns(normalizeSlideTextRuns(rawRuns, fallbackText)).map((run) => {
         const encodedRun = {t: run.text};
         const encodedStyle = encodeSlideTextStyle(run.style);
         if (Object.keys(encodedStyle).length) encodedRun.s = encodedStyle;
         return encodedRun;
     });
+
     const getSlidePlainTextFromRuns = (rawRuns = []) => compactSlideTextRuns(rawRuns).map((run) => run.text).join("");
     const getSlideTextLength = (block = {}) => getSlidePlainTextFromRuns(block.runs || []).length || String(block.content || "").length;
     const getActiveSlide = () => activeSlideDeck.find((slide) => slide.id === activeSlideId) || null;
@@ -207,6 +163,7 @@
         const index = activeSlideDeck.findIndex((slide) => slide.id === activeSlideId);
         return index >= 0 ? index : 0;
     };
+
     const normalizeSlideBackground = (rawBackground = null) => {
         if (!rawBackground || typeof rawBackground !== "object" || Array.isArray(rawBackground)) return null;
         const type = String(rawBackground.type || "").trim().toLowerCase();
@@ -216,26 +173,31 @@
         if (type === "image") return {type: "image", value: normalizeSlidesFilePath(value)};
         return null;
     };
+
     const setSlideBackground = (slide = null, background = null) => {
         if (!slide) return;
         const normalizedBackground = normalizeSlideBackground(background);
         if (normalizedBackground) slide.background = normalizedBackground;
         else delete slide.background;
     };
+
     const normalizeDefaultSlideBackground = (rawBackground = "") => {
         const value = String(rawBackground || "").trim();
         return value ? {type: "color", value} : null;
     };
+
     const createSlideRecord = (id = 1, title = `Slide ${id}`) => {
         const slide = {id, title, blocks: []};
         setSlideBackground(slide, slideDefaultBackground);
         return slide;
     };
+
     const getSlideBackgroundDownloadUrl = (filePath = "") => {
         const normalizedPath = normalizeSlidesFilePath(filePath);
         if (!normalizedPath) return "";
         return `/api/files/download?path=${encodeURIComponent(normalizedPath)}`;
     };
+
     const applySlideSurfaceBackground = (surfaceNode = null, background = null, showGrid = true) => {
         if (!(surfaceNode instanceof HTMLElement)) return;
         const normalizedBackground = normalizeSlideBackground(background);
@@ -245,16 +207,19 @@
         surfaceNode.style.backgroundPosition = normalizedBackground?.type === "image" ? "center center" : "0 0";
         surfaceNode.style.backgroundRepeat = normalizedBackground?.type === "image" ? "no-repeat" : (normalizedBackground?.type === "color" || !showGrid ? "no-repeat" : "repeat");
     };
+
     const getSlideTextBlockById = (blockId = null) => {
         const activeSlide = getActiveSlide();
         return activeSlide?.blocks?.find((block) => block.id === blockId && block.type === "text") || null;
     };
+
     const getSlideBlockTextStyle = (block = {}) => normalizeSlideTextStyle(block.textStyle || {});
     const setSlideBlockTextStyle = (block = {}, nextStyle = {}) => {
         const encodedStyle = encodeSlideTextStyle(nextStyle);
         if (Object.keys(encodedStyle).length) block.textStyle = encodedStyle;
         else delete block.textStyle;
     };
+
     const normalizeSlideTextBlock = (block = {}) => {
         block.content = String(block.content ?? "");
         if (block.type !== "text") return block;
@@ -264,6 +229,7 @@
         setSlideBlockTextStyle(block, block.textStyle || {});
         return block;
     };
+
     const normalizeSlideChartData = (rawData = []) => {
         const data = Array.isArray(rawData) ? rawData : [];
         return data.map((item, index) => {
@@ -271,10 +237,11 @@
             return {label: String(item?.label ?? item?.name ?? item?.x ?? `Item ${index + 1}`), value: Number.isFinite(value) ? value : 0};
         }).filter((item) => item.label || item.value);
     };
+
     const normalizeSlideChartBlock = (block = {}) => {
         if (block.type !== "chart") return block;
         const chartType = String(block.chartType || block.content || "bar").trim().toLowerCase();
-        block.chartType = SLIDE_CHART_TYPES.some((option) => option.value === chartType) ? chartType : "bar";
+        block.chartType = window.Plastic.chartTypes.some((option) => option.value === chartType) ? chartType : "bar";
         block.title = String(block.title || "Chart");
         block.data = normalizeSlideChartData(block.data).length ? normalizeSlideChartData(block.data) : SLIDE_CHART_DEFAULT_DATA.map((item) => ({...item}));
         block.labelValues = block.labelValues === true || block.showValueLabels === true;
@@ -283,6 +250,7 @@
         block.content = block.chartType;
         return block;
     };
+
     const normalizeSlideShapeBlock = (block = {}) => {
         if (block.type !== "shape") return block;
         const shapeType = String(block.shapeType || block.content || "rectangle").trim().toLowerCase();
@@ -298,18 +266,21 @@
         block.content = block.shapeType;
         return block;
     };
+
     const getDefaultSlideBlockName = (block = {}) => {
         if (block.type === "text") return "Text";
         if (block.type === "image") return "Image";
         if (block.type === "chart") return String(block.title || "Chart").trim() || "Chart";
-        if (block.type === "shape") return SLIDE_SHAPE_OPTIONS.find((option) => option.type === block.shapeType)?.label || "Shape";
+        if (block.type === "shape") return window.Plastic.shapeOptions.find((option) => option.type === block.shapeType)?.label || "Shape";
         return "Object";
     };
+
     const normalizeSlideBlockIdentity = (block = {}, fallbackId = "") => {
         block.id = String(block.id ?? fallbackId).trim() || String(fallbackId);
         block.name = String(block.name || "").trim() || getDefaultSlideBlockName(block);
         return block;
     };
+
     const decodeSlideTextRunsForBlock = (block = {}) => normalizeSlideTextRuns(block.runs, block.content);
     const mergeSlideTextStyle = (baseStyle = {}, nextStyle = {}) => {
         const mergedStyle = {...normalizeSlideTextStyle(baseStyle)};
@@ -323,6 +294,7 @@
         });
         return normalizeSlideTextStyle(mergedStyle);
     };
+
     const applyStyleToSlideTextRuns = (rawRuns = [], start = 0, end = 0, nextStyle = {}) => {
         const normalizedRuns = normalizeSlideTextRuns(rawRuns);
         const safeStart = Math.max(0, Math.min(Number(start) || 0, Number(end) || 0));
@@ -349,6 +321,7 @@
         });
         return compactSlideTextRuns(updatedRuns);
     };
+
     const createSlideStyledTextNode = (text = "", style = {}) => {
         const normalizedStyle = normalizeSlideTextStyle(style);
         if (!Object.keys(normalizedStyle).length) return document.createTextNode(text);
@@ -363,6 +336,7 @@
         span.textContent = text;
         return span;
     };
+
     const buildSlideTextFragment = (rawRuns = [], fallbackText = "") => {
         const fragment = document.createDocumentFragment();
         const normalizedRuns = normalizeSlideTextRuns(rawRuns, fallbackText);
@@ -379,6 +353,7 @@
         });
         return fragment;
     };
+
     const parseSlideTextStyleFromElement = (element, inheritedStyle = {}) => {
         const nextStyle = {...normalizeSlideTextStyle(inheritedStyle)};
         const tagName = String(element?.tagName || "").toUpperCase();
@@ -396,6 +371,7 @@
         });
         return mergeSlideTextStyle(nextStyle, inlineStyle);
     };
+
     const extractSlideTextRunsFromNode = (rootNode) => {
         const extractedRuns = [];
         const appendRun = (text = "", style = {}) => {
@@ -424,6 +400,7 @@
         Array.from(rootNode?.childNodes || []).forEach((childNode) => walkNode(childNode, {}));
         return compactSlideTextRuns(extractedRuns);
     };
+
     const getSlideSelectionOffsets = (rootNode) => {
         if (!(rootNode instanceof HTMLElement)) return null;
         const selection = window.getSelection();
@@ -438,6 +415,7 @@
         endRange.setEnd(range.endContainer, range.endOffset);
         return {start: startRange.toString().length, end: endRange.toString().length};
     };
+
     const resolveSlideSelectionPoint = (rootNode, targetOffset = 0) => {
         const safeOffset = Math.max(0, Number(targetOffset) || 0);
         const walker = document.createTreeWalker(rootNode, NodeFilter.SHOW_ALL, {
@@ -466,6 +444,7 @@
         }
         return {node: rootNode, offset: rootNode.childNodes.length};
     };
+
     const restoreSlideSelection = (rootNode, start = 0, end = 0) => {
         const selection = window.getSelection();
         if (!selection || !(rootNode instanceof HTMLElement)) return;
@@ -477,6 +456,7 @@
         selection.removeAllRanges();
         selection.addRange(range);
     };
+
     const rememberSlideSelection = (contentNode = getSlideTextEditorFromSelection()) => {
         if (!(contentNode instanceof HTMLElement)) return null;
         const blockId = String(contentNode.dataset.blockId || "").trim();
@@ -486,6 +466,7 @@
         savedSlideSelectionOffsets = {blockId, ...selectionOffsets};
         return savedSlideSelectionOffsets;
     };
+
     const getSavedSlideSelection = (blockId = selectedSlideBlockId, contentNode = null) => {
         const activeContentNode = contentNode instanceof HTMLElement ? contentNode : document.querySelector(`.editor-slide-text-content[data-block-id="${blockId}"]`);
         const liveSelection = activeContentNode instanceof HTMLElement ? getSlideSelectionOffsets(activeContentNode) : null;
@@ -496,6 +477,7 @@
         if (savedSlideSelectionOffsets?.blockId === blockId) return {...savedSlideSelectionOffsets};
         return null;
     };
+
     const getSlideSelectionRect = (rootNode) => {
         const selection = window.getSelection();
         if (!selection || !selection.rangeCount) return null;
@@ -505,6 +487,7 @@
         if (rect && (rect.width || rect.height)) return rect;
         return rootNode.getBoundingClientRect();
     };
+
     const getSlideSelectionStyle = (block = {}, selectionOffsets = null) => {
         const runs = decodeSlideTextRunsForBlock(block);
         const blockStyle = getSlideBlockTextStyle(block);
@@ -530,17 +513,20 @@
         });
         return {...(activeStyle || {}), textAlign: blockStyle.textAlign || ""};
     };
+
     const updateSlideTextBlockFromRuns = (block = {}, runs = [], textStyle = null) => {
         block.runs = encodeSlideTextRuns(runs, block.content);
         block.content = getSlidePlainTextFromRuns(block.runs) || "";
         if (textStyle) setSlideBlockTextStyle(block, textStyle);
     };
+
     const renderSlideTextBlockContent = (contentNode, block = {}) => {
         if (!(contentNode instanceof HTMLElement)) return;
         contentNode.innerHTML = "";
         contentNode.appendChild(buildSlideTextFragment(block.runs, block.content));
         contentNode.style.textAlign = getSlideBlockTextStyle(block).textAlign || "";
     };
+
     const applyInlineStyleToSlideSelection = (blockId = null, selectionOffsets = null, nextStyle = {}, contentNode = null, restoreSelectionOffsets = selectionOffsets) => {
         const block = getSlideTextBlockById(blockId);
         if (!block || !selectionOffsets) return;
@@ -560,11 +546,13 @@
         saveSlidePortalState();
         updateSlideToolbarState();
     };
+
     const getSlideToolbarTarget = () => {
         const block = getSlideTextBlockById(selectedSlideBlockId);
         const contentNode = block ? document.querySelector(`.editor-slide-text-content[data-block-id="${block.id}"]`) : null;
         return {block, contentNode: contentNode instanceof HTMLElement ? contentNode : null};
     };
+
     const getSlideToolbarSelectionOffsets = (block = null, contentNode = null, {expandCollapsed = false} = {}) => {
         if (!block) return null;
         const savedSelection = getSavedSlideSelection(block.id, contentNode);
@@ -574,6 +562,7 @@
         if (expandCollapsed && blockLength > 0) return {blockId: block.id, start: 0, end: blockLength};
         return savedSelection || {blockId: block.id, start: 0, end: 0};
     };
+
     const applySlideToolbarStyle = (styleResolver) => {
         const {block, contentNode} = getSlideToolbarTarget();
         if (!block) return false;
@@ -585,9 +574,11 @@
         applyInlineStyleToSlideSelection(block.id, selectionOffsets, nextStyle, contentNode, restoreSelectionOffsets);
         return true;
     };
+
     const hideSlideInlineStyleEditor = () => {
         if (typeof window.Plastic?.removeInlineStyleEditor === "function") window.Plastic.removeInlineStyleEditor(false);
     };
+
     const blurSlideTextEditing = () => {
         const activeEditor = document.activeElement?.closest?.(".editor-slide-text-content");
         if (activeEditor instanceof HTMLElement) activeEditor.blur();
@@ -595,6 +586,7 @@
         if (selection) selection.removeAllRanges();
         hideSlideInlineStyleEditor();
     };
+
     const openSlideInlineStyleEditor = ({blockId = selectedSlideBlockId, contentNode = null, event = null} = {}) => {
         const block = getSlideTextBlockById(blockId);
         if (!block || typeof window.Plastic?.showInlineStyleEditor !== "function") return;
@@ -611,6 +603,7 @@
             onchange: (updatedStyle = {}) => applyInlineStyleToSlideSelection(block.id, selectionOffsets, updatedStyle, activeContentNode)
         });
     };
+
     const scheduleSlideInlineStyleEditor = (blockId = selectedSlideBlockId, contentNode = null, event = null) => {
         const requestId = ++slideInlineStyleRequest;
         requestAnimationFrame(() => {
@@ -618,11 +611,13 @@
             openSlideInlineStyleEditor({blockId, contentNode, event});
         });
     };
+
     const getSlideTextEditorFromSelection = () => {
         const selection = window.getSelection();
         const anchorElement = selection?.anchorNode instanceof Element ? selection.anchorNode : selection?.anchorNode?.parentElement || null;
         return document.activeElement?.closest?.(".editor-slide-text-content") || anchorElement?.closest?.(".editor-slide-text-content") || null;
     };
+
     const handleSlideSelectionChange = () => {
         if (document.activeElement?.matches?.("#editor-slide-font-family, #editor-slide-font-size")) return;
         const contentNode = getSlideTextEditorFromSelection();
@@ -638,6 +633,7 @@
         scheduleSlideInlineStyleEditor(blockId, contentNode);
         updateSlideToolbarState();
     };
+
     const resolveSlideColor = (rawColor = "") => {
         const colorValue = String(rawColor || "").trim();
         if (!colorValue || colorValue === "transparent") return "";
@@ -653,6 +649,7 @@
         resolvedSlideColorCache.set(colorValue, resolvedColor);
         return resolvedColor;
     };
+
     const getSlideToolbarContrastColor = (rawColor = "") => {
         const resolvedColor = resolveSlideColor(rawColor);
         const match = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/i.exec(resolvedColor);
@@ -663,10 +660,12 @@
         const brightness = ((red * 299) + (green * 587) + (blue * 114)) / 1000;
         return brightness < 140 ? "#ffffff" : "#111111";
     };
+
     const setSlideToolbarButtonState = (buttonNode, isActive = false) => {
         if (!buttonNode) return;
         buttonNode.className = `${isActive ? "tiny primary" : ""} naked align-bottom small-margin-right inner-radius`.trim();
     };
+
     const syncSlideToolbarIconColor = (buttonNode) => {
         if (!buttonNode) return;
         buttonNode.querySelectorAll("svg path").forEach((pathNode) => {
@@ -715,7 +714,7 @@
         }
         if (alignmentButton) {
             const alignment = activeStyle.textAlign || "left";
-            alignmentButton.innerHTML = SLIDE_ALIGN_ICONS[alignment] || SLIDE_ALIGN_ICONS.left;
+            alignmentButton.innerHTML = window.Plastic.icons[alignment] || window.Plastic.icons.left;
             alignmentButton.className = `${activeStyle.textAlign && activeStyle.textAlign !== "left" ? "tiny primary" : ""} naked align-bottom small-margin-right inner-radius`.trim();
         }
         document.querySelectorAll(".editor-slide-layer-item").forEach((itemNode) => {
@@ -723,6 +722,7 @@
         });
         syncSlideLayersUiState();
     };
+
     const ensureDeckIntegrity = () => {
         if (!Array.isArray(activeSlideDeck) || !activeSlideDeck.length) activeSlideDeck = [{id: 1, title: "Slide 1", blocks: []}];
         if (selectedSlideBlockId !== null && selectedSlideBlockId !== undefined && selectedSlideBlockId !== "") selectedSlideBlockId = String(selectedSlideBlockId);
@@ -751,6 +751,7 @@
         slideBlockCounter = Math.max(nextBlockId, 1);
         if (!activeSlideDeck.some((slide) => (slide?.blocks || []).some((block) => block.id === selectedSlideBlockId))) selectedSlideBlockId = null;
     };
+
     const buildSlidesPayload = () => ({
         format: "std.slides.v1",
         fileName: getSlidesFileName(activeSlideDeckFilePath).replace(/\.slds$/i, "") || "slides",
@@ -759,6 +760,7 @@
         activeSlideId,
         selectedSlideBlockId
     });
+
     const parseSlidesPayload = (rawPayload = {}) => {
         const hasDeck = Array.isArray(rawPayload?.deck);
         const legacyDeck = Array.isArray(rawPayload) ? rawPayload : [];
@@ -767,9 +769,11 @@
         selectedSlideBlockId = rawPayload?.selectedSlideBlockId === null || rawPayload?.selectedSlideBlockId === undefined || rawPayload?.selectedSlideBlockId === "" ? null : String(rawPayload.selectedSlideBlockId);
         ensureDeckIntegrity();
     };
+
     const updateSlidesPortalTitle = (slidesPortal = findSlidesPortal()) => {
         if (slidesPortal?.setTitle) slidesPortal.setTitle(activeSlideDeckFilePath ? getSlidesFileName(activeSlideDeckFilePath) : "Slides");
     };
+
     const saveSlidesDeckToPath = async (targetPath = "") => {
         const normalizedPath = normalizeSlidesFilePath(targetPath);
         if (!normalizedPath) {
@@ -791,6 +795,7 @@
         modular.success(`Saved ${normalizedPath} (${response.byteCount} bytes)`);
         return true;
     };
+
     const saveNewSlidesDeckToDocuments = () => {
         inputDialogue({title: "File name", placeholder: "slideshow.slds", value: "slideshow.slds", location_picker: true, confirmation: async (_, inputFileName, location) => {
                 if (!modular.validateFileName(inputFileName)) return;
@@ -799,6 +804,7 @@
             }
         });
     };
+
     const saveLoadedSlidesDeck = async () => {
         if (!activeSlideDeckFilePath) {
             saveNewSlidesDeckToDocuments();
@@ -806,6 +812,7 @@
         }
         await saveSlidesDeckToPath(activeSlideDeckFilePath);
     };
+
     const applySlidesPayload = (rawPath = "", payload = null) => {
         const slidePath = normalizeSlidesFilePath(rawPath);
         if (!slidePath) return false;
@@ -819,6 +826,7 @@
         updateSlidesPortalTitle(portal);
         return true;
     };
+
     const openSlideFilePath = async (rawPath = "", sourceNode = null) => {
         const slidePath = normalizeSlidesFilePath(rawPath);
         if (!slidePath) return false;
@@ -834,6 +842,7 @@
             return false;
         }
     };
+
     window.StandardSlides = window.StandardSlides || {};
     window.StandardSlides.openSlidePath = (rawPath = "", sourceNode = null) => openSlideFilePath(rawPath, sourceNode);
     window.StandardSlides.openSlidePayload = (rawPath = "", payload = null, sourceNode = null) => applySlidesPayload(rawPath, payload, sourceNode);
@@ -852,15 +861,18 @@
         updateSlidesPortalTitle();
         return true;
     };
+
     const snapSlideValue = (value = 0) => {
         const numericValue = Math.max(0, Number(value) || 0);
         return slideSnapToGrid ? Math.round(numericValue / SLIDE_GRID_SIZE) * SLIDE_GRID_SIZE : numericValue;
     };
+
     const captureSlideListRects = () => {
         const list = document.getElementById("editor-slide-list");
         if (!list) return new Map();
         return new Map(Array.from(list.querySelectorAll(".editor-slide-item")).map((item) => [Number(item.dataset.slideId), item.getBoundingClientRect()]));
     };
+
     const animateSlideListFromRects = (previousRects = new Map()) => {
         const list = document.getElementById("editor-slide-list");
         if (!list) return;
@@ -879,6 +891,7 @@
             });
         });
     };
+
     const saveSlidePortalState = (portal = findSlidesPortal()) => {
         if (!portal || typeof portal.setWindowState !== "function") return;
         portal.setWindowState({
@@ -894,6 +907,7 @@
         });
         updateSlidesPortalTitle(portal);
     };
+
     const restoreSlidePortalState = (portal = findSlidesPortal()) => {
         const state = portal?.windowState?.() || {};
         slideGridDefaultPending = slideForceViewDefaults || !Object.prototype.hasOwnProperty.call(state, "slideGridVisible");
@@ -916,6 +930,7 @@
         ensureDeckIntegrity();
         updateSlidesPortalTitle(portal);
     };
+
     const loadSlideAppSettings = async (portal = findSlidesPortal()) => {
         const settings = await window.StandardAppSettings?.values?.(SERVICE_ID) || {};
         slideDefaultBackground = normalizeDefaultSlideBackground(settings.default_background);
@@ -1225,7 +1240,7 @@
         list.contextmenu(() => {
             const items = [{
             label: "Rename",
-            icon: modular.icons.modify,
+            icon: window.Plastic.icons.modify,
             action: (_, __, target) => renameSlide(getSlideIdFromThumbnail(target))
         }, {
             label: "Add Slide",
@@ -1233,12 +1248,12 @@
             action: (_, __, target) => addBlankSlideAfter(getSlideIdFromThumbnail(target))
         }, {
             label: "Duplicate",
-            icon: SLIDE_DUPLICATE_ICON,
+            icon: window.Plastic.icons.duplicate,
             action: (_, __, target) => duplicateSlide(getSlideIdFromThumbnail(target))
             }];
             if (activeSlideDeck.length > 1) items.push("separator", {
                 label: "Delete",
-                icon: modular.icons.delete,
+                icon: window.Plastic.icons.delete,
                 destructive: true,
                 action: (_, __, target) => deleteSlide(getSlideIdFromThumbnail(target))
             });
@@ -1300,7 +1315,7 @@
             return text ? (text.length > 34 ? `${text.slice(0, 34)}\u2026` : text) : "Text";
         }
         if (block.type === "chart") return String(block.title || "Chart").trim() || "Chart";
-        if (block.type === "shape") return SLIDE_SHAPE_OPTIONS.find((option) => option.type === block.shapeType)?.label || "Shape";
+        if (block.type === "shape") return window.Plastic.shapeOptions.find((option) => option.type === block.shapeType)?.label || "Shape";
         if (block.type === "image") return "Image";
         return "Object";
     };
@@ -1443,12 +1458,12 @@
             navigation: false,
             tools: [{
                 title: "Delete",
-                icon: modular.icons.delete,
+                icon: window.Plastic.icons.delete,
                 destructive: true,
                 onclick: (_, context) => deleteSlideLayerFromDetails(ownerSlide.id, block.id, context?.portal || detailsPortal)
             }, {
                 title: "Save",
-                icon: modular.icons.save,
+                icon: window.Plastic.icons.save,
                 onclick: saveLayerDetails
             }],
             route: () => div({style: "large-padding-top editor-slide-layer-details editor-portal-shell", content: children([
@@ -1630,7 +1645,7 @@
         svgNode.classList.add("editor-slide-shape-content");
         svgNode.setAttribute("viewBox", "0 0 100 100");
         svgNode.setAttribute("preserveAspectRatio", "none");
-        svgNode.setAttribute("aria-label", SLIDE_SHAPE_OPTIONS.find((option) => option.type === block.shapeType)?.label || "Shape");
+        svgNode.setAttribute("aria-label", window.Plastic.shapeOptions.find((option) => option.type === block.shapeType)?.label || "Shape");
         let shapeNode;
         if (block.shapeType === "ellipse") {
             shapeNode = document.createElementNS(svgNamespace, "ellipse");
@@ -1932,7 +1947,7 @@
                             style: "editor-chart-type-segmented",
                             ariaLabel: "Chart type",
                             value: selectedType,
-                            options: SLIDE_CHART_TYPES
+                            options: window.Plastic.chartTypes
                         })
                     ])}),
                     div({id: "editor-slide-chart-data-panel", style: "editor-slide-chart-panel hidden", content: children([
@@ -2221,7 +2236,7 @@
         const insertionPoint = getSlideChartInsertionPoint();
         const block = normalizeSlideShapeBlock({
             id: String(slideBlockCounter),
-            name: SLIDE_SHAPE_OPTIONS.find((option) => option.type === shapeType)?.label || "Shape",
+            name: window.Plastic.shapeOptions.find((option) => option.type === shapeType)?.label || "Shape",
             type: "shape",
             shapeType,
             x: insertionPoint.x,
@@ -2301,27 +2316,27 @@
         }, true);
         canvas.contextmenu([{
             label: "Fill Color",
-            icon: modular.icons.brush,
+            icon: window.Plastic.icons.brush,
             visible: hasShapeContext,
             action: (_, __, target) => showSlideShapeStyleDialogue(target, "fill")
         }, {
             label: "Border Color",
-            icon: modular.icons.rectangle,
+            icon: window.Plastic.icons.rectangle,
             visible: hasShapeContext,
             action: (_, __, target) => showSlideShapeStyleDialogue(target, "stroke")
         }, {
             label: "Border Width",
-            icon: modular.icons.modify,
+            icon: window.Plastic.icons.modify,
             visible: hasShapeContext,
             action: (_, __, target) => showSlideShapeStyleDialogue(target, "strokeWidth")
         }, {
             label: "Opacity",
-            icon: modular.icons.ellipse,
+            icon: window.Plastic.icons.ellipse,
             visible: hasShapeContext,
             action: (_, __, target) => showSlideShapeStyleDialogue(target, "opacity")
         }, "separator", {
             label: "Delete Shape",
-            icon: modular.icons.delete,
+            icon: window.Plastic.icons.delete,
             destructive: true,
             visible: hasShapeContext,
             action: () => deleteSelectedSlideBlock()
@@ -2414,7 +2429,7 @@
         }
         if (addShapeButton && addShapeButton.dataset.bound !== "1") {
             addShapeButton.dataset.bound = "1";
-            addShapeButton.popoutmenu(SLIDE_SHAPE_OPTIONS.map((shape) => ({
+            addShapeButton.popoutmenu(window.Plastic.shapeOptions.map((shape) => ({
                 label: shape.label,
                 icon: shape.icon,
                 action: () => insertSlideShape(shape.type)
@@ -2457,7 +2472,7 @@
         }
         if (textColorButton && textColorButton.dataset.bound !== "1") {
             textColorButton.dataset.bound = "1";
-            textColorButton.popoutmenu(SLIDE_TEXT_COLORS.map((colorOption) => ({
+            textColorButton.popoutmenu(window.Plastic.text_colors.map((colorOption) => ({
                 label: colorOption.label,
                 icon: `<div class="inline round small-icon space-right" style="background:${colorOption.value || "transparent"};border:1px solid var(--border)"></div>`,
                 action: () => applySlideToolbarStyle((style) => ({...style, color: colorOption.value || ""}))
@@ -2465,7 +2480,7 @@
         }
         if (backgroundColorButton && backgroundColorButton.dataset.bound !== "1") {
             backgroundColorButton.dataset.bound = "1";
-            backgroundColorButton.popoutmenu(SLIDE_BACKGROUND_COLORS.map((colorOption) => ({
+            backgroundColorButton.popoutmenu(window.Plastic.fillColors.map((colorOption) => ({
                 label: colorOption.label,
                 icon: `<div class="inline round small-icon space-right" style="background:${colorOption.value || "transparent"};border:1px solid var(--border)"></div>`,
                 action: () => applySlideToolbarStyle((style) => ({...style, backgroundColor: colorOption.value || ""}))
@@ -2474,9 +2489,9 @@
         if (alignmentButton && alignmentButton.dataset.bound !== "1") {
             alignmentButton.dataset.bound = "1";
             alignmentButton.popoutmenu([
-                {label: "Align Left", icon: SLIDE_ALIGN_ICONS.left, action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "left"}))},
-                {label: "Align Center", icon: SLIDE_ALIGN_ICONS.center, action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "center"}))},
-                {label: "Align Right", icon: SLIDE_ALIGN_ICONS.right, action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "right"}))}
+                {label: "Align Left", icon: window.Plastic.icons.left, action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "left"}))},
+                {label: "Align Center", icon: window.Plastic.icons.center, action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "center"}))},
+                {label: "Align Right", icon: window.Plastic.icons.right, action: () => applySlideToolbarStyle((style) => ({...style, textAlign: "right"}))}
             ]);
         }
         const backgroundButton = document.getElementById("editor-slide-background-button");
@@ -2536,7 +2551,7 @@
                     onclick: () => showSlidePresentation()
                 }, {
                     title: "Save",
-                    icon: modular.icons.save,
+                    icon: window.Plastic.icons.save,
                     onclick: () => saveLoadedSlidesDeck()
                 }
             ],
@@ -2551,21 +2566,21 @@
                         ])}),
                         div({style: "editor-slide-workspace", content: children([
                             div({style: "editor-slide-toolbar secondary-bordered radius shadowed", content: children([
-                                button({id: "editor-slide-add", style: "editor-slide-add-button float-right", icon: modular.icons.create}),
-                                searchComboBox({id: "editor-slide-font-family", altsync: "FF", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: SLIDE_FONT_FAMILIES.map((fontName) => ({label: fontName, value: fontName}))}),
-                                searchComboBox({id: "editor-slide-font-size", altsync: "FS", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: SLIDE_FONT_SIZES.map((fontSize) => ({label: fontSize, value: fontSize}))}),
-                                button({id: "editor-slide-add-text", style: "naked align-bottom small-margin-right inner-radius", title: "Add Text", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 11.984375 2.9863281 A 1.0001 1.0001 0 0 0 11.841797 3 L 4.25 3 A 1.0001 1.0001 0 0 0 3.2578125 3.875 L 3.0078125 5.875 A 1.0001 1.0001 0 1 0 4.9921875 6.125 L 5.1328125 5 L 11 5 L 11 19 L 9 19 A 1.0001 1.0001 0 1 0 9 21 L 11.832031 21 A 1.0001 1.0001 0 0 0 12.158203 21 L 15 21 A 1.0001 1.0001 0 1 0 15 19 L 13 19 L 13 5 L 18.867188 5 L 19.007812 6.125 A 1.0001 1.0001 0 1 0 20.992188 5.875 L 20.742188 3.875 A 1.0001 1.0001 0 0 0 19.75 3 L 12.167969 3 A 1.0001 1.0001 0 0 0 11.984375 2.9863281 z"/></svg>`}),
-                                button({id: "editor-slide-add-image", style: "naked align-bottom small-margin-right inner-radius", title: "Add Image", icon: modular.icons.image}),
-                                button({id: "editor-slide-add-chart", style: "naked align-bottom small-margin-right inner-radius", title: "Add Chart", icon: modular.icons.chart}),
-                                button({id: "editor-slide-add-shape", style: "naked align-bottom small-margin-right inner-radius", title: "Insert Shape", icon: modular.icons.shapes}),
-                                button({id: "editor-slide-style-bold", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: modular.icons.bold}),
-                                button({id: "editor-slide-style-italic", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: modular.icons.italic}),
+                                button({id: "editor-slide-add", style: "editor-slide-add-button float-right", icon: window.Plastic.icons.create}),
+                                searchComboBox({id: "editor-slide-font-family", altsync: "FF", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-family-combo", value: "Inter", placeholder: "Font", options: window.Plastic.fontFamilies.map((fontName) => ({label: fontName, value: fontName}))}),
+                                searchComboBox({id: "editor-slide-font-size", altsync: "FS", wrapperStyle: "search-combobox-wrapper searchbox-wrapper small-margin-right", style: "inner-radius editor-font-size-combo", value: "12", placeholder: "Size", allow_custom: true, options: window.Plastic.fontSizes.map((fontSize) => ({label: fontSize, value: fontSize}))}),
+                                button({id: "editor-slide-style-bold", style: "naked align-bottom small-margin-right inner-radius", title: "Bold", icon: window.Plastic.icons.bold}),
+                                button({id: "editor-slide-style-italic", style: "naked align-bottom small-margin-right inner-radius", title: "Italicize", icon: window.Plastic.icons.italic}),
                                 button({id: "editor-slide-style-color", style: "naked align-bottom small-margin-right inner-radius", title: "Foreground", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 12.017578 2 A 0.750075 0.750075 0 0 0 11.294922 2.4941406 L 6.0507812 16.996094 A 0.75065194 0.75065194 0 1 0 7.4628906 17.505859 L 8.3691406 14.998047 L 15.638672 14.998047 L 16.546875 17.505859 A 0.750075 0.750075 0 1 0 17.957031 16.996094 L 12.705078 2.4941406 A 0.750075 0.750075 0 0 0 12.017578 2 z M 12 4.9550781 L 15.095703 13.498047 L 8.9121094 13.498047 L 12 4.9550781 z M 5.7480469 20.003906 A 0.750075 0.750075 0 1 0 5.7480469 21.503906 L 18.251953 21.503906 A 0.750075 0.750075 0 1 0 18.251953 20.003906 L 5.7480469 20.003906 z"/></svg>`}),
+                                button({id: "editor-slide-add-text", style: "naked align-bottom small-margin-right inner-radius", title: "Add Text", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 11.984375 2.9863281 A 1.0001 1.0001 0 0 0 11.841797 3 L 4.25 3 A 1.0001 1.0001 0 0 0 3.2578125 3.875 L 3.0078125 5.875 A 1.0001 1.0001 0 1 0 4.9921875 6.125 L 5.1328125 5 L 11 5 L 11 19 L 9 19 A 1.0001 1.0001 0 1 0 9 21 L 11.832031 21 A 1.0001 1.0001 0 0 0 12.158203 21 L 15 21 A 1.0001 1.0001 0 1 0 15 19 L 13 19 L 13 5 L 18.867188 5 L 19.007812 6.125 A 1.0001 1.0001 0 1 0 20.992188 5.875 L 20.742188 3.875 A 1.0001 1.0001 0 0 0 19.75 3 L 12.167969 3 A 1.0001 1.0001 0 0 0 11.984375 2.9863281 z"/></svg>`}),
+                                button({id: "editor-slide-add-image", style: "naked align-bottom small-margin-right inner-radius", title: "Add Image", icon: window.Plastic.icons.image}),
+                                button({id: "editor-slide-add-chart", style: "naked align-bottom small-margin-right inner-radius", title: "Add Chart", icon: window.Plastic.icons.chart}),
+                                button({id: "editor-slide-add-shape", style: "naked align-bottom small-margin-right inner-radius", title: "Insert Shape", icon: window.Plastic.icons.shapes}),
                                 button({id: "editor-slide-style-background", style: "naked align-bottom small-margin-right inner-radius", title: "Fill", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" viewBox="0 0 24 24"><path d="M 9.0996094 -0.00390625 A 0.750075 0.750075 0 0 0 8.578125 1.2832031 L 9.9414062 2.6484375 L 3.0214844 9.5722656 C 1.6862427 10.90878 1.6862427 13.097079 3.0214844 14.433594 L 9.5683594 20.984375 C 10.904906 22.320922 13.094894 22.322395 14.431641 20.984375 L 21.880859 13.53125 A 0.750075 0.750075 0 0 0 21.880859 12.472656 L 9.6386719 0.22265625 A 0.750075 0.750075 0 0 0 9.0996094 -0.00390625 z M 11.001953 3.7089844 L 20.289062 13.001953 L 13.371094 19.923828 C 12.60784 20.687809 11.39236 20.687282 10.628906 19.923828 L 4.0820312 13.373047 C 3.319273 12.609561 3.319273 11.396299 4.0820312 10.632812 L 11.001953 3.7089844 z M 8 13.25 A 0.75 0.75 0 0 0 8 14.75 A 0.75 0.75 0 0 0 8 13.25 z M 12 13.25 A 0.75 0.75 0 0 0 12 14.75 A 0.75 0.75 0 0 0 12 13.25 z M 16 13.25 A 0.75 0.75 0 0 0 16 14.75 A 0.75 0.75 0 0 0 16 13.25 z M 10 15.25 A 0.75 0.75 0 0 0 10 16.75 A 0.75 0.75 0 0 0 10 15.25 z M 14 15.25 A 0.75 0.75 0 0 0 14 16.75 A 0.75 0.75 0 0 0 14 15.25 z M 22 17 C 21.596 17 21.232875 17.301656 20.796875 17.972656 C 20.360875 18.643656 20 19.282 20 20 C 20 21.105 20.895 22 22 22 C 23.105 22 24 21.105 24 20 C 24 19.282 23.639125 18.643656 23.203125 17.972656 C 22.767125 17.301656 22.404 17 22 17 z M 12 17.25 A 0.75 0.75 0 0 0 12 18.75 A 0.75 0.75 0 0 0 12 17.25 z"/></svg>`}),
-                                button({id: "editor-slide-style-align", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: SLIDE_ALIGN_ICONS.left}),
+                                button({id: "editor-slide-style-align", style: "naked align-bottom small-margin-right inner-radius", title: "Alignment", icon: window.Plastic.icons.left}),
                                 button({id: "editor-slide-background-button", style: "naked align-bottom small-margin-right inner-radius", title: "Slide background", icon: `<svg xmlns="http://www.w3.org/2000/svg" class="small-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42"/></svg>`}),
-                                button({id: "editor-slide-layers-button", style: "naked align-bottom small-margin-right inner-radius", title: "Layers", icon: SLIDE_LAYERS_ICON}),
-                                button({id: "editor-slide-more-options", style: "naked align-bottom inner-radius", title: "Other", icon: modular.icons.ellipses})
+                                button({id: "editor-slide-layers-button", style: "naked align-bottom small-margin-right inner-radius", title: "Layers", icon: window.Plastic.icons.layers}),
+                                button({id: "editor-slide-more-options", style: "naked align-bottom inner-radius", title: "Other", icon: window.Plastic.icons.ellipses})
                             ])}),
                             div({id: "editor-slide-canvas", style: "editor-slide-canvas secondary-bordered shadowed radius"})
                         ])}),
