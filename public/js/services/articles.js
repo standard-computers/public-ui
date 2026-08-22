@@ -417,6 +417,22 @@
         });
     };
 
+    const bindArticleSearchShortcut = () => {
+        if (window.__standardArticlesSearchShortcutBound) return;
+        window.__standardArticlesSearchShortcutBound = true;
+        document.addEventListener("keydown", event => {
+            if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+            const activeElement = document.activeElement;
+            if (activeElement?.isContentEditable || activeElement?.matches?.("input, textarea, select")) return;
+            const focusedWindow = typeof getFocusedPortalWindow === "function" ? getFocusedPortalWindow() : null;
+            if (focusedWindow?.portal?.serviceId?.() !== "com.standard.articles") return;
+            const searchInput = focusedWindow.querySelector("#articles-search-input");
+            if (!searchInput) return;
+            event.preventDefault();
+            searchInput.focus();
+        });
+    };
+
     const openManualCreateArticle = () => {
         pendingCreateArticleDraft = null;
         modular.show("com.standard.articles", 1);
@@ -503,6 +519,7 @@
     };
 
     bindArticleLinkShortcut();
+    bindArticleSearchShortcut();
 
     modular.register(new Service("com.standard.articles", [
         new Portal({

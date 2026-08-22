@@ -1169,11 +1169,12 @@ function getAppliedThemeBackgroundImageUrl() {
     }
     return "";
 }
-async function applyThemeData(d) {
+async function applyThemeData(d, {preserveBackground = false} = {}) {
     if (!d) return false;
     window.StandardUI = window.StandardUI || {};
     const defaultTheme = window.StandardUI.defaultTheme || defaultThemeData;
     d = {...defaultTheme, ...d};
+    const previousBackgroundSetting = window.StandardUI.currentTheme?.background_image;
     window.StandardUI.currentTheme = d;
     document.documentElement.style.setProperty("--fs", `${d.font_size}px`);
     document.documentElement.style.setProperty("--interface-shortcut-icon-size", `${d.shortcut_icon_size}px`);
@@ -1192,8 +1193,13 @@ async function applyThemeData(d) {
     document.documentElement.style.setProperty("--small-shadow", shadowsEnabled ? "0 4px 12px rgba(5, 5, 5, 0.08)" : "none");
     document.documentElement.style.setProperty("--shadow", shadowsEnabled ? "0 8px 32px rgba(0, 0, 0, 0.1)" : "none");
     document.documentElement.style.setProperty("--darker-shadow", shadowsEnabled ? "4px 4px 10px rgba(0, 0, 0, 0.3)" : "none");
-    const backgroundSource = await resolveThemeBackgroundSource(d.background_image);
-    applyResolvedThemeBackground(backgroundSource);
+    const canPreserveBackground = preserveBackground
+        && previousBackgroundSetting === d.background_image
+        && Boolean(window.StandardUI.currentBackgroundImageSource || getAppliedThemeBackgroundImageUrl());
+    if (!canPreserveBackground) {
+        const backgroundSource = await resolveThemeBackgroundSource(d.background_image);
+        applyResolvedThemeBackground(backgroundSource);
+    }
     document.body.dataset.useSvgIcons = d.use_svg_icons === false ? "false" : "true";
     window.StandardUI.setUseCursor?.(d.use_cursor !== false);
     window.StandardUI.setGridBackground?.(d.grid_background === true);
@@ -1422,29 +1428,29 @@ window.StandardUI.setDisableBar = (() => {
     };
 })();
 applyThemeData({...window.StandardUI.defaultTheme});
-async function loadAndApplyTheme({attempt = 0, maxAttempts = 2, retryDelayMs = 250} = {}) {
+async function loadAndApplyTheme({attempt = 0, maxAttempts = 2, retryDelayMs = 250, preserveBackground = false} = {}) {
     try {
         const cookieTheme = getThemeFromUserCookie();
         const data = (cookieTheme && typeof cookieTheme === "object")
             ? cookieTheme
             : (typeof modular?.user?.theme === "function" ? await modular.user.theme() : null);
         if (data && typeof data === "object") {
-            if (await applyThemeData(data)) return true;
+            if (await applyThemeData(data, {preserveBackground})) return true;
         }
     } catch (_) {
     }
-    if (await applyThemeData({...window.StandardUI.defaultTheme})) return true;
+    if (await applyThemeData({...window.StandardUI.defaultTheme}, {preserveBackground})) return true;
     if (attempt >= maxAttempts) return false;
     const delay = Math.min(retryDelayMs * Math.max(1, attempt + 1), 1000);
     await new Promise(resolve => setTimeout(resolve, delay));
-    return loadAndApplyTheme({attempt: attempt + 1, maxAttempts, retryDelayMs});
+    return loadAndApplyTheme({attempt: attempt + 1, maxAttempts, retryDelayMs, preserveBackground});
 }
 window.StandardUI.prefersSvgIcons = () => window.StandardUI?.currentTheme?.use_svg_icons !== false;
 window.StandardUI.applyResolvedBackgroundImage = applyResolvedThemeBackground;
 window.StandardUI.getAppliedBackgroundImageUrl = getAppliedThemeBackgroundImageUrl;
-window.StandardUI.refreshTheme = ({maxAttempts = 2, retryDelayMs = 250, force = false} = {}) => {
+window.StandardUI.refreshTheme = ({maxAttempts = 2, retryDelayMs = 250, force = false, preserveBackground = false} = {}) => {
     if (themeRefreshInFlight && !force) return themeRefreshInFlight;
-    themeRefreshInFlight = loadAndApplyTheme({attempt: 0, maxAttempts, retryDelayMs})
+    themeRefreshInFlight = loadAndApplyTheme({attempt: 0, maxAttempts, retryDelayMs, preserveBackground})
         .finally(() => {
             themeRefreshInFlight = null;
         });
@@ -1453,5 +1459,5 @@ window.StandardUI.refreshTheme = ({maxAttempts = 2, retryDelayMs = 250, force = 
 window.StandardUI.refreshTheme();
 window.StandardUI.altSync.init();
 window.addEventListener("focus", () => {
-    window.StandardUI.refreshTheme({maxAttempts: 0});
+    window.StandardUI.refreshTheme({maxAttempts: 0, preserveBackground: true});
 });
